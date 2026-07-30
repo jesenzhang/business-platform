@@ -1,7 +1,15 @@
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 use thiserror::Error;
+
+/// Protocol-agnostic error category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCategory {
+    /// 4xx-class: validation, not found, forbidden, unauthorized, conflict, rate limit.
+    Client,
+    /// External service failure.
+    Upstream,
+    /// Server-side bug.
+    Internal,
+}
 
 /// 统一应用错误类型
 #[derive(Debug, Error)]
@@ -46,37 +54,24 @@ pub enum AppError {
 /// 应用结果类型别名
 pub type AppResult<T> = Result<T, AppError>;
 
-/// API 错误响应体
-#[derive(Debug, Serialize)]
-pub struct ErrorBody {
-    /// 错误码，用于客户端程序化处理
-    pub code: String,
-    /// 人类可读的错误消息
-    pub message: String,
-    /// 请求追踪 ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub trace_id: Option<String>,
-    /// 详细错误信息（仅开发环境返回）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<serde_json::Value>,
-}
-
 impl AppError {
-    /// 返回对应的 HTTP 状态码
-    pub fn status_code(&self) -> StatusCode {
+    /// Returns the protocol-agnostic error category.
+    #[must_use]
+    pub fn category(&self) -> ErrorCategory {
         match self {
-            AppError::Validation(_) => StatusCode::BAD_REQUEST,
-            AppError::NotFound { .. } => StatusCode::NOT_FOUND,
-            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
-            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
-            AppError::Conflict(_) => StatusCode::CONFLICT,
-            AppError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
-            AppError::ExternalService { .. } => StatusCode::BAD_GATEWAY,
-            AppError::Internal(_) | AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Validation(_)
+            | AppError::NotFound { .. }
+            | AppError::Forbidden(_)
+            | AppError::Unauthorized(_)
+            | AppError::Conflict(_)
+            | AppError::RateLimited => ErrorCategory::Client,
+            AppError::ExternalService { .. } => ErrorCategory::Upstream,
+            AppError::Internal(_) | AppError::Database(_) => ErrorCategory::Internal,
         }
     }
 
     /// 返回错误码字符串
+    #[must_use]
     pub fn error_code(&self) -> &'static str {
         match self {
             AppError::Validation(_) => "VALIDATION_ERROR",
@@ -88,43 +83,6 @@ impl AppError {
             AppError::ExternalService { .. } => "EXTERNAL_SERVICE_ERROR",
             AppError::Internal(_) => "INTERNAL_ERROR",
             AppError::Database(_) => "DATABASE_ERROR",
-        }
-    }
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let status = self.status_code();
-        let is_internal = matches!(self, AppError::Internal(_) | AppError::Database(_));
-
-        // 内部错误记录日志，不向客户端暴露细节
-        if is_internal {
-            tracing::error!(error = %self, "Internal error occurred");
-        }
-
-        let body = ErrorBody {
-            code: self.error_code().to_string(),
-            message: if is_internal {
-                "Internal server error".to_string()
-            } else {
-                self.to_string()
-            },
-            trace_id: None,
-            details: None,
-        };
-
-        (status, axum::Json(body)).into_response()
-    }
-}
-
-impl From<sqlx::Error> for AppError {
-    fn from(err: sqlx::Error) -> Self {
-        match err {
-            sqlx::Error::RowNotFound => AppError::NotFound {
-                resource: "record".to_string(),
-                id: "unknown".to_string(),
-            },
-            _ => AppError::Database(err.to_string()),
         }
     }
 }

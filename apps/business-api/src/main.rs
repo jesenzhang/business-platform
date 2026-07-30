@@ -1,6 +1,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+#[allow(dead_code)]
+mod api_error;
+#[allow(dead_code)]
+mod api_response;
 mod routes;
 mod state;
 
