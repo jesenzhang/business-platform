@@ -1,0 +1,39 @@
+# Rust build artifacts
+/target/
+**/target/
+
+# Generated documentation
+/doc/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cargo lock for libraries (keep for workspace)
+# Cargo.lock
+
+# Test coverage
+*.profraw
+*.profdata
+tarpaulin-report.html
+coverage/
+
+# Benchmark results
+criterion/
+
+# Flamegraph profiling
+perf.data
+perf.data.old
+flamegraph.svg

@@ -1,0 +1,5 @@
+[observability]
+log_level = "debug"
+
+[messaging]
+enabled = false

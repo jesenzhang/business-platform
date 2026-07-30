@@ -1,0 +1,13 @@
+[server]
+request_timeout_secs = 60
+
+[database]
+max_connections = 50
+min_connections = 5
+
+[messaging]
+enabled = true
+
+[observability]
+log_level = "info"
+# otlp_endpoint = "http://otel-collector:4317"

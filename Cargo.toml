@@ -1,0 +1,93 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/business-api",
+    "apps/business-worker",
+    "apps/ai-worker",
+    "apps/agent-adapter",
+    "apps/migration",
+    "crates/shared-kernel",
+    "crates/identity",
+    "crates/organization",
+    "crates/customer",
+    "crates/contract",
+    "crates/project",
+    "crates/approval",
+    "crates/finance",
+    "crates/document",
+    "crates/notification",
+    "crates/audit",
+    "crates/workflow",
+    "crates/ai-application",
+    "crates/agent-integration",
+    "crates/policy",
+    "crates/object-storage",
+    "crates/messaging",
+    "crates/observability",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+authors = ["Enterprise Platform Team"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "timeout", "compression-gzip"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "migrate"] }
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
+
+# TLS
+rustls = "0.23"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.28"
+opentelemetry = { version = "0.27", features = ["trace"] }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+async-trait = "0.1"
+config = "0.14"
+validator = { version = "0.19", features = ["derive"] }
+
+# Internal crates
+shared-kernel = { path = "crates/shared-kernel" }
+observability = { path = "crates/observability" }
+object-storage = { path = "crates/object-storage" }
+messaging = { path = "crates/messaging" }
+policy = { path = "crates/policy" }
+identity = { path = "crates/identity" }
+organization = { path = "crates/organization" }
+customer = { path = "crates/customer" }
+contract = { path = "crates/contract" }
+project = { path = "crates/project" }
+approval = { path = "crates/approval" }
+finance = { path = "crates/finance" }
+document = { path = "crates/document" }
+notification = { path = "crates/notification" }
+audit = { path = "crates/audit" }
+workflow = { path = "crates/workflow" }
+ai-application = { path = "crates/ai-application" }
+agent-integration = { path = "crates/agent-integration" }

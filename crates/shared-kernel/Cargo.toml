@@ -1,0 +1,18 @@
+[package]
+name = "shared-kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+config = { workspace = true }
+tracing = { workspace = true }
+validator = { workspace = true }
+async-trait = { workspace = true }
+sqlx = { workspace = true }
