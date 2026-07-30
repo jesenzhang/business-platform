@@ -21,7 +21,7 @@
 |---|---|---|---|
 | 总体架构 | [`../企业AI业务平台与智能助手总体架构方案_v2.md`](../企业AI业务平台与智能助手总体架构方案_v2.md) | Baseline | 产品、系统主体、Agent 与总体部署边界 |
 | 完整服务端架构清单 | [`architecture/BACKEND_ARCHITECTURE_MANIFEST.md`](architecture/BACKEND_ARCHITECTURE_MANIFEST.md) | Baseline | 定义完整架构文档集、权威关系和任务准入 |
-| 服务端总体架构 | [`architecture/SERVER_BACKEND_ARCHITECTURE.md`](architecture/SERVER_BACKEND_ARCHITECTURE.md) | Baseline | 战略 DDD、模块化单体、分层和端口适配 |
+| 服务端总体架构 | [`architecture/SERVER_BACKEND_ARCHITECTURE.md`](architecture/SERVER_BACKEND_ARCHITECTURE.md) | Baseline | 战略 DDD、模块化单体、分层、数据所有权和质量属性 |
 | Bounded Context Map | [`architecture/BOUNDED_CONTEXT_MAP.md`](architecture/BOUNDED_CONTEXT_MAP.md) | Baseline | 业务能力、上下文职责与协作关系 |
 | 数据与一致性 | [`architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`](architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md) | Baseline | 数据所有权、事务、事件、幂等和补偿 |
 | 长时任务 | [`architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md`](architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md) | Baseline | 业务状态、流程协调和可靠执行边界 |
@@ -47,7 +47,7 @@
 
 ## 4. 已接受架构决策
 
-- [`adr/ADR-0003-domain-driven-layered-backend.md`](adr/ADR-0003-domain-driven-layered-backend.md)：服务端采用战略 DDD、模块化单体、领域/应用/适配器分层和依赖倒置。
+- [`adr/ADR-0003-domain-driven-layered-backend.md`](adr/ADR-0003-domain-driven-layered-backend.md)：服务端采用战略 DDD、模块化单体、领域/应用/适配器分层、数据所有权、质量属性与自动架构门禁。
 
 `ADR-0001` 和 `ADR-0002` 已由正在实施的 PLAN-0001 预留给对象存储 SDK 和可靠 Outbox 决策。
 
@@ -100,9 +100,25 @@ docs/
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 
-PLAN-0001 正在实施。其实现分支在合并前必须同步完整服务端架构 Baseline，并提供架构门禁证据。
+PLAN-0001 正在实施。PR #2 合并后，其实现分支必须同步 `origin/main`，补充架构符合性说明并重新运行相应门禁。
 
-## 9. 后续仍需落地的运行文档
+## 9. 合并后的后续任务规则
+
+所有新计划和实施指令必须明确引用：
+
+```text
+docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md
+docs/architecture/BOUNDED_CONTEXT_MAP.md
+docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md
+docs/architecture/QUALITY_ATTRIBUTE_SCENARIOS.md
+docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md
+```
+
+涉及安全、长时任务、部署、可观测性或迁移时，同时引用对应专题 Baseline。
+
+功能测试通过但架构门禁失败，任务不得声明完成。
+
+## 10. 后续运行文档
 
 架构设计已经形成，后续按实施阶段补充具体 Runbook：
 
@@ -116,6 +132,6 @@ PLAN-0001 正在实施。其实现分支在合并前必须同步完整服务端�
 
 Runbook 是架构的操作实现，不得修改 Baseline 语义。
 
-## 10. 模板
+## 11. 模板
 
 - [`templates/ADR_TEMPLATE.md`](templates/ADR_TEMPLATE.md)
