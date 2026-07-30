@@ -1,3 +1,5 @@
+env = "production"
+
 [server]
 request_timeout_secs = 60
 
