@@ -32,6 +32,16 @@ pub struct ServerConfig {
     pub port: u16,
     #[serde(default = "default_request_timeout_secs")]
     pub request_timeout_secs: u64,
+    /// Allowed CORS origins.
+    ///
+    /// - empty: reject all cross-origin requests (restrictive default)
+    /// - `["*"]`: allow any origin (development only)
+    /// - otherwise: allow exactly the listed origins
+    #[serde(default)]
+    pub cors_origins: Vec<String>,
+    /// Maximum request body size in bytes. Defaults to 10 MiB.
+    #[serde(default = "default_body_limit_bytes")]
+    pub body_limit_bytes: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,6 +120,12 @@ pub struct AuthConfig {
     /// JWT 密钥（开发环境用，生产环境应使用 OIDC）
     #[serde(default)]
     pub dev_secret: Option<Secret<String>>,
+    /// 启用开发模式静态令牌认证。
+    ///
+    /// 默认 `false`（fail-closed）。仅开发环境可开启；生产环境必须保持关闭，
+    /// 由 OIDC/JWT 校验承担认证职责。
+    #[serde(default)]
+    pub dev_auth_enabled: bool,
 }
 
 /// Configuration validation errors collected during `AppConfig::validate`.
@@ -206,6 +222,11 @@ impl AppConfig {
                 messages
                     .push("auth.dev_secret must be None in production (fail-closed)".to_string());
             }
+            if self.auth.dev_auth_enabled {
+                messages.push(
+                    "auth.dev_auth_enabled must be false in production (fail-closed)".to_string(),
+                );
+            }
             if self.auth.issuer_url.is_empty() {
                 messages.push("auth.issuer_url must not be empty in production".to_string());
             }
@@ -229,6 +250,10 @@ fn default_port() -> u16 {
 
 fn default_request_timeout_secs() -> u64 {
     30
+}
+
+fn default_body_limit_bytes() -> usize {
+    10 * 1024 * 1024
 }
 
 fn default_max_connections() -> u32 {
@@ -287,6 +312,8 @@ mod tests {
                 host: "0.0.0.0".to_string(),
                 port: 3000,
                 request_timeout_secs: 30,
+                cors_origins: Vec::new(),
+                body_limit_bytes: 10 * 1024 * 1024,
             },
             database: DatabaseConfig {
                 url: "postgres://user:pass@localhost:5432/db".to_string(),
@@ -314,6 +341,7 @@ mod tests {
                 issuer_url: "http://localhost:8080/realms/test".to_string(),
                 audience: None,
                 dev_secret: Some(Secret::new("dev-only".to_string())),
+                dev_auth_enabled: true,
             },
         }
     }
@@ -385,8 +413,19 @@ mod tests {
         let mut config = valid_config();
         config.env = AppEnv::Production;
         config.auth.dev_secret = Some(Secret::new("should-not-exist".to_string()));
+        config.auth.dev_auth_enabled = false;
         let err = config.validate().unwrap_err();
         assert!(err.messages.iter().any(|m| m.contains("dev_secret")));
+    }
+
+    #[test]
+    fn production_with_dev_auth_enabled_fails() {
+        let mut config = valid_config();
+        config.env = AppEnv::Production;
+        config.auth.dev_secret = None;
+        config.auth.dev_auth_enabled = true;
+        let err = config.validate().unwrap_err();
+        assert!(err.messages.iter().any(|m| m.contains("dev_auth_enabled")));
     }
 
     #[test]
@@ -394,6 +433,7 @@ mod tests {
         let mut config = valid_config();
         config.env = AppEnv::Production;
         config.auth.dev_secret = None;
+        config.auth.dev_auth_enabled = false;
         config.auth.issuer_url = String::new();
         let err = config.validate().unwrap_err();
         assert!(err.messages.iter().any(|m| m.contains("issuer_url")));
@@ -404,6 +444,7 @@ mod tests {
         let mut config = valid_config();
         config.env = AppEnv::Production;
         config.auth.dev_secret = None;
+        config.auth.dev_auth_enabled = false;
         config.auth.issuer_url = "https://auth.example.com/realms/prod".to_string();
         assert!(config.validate().is_ok());
     }

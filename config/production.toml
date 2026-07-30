@@ -2,6 +2,12 @@ env = "production"
 
 [server]
 request_timeout_secs = 60
+# Restrictive default: no cross-origin access. Add explicit origins if needed.
+cors_origins = []
+
+[auth]
+# Fail-closed: static dev token auth must never be enabled in production.
+dev_auth_enabled = false
 
 [database]
 max_connections = 50
