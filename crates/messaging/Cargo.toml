@@ -15,5 +15,8 @@ tracing = { workspace = true }
 sqlx = { workspace = true }
 shared-kernel = { workspace = true }
 
+[dev-dependencies]
+tokio = { workspace = true }
+
 [lints]
 workspace = true

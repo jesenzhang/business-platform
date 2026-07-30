@@ -27,7 +27,7 @@ ADR-0003-domain-driven-layered-backend.md
 | 编号 | 标题 | 状态 | 说明 |
 |---|---|---|---|
 | [`ADR-0001`](ADR-0001-s3-sdk-selection.md) | S3 SDK 选型 | Accepted | PLAN-0001 对 S3 SDK 适配器的选型决策 |
-| ADR-0002 | Outbox Claim 与重试 | Reserved / PLAN-0001 | PLAN-0001 预留，合并前补齐文件和登记 |
+| [`ADR-0002`](ADR-0002-outbox-claim-retry.md) | Outbox Claim 与重试 | Accepted | Outbox claim/lease/retry 设计 |
 | [`ADR-0003`](ADR-0003-domain-driven-layered-backend.md) | 服务端采用领域驱动的分层架构 | Accepted | 战略 DDD、数据所有权、显式一致性、端口适配、质量属性与自动架构门禁 |
 
 ## 4. ADR-0003 的完整 Baseline
