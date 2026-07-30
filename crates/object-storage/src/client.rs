@@ -1,210 +1,253 @@
-use async_trait::async_trait;
+//! Object storage client trait and implementations.
+
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use async_trait::async_trait;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::presigning::PresigningConfig;
+use bytes::Bytes;
 use tracing::{debug, instrument};
 
 use crate::error::StorageError;
+use crate::key::ObjectKey;
 
-/// 对象存储客户端 trait
+/// Object storage operations.
+///
+/// All keys are validated [`ObjectKey`] values, preventing path traversal
+/// and other injection attacks at the type level.
 #[async_trait]
 pub trait ObjectStorageClient: Send + Sync {
-    /// 上传对象
+    /// Upload an object with content type.
     async fn put_object(
         &self,
-        key: &str,
-        data: Vec<u8>,
+        key: &ObjectKey,
+        data: Bytes,
         content_type: &str,
     ) -> Result<(), StorageError>;
-    /// 获取对象
-    async fn get_object(&self, key: &str) -> Result<Vec<u8>, StorageError>;
-    /// 删除对象
-    async fn delete_object(&self, key: &str) -> Result<(), StorageError>;
-    /// 生成预签名 URL
-    async fn presigned_url(&self, key: &str, expires_secs: u64) -> Result<String, StorageError>;
-    /// 检查对象是否存在
-    async fn object_exists(&self, key: &str) -> Result<bool, StorageError>;
+
+    /// Download an object.
+    async fn get_object(&self, key: &ObjectKey) -> Result<Bytes, StorageError>;
+
+    /// Delete an object. Idempotent: deleting a non-existent object succeeds.
+    async fn delete_object(&self, key: &ObjectKey) -> Result<(), StorageError>;
+
+    /// Check if an object exists.
+    async fn object_exists(&self, key: &ObjectKey) -> Result<bool, StorageError>;
+
+    /// Generate a presigned URL for temporary access.
+    async fn presigned_url(
+        &self,
+        key: &ObjectKey,
+        expires_secs: u64,
+    ) -> Result<String, StorageError>;
 }
 
-/// S3 兼容存储客户端配置
-#[derive(Debug, Clone)]
-pub struct S3Config {
-    pub endpoint: String,
-    pub access_key: String,
-    pub secret_key: String,
-    pub bucket: String,
-    pub region: String,
+/// Check whether an AWS SDK error represents a 404 Not Found response.
+fn is_not_found<E: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static>(
+    err: &SdkError<E>,
+) -> bool {
+    match err {
+        SdkError::ServiceError(ctx) => ctx.raw().status().as_u16() == 404,
+        _ => false,
+    }
 }
 
-/// S3 兼容存储客户端（MinIO / AWS S3）
+/// S3-compatible storage client backed by the official AWS SDK.
+///
+/// Uses path-style addressing for `MinIO` compatibility.
 #[derive(Debug)]
 pub struct S3Client {
-    config: S3Config,
-    http: reqwest::Client,
+    client: aws_sdk_s3::Client,
+    bucket: String,
 }
 
 impl S3Client {
-    /// 创建 S3 客户端
-    pub fn new(config: S3Config) -> Result<Self, StorageError> {
-        if config.endpoint.is_empty() {
-            return Err(StorageError::Config("endpoint cannot be empty".to_string()));
+    /// Create a new S3 client from explicit credentials and endpoint.
+    ///
+    /// Uses path-style addressing (`force_path_style`) so that the client
+    /// works with `MinIO` and other S3-compatible stores out of the box.
+    #[must_use]
+    pub fn new(
+        endpoint: &str,
+        access_key: &str,
+        secret_key: &str,
+        bucket: &str,
+        region: &str,
+    ) -> Self {
+        use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
+
+        let creds = Credentials::new(access_key, secret_key, None, None, "static");
+
+        let config = aws_sdk_s3::Config::builder()
+            .behavior_version(BehaviorVersion::latest())
+            .endpoint_url(endpoint)
+            .region(Region::new(region.to_string()))
+            .credentials_provider(creds)
+            .force_path_style(true)
+            .build();
+
+        let client = aws_sdk_s3::Client::from_conf(config);
+
+        Self {
+            client,
+            bucket: bucket.to_string(),
         }
-        if config.bucket.is_empty() {
-            return Err(StorageError::Config("bucket cannot be empty".to_string()));
-        }
-
-        let http = reqwest::Client::builder()
-            .build()
-            .map_err(|e| StorageError::Connection(format!("Failed to create HTTP client: {e}")))?;
-
-        Ok(Self { config, http })
-    }
-
-    /// 构建对象 URL
-    fn object_url(&self, key: &str) -> String {
-        format!("{}/{}/{}", self.config.endpoint, self.config.bucket, key)
     }
 }
 
 #[async_trait]
 impl ObjectStorageClient for S3Client {
-    #[instrument(skip(self, data), fields(bucket = %self.config.bucket))]
+    #[instrument(skip(self, data), fields(bucket = %self.bucket))]
     async fn put_object(
         &self,
-        key: &str,
-        data: Vec<u8>,
+        key: &ObjectKey,
+        data: Bytes,
         content_type: &str,
     ) -> Result<(), StorageError> {
-        let url = self.object_url(key);
-        debug!(key, size = data.len(), "Uploading object to S3");
+        debug!(key = %key, size = data.len(), "Uploading object to S3");
 
-        // TODO: 实现 AWS Signature V4 签名
-        let response = self
-            .http
-            .put(&url)
-            .header("Content-Type", content_type)
-            .header("x-amz-content-sha256", "UNSIGNED-PAYLOAD")
-            .body(data)
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .body(data.into())
+            .content_type(content_type)
             .send()
             .await
-            .map_err(|e| StorageError::Connection(format!("PUT {url} failed: {e}")))?;
+            .map_err(|e| StorageError::S3(format!("put_object failed: {e}")))?;
 
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(StorageError::Connection(format!(
-                "PUT {url} returned {status}: {body}"
-            )))
+        Ok(())
+    }
+
+    #[instrument(skip(self), fields(bucket = %self.bucket))]
+    async fn get_object(&self, key: &ObjectKey) -> Result<Bytes, StorageError> {
+        debug!(key = %key, "Downloading object from S3");
+
+        let resp = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+            .map_err(|e| {
+                if is_not_found(&e) {
+                    StorageError::NotFound(key.to_string())
+                } else {
+                    StorageError::S3(format!("get_object failed: {e}"))
+                }
+            })?;
+
+        let bytes = resp
+            .body
+            .collect()
+            .await
+            .map_err(|e| StorageError::Io(format!("failed to read response body: {e}")))?
+            .into_bytes();
+
+        Ok(bytes)
+    }
+
+    #[instrument(skip(self), fields(bucket = %self.bucket))]
+    async fn delete_object(&self, key: &ObjectKey) -> Result<(), StorageError> {
+        debug!(key = %key, "Deleting object from S3");
+
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+            .map_err(|e| StorageError::S3(format!("delete_object failed: {e}")))?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self), fields(bucket = %self.bucket))]
+    async fn object_exists(&self, key: &ObjectKey) -> Result<bool, StorageError> {
+        debug!(key = %key, "Checking object existence");
+
+        match self
+            .client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .send()
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(e) if is_not_found(&e) => Ok(false),
+            Err(e) => Err(StorageError::S3(format!("head_object failed: {e}"))),
         }
     }
 
-    #[instrument(skip(self), fields(bucket = %self.config.bucket))]
-    async fn get_object(&self, key: &str) -> Result<Vec<u8>, StorageError> {
-        let url = self.object_url(key);
-        debug!(key, "Downloading object from S3");
+    #[instrument(skip(self), fields(bucket = %self.bucket))]
+    async fn presigned_url(
+        &self,
+        key: &ObjectKey,
+        expires_secs: u64,
+    ) -> Result<String, StorageError> {
+        debug!(key = %key, expires_secs, "Generating presigned URL");
 
-        // TODO: 实现 AWS Signature V4 签名
-        let response = self
-            .http
-            .get(&url)
-            .send()
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(expires_secs))
+            .map_err(|e| StorageError::Presign(format!("invalid presign config: {e}")))?;
+
+        let presigned = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key.as_str())
+            .presigned(presigning_config)
             .await
-            .map_err(|e| StorageError::Connection(format!("GET {url} failed: {e}")))?;
+            .map_err(|e| StorageError::Presign(format!("presign failed: {e}")))?;
 
-        match response.status().as_u16() {
-            200 => {
-                let bytes = response
-                    .bytes()
-                    .await
-                    .map_err(|e| StorageError::Io(format!("Failed to read response body: {e}")))?;
-                Ok(bytes.to_vec())
-            }
-            404 => Err(StorageError::NotFound(key.to_string())),
-            status => Err(StorageError::Connection(format!(
-                "GET {url} returned {status}"
-            ))),
-        }
-    }
-
-    #[instrument(skip(self), fields(bucket = %self.config.bucket))]
-    async fn delete_object(&self, key: &str) -> Result<(), StorageError> {
-        let url = self.object_url(key);
-        debug!(key, "Deleting object from S3");
-
-        // TODO: 实现 AWS Signature V4 签名
-        let response = self
-            .http
-            .delete(&url)
-            .send()
-            .await
-            .map_err(|e| StorageError::Connection(format!("DELETE {url} failed: {e}")))?;
-
-        if response.status().is_success() || response.status().as_u16() == 404 {
-            // S3 DELETE 对不存在的对象也返回成功
-            Ok(())
-        } else {
-            let status = response.status();
-            Err(StorageError::Connection(format!(
-                "DELETE {url} returned {status}"
-            )))
-        }
-    }
-
-    #[instrument(skip(self), fields(bucket = %self.config.bucket))]
-    async fn presigned_url(&self, key: &str, expires_secs: u64) -> Result<String, StorageError> {
-        // TODO: 实现 AWS Signature V4 预签名 URL 生成
-        // 当前返回基础 URL + 过期参数占位
-        let url = self.object_url(key);
-        debug!(key, expires_secs, "Generating presigned URL");
-
-        Ok(format!(
-            "{url}?X-Amz-Expires={expires_secs}&X-Amz-Signature=TODO"
-        ))
-    }
-
-    #[instrument(skip(self), fields(bucket = %self.config.bucket))]
-    async fn object_exists(&self, key: &str) -> Result<bool, StorageError> {
-        let url = self.object_url(key);
-        debug!(key, "Checking object existence");
-
-        // TODO: 实现 AWS Signature V4 签名
-        let response = self
-            .http
-            .head(&url)
-            .send()
-            .await
-            .map_err(|e| StorageError::Connection(format!("HEAD {url} failed: {e}")))?;
-
-        match response.status().as_u16() {
-            200 => Ok(true),
-            404 => Ok(false),
-            status => Err(StorageError::Connection(format!(
-                "HEAD {url} returned {status}"
-            ))),
-        }
+        Ok(presigned.uri().to_string())
     }
 }
 
-/// 本地文件系统存储客户端（开发环境使用）
+/// Local filesystem storage client (development environment).
+///
+/// All paths are validated against the storage root to prevent directory
+/// traversal, providing defense-in-depth on top of [`ObjectKey`] validation.
 #[derive(Debug)]
 pub struct LocalStorageClient {
     base_dir: PathBuf,
 }
 
 impl LocalStorageClient {
-    /// 创建本地存储客户端
+    /// Create a local storage client rooted at `base_dir`.
     ///
-    /// `base_dir` 为文件存储根目录，不存在时自动创建
-    pub fn new(base_dir: impl AsRef<Path>) -> Result<Self, StorageError> {
+    /// The directory is created if it does not exist and canonicalized
+    /// so that all subsequent path checks are symlink-safe.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StorageError::Io`] if the directory cannot be created or canonicalized.
+    pub async fn new(base_dir: impl AsRef<Path>) -> Result<Self, StorageError> {
         let base_dir = base_dir.as_ref().to_path_buf();
-        std::fs::create_dir_all(&base_dir)
+        tokio::fs::create_dir_all(&base_dir)
+            .await
             .map_err(|e| StorageError::Io(format!("Failed to create storage dir: {e}")))?;
+        let base_dir = tokio::fs::canonicalize(&base_dir)
+            .await
+            .map_err(|e| StorageError::Io(format!("Failed to canonicalize storage dir: {e}")))?;
         Ok(Self { base_dir })
     }
 
-    /// 获取对象的本地文件路径
-    fn object_path(&self, key: &str) -> PathBuf {
-        self.base_dir.join(key)
+    /// Join the storage root with the object key to form the target path.
+    fn object_path(&self, key: &ObjectKey) -> PathBuf {
+        self.base_dir.join(key.as_str())
+    }
+
+    /// Verify that a canonicalized path is still under the storage root.
+    fn verify_under_root(&self, canonical: &Path) -> Result<(), StorageError> {
+        if !canonical.starts_with(&self.base_dir) {
+            return Err(StorageError::Config(
+                "resolved path escapes storage root".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -213,20 +256,24 @@ impl ObjectStorageClient for LocalStorageClient {
     #[instrument(skip(self, data))]
     async fn put_object(
         &self,
-        key: &str,
-        data: Vec<u8>,
+        key: &ObjectKey,
+        data: Bytes,
         _content_type: &str,
     ) -> Result<(), StorageError> {
         let path = self.object_path(key);
-        debug!(key, path = %path.display(), size = data.len(), "Writing object to local storage");
+        debug!(key = %key, path = %path.display(), size = data.len(), "Writing object to local storage");
 
-        // 确保父目录存在
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(|e| StorageError::Io(format!("Failed to create parent dir: {e}")))?;
+            let canonical_parent = tokio::fs::canonicalize(parent)
+                .await
+                .map_err(|e| StorageError::Io(format!("Failed to canonicalize parent dir: {e}")))?;
+            self.verify_under_root(&canonical_parent)?;
         }
 
-        std::fs::write(&path, &data).map_err(|e| {
+        tokio::fs::write(&path, &data).await.map_err(|e| {
             StorageError::Io(format!("Failed to write file {}: {e}", path.display()))
         })?;
 
@@ -234,26 +281,36 @@ impl ObjectStorageClient for LocalStorageClient {
     }
 
     #[instrument(skip(self))]
-    async fn get_object(&self, key: &str) -> Result<Vec<u8>, StorageError> {
+    async fn get_object(&self, key: &ObjectKey) -> Result<Bytes, StorageError> {
         let path = self.object_path(key);
-        debug!(key, path = %path.display(), "Reading object from local storage");
+        debug!(key = %key, path = %path.display(), "Reading object from local storage");
 
-        if !path.exists() {
-            return Err(StorageError::NotFound(key.to_string()));
-        }
+        let canonical = tokio::fs::canonicalize(&path)
+            .await
+            .map_err(|_| StorageError::NotFound(key.to_string()))?;
+        self.verify_under_root(&canonical)?;
 
-        std::fs::read(&path)
-            .map_err(|e| StorageError::Io(format!("Failed to read file {}: {e}", path.display())))
+        tokio::fs::read(&canonical)
+            .await
+            .map(Bytes::from)
+            .map_err(|e| {
+                StorageError::Io(format!("Failed to read file {}: {e}", canonical.display()))
+            })
     }
 
     #[instrument(skip(self))]
-    async fn delete_object(&self, key: &str) -> Result<(), StorageError> {
+    async fn delete_object(&self, key: &ObjectKey) -> Result<(), StorageError> {
         let path = self.object_path(key);
-        debug!(key, path = %path.display(), "Deleting object from local storage");
+        debug!(key = %key, path = %path.display(), "Deleting object from local storage");
 
-        if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| {
-                StorageError::Io(format!("Failed to delete file {}: {e}", path.display()))
+        // File does not exist → delete is idempotent, so we only act on Ok.
+        if let Ok(canonical) = tokio::fs::canonicalize(&path).await {
+            self.verify_under_root(&canonical)?;
+            tokio::fs::remove_file(&canonical).await.map_err(|e| {
+                StorageError::Io(format!(
+                    "Failed to delete file {}: {e}",
+                    canonical.display()
+                ))
             })?;
         }
 
@@ -261,15 +318,18 @@ impl ObjectStorageClient for LocalStorageClient {
     }
 
     #[instrument(skip(self))]
-    async fn presigned_url(&self, key: &str, _expires_secs: u64) -> Result<String, StorageError> {
-        // 本地存储返回 file:// URL
+    async fn presigned_url(
+        &self,
+        key: &ObjectKey,
+        _expires_secs: u64,
+    ) -> Result<String, StorageError> {
         let path = self.object_path(key);
         Ok(format!("file://{}", path.display()))
     }
 
     #[instrument(skip(self))]
-    async fn object_exists(&self, key: &str) -> Result<bool, StorageError> {
+    async fn object_exists(&self, key: &ObjectKey) -> Result<bool, StorageError> {
         let path = self.object_path(key);
-        Ok(path.exists())
+        Ok(tokio::fs::try_exists(&path).await.unwrap_or(false))
     }
 }

@@ -14,4 +14,10 @@ pub enum StorageError {
 
     #[error("Configuration error: {0}")]
     Config(String),
+
+    #[error("S3 operation error: {0}")]
+    S3(String),
+
+    #[error("Presigning error: {0}")]
+    Presign(String),
 }
