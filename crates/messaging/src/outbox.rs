@@ -54,12 +54,12 @@ impl OutboxStore {
         event: &DomainEvent,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO outbox_events
                 (event_id, event_type, tenant_id, aggregate_id, aggregate_type,
                  payload, schema_version, trace_id, occurred_at, published)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
-            "#,
+            ",
         )
         .bind(event.event_id)
         .bind(&event.event_type)
@@ -79,14 +79,14 @@ impl OutboxStore {
     /// 获取未发布的事件（供 worker 轮询）。
     pub async fn fetch_unpublished(&self, limit: i64) -> Result<Vec<OutboxRecord>, sqlx::Error> {
         sqlx::query_as::<_, OutboxRecord>(
-            r#"
+            r"
             SELECT event_id, event_type, tenant_id, aggregate_id, aggregate_type,
                    payload, schema_version, trace_id, occurred_at, published
             FROM outbox_events
             WHERE published = false
             ORDER BY occurred_at ASC
             LIMIT $1
-            "#,
+            ",
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -96,11 +96,11 @@ impl OutboxStore {
     /// 标记事件为已发布。
     pub async fn mark_published(&self, event_ids: &[Uuid]) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE outbox_events
             SET published = true
             WHERE event_id = ANY($1)
-            "#,
+            ",
         )
         .bind(event_ids)
         .execute(&self.pool)

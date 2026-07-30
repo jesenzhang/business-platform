@@ -72,8 +72,7 @@ impl AppError {
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             AppError::ExternalService { .. } => StatusCode::BAD_GATEWAY,
-            AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Internal(_) | AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 

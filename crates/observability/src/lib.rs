@@ -30,47 +30,41 @@ impl Drop for TracingGuard {
 /// configured alongside the standard fmt layer. Otherwise only the fmt layer
 /// with an env-filter (derived from `config.log_level`) is installed.
 pub fn init_tracing(config: &ObservabilityConfig) -> anyhow::Result<TracingGuard> {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     let fmt_layer = tracing_subscriber::fmt::layer();
 
-    match &config.otlp_endpoint {
-        Some(endpoint) => {
-            let exporter = opentelemetry_otlp::SpanExporter::builder()
-                .with_tonic()
-                .with_endpoint(endpoint)
-                .build()?;
+    if let Some(endpoint) = &config.otlp_endpoint {
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(endpoint)
+            .build()?;
 
-            let provider = TracerProvider::builder()
-                .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-                .with_resource(opentelemetry_sdk::Resource::new(vec![
-                    opentelemetry::KeyValue::new(
-                        "service.name",
-                        config.service_name.clone(),
-                    ),
-                ]))
-                .build();
+        let provider = TracerProvider::builder()
+            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_resource(opentelemetry_sdk::Resource::new(vec![
+                opentelemetry::KeyValue::new("service.name", config.service_name.clone()),
+            ]))
+            .build();
 
-            let tracer = provider.tracer(config.service_name.clone());
+        let tracer = provider.tracer(config.service_name.clone());
 
-            tracing_subscriber::registry()
-                .with(env_filter)
-                .with(fmt_layer)
-                .with(tracing_opentelemetry::layer().with_tracer(tracer))
-                .init();
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .init();
 
-            Ok(TracingGuard {
-                provider: Some(provider),
-            })
-        }
-        None => {
-            tracing_subscriber::registry()
-                .with(env_filter)
-                .with(fmt_layer)
-                .init();
+        Ok(TracingGuard {
+            provider: Some(provider),
+        })
+    } else {
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .init();
 
-            Ok(TracingGuard { provider: None })
-        }
+        Ok(TracingGuard { provider: None })
     }
 }

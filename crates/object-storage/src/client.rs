@@ -8,7 +8,12 @@ use crate::error::StorageError;
 #[async_trait]
 pub trait ObjectStorageClient: Send + Sync {
     /// 上传对象
-    async fn put_object(&self, key: &str, data: Vec<u8>, content_type: &str) -> Result<(), StorageError>;
+    async fn put_object(
+        &self,
+        key: &str,
+        data: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), StorageError>;
     /// 获取对象
     async fn get_object(&self, key: &str) -> Result<Vec<u8>, StorageError>;
     /// 删除对象
@@ -62,7 +67,12 @@ impl S3Client {
 #[async_trait]
 impl ObjectStorageClient for S3Client {
     #[instrument(skip(self, data), fields(bucket = %self.config.bucket))]
-    async fn put_object(&self, key: &str, data: Vec<u8>, content_type: &str) -> Result<(), StorageError> {
+    async fn put_object(
+        &self,
+        key: &str,
+        data: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), StorageError> {
         let url = self.object_url(key);
         debug!(key, size = data.len(), "Uploading object to S3");
 
@@ -201,7 +211,12 @@ impl LocalStorageClient {
 #[async_trait]
 impl ObjectStorageClient for LocalStorageClient {
     #[instrument(skip(self, data))]
-    async fn put_object(&self, key: &str, data: Vec<u8>, _content_type: &str) -> Result<(), StorageError> {
+    async fn put_object(
+        &self,
+        key: &str,
+        data: Vec<u8>,
+        _content_type: &str,
+    ) -> Result<(), StorageError> {
         let path = self.object_path(key);
         debug!(key, path = %path.display(), size = data.len(), "Writing object to local storage");
 
@@ -211,8 +226,9 @@ impl ObjectStorageClient for LocalStorageClient {
                 .map_err(|e| StorageError::Io(format!("Failed to create parent dir: {e}")))?;
         }
 
-        std::fs::write(&path, &data)
-            .map_err(|e| StorageError::Io(format!("Failed to write file {}: {e}", path.display())))?;
+        std::fs::write(&path, &data).map_err(|e| {
+            StorageError::Io(format!("Failed to write file {}: {e}", path.display()))
+        })?;
 
         Ok(())
     }
@@ -236,8 +252,9 @@ impl ObjectStorageClient for LocalStorageClient {
         debug!(key, path = %path.display(), "Deleting object from local storage");
 
         if path.exists() {
-            std::fs::remove_file(&path)
-                .map_err(|e| StorageError::Io(format!("Failed to delete file {}: {e}", path.display())))?;
+            std::fs::remove_file(&path).map_err(|e| {
+                StorageError::Io(format!("Failed to delete file {}: {e}", path.display()))
+            })?;
         }
 
         Ok(())

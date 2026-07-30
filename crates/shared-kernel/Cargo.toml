@@ -16,3 +16,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 async-trait = { workspace = true }
 sqlx = { workspace = true }
+
+[lints]
+workspace = true

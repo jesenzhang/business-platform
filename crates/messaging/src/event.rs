@@ -38,6 +38,7 @@ impl DomainEvent {
     }
 
     /// Attach a trace ID to the event for distributed tracing correlation.
+    #[must_use]
     pub fn with_trace_id(mut self, trace_id: impl Into<String>) -> Self {
         self.trace_id = Some(trace_id.into());
         self

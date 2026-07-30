@@ -23,3 +23,6 @@ anyhow = { workspace = true }
 
 shared-kernel = { workspace = true }
 observability = { workspace = true }
+
+[lints]
+workspace = true
