@@ -47,9 +47,9 @@
 
 ## 4. 已接受架构决策
 
+- [`adr/ADR-0001-s3-sdk-selection.md`](adr/ADR-0001-s3-sdk-selection.md)：对象存储采用 `aws-sdk-s3`。
+- [`adr/ADR-0002-outbox-claim-retry.md`](adr/ADR-0002-outbox-claim-retry.md)：Outbox claim/lease/retry 设计。
 - [`adr/ADR-0003-domain-driven-layered-backend.md`](adr/ADR-0003-domain-driven-layered-backend.md)：服务端采用战略 DDD、模块化单体、领域/应用/适配器分层、数据所有权、质量属性与自动架构门禁。
-
-`ADR-0001` 和 `ADR-0002` 已由正在实施的 PLAN-0001 预留给对象存储 SDK 和可靠 Outbox 决策。
 
 ## 5. 文档目录
 
@@ -99,8 +99,9 @@ docs/
 - 当前计划：[`plans/current/PLAN-0001-foundation-hardening.md`](plans/current/PLAN-0001-foundation-hardening.md)
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
+- PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-PLAN-0001 正在实施。PR #2 合并后，其实现分支必须同步 `origin/main`，补充架构符合性说明并重新运行相应门禁。
+PLAN-0001 当前状态为 `Revision Required`，PR #3 保持 Draft，直到修订门禁和真实基础设施测试全部通过。
 
 ## 9. 合并后的后续任务规则
 

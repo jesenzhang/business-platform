@@ -1,9 +1,9 @@
 # PLAN-0001：初始服务基座加固
 
-> 状态：Proposed  
+> 状态：Implemented  
 > 日期：2026-07-30  
 > 来源：`REVIEW-2026-07-30-001`  
-> 目标分支：后续独立实现分支
+> 目标分支：feat/PLAN-0001-foundation-hardening
 
 ## 1. 目标
 
@@ -163,10 +163,26 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 
 ## 8. 完成定义
 
-- [ ] 所有 WP 验收通过；
-- [ ] CI 全绿；
-- [ ] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
-- [ ] 总体架构、代码架构和代码实现一致；
-- [ ] 基础设施契约测试可重复运行；
-- [ ] 首个垂直切片证明 UI/API/Worker/未来 Agent 可复用应用层；
-- [ ] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。
+- [x] 所有 WP 验收通过；
+- [x] CI 全绿；
+- [x] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
+- [x] 总体架构、代码架构和代码实现一致；
+- [x] 基础设施契约测试可重复运行；
+- [x] 首个垂直切片证明 UI/API/Worker/未来 Agent 可复用应用层；
+- [ ] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。（待 PR 合并后执行）
+
+## 9. 候选提交
+
+实施位于分支 `feat/PLAN-0001-foundation-hardening`，基线为 `696acfb` (main)。每个工作包对应一个独立提交：
+
+| 提交 | 工作包 | 说明 |
+|---|---|---|
+| `73a2606` | WP-01 | ci: establish Rust workspace gates |
+| `7bee85d` | WP-02 | refactor: decouple shared kernel from frameworks |
+| `0458365` | WP-05 | security: protect configuration secrets |
+| `76566f5` | WP-03 / WP-04 | security: establish HTTP security baseline and app composition |
+| `6e64466` | WP-06 / WP-07 / WP-08 | feat: implement S3 adapter, ObjectKey security, and migration CLI |
+| `fbe6300` | WP-09 | feat: make outbox claiming reliable for multi-worker delivery |
+| `8fac234` | WP-10 | feat: add document metadata vertical slice |
+
+实施审查见 [`../../reviews/2026-07-30-plan-0001-implementation-review.md`](../../reviews/2026-07-30-plan-0001-implementation-review.md)。
