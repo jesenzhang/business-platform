@@ -739,8 +739,10 @@ name = "business-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum 0.8.9",
  "chrono",
+ "document",
  "http-body-util",
  "observability",
  "serde",
@@ -1127,9 +1129,17 @@ name = "document"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "axum 0.8.9",
  "chrono",
+ "messaging",
+ "object-storage",
  "serde",
+ "serde_json",
  "shared-kernel",
+ "sqlx",
+ "thiserror 2.0.19",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 

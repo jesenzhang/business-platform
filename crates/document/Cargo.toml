@@ -6,10 +6,20 @@ rust-version.workspace = true
 
 [dependencies]
 shared-kernel = { workspace = true }
+messaging = { workspace = true }
+object-storage = { workspace = true }
 serde = { workspace = true }
-chrono = { workspace = true }
+serde_json = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+axum = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
 
 [lints]
 workspace = true

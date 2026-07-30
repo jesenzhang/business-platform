@@ -23,10 +23,12 @@ anyhow = { workspace = true }
 
 shared-kernel = { workspace = true }
 observability = { workspace = true }
+document = { workspace = true }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+async-trait = { workspace = true }
 
 [lints]
 workspace = true
