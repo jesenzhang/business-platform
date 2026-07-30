@@ -2,7 +2,7 @@
 
 本目录保存长期、跨模块或难以逆转的架构决策。
 
-## 状态
+## 1. 状态
 
 - `Proposed`
 - `Accepted`
@@ -10,7 +10,7 @@
 - `Superseded`
 - `Deprecated`
 
-## 编号
+## 2. 编号
 
 使用连续四位编号：
 
@@ -22,35 +22,63 @@ ADR-0003-domain-driven-layered-backend.md
 
 编号一经创建不得复用，即使 ADR 被拒绝。
 
-## 当前登记
+## 3. 当前登记
 
 | 编号 | 标题 | 状态 | 说明 |
 |---|---|---|---|
-| ADR-0001 | S3 SDK 选型 | Reserved / PLAN-0001 | 正在实施的 PLAN-0001 预留，合并前必须补齐文件和登记 |
-| ADR-0002 | Outbox Claim 与重试 | Reserved / PLAN-0001 | 正在实施的 PLAN-0001 预留，合并前必须补齐文件和登记 |
-| [`ADR-0003`](ADR-0003-domain-driven-layered-backend.md) | 服务端采用领域驱动的分层架构 | Accepted | 战略 DDD、模块化单体、领域/应用/适配器分层和基础设施独立性 |
+| ADR-0001 | S3 SDK 选型 | Reserved / PLAN-0001 | PLAN-0001 预留，合并前补齐文件和登记 |
+| ADR-0002 | Outbox Claim 与重试 | Reserved / PLAN-0001 | PLAN-0001 预留，合并前补齐文件和登记 |
+| [`ADR-0003`](ADR-0003-domain-driven-layered-backend.md) | 服务端采用领域驱动的分层架构 | Accepted | 战略 DDD、数据所有权、显式一致性、端口适配、质量属性与自动架构门禁 |
 
-后续建议形成：
+## 4. ADR-0003 的完整 Baseline
 
-1. PostgreSQL 或其他权威状态存储的角色边界；
-2. 生产对象存储产品选型；
-3. Agent 为可插拔入口；
-4. 认证、授权与多租户模型；
-5. Bounded Context Map 和跨上下文协作策略；
-6. 长时任务核心与业务过程的边界。
+ADR-0003 不是只约束代码目录，而是由完整服务端架构文档集落实：
 
-## 决策原则
+- `docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md`
+- `docs/architecture/SERVER_BACKEND_ARCHITECTURE.md`
+- `docs/architecture/BOUNDED_CONTEXT_MAP.md`
+- `docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`
+- `docs/architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md`
+- `docs/architecture/QUALITY_ATTRIBUTE_SCENARIOS.md`
+- `docs/architecture/SECURITY_ARCHITECTURE.md`
+- `docs/architecture/DEPLOYMENT_ARCHITECTURE.md`
+- `docs/architecture/OBSERVABILITY_ARCHITECTURE.md`
+- `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`
+- `docs/standards/API_AND_EVENT_CONTRACT_STANDARD.md`
+- `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`
 
-ADR 应优先记录稳定的架构语义和约束，而不是把当前产品名称提升为业务核心概念。
+后续实现任务必须遵循以上文档，而不是只引用 ADR 标题。
 
-需要记录具体技术时，应明确区分：
+## 5. 后续 ADR 触发条件
+
+以下变化必须创建或替代 ADR：
+
+- 新增、合并或拆分 Bounded Context；
+- 改变权威数据所有者；
+- 改变跨上下文一致性和补偿模型；
+- 新增独立部署单元或拆分微服务；
+- 改变身份、租户和授权模型；
+- 引入全局基础设施、框架或供应商；
+- 改变长时任务 claim、lease、重试和恢复语义；
+- 改变 API/Event 兼容性策略；
+- 调整关键质量属性、RPO/RTO 或安全风险接受；
+- 建立或废弃遗留迁移路径。
+
+## 6. 决策原则
+
+ADR 优先记录稳定的架构语义和约束，而不是把当前产品名称提升为业务核心概念。
+
+涉及具体技术时必须区分：
 
 ```text
 核心能力要求
 当前适配器选择
+质量属性影响
 替换条件
 迁移和回滚
 ```
+
+## 7. 模板与治理
 
 模板见 [`../templates/ADR_TEMPLATE.md`](../templates/ADR_TEMPLATE.md)。
 
