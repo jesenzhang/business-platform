@@ -369,7 +369,7 @@ async fn max_attempts_reached() {
         .await
         .expect("fetch failed");
 
-    assert_eq!(row.0, "pending");
+    assert_eq!(row.0, "failed");
 
     cleanup(&pool, &tenant).await;
 }

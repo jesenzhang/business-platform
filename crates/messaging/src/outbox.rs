@@ -129,6 +129,9 @@ impl ReliableOutbox {
     pub async fn claim_batch(&self, batch_size: i64) -> Result<Vec<OutboxRecord>, OutboxError> {
         let lease_secs = i64::try_from(self.lease_duration.as_secs()).unwrap_or(i64::MAX);
         let mut tx = self.pool.begin().await.map_err(OutboxError::Database)?;
+        reconcile_exhausted_in_tx(&mut tx)
+            .await
+            .map_err(OutboxError::Database)?;
         let records = sqlx::query_as::<_, OutboxRecord>(
             r"
             WITH claimed AS (
@@ -269,6 +272,38 @@ impl ReliableOutbox {
         .map_err(OutboxError::Database)?;
         Ok(result.rows_affected())
     }
+
+    /// Move non-terminal events that have exhausted their retry budget to a
+    /// stable failed state. Repeated calls only update eligible rows once.
+    pub async fn reconcile_exhausted_events(&self) -> Result<u64, OutboxError> {
+        let mut tx = self.pool.begin().await.map_err(OutboxError::Database)?;
+        let affected = reconcile_exhausted_in_tx(&mut tx)
+            .await
+            .map_err(OutboxError::Database)?;
+        tx.commit().await.map_err(OutboxError::Database)?;
+        Ok(affected)
+    }
+}
+
+async fn reconcile_exhausted_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        r"
+        UPDATE outbox_events
+        SET status = 'failed',
+            published = FALSE,
+            claimed_by = NULL,
+            claim_token = NULL,
+            lease_until = NULL,
+            last_error = COALESCE(last_error, 'maximum attempts reached')
+        WHERE status IN ('pending', 'retry_scheduled')
+          AND attempt_count >= max_attempts
+        ",
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(result.rows_affected())
 }
 
 fn ensure_lease_owned(result: &PgQueryResult) -> Result<(), OutboxError> {
