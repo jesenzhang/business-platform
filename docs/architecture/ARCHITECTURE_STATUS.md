@@ -6,6 +6,10 @@
 > 当前计划：`PLAN-0002-foundation-integrity-and-closeout`
 > 当前架构 PR：PLAN-0002 尚未创建（Active）
 
+> 2026-07-31: PLAN-0002 WP-01 and WP-02 are implemented locally. Runtime
+> configuration is process-specific, `shared-kernel` has no infrastructure
+> topology, and connection URLs are redacted values.
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 是可选入口；

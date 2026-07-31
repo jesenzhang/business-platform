@@ -333,3 +333,10 @@ architecture
 ```
 
 只有所有 Required 门禁通过、Conditional Required 有对应证据、无法自动化的 Evidence Required 有记录时，任务才可进入合并判断。
+
+## 22. Runtime configuration checks
+
+The architecture fitness script must reject process configuration and `config`
+crate dependencies in `shared-kernel`, environment access in Document Domain
+or Application, and `AppState` fields containing `AppConfig`,
+`DatabaseConfig`, `SecretUrl`, or `PgPool`.

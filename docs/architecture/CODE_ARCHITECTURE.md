@@ -473,3 +473,11 @@ Prepare → Preview → Confirm → Execute
 - [ ] Outbox 支持多 Worker 安全处理；
 - [ ] 生产 CORS、错误和 Secret 行为安全；
 - [ ] 关键依赖具有真实集成测试。
+
+## 16. Runtime configuration boundary
+
+Runtime configuration is owned by each `apps/*` composition root. A process
+may compose small runtime value types, but `shared-kernel`, Domain, and
+Application do not load environment variables, configuration files, or
+infrastructure topology. `AppState` contains no full configuration object,
+database pool, or secret connection URL.

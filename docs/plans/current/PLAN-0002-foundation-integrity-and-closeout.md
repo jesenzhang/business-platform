@@ -32,3 +32,18 @@ complete object-storage contracts, and workspace-wide architecture gates.
 PLAN-0002 remains `Active` and its PR remains Draft until every listed work
 package has passing local and GitHub Actions evidence. It becomes `Accepted
 Candidate` only when the checklist in the task request is fully satisfied.
+
+## WP-01 and WP-02 evidence
+
+- WP-01 Process-specific configuration: PASS. `runtime-config` contains only
+  generic runtime support; each application owns its own configuration root;
+  `shared-kernel` no longer carries runtime topology; and `AppState` retains
+  only services and a readiness probe.
+- WP-02 Secret and connection-string protection: PASS. `SecretUrl` redacts
+  credentials and sensitive query parameters in `Debug`, `Display`, and parse
+  errors. Migration supports the deprecated `DATABASE_URL` input only when it
+  does not conflict with `MIGRATION__DATABASE__URL`.
+- Verification: `cargo fmt --all -- --check`, workspace check, workspace
+  Clippy, package tests, and `scripts/check-architecture.ps1` passed on
+  2026-07-31. Full workspace test was blocked by the Windows linker PDB limit
+  after the first workspace test attempt.

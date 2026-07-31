@@ -324,3 +324,10 @@ Agent 是委托入口，不是新身份边界。
 - [ ] 数据库、Broker 和对象存储最小权限；
 - [ ] 安全测试和威胁模型随功能更新；
 - [ ] 生产配置默认拒绝不安全降级。
+
+## 22. Runtime configuration secrets
+
+Connection URLs are secret-bearing runtime values. They are rendered in
+redacted form by `Debug` and `Display`; parsing and validation failures expose
+only field-level rules. Plaintext is read only at the immediate infrastructure
+client construction boundary.

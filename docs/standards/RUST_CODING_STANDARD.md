@@ -362,3 +362,10 @@ tracing::info!(
 - [ ] 测试覆盖失败路径；
 - [ ] 文档与公开协议同步；
 - [ ] 格式、Clippy 和测试通过。
+
+## 20. Runtime configuration
+
+Configuration loading is permitted only in runtime support and application
+composition roots. Connection URLs and credentials use redacted value types;
+call `expose()` only while constructing an infrastructure client and never
+store its plaintext result in application state or log it.
