@@ -1,3 +1,4 @@
+pub mod documents;
 pub mod health;
 
 use std::sync::Arc;
@@ -31,21 +32,13 @@ pub fn create_router(state: Arc<AppState>, auth_config: AuthMiddlewareConfig) ->
     let body_limit = state.config.server.body_limit_bytes;
     let cors = build_cors_layer(&state.config.server.cors_origins);
 
-    let doc_services = document::api::DocumentServices {
-        repo: Arc::new(document::infrastructure::PostgresDocumentRepository::new(
-            state.pool.clone(),
-        )),
-        pool: state.pool.clone(),
-    };
-
     let protected_routes = Router::new()
-        .nest("/api/v1/documents", document::api::router(doc_services))
+        .nest("/api/v1/documents", documents::router())
         .layer(middleware::from_fn_with_state(auth_config, auth_middleware));
 
     let public_routes = Router::new()
         .route("/health/live", get(health::liveness))
-        .route("/health/ready", get(health::readiness))
-        .with_state(state);
+        .route("/health/ready", get(health::readiness));
 
     Router::new()
         .merge(public_routes)
@@ -59,6 +52,7 @@ pub fn create_router(state: Arc<AppState>, auth_config: AuthMiddlewareConfig) ->
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        .with_state(state)
 }
 
 /// 根据配置构建 CORS 层。

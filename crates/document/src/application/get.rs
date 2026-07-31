@@ -1,37 +1,43 @@
-//! `GetDocumentMetadata` use case.
+use std::sync::Arc;
 
-use shared_kernel::error::AppError;
+use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::{DocumentMetadata, DocumentRepository};
+use crate::domain::{DocumentMetadata, DocumentQueryRepository, RepositoryError};
 
-/// Use case: retrieve a single document by ID within a tenant.
-pub struct GetDocumentMetadata<'a> {
-    repo: &'a dyn DocumentRepository,
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum QueryDocumentError {
+    #[error("document repository is unavailable")]
+    Unavailable,
+    #[error("document query failed")]
+    Failed,
 }
 
-impl<'a> GetDocumentMetadata<'a> {
-    /// Create a new instance of the use case.
-    pub fn new(repo: &'a dyn DocumentRepository) -> Self {
-        Self { repo }
+pub struct GetDocumentMetadata {
+    repository: Arc<dyn DocumentQueryRepository>,
+}
+
+impl GetDocumentMetadata {
+    #[must_use]
+    pub fn new(repository: Arc<dyn DocumentQueryRepository>) -> Self {
+        Self { repository }
     }
 
-    /// Execute the get document use case.
-    ///
-    /// Returns `None` if the document does not exist or belongs to a
-    /// different tenant (tenant isolation).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AppError::Database`] if the query fails.
     pub async fn execute(
         &self,
         tenant_id: Uuid,
-        id: Uuid,
-    ) -> Result<Option<DocumentMetadata>, AppError> {
-        self.repo
-            .find_by_id(tenant_id, id)
+        document_id: Uuid,
+    ) -> Result<Option<DocumentMetadata>, QueryDocumentError> {
+        self.repository
+            .find_by_id(tenant_id, document_id)
             .await
-            .map_err(|e| AppError::Database(e.to_string()))
+            .map_err(|error| map_repository_error(&error))
+    }
+}
+
+pub(crate) fn map_repository_error(error: &RepositoryError) -> QueryDocumentError {
+    match error {
+        RepositoryError::Unavailable => QueryDocumentError::Unavailable,
+        RepositoryError::Conflict | RepositoryError::Failed => QueryDocumentError::Failed,
     }
 }

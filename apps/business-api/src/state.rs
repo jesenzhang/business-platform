@@ -1,14 +1,93 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
 use shared_kernel::AppConfig;
 use sqlx::PgPool;
 
-/// 应用共享状态。
-///
-/// `pool` 是内部基础设施句柄，仅供健康探针（readiness）和未来依赖注入使用。
-/// 业务 handler 不应直接持有 `PgPool`，而应接收 application 层服务
-/// （use case / port），由 application 层编排数据库访问。当前尚无业务 handler，
-/// 此处仅为结构化预留。
+/// Application services injected by the composition root.
+#[derive(Clone)]
+pub struct DocumentServices {
+    pub create: Arc<CreateDocumentMetadata>,
+    pub get: Arc<GetDocumentMetadata>,
+    pub list: Arc<ListDocumentMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadinessStatus {
+    Ready,
+    NotReady,
+}
+
+#[async_trait]
+pub trait ReadinessProbe: Send + Sync {
+    async fn check(&self) -> ReadinessReport;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadinessReport {
+    pub status: ReadinessStatus,
+    pub database: &'static str,
+    pub migrations: &'static str,
+}
+
+/// HTTP application state. No handler receives a database pool.
+#[derive(Clone)]
 pub struct AppState {
-    /// 内部数据库连接池：健康检查与未来 DI 容器使用，不直接暴露给业务 handler。
-    pub pool: PgPool,
     pub config: AppConfig,
+    pub documents: DocumentServices,
+    pub readiness: Arc<dyn ReadinessProbe>,
+}
+
+pub struct PostgresReadinessProbe {
+    pool: PgPool,
+    expected_migration: i64,
+}
+
+impl PostgresReadinessProbe {
+    #[must_use]
+    pub fn new(pool: PgPool, expected_migration: i64) -> Self {
+        Self {
+            pool,
+            expected_migration,
+        }
+    }
+}
+
+#[async_trait]
+impl ReadinessProbe for PostgresReadinessProbe {
+    async fn check(&self) -> ReadinessReport {
+        let database = sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map(|_| "available")
+            .unwrap_or("unavailable");
+        if database == "unavailable" {
+            return ReadinessReport {
+                status: ReadinessStatus::NotReady,
+                database,
+                migrations: "unknown",
+            };
+        }
+
+        let migration_version =
+            sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or_default();
+        let migrations = if migration_version >= self.expected_migration {
+            "compatible"
+        } else {
+            "incompatible"
+        };
+        ReadinessReport {
+            status: if migrations == "compatible" {
+                ReadinessStatus::Ready
+            } else {
+                ReadinessStatus::NotReady
+            },
+            database,
+            migrations,
+        }
+    }
 }

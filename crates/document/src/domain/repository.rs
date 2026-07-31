@@ -1,43 +1,43 @@
-//! Port: document metadata persistence.
-
 use async_trait::async_trait;
+use thiserror::Error;
 use uuid::Uuid;
 
 use super::entity::DocumentMetadata;
 
-/// Port trait for document metadata persistence.
-///
-/// Implementations must enforce tenant isolation: all queries filter by
-/// `tenant_id` so that cross-tenant reads are impossible.
-#[async_trait]
-pub trait DocumentRepository: Send + Sync {
-    /// Persist a document within an existing transaction.
-    ///
-    /// The caller owns the transaction to allow atomic writes of business
-    /// data, outbox events, and audit records.
-    async fn save(
-        &self,
-        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-        doc: &DocumentMetadata,
-    ) -> Result<(), sqlx::Error>;
+/// Bounded query used by the list use case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListDocumentsQuery {
+    pub tenant_id: Uuid,
+    pub limit: i64,
+    pub offset: i64,
+}
 
-    /// Find a document by ID, scoped to the given tenant.
-    ///
-    /// Returns `None` if the document does not exist or belongs to a
-    /// different tenant.
+/// A page of tenant-scoped documents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentPage {
+    pub items: Vec<DocumentMetadata>,
+    pub total: i64,
+}
+
+/// Stable repository error classification; `SQLx` stays in the adapter.
+#[derive(Debug, Error)]
+pub enum RepositoryError {
+    #[error("document repository unavailable")]
+    Unavailable,
+    #[error("document repository conflict")]
+    Conflict,
+    #[error("document repository failed")]
+    Failed,
+}
+
+/// Read-only persistence port for document metadata.
+#[async_trait]
+pub trait DocumentQueryRepository: Send + Sync {
     async fn find_by_id(
         &self,
         tenant_id: Uuid,
-        id: Uuid,
-    ) -> Result<Option<DocumentMetadata>, sqlx::Error>;
+        document_id: Uuid,
+    ) -> Result<Option<DocumentMetadata>, RepositoryError>;
 
-    /// List documents for a tenant with pagination.
-    ///
-    /// Returns the page of documents and the total count.
-    async fn list(
-        &self,
-        tenant_id: Uuid,
-        limit: i64,
-        offset: i64,
-    ) -> Result<(Vec<DocumentMetadata>, i64), sqlx::Error>;
+    async fn list(&self, query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError>;
 }

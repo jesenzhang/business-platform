@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::routes;
-use business_api::state::AppState;
+use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,8 +32,23 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Database connection established");
 
+    let repository = Arc::new(document_postgres::PostgresDocumentQueryRepository::new(
+        pool.clone(),
+    ));
+    let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
+        pool.clone(),
+    ));
     let state = Arc::new(AppState {
-        pool,
+        documents: DocumentServices {
+            create: Arc::new(document::application::CreateDocumentMetadata::new(
+                unit_of_work,
+            )),
+            get: Arc::new(document::application::GetDocumentMetadata::new(
+                repository.clone(),
+            )),
+            list: Arc::new(document::application::ListDocumentMetadata::new(repository)),
+        },
+        readiness: Arc::new(PostgresReadinessProbe::new(pool, 5)),
         config: config.clone(),
     });
 

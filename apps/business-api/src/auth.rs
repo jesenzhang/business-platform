@@ -141,5 +141,5 @@ fn header_str(request: &Request, name: &str) -> Option<String> {
 /// operators but never exposed to the client.
 fn unauthorized(kind: AuthError, public_message: &str) -> ApiError {
     tracing::debug!(?kind, "authentication rejected");
-    ApiError(AppError::Unauthorized(public_message.to_owned()))
+    ApiError::from(AppError::Unauthorized(public_message.to_owned()))
 }

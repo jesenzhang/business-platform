@@ -1,10 +1,10 @@
 //! Document metadata aggregate root.
 
 use chrono::{DateTime, Utc};
-use object_storage::ObjectKey;
 use uuid::Uuid;
 
 use super::error::DocumentDomainError;
+use super::object_key::DocumentObjectKey;
 
 /// Lifecycle status of a document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -46,7 +46,7 @@ impl DocumentStatus {
 /// - `content_type` is non-empty
 /// - `object_key` is a valid, non-empty storage key (no path traversal)
 /// - `version` starts at 1 and increments on mutation
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DocumentMetadata {
     /// Unique identifier (`UUIDv7`, time-ordered).
     pub id: Uuid,
@@ -96,14 +96,14 @@ impl DocumentMetadata {
             return Err(DocumentDomainError::EmptyObjectKey);
         }
 
-        // Validate the object key for path traversal safety.
-        ObjectKey::new(object_key.clone())
-            .map_err(|e| DocumentDomainError::InvalidObjectKey(e.to_string()))?;
-
         let now = Utc::now();
+        let id = Uuid::now_v7();
+        let object_key = DocumentObjectKey::new(tenant_id, id, 1, object_key)
+            .map_err(|e| DocumentDomainError::InvalidObjectKey(e.to_string()))?
+            .as_storage_key();
 
         Ok(Self {
-            id: Uuid::now_v7(),
+            id,
             tenant_id,
             original_filename,
             content_type,

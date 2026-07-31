@@ -1,117 +1,174 @@
-//! `CreateDocumentMetadata` use case.
-//!
-//! Flow: validate → create domain object → begin tx → save → write outbox → commit.
+use std::sync::Arc;
 
-use messaging::{DomainEvent, ReliableOutbox};
-use shared_kernel::error::AppError;
-use sqlx::PgPool;
+use sha2::{Digest, Sha256};
+use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::{DocumentDomainError, DocumentMetadata, DocumentRepository};
+use crate::domain::{DocumentDomainError, DocumentMetadata};
+use crate::ports::{
+    ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
+};
 
-/// Command to create a new document metadata record.
 #[derive(Debug, Clone)]
 pub struct CreateDocumentCommand {
-    /// Owning tenant.
     pub tenant_id: Uuid,
-    /// User performing the action.
     pub user_id: Uuid,
-    /// Original filename as uploaded.
     pub original_filename: String,
-    /// MIME content type.
     pub content_type: String,
-    /// Object storage key (already validated by the caller or domain).
+    /// Logical object path. The domain adds tenant/document/version segments.
     pub object_key: String,
-    /// Optional file size in bytes.
     pub size_bytes: Option<i64>,
+    pub idempotency_key: String,
 }
 
-/// Use case: create document metadata with transactional outbox.
-pub struct CreateDocumentMetadata<'a> {
-    repo: &'a dyn DocumentRepository,
-    pool: &'a PgPool,
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum CreateDocumentError {
+    #[error("validation failed: {0}")]
+    Validation(String),
+    #[error("idempotency key was reused with different request content")]
+    IdempotencyConflict,
+    #[error("document persistence is unavailable")]
+    Unavailable,
+    #[error("document creation failed")]
+    Failed,
 }
 
-impl<'a> CreateDocumentMetadata<'a> {
-    /// Create a new instance of the use case.
-    pub fn new(repo: &'a dyn DocumentRepository, pool: &'a PgPool) -> Self {
-        Self { repo, pool }
+pub struct CreateDocumentMetadata {
+    unit_of_work: Arc<dyn CreateDocumentUnitOfWork>,
+}
+
+impl CreateDocumentMetadata {
+    #[must_use]
+    pub fn new(unit_of_work: Arc<dyn CreateDocumentUnitOfWork>) -> Self {
+        Self { unit_of_work }
     }
 
-    /// Execute the create document use case.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AppError::Validation`] if domain invariants are violated,
-    /// or [`AppError::Database`] if persistence fails.
-    pub async fn execute(&self, cmd: CreateDocumentCommand) -> Result<DocumentMetadata, AppError> {
-        // 1. Create domain entity (validates invariants).
-        let doc = DocumentMetadata::create(
-            cmd.tenant_id,
-            cmd.original_filename,
-            cmd.content_type,
-            cmd.object_key,
-            cmd.user_id,
-            cmd.size_bytes,
+    pub async fn execute(
+        &self,
+        command: CreateDocumentCommand,
+    ) -> Result<CreateDocumentResult, CreateDocumentError> {
+        let idempotency_key = command.idempotency_key.trim();
+        if idempotency_key.is_empty() || idempotency_key.len() > 255 {
+            return Err(CreateDocumentError::Validation(
+                "Idempotency-Key must contain 1 to 255 characters".to_string(),
+            ));
+        }
+
+        let fingerprint = request_fingerprint(&command);
+        let document = DocumentMetadata::create(
+            command.tenant_id,
+            command.original_filename,
+            command.content_type,
+            command.object_key,
+            command.user_id,
+            command.size_bytes,
         )
-        .map_err(|e| map_domain_error(&e))?;
+        .map_err(|error| map_domain_error(&error))?;
 
-        // 2. Begin transaction.
-        let mut tx = self
-            .pool
-            .begin()
+        self.unit_of_work
+            .execute(PersistNewDocument {
+                document,
+                idempotency_key: idempotency_key.to_string(),
+                request_fingerprint: fingerprint,
+            })
             .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        // 3. Save to repository.
-        self.repo
-            .save(&mut tx, &doc)
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        // 4. Write outbox event (document.created).
-        let event = DomainEvent::new(
-            "document.created",
-            cmd.tenant_id.to_string(),
-            doc.id.to_string(),
-            "document",
-            serde_json::json!({
-                "document_id": doc.id,
-                "original_filename": doc.original_filename,
-                "content_type": doc.content_type,
-                "object_key": doc.object_key,
-                "created_by": doc.created_by,
-            }),
-        );
-
-        ReliableOutbox::append_in_tx(&mut tx, &event)
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        // 5. Commit.
-        tx.commit()
-            .await
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        tracing::info!(document_id = %doc.id, tenant_id = %cmd.tenant_id, "document metadata created");
-
-        Ok(doc)
+            .map_err(map_port_error)
     }
 }
 
-/// Map domain errors to application errors at the boundary.
-fn map_domain_error(err: &DocumentDomainError) -> AppError {
-    match err {
-        DocumentDomainError::EmptyFilename
-        | DocumentDomainError::EmptyContentType
-        | DocumentDomainError::EmptyObjectKey
-        | DocumentDomainError::InvalidObjectKey(_) => AppError::Validation(err.to_string()),
-        DocumentDomainError::NotFound(id) => AppError::NotFound {
-            resource: "document".to_string(),
-            id: id.to_string(),
-        },
-        DocumentDomainError::VersionConflict { expected, actual } => AppError::Conflict(format!(
-            "version conflict: expected {expected}, got {actual}"
-        )),
+fn request_fingerprint(command: &CreateDocumentCommand) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(command.tenant_id.as_bytes());
+    hasher.update(command.user_id.as_bytes());
+    hasher.update(command.original_filename.as_bytes());
+    hasher.update([0]);
+    hasher.update(command.content_type.as_bytes());
+    hasher.update([0]);
+    hasher.update(command.object_key.as_bytes());
+    hasher.update(command.size_bytes.unwrap_or_default().to_be_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn map_domain_error(error: &DocumentDomainError) -> CreateDocumentError {
+    CreateDocumentError::Validation(error.to_string())
+}
+
+fn map_port_error(error: ApplicationPortError) -> CreateDocumentError {
+    match error {
+        ApplicationPortError::IdempotencyConflict => CreateDocumentError::IdempotencyConflict,
+        ApplicationPortError::Unavailable => CreateDocumentError::Unavailable,
+        ApplicationPortError::Failed => CreateDocumentError::Failed,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use std::sync::Mutex;
+
+    use async_trait::async_trait;
+
+    use super::*;
+
+    #[derive(Default)]
+    struct FakeUnitOfWork {
+        calls: Mutex<Vec<PersistNewDocument>>,
+    }
+
+    #[async_trait]
+    impl CreateDocumentUnitOfWork for FakeUnitOfWork {
+        async fn execute(
+            &self,
+            command: PersistNewDocument,
+        ) -> Result<CreateDocumentResult, ApplicationPortError> {
+            self.calls.lock().expect("test lock").push(command.clone());
+            Ok(CreateDocumentResult {
+                document: command.document,
+                replayed: false,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn create_uses_application_port_without_database_types() {
+        let unit_of_work = Arc::new(FakeUnitOfWork::default());
+        let service = CreateDocumentMetadata::new(unit_of_work.clone());
+        let tenant_id = Uuid::now_v7();
+        let result = service
+            .execute(CreateDocumentCommand {
+                tenant_id,
+                user_id: Uuid::now_v7(),
+                original_filename: "report.pdf".to_string(),
+                content_type: "application/pdf".to_string(),
+                object_key: "report.pdf".to_string(),
+                size_bytes: Some(10),
+                idempotency_key: "key-1".to_string(),
+            })
+            .await
+            .expect("fake port should succeed");
+
+        assert!(!result.replayed);
+        assert_eq!(result.document.tenant_id, tenant_id);
+        assert_eq!(unit_of_work.calls.lock().expect("test lock").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn create_rejects_missing_idempotency_key_before_port_call() {
+        let unit_of_work = Arc::new(FakeUnitOfWork::default());
+        let service = CreateDocumentMetadata::new(unit_of_work.clone());
+        let result = service
+            .execute(CreateDocumentCommand {
+                tenant_id: Uuid::now_v7(),
+                user_id: Uuid::now_v7(),
+                original_filename: "report.pdf".to_string(),
+                content_type: "application/pdf".to_string(),
+                object_key: "report.pdf".to_string(),
+                size_bytes: None,
+                idempotency_key: String::new(),
+            })
+            .await;
+
+        assert!(matches!(result, Err(CreateDocumentError::Validation(_))));
+        assert!(unit_of_work.calls.lock().expect("test lock").is_empty());
     }
 }

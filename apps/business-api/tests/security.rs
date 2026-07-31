@@ -8,11 +8,20 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::routes::create_router;
-use business_api::state::AppState;
+use business_api::state::{
+    AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
+};
+use document::domain::{
+    DocumentPage, DocumentQueryRepository, ListDocumentsQuery, RepositoryError,
+};
+use document::ports::{
+    ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
+};
 use shared_kernel::config::{
     AppEnv, AuthConfig, BucketConfig, DatabaseConfig, MessagingConfig, ObservabilityConfig,
     ServerConfig, StorageConfig,
@@ -21,6 +30,47 @@ use shared_kernel::{AppConfig, Secret};
 use tower::ServiceExt;
 
 const DEV_SECRET: &str = "test-dev-secret";
+
+struct EmptyPorts;
+
+#[async_trait]
+impl DocumentQueryRepository for EmptyPorts {
+    async fn find_by_id(
+        &self,
+        _tenant_id: uuid::Uuid,
+        _document_id: uuid::Uuid,
+    ) -> Result<Option<document::domain::DocumentMetadata>, RepositoryError> {
+        Ok(None)
+    }
+
+    async fn list(&self, _query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError> {
+        Ok(DocumentPage {
+            items: Vec::new(),
+            total: 0,
+        })
+    }
+}
+
+#[async_trait]
+impl CreateDocumentUnitOfWork for EmptyPorts {
+    async fn execute(
+        &self,
+        _command: PersistNewDocument,
+    ) -> Result<CreateDocumentResult, ApplicationPortError> {
+        Err(ApplicationPortError::Unavailable)
+    }
+}
+
+#[async_trait]
+impl ReadinessProbe for EmptyPorts {
+    async fn check(&self) -> ReadinessReport {
+        ReadinessReport {
+            status: ReadinessStatus::NotReady,
+            database: "unavailable",
+            migrations: "unknown",
+        }
+    }
+}
 
 fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> AppConfig {
     AppConfig {
@@ -65,13 +115,22 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> AppConfig {
 
 fn test_router(dev_auth_enabled: bool) -> axum::Router {
     let config = test_config(dev_auth_enabled, vec!["*".to_string()]);
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .min_connections(0)
-        .max_connections(1)
-        .connect_lazy(&config.database.url)
-        .expect("lazy pool must not connect eagerly");
-
-    let state = Arc::new(AppState { pool, config });
+    let ports = Arc::new(EmptyPorts);
+    let state = Arc::new(AppState {
+        documents: DocumentServices {
+            create: Arc::new(document::application::CreateDocumentMetadata::new(
+                ports.clone(),
+            )),
+            get: Arc::new(document::application::GetDocumentMetadata::new(
+                ports.clone(),
+            )),
+            list: Arc::new(document::application::ListDocumentMetadata::new(
+                ports.clone(),
+            )),
+        },
+        readiness: ports,
+        config,
+    });
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled,
         dev_secret: Some(DEV_SECRET.to_string()),
