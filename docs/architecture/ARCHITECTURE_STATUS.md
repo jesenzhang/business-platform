@@ -67,7 +67,8 @@
 仍需收敛：
 
 - API 组合状态仍需通过真实 readiness/端到端测试验证；
-- PostgreSQL adapter 已移出 `document` 核心，需通过自动 Fitness Function 持续验证；
+- PostgreSQL adapter 已移出 `document` 核心，本地 Fitness Function 已通过，
+  仍需 GitHub Actions 持续验证；
 - 当前领域 crate 尚未按 Bounded Context Map 完成统一语言和数据所有权落实；
 - `workflow` 仍未实现 Durable Task Execution 核心；
 - Worker、Migration 和 Agent Adapter 仍处于骨架阶段；
@@ -142,7 +143,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：尚未实现
+自动化架构门禁：已实现，本地 PASS，GitHub Actions 待运行
 PLAN-0001：Revision Required
 ```
 

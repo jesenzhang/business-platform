@@ -201,15 +201,30 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 
 ### 修复提交
 
-修复正在本分支按工具链、Document、Outbox、Migration、对象存储、
-readiness/architecture、CI/文档主题形成提交；最终 SHA 在验证后登记。
+修复已在本分支按工具链、Document、Outbox、Migration、对象存储、
+CI/架构和文档主题形成提交：
+
+- `0733b54` build: align Rust MSRV and toolchain
+- `858fdb9` refactor: isolate document core from infrastructure
+- `28b4876` fix: enforce outbox claim ownership and fencing
+- `06b98ba` feat: add atomic document command persistence
+- `0c5a1e9` feat: add streaming object storage contracts
+- `de85061` test: run infrastructure and architecture contracts in CI
+- `8b959ca` docs: record PLAN-0001 revision evidence
+- `6ef3fb6` test: harden outbox and object key fixtures
 
 ### 验证证据
 
 - `cargo +1.85.0 fmt --all -- --check`: PASS
 - `cargo +1.85.0 check --workspace --all-targets --all-features`: FAIL
-- `cargo +1.94.1 check --workspace --all-targets --all-features`（修订前基线）: PASS
-- 修订后的全量本地、PostgreSQL、MinIO、E2E 与 CI：NOT RUN
+- Rust 1.85 首个不兼容点：`aws-sdk-s3 1.140.0`/Smithy 要求 Rust 1.94.1
+- Rust 1.94.1 fmt/check/clippy/workspace test：PASS
+- 普通 workspace 测试：54 passed、0 failed、17 ignored
+- Architecture Fitness：PASS
+- PostgreSQL migration/Outbox：BLOCKED（本机无 PostgreSQL，`PoolTimedOut`）
+- MinIO contract：BLOCKED（本机无 MinIO，AWS `dispatch failure`）
+- Document E2E：NOT RUN
+- GitHub Actions：NOT RUN
 
 ### 剩余风险
 
