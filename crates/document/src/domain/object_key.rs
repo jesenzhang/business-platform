@@ -92,7 +92,9 @@ mod tests {
         let Ok(key) = DocumentObjectKey::new(tenant, document, 1, "report.pdf") else {
             return;
         };
-        assert!(key.as_storage_key().starts_with(&format!("tenants/{tenant}/")));
+        assert!(key
+            .as_storage_key()
+            .starts_with(&format!("tenants/{tenant}/")));
     }
 
     #[test]

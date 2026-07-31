@@ -134,8 +134,13 @@ async fn stale_worker_cannot_publish_or_fail() {
     );
     insert_test_event(&pool, &event).await;
 
-    let worker_a = ReliableOutbox::new(pool.clone(), "worker-a".to_string(), Duration::from_secs(1));
-    let worker_b = ReliableOutbox::new(pool.clone(), "worker-b".to_string(), Duration::from_secs(60));
+    let worker_a =
+        ReliableOutbox::new(pool.clone(), "worker-a".to_string(), Duration::from_secs(1));
+    let worker_b = ReliableOutbox::new(
+        pool.clone(),
+        "worker-b".to_string(),
+        Duration::from_secs(60),
+    );
     let first = worker_a.claim_batch(1).await.expect("first claim");
     assert_eq!(first.len(), 1);
     let old_token = first[0].claim_token.expect("first token");
