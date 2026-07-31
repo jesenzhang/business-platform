@@ -20,6 +20,17 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 
 shared-kernel = { workspace = true }
 observability = { workspace = true }
+document = { workspace = true }
+document-postgres = { workspace = true }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

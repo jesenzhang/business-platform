@@ -42,22 +42,21 @@ pub struct PageResponse<T: Serialize> {
 impl PageRequest {
     /// 计算 SQL OFFSET
     pub fn offset(&self) -> i64 {
-        ((self.page.saturating_sub(1)) * self.page_size) as i64
+        i64::from(self.page.saturating_sub(1) * self.page_size)
     }
 
     /// 获取 LIMIT 值（限制最大 100）
     pub fn limit(&self) -> i64 {
-        self.page_size.min(100) as i64
+        i64::from(self.page_size.min(100))
     }
 }
 
 impl<T: Serialize> PageResponse<T> {
     pub fn new(items: Vec<T>, total: i64, page: u32, page_size: u32) -> Self {
-        let total_pages = if page_size > 0 {
-            ((total as u32) + page_size - 1) / page_size
-        } else {
-            0
-        };
+        let page_size_safe = i64::from(page_size.max(1));
+        let total_nonneg = total.max(0);
+        let total_pages =
+            u32::try_from((total_nonneg + page_size_safe - 1) / page_size_safe).unwrap_or(0);
         Self {
             items,
             total,

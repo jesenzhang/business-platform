@@ -7,6 +7,14 @@ rust-version.workspace = true
 [dependencies]
 shared-kernel = { workspace = true }
 serde = { workspace = true }
-chrono = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 async-trait = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

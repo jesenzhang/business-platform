@@ -1,9 +1,11 @@
+//! Unified API response types.
+
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Serialize;
 
-/// 统一 API 响应包装
+/// Unified API response wrapper.
 #[derive(Debug, Serialize)]
 pub struct ApiResponse<T: Serialize> {
     /// 是否成功
@@ -18,6 +20,7 @@ pub struct ApiResponse<T: Serialize> {
 
 impl<T: Serialize> ApiResponse<T> {
     /// 成功响应
+    #[must_use]
     pub fn ok(data: T) -> Self {
         Self {
             success: true,
@@ -27,6 +30,7 @@ impl<T: Serialize> ApiResponse<T> {
     }
 
     /// 成功响应附带消息
+    #[must_use]
     pub fn ok_with_message(data: T, message: impl Into<String>) -> Self {
         Self {
             success: true,

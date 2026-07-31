@@ -1,0 +1,20 @@
+[package]
+name = "document-postgres"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+document = { workspace = true }
+messaging = { workspace = true }
+sqlx = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

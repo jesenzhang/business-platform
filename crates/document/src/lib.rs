@@ -1,7 +1,9 @@
-//! 文档管理领域
+//! Framework-free Document Management bounded context.
 //!
-//! 负责文档上传、版本控制、权限管理、全文检索等文档管理功能。
-//!
-//! 本模块遵循 DDD 分层：domain / application / infrastructure / api
+//! HTTP, `SQLx`, object storage, and message broker adapters live outside this
+//! crate. This crate contains only business data, invariants, and application
+//! ports so it can be tested without a runtime or external services.
 
-// TODO: 阶段二实现
+pub mod application;
+pub mod domain;
+pub mod ports;

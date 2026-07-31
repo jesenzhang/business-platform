@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_TOOLCHAIN: "1.94.1"
+
+jobs:
+  fmt:
+    name: Format (Rust 1.94.1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: rustfmt
+      - run: rustc --version --verbose
+      - run: cargo --version
+      - run: cargo fmt --all -- --check
+
+  check:
+    name: Check (Rust 1.94.1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - run: rustc --version --verbose
+      - run: cargo --version
+      - run: cargo check --workspace --all-targets --all-features
+
+  clippy:
+    name: Clippy (Rust 1.94.1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: rustc --version --verbose
+      - run: cargo --version
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  architecture:
+    name: Architecture Fitness
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: ./scripts/check-architecture.ps1
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features
+
+  integration:
+    name: PostgreSQL + MinIO + E2E contracts
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: business_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d business_platform"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      minio:
+        image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+        command: server /data
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/business_platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - run: rustc --version --verbose
+      - run: cargo --version
+      - name: Create private MinIO test bucket
+        run: |
+          docker run --network host --rm --entrypoint /bin/sh minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
+      - name: Apply migrations
+        run: cargo run -p migration -- up
+      - name: Run real infrastructure and E2E tests
+        run: |
+          cargo test -p migration --test migration_test --all-features -- --include-ignored --test-threads=1
+          cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1
+          cargo test -p object-storage --test minio_contract --all-features -- --include-ignored --test-threads=1
+          cargo test -p business-api --test documents_postgres --all-features -- --include-ignored --test-threads=1
+      - name: Architecture and diff checks
+        shell: pwsh
+        run: |
+          ./scripts/check-architecture.ps1
+          git diff --check

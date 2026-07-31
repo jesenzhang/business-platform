@@ -12,7 +12,12 @@
 
 ## 2. 工具链与门禁
 
-仓库必须固定 Rust 工具链，并在 CI 执行：
+仓库当前 MSRV 和构建工具链统一固定为 Rust 1.94.1。Rust 1.85.0
+已在 2026-07-31 验证失败，原因是当前维护中的 `aws-sdk-s3`/Smithy
+运行时要求 Rust 1.94.1；完整决策见
+[`../adr/ADR-0004-rust-msrv-toolchain.md`](../adr/ADR-0004-rust-msrv-toolchain.md)。
+
+仓库必须使用该精确工具链，并在 CI 执行：
 
 ```bash
 cargo fmt --all -- --check

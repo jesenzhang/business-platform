@@ -1,10 +1,10 @@
 # 架构实施状态
 
-> 文档类型：Living Document  
-> 最后更新：2026-07-30  
-> 当前阶段：Phase 0 → 基础服务加固  
-> 当前计划：`PLAN-0001-foundation-hardening`  
-> 当前架构 PR：`#2 docs/ddd-backend-architecture`
+> 文档类型：Living Document
+> 最后更新：2026-07-31
+> 当前阶段：Phase 0 → 基础服务加固
+> 当前计划：`PLAN-0001-foundation-hardening`
+> 当前架构 PR：`#3 feat/PLAN-0001-foundation-hardening`（Ready for Review，Implemented）
 
 ## 1. 当前权威结论
 
@@ -53,7 +53,8 @@
 
 ## 3. 当前实现状态
 
-当前仓库仍是 Phase 0 工程骨架，完整架构已经定义，但代码尚未完全符合。
+当前仓库仍是 Phase 0 工程骨架；PLAN-0001 修订正在把首个 Document
+垂直切片和可靠基础设施实现已收敛到 Baseline，真实依赖证据已在 CI 形成。
 
 已具备：
 
@@ -65,20 +66,20 @@
 
 仍需收敛：
 
-- `shared-kernel` 仍存在框架和数据库依赖；
-- API 组合状态仍直接公开数据库连接；
-- 部分端口、适配器和核心模型尚未物理分离；
+- API 组合状态已通过真实 PostgreSQL HTTP 流程验证；
+- PostgreSQL adapter 已移出 `document` 核心，本地与 GitHub Actions Fitness Function 均已通过；
 - 当前领域 crate 尚未按 Bounded Context Map 完成统一语言和数据所有权落实；
 - `workflow` 仍未实现 Durable Task Execution 核心；
 - Worker、Migration 和 Agent Adapter 仍处于骨架阶段；
 - API/Event 契约尚未全部形成可生成 Schema；
 - 质量属性尚未形成性能和恢复证据；
-- 架构依赖规则尚未进入自动化 CI；
+- 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
 - 生产 Runbook 尚未完成。
 
 ## 4. PLAN-0001 实施约束
 
-`PLAN-0001` 已在实施中，其实现分支在合并前必须同步本架构 PR，并满足：
+`PLAN-0001` 当前为 `Implemented`，其实现分支已同步最新
+`origin/main`，在合并前必须满足：
 
 1. 首个 document metadata 垂直切片属于 Document Management Context；
 2. Document Management 拥有文档身份、版本和元数据；
@@ -141,20 +142,20 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：尚未实现
-PLAN-0001：实施中
+自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
+PLAN-0001：Implemented
 ```
 
 ## 8. 合并后的采用动作
 
-PR #2 合并后：
+PR #3 完成前：
 
-1. PLAN-0001 实现分支同步 `origin/main`；
-2. 检查其设计和代码是否符合完整 Baseline；
-3. 补充计划中的架构符合性章节；
-4. 重新运行架构、测试、安全和契约门禁；
-5. 在 PLAN-0001 PR 中提供逐项证据；
-6. 任何冲突以 Baseline 或新 ADR 解决，不静默保留。
+1. 运行 `scripts/check-architecture.ps1`；
+2. 运行固定 Rust 1.94.1 的 fmt/check/clippy/test；
+3. 启动 PostgreSQL/MinIO，执行 migration upgrade、Outbox fencing、
+   Document E2E 和对象存储契约测试；
+4. 在 PLAN-0001 PR 中提供逐项证据；
+5. 任何冲突以 Baseline 或新 ADR 解决，不静默保留。
 
 ## 9. 下一次更新条件
 
