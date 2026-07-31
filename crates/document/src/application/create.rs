@@ -9,6 +9,8 @@ use crate::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
 
+const REQUEST_FINGERPRINT_VERSION: i16 = 1;
+
 #[derive(Debug, Clone)]
 pub struct CreateDocumentCommand {
     pub tenant_id: Uuid,
@@ -70,6 +72,7 @@ impl CreateDocumentMetadata {
                 document,
                 idempotency_key: idempotency_key.to_string(),
                 request_fingerprint: fingerprint,
+                fingerprint_version: REQUEST_FINGERPRINT_VERSION,
             })
             .await
             .map_err(map_port_error)
@@ -78,15 +81,26 @@ impl CreateDocumentMetadata {
 
 fn request_fingerprint(command: &CreateDocumentCommand) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(b"document-create-fingerprint:v1\0");
     hasher.update(command.tenant_id.as_bytes());
     hasher.update(command.user_id.as_bytes());
-    hasher.update(command.original_filename.as_bytes());
-    hasher.update([0]);
-    hasher.update(command.content_type.as_bytes());
-    hasher.update([0]);
-    hasher.update(command.object_key.as_bytes());
-    hasher.update(command.size_bytes.unwrap_or_default().to_be_bytes());
+    update_string(&mut hasher, &command.original_filename);
+    update_string(&mut hasher, &command.content_type);
+    update_string(&mut hasher, &command.object_key);
+    match command.size_bytes {
+        None => hasher.update([0]),
+        Some(size) => {
+            hasher.update([1]);
+            hasher.update(size.to_be_bytes());
+        }
+    }
     format!("{:x}", hasher.finalize())
+}
+
+fn update_string(hasher: &mut Sha256, value: &str) {
+    let length = u64::try_from(value.len()).unwrap_or(u64::MAX);
+    hasher.update(length.to_be_bytes());
+    hasher.update(value.as_bytes());
 }
 
 fn map_domain_error(error: &DocumentDomainError) -> CreateDocumentError {
@@ -150,6 +164,10 @@ mod tests {
         assert!(!result.replayed);
         assert_eq!(result.document.tenant_id, tenant_id);
         assert_eq!(unit_of_work.calls.lock().expect("test lock").len(), 1);
+        assert_eq!(
+            unit_of_work.calls.lock().expect("test lock")[0].fingerprint_version,
+            REQUEST_FINGERPRINT_VERSION
+        );
     }
 
     #[tokio::test]
@@ -170,5 +188,27 @@ mod tests {
 
         assert!(matches!(result, Err(CreateDocumentError::Validation(_))));
         assert!(unit_of_work.calls.lock().expect("test lock").is_empty());
+    }
+
+    #[test]
+    fn fingerprint_distinguishes_missing_size_from_zero_size() {
+        let tenant_id = Uuid::now_v7();
+        let user_id = Uuid::now_v7();
+        let command = CreateDocumentCommand {
+            tenant_id,
+            user_id,
+            original_filename: "report.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            object_key: "report.pdf".to_string(),
+            size_bytes: None,
+            idempotency_key: "key-1".to_string(),
+        };
+        let zero_sized = CreateDocumentCommand {
+            size_bytes: Some(0),
+            ..command.clone()
+        };
+
+        assert_ne!(request_fingerprint(&command), request_fingerprint(&zero_sized));
+        assert_eq!(request_fingerprint(&command), request_fingerprint(&command));
     }
 }

@@ -22,21 +22,23 @@ pub(crate) struct DocumentRow {
     pub(crate) updated_at: DateTime<Utc>,
 }
 
-impl From<DocumentRow> for DocumentMetadata {
-    fn from(row: DocumentRow) -> Self {
-        Self {
+impl TryFrom<DocumentRow> for DocumentMetadata {
+    type Error = document::domain::DocumentStatusParseError;
+
+    fn try_from(row: DocumentRow) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: row.id,
             tenant_id: row.tenant_id,
             original_filename: row.original_filename,
             content_type: row.content_type,
             object_key: row.object_key,
-            status: DocumentStatus::from_db_str(&row.status),
+            status: DocumentStatus::try_from(row.status.as_str())?,
             version: row.version,
             size_bytes: row.size_bytes,
             created_by: row.created_by,
             created_at: row.created_at,
             updated_at: row.updated_at,
-        }
+        })
     }
 }
 
@@ -70,8 +72,12 @@ impl DocumentQueryRepository for PostgresDocumentQueryRepository {
         .bind(document_id)
         .fetch_optional(&self.pool)
         .await
-        .map(|row| row.map(DocumentMetadata::from))
         .map_err(map_sqlx_error)
+        .and_then(|row| {
+            row.map(DocumentMetadata::try_from)
+                .transpose()
+                .map_err(|_| RepositoryError::Failed)
+        })
     }
 
     async fn list(&self, query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError> {
@@ -101,7 +107,11 @@ impl DocumentQueryRepository for PostgresDocumentQueryRepository {
                 .get("count");
 
         Ok(DocumentPage {
-            items: rows.into_iter().map(DocumentMetadata::from).collect(),
+            items: rows
+                .into_iter()
+                .map(DocumentMetadata::try_from)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| RepositoryError::Failed)?,
             total,
         })
     }

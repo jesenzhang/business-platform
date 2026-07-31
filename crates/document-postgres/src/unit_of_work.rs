@@ -36,7 +36,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
 
         let existing = sqlx::query_as::<_, ExistingCreateRow>(
             r"
-            SELECT i.request_fingerprint,
+            SELECT i.request_fingerprint, i.fingerprint_version,
                    d.id, d.tenant_id, d.original_filename, d.content_type,
                    d.object_key, d.status, d.version, d.size_bytes, d.created_by,
                    d.created_at, d.updated_at
@@ -52,12 +52,15 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
         .map_err(map_sqlx_error)?;
 
         if let Some(existing) = existing {
-            if existing.request_fingerprint != command.request_fingerprint {
+            if existing.request_fingerprint != command.request_fingerprint
+                || existing.fingerprint_version != command.fingerprint_version
+            {
                 return Err(ApplicationPortError::IdempotencyConflict);
             }
+            let document = existing.into_document()?;
             transaction.commit().await.map_err(map_sqlx_error)?;
             return Ok(CreateDocumentResult {
-                document: existing.into_document(),
+                document,
                 replayed: true,
             });
         }
@@ -78,6 +81,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
 #[derive(Debug, sqlx::FromRow)]
 struct ExistingCreateRow {
     request_fingerprint: String,
+    fingerprint_version: i16,
     id: uuid::Uuid,
     tenant_id: uuid::Uuid,
     original_filename: String,
@@ -92,7 +96,7 @@ struct ExistingCreateRow {
 }
 
 impl ExistingCreateRow {
-    fn into_document(self) -> DocumentMetadata {
+    fn into_document(self) -> Result<DocumentMetadata, ApplicationPortError> {
         DocumentRow {
             id: self.id,
             tenant_id: self.tenant_id,
@@ -106,7 +110,8 @@ impl ExistingCreateRow {
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
-        .into()
+        .try_into()
+        .map_err(|_| ApplicationPortError::Failed)
     }
 }
 
@@ -193,13 +198,14 @@ async fn insert_idempotency(
     sqlx::query(
         r"
         INSERT INTO document_idempotency
-            (tenant_id, idempotency_key, request_fingerprint, document_id)
-        VALUES ($1, $2, $3, $4)
+            (tenant_id, idempotency_key, request_fingerprint, fingerprint_version, document_id)
+        VALUES ($1, $2, $3, $4, $5)
         ",
     )
     .bind(command.document.tenant_id)
     .bind(&command.idempotency_key)
     .bind(&command.request_fingerprint)
+    .bind(command.fingerprint_version)
     .bind(command.document.id)
     .execute(&mut **transaction)
     .await

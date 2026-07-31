@@ -9,6 +9,7 @@ pub struct PersistNewDocument {
     pub document: DocumentMetadata,
     pub idempotency_key: String,
     pub request_fingerprint: String,
+    pub fingerprint_version: i16,
 }
 
 /// Result of an atomic create. `replayed` is true for an idempotent retry.

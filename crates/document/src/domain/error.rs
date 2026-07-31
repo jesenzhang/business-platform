@@ -6,6 +6,10 @@ use uuid::Uuid;
 /// Errors that can occur within the document domain.
 #[derive(Debug, Error)]
 pub enum DocumentDomainError {
+    /// File size must be absent, zero, or positive.
+    #[error("document size must not be negative")]
+    InvalidSize,
+
     /// The original filename is empty or blank.
     #[error("filename must not be empty")]
     EmptyFilename,
