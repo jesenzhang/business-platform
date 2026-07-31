@@ -118,6 +118,92 @@ async fn concurrent_claim_no_duplicates() {
     cleanup(&pool, &tenant).await;
 }
 
+/// Fencing rejects a late worker after the lease is recovered and reclaimed.
+#[tokio::test]
+#[ignore = "requires running PostgreSQL"]
+async fn stale_worker_cannot_publish_or_fail() {
+    let pool = setup_pool().await;
+    run_migrations(&pool).await;
+    let tenant = format!("test-fencing-{}", Uuid::now_v7());
+    let event = DomainEvent::new(
+        "test.fencing",
+        &tenant,
+        "aggregate",
+        "TestAggregate",
+        serde_json::json!({}),
+    );
+    insert_test_event(&pool, &event).await;
+
+    let worker_a = ReliableOutbox::new(pool.clone(), "worker-a".to_string(), Duration::from_secs(1));
+    let worker_b = ReliableOutbox::new(pool.clone(), "worker-b".to_string(), Duration::from_secs(60));
+    let first = worker_a.claim_batch(1).await.expect("first claim");
+    assert_eq!(first.len(), 1);
+    let old_token = first[0].claim_token.expect("first token");
+    let old_version = first[0].claim_version;
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
+    worker_a.recover_expired_leases().await.expect("recovery");
+    let second = worker_b.claim_batch(1).await.expect("second claim");
+    assert_eq!(second.len(), 1);
+    assert!(matches!(
+        worker_a
+            .mark_published(event.event_id, old_token, old_version)
+            .await,
+        Err(messaging::OutboxError::LeaseLost)
+    ));
+    assert!(matches!(
+        worker_a
+            .mark_failed(event.event_id, old_token, old_version, "late")
+            .await,
+        Err(messaging::OutboxError::LeaseLost)
+    ));
+    cleanup(&pool, &tenant).await;
+}
+
+/// A larger concurrent batch has one owner per event.
+#[tokio::test]
+#[ignore = "requires running PostgreSQL"]
+async fn concurrent_claim_100_has_unique_ownership() {
+    let pool = setup_pool().await;
+    run_migrations(&pool).await;
+    let tenant = format!("test-concurrent-100-{}", Uuid::now_v7());
+    for i in 0..100 {
+        insert_test_event(
+            &pool,
+            &DomainEvent::new(
+                "test.concurrent.100",
+                &tenant,
+                format!("aggregate-{i}"),
+                "TestAggregate",
+                serde_json::json!({"i": i}),
+            ),
+        )
+        .await;
+    }
+    let workers: Vec<_> = (0..10)
+        .map(|index| {
+            ReliableOutbox::new(
+                pool.clone(),
+                format!("worker-{index}"),
+                Duration::from_secs(60),
+            )
+        })
+        .collect();
+    let mut tasks = Vec::new();
+    for worker in workers {
+        tasks.push(tokio::spawn(async move {
+            worker.claim_batch(10).await.expect("claim")
+        }));
+    }
+    let mut ids = std::collections::HashSet::new();
+    for task in tasks {
+        for record in task.await.expect("worker task") {
+            assert!(ids.insert(record.event_id), "duplicate ownership");
+        }
+    }
+    assert_eq!(ids.len(), 100);
+    cleanup(&pool, &tenant).await;
+}
+
 /// Expired leases are recovered and events become available again.
 #[tokio::test]
 #[ignore = "requires running PostgreSQL"]
@@ -193,7 +279,12 @@ async fn failure_schedules_retry() {
     assert_eq!(claimed[0].attempt_count, 1);
 
     outbox
-        .mark_failed(event.event_id, "transient error")
+        .mark_failed(
+            event.event_id,
+            claimed[0].claim_token.expect("claim token"),
+            claimed[0].claim_version,
+            "transient error",
+        )
         .await
         .expect("mark_failed failed");
 
@@ -265,13 +356,7 @@ async fn max_attempts_reached() {
     .expect("reset status failed");
 
     let claimed = outbox.claim_batch(1).await.expect("claim failed");
-    assert_eq!(claimed.len(), 1);
-
-    // Fail it - should become permanently failed since attempt_count >= max_attempts
-    outbox
-        .mark_failed(event.event_id, "permanent error")
-        .await
-        .expect("mark_failed failed");
+    assert_eq!(claimed.len(), 0, "events at max attempts are not claimable");
 
     let row: (String,) = sqlx::query_as("SELECT status FROM outbox_events WHERE event_id = $1")
         .bind(event.event_id)
@@ -279,7 +364,7 @@ async fn max_attempts_reached() {
         .await
         .expect("fetch failed");
 
-    assert_eq!(row.0, "failed");
+    assert_eq!(row.0, "pending");
 
     cleanup(&pool, &tenant).await;
 }

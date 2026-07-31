@@ -30,10 +30,11 @@ pattern inside a CTE-based `UPDATE ... RETURNING` query. This provides:
 
 ### Lease-based ownership
 
-Each claimed event receives a `claimed_by` worker identifier and a
-`lease_until` timestamp. If a worker crashes before marking the event as
-published, a periodic recovery sweep resets expired leases back to
-`retry_scheduled`, making events available for other workers.
+Each claimed event receives `claimed_by`, a UUID `claim_token`, a monotonically
+increasing `claim_version`, and `lease_until`. Publish/fail updates require all
+four ownership fields, `status = processing`, and an unexpired lease. An update
+that affects zero rows returns `LeaseLost`, preventing a stale worker from
+overwriting a newer claim.
 
 ### Exponential backoff with max attempts
 
@@ -59,7 +60,12 @@ pending -> processing -> published
 
 ## Consequences
 
-- The `published: bool` column is superseded by `status VARCHAR(30)`
+- `status VARCHAR(30)` is authoritative. The legacy `published` flag is
+  temporarily retained for rolling compatibility and constrained to equal
+  `(status = 'published')`.
+- Migration 004 reconciles historical rows before adding constraints.
+- Consumer-side `inbox_events` markers provide at-least-once idempotency when
+  inserted in the same transaction as a consumer side effect.
 - Old index `idx_outbox_unpublished` is dropped; replaced by partial indexes
 - Workers must run periodic lease recovery (recommended: every 30 seconds)
 - The `claim_batch` query uses a CTE which requires PostgreSQL 12+

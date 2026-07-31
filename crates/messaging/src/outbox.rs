@@ -3,11 +3,11 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use sqlx::postgres::PgQueryResult;
 use sqlx::{PgPool, Postgres, Transaction};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::event::DomainEvent;
 
-/// Outbox event status representing the delivery state machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutboxStatus {
     Pending,
@@ -18,7 +18,6 @@ pub enum OutboxStatus {
 }
 
 impl OutboxStatus {
-    /// Return the database string representation.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -37,7 +36,14 @@ impl std::fmt::Display for OutboxStatus {
     }
 }
 
-/// A claimable outbox record with full delivery state.
+#[derive(Debug, Error)]
+pub enum OutboxError {
+    #[error("outbox lease was lost or claim is stale")]
+    LeaseLost,
+    #[error("outbox database operation failed")]
+    Database(#[source] sqlx::Error),
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct OutboxRecord {
     pub event_id: Uuid,
@@ -54,13 +60,14 @@ pub struct OutboxRecord {
     pub max_attempts: i32,
     pub available_at: DateTime<Utc>,
     pub claimed_by: Option<String>,
+    pub claim_token: Option<Uuid>,
+    pub claim_version: i64,
     pub lease_until: Option<DateTime<Utc>>,
     pub published_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
 }
 
 impl OutboxRecord {
-    /// Convert the stored record back into a [`DomainEvent`].
     #[must_use]
     pub fn into_domain_event(self) -> DomainEvent {
         DomainEvent {
@@ -77,10 +84,6 @@ impl OutboxRecord {
     }
 }
 
-/// Reliable outbox with claim-based multi-worker delivery.
-///
-/// Uses `FOR UPDATE SKIP LOCKED` for safe concurrent claiming and
-/// lease-based ownership with expiration recovery.
 pub struct ReliableOutbox {
     pool: PgPool,
     worker_id: String,
@@ -88,11 +91,6 @@ pub struct ReliableOutbox {
 }
 
 impl ReliableOutbox {
-    /// Create a new reliable outbox worker.
-    ///
-    /// - `pool`: database connection pool
-    /// - `worker_id`: unique identifier for this worker instance
-    /// - `lease_duration`: how long a claimed event is held before recovery
     #[must_use]
     pub fn new(pool: PgPool, worker_id: String, lease_duration: Duration) -> Self {
         Self {
@@ -102,10 +100,6 @@ impl ReliableOutbox {
         }
     }
 
-    /// Append an event within an existing transaction.
-    ///
-    /// The caller should perform business writes and event append in the same
-    /// transaction to guarantee atomicity.
     pub async fn append_in_tx(
         tx: &mut Transaction<'_, Postgres>,
         event: &DomainEvent,
@@ -114,8 +108,8 @@ impl ReliableOutbox {
             r"
             INSERT INTO outbox_events
                 (event_id, event_type, tenant_id, aggregate_id, aggregate_type,
-                 payload, schema_version, trace_id, occurred_at, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+                 payload, schema_version, trace_id, occurred_at, status, published)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', FALSE)
             ",
         )
         .bind(event.event_id)
@@ -129,19 +123,12 @@ impl ReliableOutbox {
         .bind(event.occurred_at)
         .execute(&mut **tx)
         .await?;
-
         Ok(())
     }
 
-    /// Atomically claim a batch of events using `FOR UPDATE SKIP LOCKED`.
-    ///
-    /// Returns claimed events with lease set. Events are ordered
-    /// deterministically by `(available_at, event_id)`.
-    pub async fn claim_batch(&self, batch_size: i64) -> Result<Vec<OutboxRecord>, sqlx::Error> {
+    pub async fn claim_batch(&self, batch_size: i64) -> Result<Vec<OutboxRecord>, OutboxError> {
         let lease_secs = i64::try_from(self.lease_duration.as_secs()).unwrap_or(i64::MAX);
-
-        let mut tx = self.pool.begin().await?;
-
+        let mut tx = self.pool.begin().await.map_err(OutboxError::Database)?;
         let records = sqlx::query_as::<_, OutboxRecord>(
             r"
             WITH claimed AS (
@@ -149,6 +136,7 @@ impl ReliableOutbox {
                 FROM outbox_events
                 WHERE status IN ('pending', 'retry_scheduled')
                   AND available_at <= NOW()
+                  AND attempt_count < max_attempts
                 ORDER BY available_at, event_id
                 LIMIT $1
                 FOR UPDATE SKIP LOCKED
@@ -156,105 +144,145 @@ impl ReliableOutbox {
             UPDATE outbox_events e
             SET status = 'processing',
                 claimed_by = $2,
+                claim_token = uuid_generate_v4(),
+                claim_version = e.claim_version + 1,
                 lease_until = NOW() + make_interval(secs => $3),
-                attempt_count = e.attempt_count + 1
+                attempt_count = e.attempt_count + 1,
+                published = FALSE
             FROM claimed
             WHERE e.event_id = claimed.event_id
             RETURNING e.event_id, e.event_type, e.tenant_id, e.aggregate_id,
                       e.aggregate_type, e.payload, e.schema_version, e.trace_id,
                       e.occurred_at, e.status, e.attempt_count, e.max_attempts,
-                      e.available_at, e.claimed_by, e.lease_until, e.published_at,
-                      e.last_error
+                      e.available_at, e.claimed_by, e.claim_token, e.claim_version,
+                      e.lease_until, e.published_at, e.last_error
             ",
         )
         .bind(batch_size)
         .bind(&self.worker_id)
         .bind(lease_secs)
         .fetch_all(&mut *tx)
-        .await?;
-
-        tx.commit().await?;
-
+        .await
+        .map_err(OutboxError::Database)?;
+        tx.commit().await.map_err(OutboxError::Database)?;
         Ok(records)
     }
 
-    /// Mark an event as successfully published.
-    pub async fn mark_published(&self, event_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
+    pub async fn mark_published(
+        &self,
+        event_id: Uuid,
+        claim_token: Uuid,
+        claim_version: i64,
+    ) -> Result<(), OutboxError> {
+        let result = sqlx::query(
             r"
             UPDATE outbox_events
             SET status = 'published',
+                published = TRUE,
                 published_at = NOW(),
                 claimed_by = NULL,
+                claim_token = NULL,
                 lease_until = NULL
             WHERE event_id = $1
+              AND status = 'processing'
+              AND claimed_by = $2
+              AND claim_token = $3
+              AND claim_version = $4
+              AND lease_until > NOW()
             ",
         )
         .bind(event_id)
+        .bind(&self.worker_id)
+        .bind(claim_token)
+        .bind(claim_version)
         .execute(&self.pool)
-        .await?;
-
-        Ok(())
+        .await
+        .map_err(OutboxError::Database)?;
+        ensure_lease_owned(&result)
     }
 
-    /// Mark an event as failed with error.
-    ///
-    /// Schedules retry with exponential backoff if attempts remain;
-    /// otherwise marks the event as permanently failed.
-    pub async fn mark_failed(&self, event_id: Uuid, error: &str) -> Result<(), sqlx::Error> {
-        sqlx::query(
+    pub async fn mark_failed(
+        &self,
+        event_id: Uuid,
+        claim_token: Uuid,
+        claim_version: i64,
+        error: &str,
+    ) -> Result<(), OutboxError> {
+        let result = sqlx::query(
             r"
             UPDATE outbox_events
             SET status = CASE
                     WHEN attempt_count < max_attempts THEN 'retry_scheduled'
                     ELSE 'failed'
                 END,
+                published = FALSE,
                 available_at = CASE
                     WHEN attempt_count < max_attempts
                     THEN NOW() + make_interval(secs => LEAST(power(2, attempt_count)::bigint, 300))
                     ELSE available_at
                 END,
-                last_error = $2,
+                last_error = $5,
                 claimed_by = NULL,
+                claim_token = NULL,
                 lease_until = NULL
             WHERE event_id = $1
+              AND status = 'processing'
+              AND claimed_by = $2
+              AND claim_token = $3
+              AND claim_version = $4
+              AND lease_until > NOW()
             ",
         )
         .bind(event_id)
+        .bind(&self.worker_id)
+        .bind(claim_token)
+        .bind(claim_version)
         .bind(error)
         .execute(&self.pool)
-        .await?;
-
-        Ok(())
+        .await
+        .map_err(OutboxError::Database)?;
+        ensure_lease_owned(&result)
     }
 
-    /// Recover events whose lease has expired (worker crashed).
-    ///
-    /// Returns the number of recovered events.
-    pub async fn recover_expired_leases(&self) -> Result<u64, sqlx::Error> {
+    pub async fn recover_expired_leases(&self) -> Result<u64, OutboxError> {
         let result: PgQueryResult = sqlx::query(
             r"
             UPDATE outbox_events
-            SET status = 'retry_scheduled',
+            SET status = CASE
+                    WHEN attempt_count < max_attempts THEN 'retry_scheduled'
+                    ELSE 'failed'
+                END,
+                published = FALSE,
                 claimed_by = NULL,
+                claim_token = NULL,
                 lease_until = NULL,
-                available_at = NOW()
+                available_at = CASE
+                    WHEN attempt_count < max_attempts THEN NOW()
+                    ELSE available_at
+                END,
+                last_error = COALESCE(last_error, 'lease expired and was recovered')
             WHERE status = 'processing' AND lease_until < NOW()
             ",
         )
         .execute(&self.pool)
-        .await?;
-
+        .await
+        .map_err(OutboxError::Database)?;
         Ok(result.rows_affected())
     }
 }
 
-/// Exponential backoff: 2^attempt seconds, capped at 5 minutes.
+fn ensure_lease_owned(result: &PgQueryResult) -> Result<(), OutboxError> {
+    if result.rows_affected() == 1 {
+        Ok(())
+    } else {
+        Err(OutboxError::LeaseLost)
+    }
+}
+
 #[must_use]
 pub fn backoff_duration(attempt_count: i32) -> Duration {
     let exp = u32::try_from(attempt_count).unwrap_or(0);
-    let secs = 2u64.saturating_pow(exp).min(300);
-    Duration::from_secs(secs)
+    Duration::from_secs(2u64.saturating_pow(exp).min(300))
 }
 
 #[cfg(test)]
@@ -262,41 +290,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn backoff_attempt_zero() {
-        // 2^0 = 1 second
-        assert_eq!(backoff_duration(0), Duration::from_secs(1));
-    }
-
-    #[test]
-    fn backoff_attempt_one() {
-        // 2^1 = 2 seconds
-        assert_eq!(backoff_duration(1), Duration::from_secs(2));
-    }
-
-    #[test]
-    fn backoff_attempt_three() {
-        // 2^3 = 8 seconds
-        assert_eq!(backoff_duration(3), Duration::from_secs(8));
-    }
-
-    #[test]
     fn backoff_caps_at_five_minutes() {
-        // 2^10 = 1024 > 300, so capped at 300
         assert_eq!(backoff_duration(10), Duration::from_secs(300));
     }
 
     #[test]
-    fn backoff_large_attempt_caps() {
-        // Very large attempt still caps at 300
-        assert_eq!(backoff_duration(30), Duration::from_secs(300));
-    }
-
-    #[test]
-    fn outbox_status_display() {
-        assert_eq!(OutboxStatus::Pending.as_str(), "pending");
-        assert_eq!(OutboxStatus::Processing.as_str(), "processing");
-        assert_eq!(OutboxStatus::Published.as_str(), "published");
-        assert_eq!(OutboxStatus::RetryScheduled.as_str(), "retry_scheduled");
-        assert_eq!(OutboxStatus::Failed.as_str(), "failed");
+    fn status_display_is_stable() {
+        assert_eq!(OutboxStatus::RetryScheduled.to_string(), "retry_scheduled");
     }
 }

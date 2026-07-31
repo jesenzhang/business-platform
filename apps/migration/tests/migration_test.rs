@@ -28,6 +28,15 @@ fn migrations_are_valid() {
     }
 }
 
+#[test]
+fn outbox_reconciliation_migration_is_forward_only_and_fenced() {
+    let migration = include_str!("../../../migrations/004_outbox_state_reconciliation.sql");
+    assert!(migration.contains("status = 'published'"));
+    assert!(migration.contains("claim_token"));
+    assert!(migration.contains("outbox_status_check"));
+    assert!(migration.contains("published = (status = 'published')"));
+}
+
 /// Apply migrations to a fresh database. Requires `DATABASE_URL`.
 #[tokio::test]
 #[ignore = "requires running PostgreSQL"]
