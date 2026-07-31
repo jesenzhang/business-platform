@@ -105,7 +105,7 @@ jobs:
       - run: cargo --version
       - name: Create private MinIO test bucket
         run: |
-          docker run --network host --rm minio/mc:RELEASE.2024-06-12T14-34-03Z sh -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
+          docker run --network host --rm --entrypoint /bin/sh minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
       - name: Apply migrations
         run: cargo run -p migration -- up
       - name: Run real infrastructure and E2E tests
