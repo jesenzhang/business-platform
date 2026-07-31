@@ -5,15 +5,14 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
+use business_api::config::{
+    AuthConfig, BusinessApiConfig, DatabaseConfig, ObservabilityConfig, ServerConfig,
+};
 use business_api::routes;
 use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
 use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
 use http_body_util::BodyExt;
-use shared_kernel::config::{
-    AppEnv, AuthConfig, BucketConfig, DatabaseConfig, MessagingConfig, ObservabilityConfig,
-    ServerConfig, StorageConfig,
-};
-use shared_kernel::{AppConfig, Secret};
+use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -40,8 +39,8 @@ async fn run_migrations(pool: &sqlx::PgPool) {
 }
 
 fn test_router(pool: sqlx::PgPool) -> axum::Router {
-    let config = AppConfig {
-        env: AppEnv::Development,
+    let config = BusinessApiConfig {
+        env: RuntimeEnvironment::Development,
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3000,
@@ -50,21 +49,10 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             body_limit_bytes: 1024 * 1024,
         },
         database: DatabaseConfig {
-            url: "postgres://localhost/test".to_string(),
+            url: SecretUrl::parse("postgres://localhost/test").expect("test URL should parse"),
             max_connections: 10,
             min_connections: 0,
             acquire_timeout_secs: 2,
-        },
-        storage: StorageConfig {
-            endpoint: "http://localhost:9000".to_string(),
-            access_key: Secret::new("test".to_string()),
-            secret_key: Secret::new("test".to_string()),
-            region: "us-east-1".to_string(),
-            buckets: BucketConfig::default(),
-        },
-        messaging: MessagingConfig {
-            nats_url: "nats://localhost:4222".to_string(),
-            enabled: false,
         },
         observability: ObservabilityConfig {
             service_name: "business-api-postgres-test".to_string(),
@@ -85,13 +73,12 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
         pool.clone(),
     ));
     let state = Arc::new(AppState {
-        config,
         documents: DocumentServices {
             create: Arc::new(CreateDocumentMetadata::new(unit_of_work)),
             get: Arc::new(GetDocumentMetadata::new(repository.clone())),
             list: Arc::new(ListDocumentMetadata::new(repository)),
         },
-        readiness: Arc::new(PostgresReadinessProbe::new(pool, 6)),
+        readiness: Arc::new(PostgresReadinessProbe::new(pool, 7)),
     });
     routes::create_router(
         state,
@@ -99,6 +86,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
         },
+        &config.server,
     )
 }
 

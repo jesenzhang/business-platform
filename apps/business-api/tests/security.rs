@@ -12,6 +12,9 @@ use async_trait::async_trait;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
+use business_api::config::{
+    AuthConfig, BusinessApiConfig, DatabaseConfig, ObservabilityConfig, ServerConfig,
+};
 use business_api::routes::create_router;
 use business_api::state::{
     AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
@@ -22,11 +25,7 @@ use document::domain::{
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
-use shared_kernel::config::{
-    AppEnv, AuthConfig, BucketConfig, DatabaseConfig, MessagingConfig, ObservabilityConfig,
-    ServerConfig, StorageConfig,
-};
-use shared_kernel::{AppConfig, Secret};
+use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tower::ServiceExt;
 
 const DEV_SECRET: &str = "test-dev-secret";
@@ -72,9 +71,9 @@ impl ReadinessProbe for EmptyPorts {
     }
 }
 
-fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> AppConfig {
-    AppConfig {
-        env: AppEnv::Development,
+fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApiConfig {
+    BusinessApiConfig {
+        env: RuntimeEnvironment::Development,
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3000,
@@ -83,21 +82,11 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> AppConfig {
             body_limit_bytes: 1024,
         },
         database: DatabaseConfig {
-            url: "postgres://user:pass@localhost:5432/db".to_string(),
+            url: SecretUrl::parse("postgres://user:pass@localhost:5432/db")
+                .expect("test URL should parse"),
             max_connections: 1,
             min_connections: 0,
             acquire_timeout_secs: 1,
-        },
-        storage: StorageConfig {
-            endpoint: "http://localhost:9000".to_string(),
-            access_key: Secret::new("minioadmin".to_string()),
-            secret_key: Secret::new("minioadmin".to_string()),
-            region: "us-east-1".to_string(),
-            buckets: BucketConfig::default(),
-        },
-        messaging: MessagingConfig {
-            nats_url: "nats://localhost:4222".to_string(),
-            enabled: false,
         },
         observability: ObservabilityConfig {
             service_name: "business-api-test".to_string(),
@@ -129,13 +118,12 @@ fn test_router(dev_auth_enabled: bool) -> axum::Router {
             )),
         },
         readiness: ports,
-        config,
     });
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled,
         dev_secret: Some(DEV_SECRET.to_string()),
     };
-    create_router(state, auth_config)
+    create_router(state, auth_config, &config.server)
 }
 
 async fn status_of(router: axum::Router, request: Request<Body>) -> StatusCode {

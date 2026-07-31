@@ -12,9 +12,7 @@ use anyhow::Context;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::Row;
 
-/// Fallback connection string for local development.
-const DEFAULT_DATABASE_URL: &str =
-    "postgres://postgres:postgres@localhost:5432/enterprise_platform";
+mod config;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,14 +23,18 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| DEFAULT_DATABASE_URL.to_string());
+    let config = config::MigrationConfig::load()
+        .map_err(|error| anyhow::anyhow!("failed to load migration configuration: {error}"))?;
+    if let Err(error) = config.validate() {
+        eprintln!("Migration configuration validation failed:\n{error}");
+        std::process::exit(1);
+    }
 
     let command = std::env::args().nth(1).unwrap_or_default();
 
     match command.as_str() {
-        "up" => run_up(&database_url).await,
-        "status" => run_status(&database_url).await,
+        "up" => run_up(config.database.url.expose()).await,
+        "status" => run_status(config.database.url.expose()).await,
         _ => {
             eprintln!("Usage: migration <up|status>");
             eprintln!("  up      Apply all pending migrations");

@@ -22,8 +22,31 @@ function Assert-NotContains([string]$Path, [string[]]$Patterns, [string]$Message
 }
 
 Assert-NotContains "crates/shared-kernel/Cargo.toml" @("axum", "sqlx", "reqwest", "aws-sdk") "shared-kernel dependency violation"
+Assert-NotContains "crates/shared-kernel/Cargo.toml" @("config", "tracing") "shared-kernel runtime configuration dependency violation"
+Assert-NotContains "crates/shared-kernel/src" @(
+    "AppConfig",
+    "DatabaseConfig",
+    "StorageConfig",
+    "MessagingConfig",
+    "ServerConfig",
+    "AuthConfig",
+    "std::env"
+) "shared-kernel process configuration violation"
 Assert-NotContains "crates/document/Cargo.toml" @("axum", "sqlx", "aws-sdk", "object-storage", "messaging") "document core dependency violation"
 Assert-NotContains "crates/document/src/domain" @("IntoResponse", "sqlx::", "FromRow") "document domain protocol/SQL violation"
+Assert-NotContains "crates/document/src/domain" @("std::env") "document domain environment access violation"
+Assert-NotContains "crates/document/src/application" @("std::env") "document application environment access violation"
+$statePath = Join-Path $root "apps/business-api/src/state.rs"
+$stateContent = Get-Content -Raw $statePath
+$appStateMatch = [regex]::Match($stateContent, 'pub struct AppState\s*\{(?<body>[\s\S]*?)\n\}')
+if (-not $appStateMatch.Success) {
+    throw "Unable to locate AppState for architecture fitness"
+}
+foreach ($pattern in @("AppConfig", "DatabaseConfig", "SecretUrl", "PgPool")) {
+    if ($appStateMatch.Groups["body"].Value -match [regex]::Escape($pattern)) {
+        throw "HTTP application state infrastructure leak (AppState contains '$pattern')"
+    }
+}
 
 foreach ($path in @("crates/document/src/application", "crates/document/src/ports.rs")) {
     if (Test-Path (Join-Path $root $path)) {

@@ -29,7 +29,7 @@ pub enum AuthError {
 
 /// Configuration for the authentication middleware.
 ///
-/// Derived from [`shared_kernel::config::AuthConfig`] at startup.
+/// Derived from the API process configuration at startup.
 #[derive(Clone)]
 pub struct AuthMiddlewareConfig {
     /// When true, accept the static `dev_secret` token (development only).

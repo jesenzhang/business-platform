@@ -10,8 +10,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-config = { workspace = true }
-tracing = { workspace = true }
 
 [lints]
 workspace = true

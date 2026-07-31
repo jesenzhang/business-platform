@@ -2,13 +2,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use business_api::auth::AuthMiddlewareConfig;
+use business_api::config::BusinessApiConfig;
 use business_api::routes;
 use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = shared_kernel::AppConfig::load()
-        .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
+    let config =
+        BusinessApiConfig::load().map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
 
     // Fail fast on invalid configuration before touching any infrastructure.
     if let Err(e) = config.validate() {
@@ -16,7 +17,11 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let _guard = observability::init_tracing(&config.observability)?;
+    let _guard = observability::init_tracing(
+        &config.observability.service_name,
+        &config.observability.log_level,
+        config.observability.otlp_endpoint.as_deref(),
+    )?;
 
     tracing::info!(service = %config.observability.service_name, "Starting business-api");
 
@@ -27,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
         .acquire_timeout(std::time::Duration::from_secs(
             config.database.acquire_timeout_secs,
         ))
-        .connect(&config.database.url)
+        .connect(config.database.url.expose())
         .await?;
 
     tracing::info!("Database connection established");
@@ -48,8 +53,7 @@ async fn main() -> anyhow::Result<()> {
             )),
             list: Arc::new(document::application::ListDocumentMetadata::new(repository)),
         },
-        readiness: Arc::new(PostgresReadinessProbe::new(pool, 5)),
-        config: config.clone(),
+        readiness: Arc::new(PostgresReadinessProbe::new(pool, 7)),
     });
 
     let auth_config = AuthMiddlewareConfig {
@@ -61,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
             .map(|secret| secret.expose().clone()),
     };
 
-    let app = routes::create_router(state, auth_config);
+    let app = routes::create_router(state, auth_config, &config.server);
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
     tracing::info!(%addr, "Server listening");

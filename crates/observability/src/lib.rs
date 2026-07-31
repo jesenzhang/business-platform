@@ -1,7 +1,6 @@
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::TracerProvider;
-use shared_kernel::config::ObservabilityConfig;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
@@ -29,13 +28,17 @@ impl Drop for TracingGuard {
 /// When `config.otlp_endpoint` is `Some`, an OpenTelemetry OTLP exporter is
 /// configured alongside the standard fmt layer. Otherwise only the fmt layer
 /// with an env-filter (derived from `config.log_level`) is installed.
-pub fn init_tracing(config: &ObservabilityConfig) -> anyhow::Result<TracingGuard> {
+pub fn init_tracing(
+    service_name: &str,
+    log_level: &str,
+    otlp_endpoint: Option<&str>,
+) -> anyhow::Result<TracingGuard> {
     let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     let fmt_layer = tracing_subscriber::fmt::layer();
 
-    if let Some(endpoint) = &config.otlp_endpoint {
+    if let Some(endpoint) = otlp_endpoint {
         let exporter = opentelemetry_otlp::SpanExporter::builder()
             .with_tonic()
             .with_endpoint(endpoint)
@@ -44,11 +47,11 @@ pub fn init_tracing(config: &ObservabilityConfig) -> anyhow::Result<TracingGuard
         let provider = TracerProvider::builder()
             .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
             .with_resource(opentelemetry_sdk::Resource::new(vec![
-                opentelemetry::KeyValue::new("service.name", config.service_name.clone()),
+                opentelemetry::KeyValue::new("service.name", service_name.to_string()),
             ]))
             .build();
 
-        let tracer = provider.tracer(config.service_name.clone());
+        let tracer = provider.tracer(service_name.to_string());
 
         tracing_subscriber::registry()
             .with(env_filter)

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
-use shared_kernel::AppConfig;
 use sqlx::PgPool;
 
 /// Application services injected by the composition root.
@@ -34,7 +33,6 @@ pub struct ReadinessReport {
 /// HTTP application state. No handler receives a database pool.
 #[derive(Clone)]
 pub struct AppState {
-    pub config: AppConfig,
     pub documents: DocumentServices,
     pub readiness: Arc<dyn ReadinessProbe>,
 }

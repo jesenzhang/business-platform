@@ -16,6 +16,7 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::auth::{auth_middleware, AuthMiddlewareConfig};
+use crate::config::ServerConfig;
 use crate::state::AppState;
 
 /// 构建 HTTP 路由。
@@ -27,10 +28,14 @@ use crate::state::AppState;
 /// 全局中间件按请求处理顺序（外→内）为：
 /// Request ID → Trace → CORS → Body Limit → Timeout → \[Auth(仅受保护路由)\] → Handler。
 /// 由于 Axum 的 `.layer()` 越靠后越靠近 handler，下面按相反顺序声明。
-pub fn create_router(state: Arc<AppState>, auth_config: AuthMiddlewareConfig) -> Router {
-    let request_timeout = Duration::from_secs(state.config.server.request_timeout_secs);
-    let body_limit = state.config.server.body_limit_bytes;
-    let cors = build_cors_layer(&state.config.server.cors_origins);
+pub fn create_router(
+    state: Arc<AppState>,
+    auth_config: AuthMiddlewareConfig,
+    server_config: &ServerConfig,
+) -> Router {
+    let request_timeout = Duration::from_secs(server_config.request_timeout_secs);
+    let body_limit = server_config.body_limit_bytes;
+    let cors = build_cors_layer(&server_config.cors_origins);
 
     let protected_routes = Router::new()
         .nest("/api/v1/documents", documents::router())

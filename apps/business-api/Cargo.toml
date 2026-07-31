@@ -21,6 +21,7 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+runtime-config = { workspace = true }
 
 shared-kernel = { workspace = true }
 observability = { workspace = true }
