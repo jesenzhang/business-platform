@@ -13,7 +13,9 @@ name = "agent-adapter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "shared-kernel",
+ "observability",
+ "runtime-config",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -66,7 +68,9 @@ name = "ai-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "shared-kernel",
+ "observability",
+ "runtime-config",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -746,6 +750,7 @@ dependencies = [
  "document-postgres",
  "http-body-util",
  "observability",
+ "runtime-config",
  "serde",
  "serde_json",
  "shared-kernel",
@@ -762,7 +767,9 @@ name = "business-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "shared-kernel",
+ "observability",
+ "runtime-config",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -2179,7 +2186,8 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "shared-kernel",
+ "runtime-config",
+ "serde",
  "sqlx",
  "tokio",
  "tracing",
@@ -2332,7 +2340,6 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
- "shared-kernel",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -2842,6 +2849,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "runtime-config"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "serde",
+ "thiserror 2.0.19",
+ "url",
+]
+
+[[package]]
 name = "rust-ini"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3156,11 +3173,9 @@ name = "shared-kernel"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "config",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
- "tracing",
  "uuid",
 ]
 
