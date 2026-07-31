@@ -3,8 +3,8 @@
 > 文档类型：Living Document
 > 最后更新：2026-07-31
 > 当前阶段：Phase 0 → 基础服务加固
-> 当前计划：`PLAN-0001-foundation-hardening`
-> 当前架构 PR：`#3 feat/PLAN-0001-foundation-hardening`（Ready for Review，Implemented）
+> 当前计划：`PLAN-0002-foundation-integrity-and-closeout`
+> 当前架构 PR：PLAN-0002 尚未创建（Active）
 
 ## 1. 当前权威结论
 
@@ -53,8 +53,8 @@
 
 ## 3. 当前实现状态
 
-当前仓库仍是 Phase 0 工程骨架；PLAN-0001 修订正在把首个 Document
-垂直切片和可靠基础设施实现已收敛到 Baseline，真实依赖证据已在 CI 形成。
+当前仓库仍是 Phase 0 工程骨架；PLAN-0001 已合并为 `main` 基线，PLAN-0002
+正在收敛配置边界、数据完整性、消息终态和全 Workspace 架构门禁。
 
 已具备：
 

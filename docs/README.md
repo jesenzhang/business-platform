@@ -97,12 +97,12 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：[`plans/current/PLAN-0001-foundation-hardening.md`](plans/current/PLAN-0001-foundation-hardening.md)
+- 当前计划：[`plans/current/PLAN-0002-foundation-integrity-and-closeout.md`](plans/current/PLAN-0002-foundation-integrity-and-closeout.md)
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-PLAN-0001 当前状态为 `Revision Required`，PR #3 保持 Draft，直到修订门禁和真实基础设施测试全部通过。
+PLAN-0002 当前状态为 `Active`。它承接 PLAN-0001 合并后的配置、完整性、可靠性和架构门禁收尾工作。
 
 ## 9. 合并后的后续任务规则
 
