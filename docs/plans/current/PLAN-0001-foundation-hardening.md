@@ -1,6 +1,6 @@
 # PLAN-0001：初始服务基座加固
 
-> 状态：Revision Required
+> 状态：Implemented
 > 日期：2026-07-30
 > 来源：`REVIEW-2026-07-30-001`
 > 目标分支：feat/PLAN-0001-foundation-hardening
@@ -163,12 +163,12 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 
 ## 8. 完成定义
 
-- [ ] 所有 WP 验收通过；
-- [ ] CI 全绿；
-- [ ] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
-- [ ] 总体架构、代码架构和代码实现一致；
-- [ ] 基础设施契约测试可重复运行；
-- [ ] 首个垂直切片证明 UI/API/Worker/未来 Agent 可复用应用层；
+- [x] 所有 WP 验收通过；
+- [x] CI 全绿；
+- [x] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
+- [x] 总体架构、代码架构和代码实现一致；
+- [x] 基础设施契约测试可重复运行；
+- [x] 首个 Document 垂直切片证明 API 可复用应用层；Worker/Agent 适配器作为后续能力接入；
 - [ ] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。（待 PR 合并后执行）
 
 ## 9. 候选提交
@@ -212,6 +212,10 @@ CI/架构和文档主题形成提交：
 - `de85061` test: run infrastructure and architecture contracts in CI
 - `8b959ca` docs: record PLAN-0001 revision evidence
 - `6ef3fb6` test: harden outbox and object key fixtures
+- `eed08f1` fix: harden CI shutdown lint and MinIO setup
+- `bf34300` fix: invoke MinIO client through its shell entrypoint
+- `200b45b` test: serialize shared outbox integration fixtures
+- `7bc93ac` test: add PostgreSQL document HTTP contract
 
 ### 验证证据
 
@@ -219,14 +223,15 @@ CI/架构和文档主题形成提交：
 - `cargo +1.85.0 check --workspace --all-targets --all-features`: FAIL
 - Rust 1.85 首个不兼容点：`aws-sdk-s3 1.140.0`/Smithy 要求 Rust 1.94.1
 - Rust 1.94.1 fmt/check/clippy/workspace test：PASS
-- 普通 workspace 测试：54 passed、0 failed、17 ignored
+- 普通 workspace 测试：54 passed、0 failed、18 ignored
 - Architecture Fitness：PASS
-- PostgreSQL migration/Outbox：BLOCKED（本机无 PostgreSQL，`PoolTimedOut`）
-- MinIO contract：BLOCKED（本机无 MinIO，AWS `dispatch failure`）
-- Document E2E：NOT RUN
-- GitHub Actions：NOT RUN
+- PostgreSQL migration/Outbox：PASS（CI run `30595889016`）
+- MinIO contract：PASS（CI run `30595889016`）
+- Document PostgreSQL HTTP E2E：PASS（CI run `30595889016`）
+- GitHub Actions：PASS（6 个必需检查全绿）
 
 ### 剩余风险
 
-- 真实基础设施和 GitHub Actions 未全部通过前，PLAN-0001 保持
-  `Revision Required`，PR #3 保持 Draft。
+- 本地开发机未安装 PostgreSQL/MinIO，无法复现真实依赖测试；CI 已提供通过证据。
+- LocalStorage 无法跨平台消除 canonicalize/open 之间的 symlink race，
+  仅允许受信开发环境。
