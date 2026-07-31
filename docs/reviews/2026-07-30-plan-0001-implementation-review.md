@@ -1,80 +1,57 @@
 # PLAN-0001 实施审查报告
 
-> 日期：2026-07-30
+> 日期：2026-07-31
 > 分支：feat/PLAN-0001-foundation-hardening
-> 基线：696acfb (main)
+> PR：#3 (Draft)
+> 状态：Revision Required
 
-## 工作包完成状态
+## 工作包状态
 
-| WP | 名称 | 状态 | 提交 |
+| WP | 名称 | 状态 | 当前证据 |
 |---|---|---|---|
-| WP-01 | 工具链与 CI | PASS | 73a2606 |
-| WP-02 | 共享核心去框架化 | PASS | 7bee85d |
-| WP-05 | 配置与 Secret | PASS | 0458365 |
-| WP-03 | 应用组合与薄 API | PASS | 76566f5 |
-| WP-04 | HTTP 安全基线 | PASS | 76566f5 |
-| WP-06 | 真实对象存储适配 | PASS | 6e64466 |
-| WP-07 | LocalStorage 安全 | PASS | 6e64466 |
-| WP-08 | Migration 基座 | PASS | 6e64466 |
-| WP-09 | 可靠 Outbox | PASS | fbe6300 |
-| WP-10 | document metadata 垂直切片 | PASS | 8fac234 |
+| WP-01 | 工具链与 CI | FAIL | Rust 1.85 被锁定依赖拒绝；已选择 1.94.1，修订 CI 待运行 |
+| WP-02 | 共享核心去框架化 | PASS | shared-kernel Cargo 依赖不含 Axum/SQLx/Reqwest/AWS SDK |
+| WP-03 | 应用组合与薄 API | NOT RUN | Document 服务已预构造注入，完整门禁待运行 |
+| WP-04 | HTTP 安全基线 | NOT RUN | API 回归和 trace correlation 待全量运行 |
+| WP-05 | 配置与 Secret | NOT RUN | 本轮未重新执行全量安全测试 |
+| WP-06 | 真实对象存储适配 | NOT RUN | 流式接口已修订，真实 MinIO 契约待运行 |
+| WP-07 | LocalStorage 安全 | NOT RUN | 本地测试已补充，尚未执行全量门禁 |
+| WP-08 | Migration 基座 | NOT RUN | 004/005/006 向前 migration 已新增，升级测试待 PostgreSQL |
+| WP-09 | 可靠 Outbox | NOT RUN | ownership/fencing 已修订，真实并发恢复测试待 PostgreSQL |
+| WP-10 | document metadata 垂直切片 | NOT RUN | 核心已隔离，PostgreSQL 原子性/E2E 待运行 |
 
-## 关键架构变化
+## Revision
 
-1. shared-kernel 不再依赖 axum/sqlx/reqwest，仅保留纯类型
-2. 错误分为 Domain/Application/Infrastructure/API 四层
-3. HTTP 错误映射位于 business-api (api_error.rs)
-4. 认证中间件：开发模式静态 Token，生产 fail-closed
-5. 对象存储使用 aws-sdk-s3（Signature V4）
-6. ObjectKey 值对象阻止路径穿越
-7. Outbox 使用 FOR UPDATE SKIP LOCKED + lease 机制
-8. document metadata 贯穿全部 DDD 分层
+### 审查发现
 
-## 安全修复
+Document 分层、原子事务、Outbox fencing、旧发布状态、流式存储、
+readiness 错误安全、架构门禁和真实基础设施 CI 均缺少完成证据。
 
-- 移除 CorsLayer::permissive()
-- Secret<T> 脱敏类型（Debug/Display 输出 [REDACTED]）
-- 生产环境禁止 dev_auth_enabled
-- ObjectKey 拒绝 ..、绝对路径、UNC、盘符
-- 错误响应不泄漏 SQL/URL/凭证/堆栈
-- 多租户查询强制 tenant_id 条件
+### 修复提交
 
-## 新增 ADR
+当前工作树包含本轮修订，验证和主题提交完成后登记最终 SHA。
 
-- ADR-0001: S3 SDK 选择 (aws-sdk-s3)
-- ADR-0002: Outbox claim/retry 设计
+### 验证证据
 
-## 数据库 Migration
+| 检查 | 状态 | 证据 |
+|---|---|---|
+| Rust 1.85 fmt | PASS | 2026-07-31 本地退出码 0 |
+| Rust 1.85 workspace check | FAIL | `aws-sdk-s3 1.140.0`/Smithy 要求 Rust 1.94.1 |
+| Rust 1.94.1 修订前 workspace check | PASS | 退出码 0 |
+| Document API Fake Port tests | PASS | 3 passed, 0 failed, 0 ignored |
+| 修订后 workspace fmt/check/clippy/test | NOT RUN | 待执行 |
+| PostgreSQL/MinIO/Migration upgrade/E2E | NOT RUN | 待启动真实依赖 |
+| GitHub Actions | NOT RUN | 待推送 |
 
-- 001_initial.sql: tenants, users, roles, permissions, outbox_events, audit_events
-- 002_document_metadata.sql: documents 表
-- 003_outbox_reliability.sql: outbox 状态机升级
+### 剩余风险
 
-## 测试
+- LocalStorage 无法跨平台消除 canonicalize/open 之间的 symlink race，
+  仅允许受信开发环境；
+- 生产 OIDC 认证仍是 fail-closed 骨架；
+- 所有真实依赖门禁通过前，PR #3 不得转为 Ready。
 
-- 56 个测试通过（单元 + 集成）
-- 3 个忽略（需要 PostgreSQL/MinIO）
-- 7 个安全测试
-- 9 个 ObjectKey 测试
-- 7 个 document domain 测试
-- 8 个 document API 测试
-- 18 个 shared-kernel 测试
-- 6 个 outbox backoff 测试
-- 1 个 migration 编译测试
+## 回滚
 
-## 未完成项
-
-- MinIO 契约测试需要 Docker（标记 #[ignore]）
-- PostgreSQL 集成测试需要运行数据库（标记 #[ignore]）
-- 生产 OIDC 认证尚未实现（fail-closed 骨架）
-- business-worker/ai-worker/agent-adapter 仍为占位
-
-## 已接受风险
-
-- aws-sdk-s3 增加编译时间（ADR-0001 记录）
-- 开发模式使用静态 Token（仅 dev config 启用，生产禁止）
-
-## 回滚方式
-
-每个 WP 独立提交，可按提交粒度 revert。
-Migration 采用向前修复策略，不修改已发布文件。
+代码提交可按主题 revert。已发布 migration 不回退，通过后续向前
+migration 修复；对象存储和 Document adapter 可在 composition root
+切换实现。不得删除已经应用的 migration 文件。

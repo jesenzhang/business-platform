@@ -50,6 +50,7 @@
 - [`adr/ADR-0001-s3-sdk-selection.md`](adr/ADR-0001-s3-sdk-selection.md)：对象存储采用 `aws-sdk-s3`。
 - [`adr/ADR-0002-outbox-claim-retry.md`](adr/ADR-0002-outbox-claim-retry.md)：Outbox claim/lease/retry 设计。
 - [`adr/ADR-0003-domain-driven-layered-backend.md`](adr/ADR-0003-domain-driven-layered-backend.md)：服务端采用战略 DDD、模块化单体、领域/应用/适配器分层、数据所有权、质量属性与自动架构门禁。
+- [`adr/ADR-0004-rust-msrv-toolchain.md`](adr/ADR-0004-rust-msrv-toolchain.md)：Rust 1.94.1 为当前锁定依赖的最低验证工具链。
 
 ## 5. 文档目录
 

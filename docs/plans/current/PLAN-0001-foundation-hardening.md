@@ -1,8 +1,8 @@
 # PLAN-0001：初始服务基座加固
 
-> 状态：Implemented  
-> 日期：2026-07-30  
-> 来源：`REVIEW-2026-07-30-001`  
+> 状态：Revision Required
+> 日期：2026-07-30
+> 来源：`REVIEW-2026-07-30-001`
 > 目标分支：feat/PLAN-0001-foundation-hardening
 
 ## 1. 目标
@@ -163,12 +163,12 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 
 ## 8. 完成定义
 
-- [x] 所有 WP 验收通过；
-- [x] CI 全绿；
-- [x] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
-- [x] 总体架构、代码架构和代码实现一致；
-- [x] 基础设施契约测试可重复运行；
-- [x] 首个垂直切片证明 UI/API/Worker/未来 Agent 可复用应用层；
+- [ ] 所有 WP 验收通过；
+- [ ] CI 全绿；
+- [ ] 审查报告中的 P0/P1 已关闭或有明确接受的 ADR；
+- [ ] 总体架构、代码架构和代码实现一致；
+- [ ] 基础设施契约测试可重复运行；
+- [ ] 首个垂直切片证明 UI/API/Worker/未来 Agent 可复用应用层；
 - [ ] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。（待 PR 合并后执行）
 
 ## 9. 候选提交
@@ -186,3 +186,32 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 | `8fac234` | WP-10 | feat: add document metadata vertical slice |
 
 实施审查见 [`../../reviews/2026-07-30-plan-0001-implementation-review.md`](../../reviews/2026-07-30-plan-0001-implementation-review.md)。
+
+## 10. Revision
+
+### 审查发现
+
+- Rust 1.85 声明没有工具链证据且被当前锁定依赖拒绝；
+- Document 核心混入 Axum、SQLx、对象存储和消息实现；
+- Document 创建缺少 Audit 与 Idempotency 的原子写入；
+- Outbox 完成/失败未校验 claim ownership/fencing；
+- Outbox 新旧发布状态未向前协调；
+- 对象存储默认整块读写，真实 MinIO/PostgreSQL 测试未进入 CI；
+- readiness 泄漏数据库错误且 Handler 直接获取连接池。
+
+### 修复提交
+
+修复正在本分支按工具链、Document、Outbox、Migration、对象存储、
+readiness/architecture、CI/文档主题形成提交；最终 SHA 在验证后登记。
+
+### 验证证据
+
+- `cargo +1.85.0 fmt --all -- --check`: PASS
+- `cargo +1.85.0 check --workspace --all-targets --all-features`: FAIL
+- `cargo +1.94.1 check --workspace --all-targets --all-features`（修订前基线）: PASS
+- 修订后的全量本地、PostgreSQL、MinIO、E2E 与 CI：NOT RUN
+
+### 剩余风险
+
+- 真实基础设施和 GitHub Actions 未全部通过前，PLAN-0001 保持
+  `Revision Required`，PR #3 保持 Draft。
