@@ -82,13 +82,14 @@ async fn shutdown_signal() {
 
     #[cfg(unix)]
     let terminate = async {
-        // `expect` is acceptable here: installing the SIGTERM handler is a
-        // startup-time static initialization that cannot fail in practice, and
-        // a failure would mean the process can never be drained gracefully.
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                let _ = signal.recv().await;
+            }
+            Err(error) => {
+                tracing::error!(%error, "failed to install SIGTERM handler");
+            }
+        }
     };
 
     #[cfg(not(unix))]
