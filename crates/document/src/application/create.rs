@@ -208,7 +208,10 @@ mod tests {
             ..command.clone()
         };
 
-        assert_ne!(request_fingerprint(&command), request_fingerprint(&zero_sized));
+        assert_ne!(
+            request_fingerprint(&command),
+            request_fingerprint(&zero_sized)
+        );
         assert_eq!(request_fingerprint(&command), request_fingerprint(&command));
     }
 }

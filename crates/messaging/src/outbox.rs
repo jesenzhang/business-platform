@@ -285,9 +285,7 @@ impl ReliableOutbox {
     }
 }
 
-async fn reconcile_exhausted_in_tx(
-    tx: &mut Transaction<'_, Postgres>,
-) -> Result<u64, sqlx::Error> {
+async fn reconcile_exhausted_in_tx(tx: &mut Transaction<'_, Postgres>) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
         r"
         UPDATE outbox_events

@@ -32,7 +32,6 @@ impl DocumentStatus {
             Self::Deleted => "deleted",
         }
     }
-
 }
 
 impl TryFrom<&str> for DocumentStatus {
