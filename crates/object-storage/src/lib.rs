@@ -10,6 +10,8 @@ pub mod client;
 pub mod error;
 pub mod key;
 
-pub use client::{LocalStorageClient, ObjectStorageClient, S3Client};
+pub use client::{
+    LocalStorageClient, ObjectMetadata, ObjectStorageClient, ObjectStream, S3Client, StoredObject,
+};
 pub use error::StorageError;
 pub use key::{ObjectKey, ObjectKeyError};

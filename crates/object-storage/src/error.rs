@@ -20,4 +20,7 @@ pub enum StorageError {
 
     #[error("Presigning error: {0}")]
     Presign(String),
+
+    #[error("object exceeds the in-memory convenience limit of {0} bytes")]
+    TooLarge(usize),
 }

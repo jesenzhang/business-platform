@@ -21,4 +21,7 @@ Rationale:
 ## Consequences
 - Increased compile time (~30s additional)
 - Larger dependency tree
-- SDK types confined to adapter; domain uses ObjectKey and Bytes
+- SDK types confined to adapter; domain uses provider-neutral object metadata
+  and byte-stream contracts
+- Small-object `Bytes` helpers are bounded to 16 MiB and implemented on top of
+  the streaming interface
