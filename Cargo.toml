@@ -15,6 +15,7 @@ members = [
     "crates/approval",
     "crates/finance",
     "crates/document",
+    "crates/document-postgres",
     "crates/notification",
     "crates/audit",
     "crates/workflow",
@@ -29,7 +30,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.94.1"
 license = "MIT"
 authors = ["Enterprise Platform Team"]
 
@@ -87,6 +88,12 @@ anyhow = "1"
 async-trait = "0.1"
 config = "0.14"
 validator = { version = "0.19", features = ["derive"] }
+sha2 = "0.10"
+futures-util = "0.3"
+tokio-util = { version = "0.7", features = ["io"] }
+http-body = "1"
+http-body-util = "0.1"
+http = "1"
 
 # Internal crates
 shared-kernel = { path = "crates/shared-kernel" }
@@ -102,6 +109,7 @@ project = { path = "crates/project" }
 approval = { path = "crates/approval" }
 finance = { path = "crates/finance" }
 document = { path = "crates/document" }
+document-postgres = { path = "crates/document-postgres" }
 notification = { path = "crates/notification" }
 audit = { path = "crates/audit" }
 workflow = { path = "crates/workflow" }
