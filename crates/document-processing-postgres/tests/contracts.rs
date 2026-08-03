@@ -77,6 +77,7 @@ async fn postgres_processing_contract_claims_and_restarts() {
         )
         .await
         .is_ok());
+    assert!(store.request_cancel(tenant, claimed.job.id()).await.is_ok());
     assert!(store
         .detail(tenant, job.id())
         .await
