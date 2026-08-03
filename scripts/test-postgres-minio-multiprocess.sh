@@ -19,7 +19,16 @@ tenant="$(cat /proc/sys/kernel/random/uuid)"
 user="$(cat /proc/sys/kernel/random/uuid)"
 
 cleanup() {
+  exit_code=$?
   set +e
+  if [[ "$exit_code" != "0" ]]; then
+    echo "PostgreSQL + MinIO process E2E diagnostics:" >&2
+    for log in "$log_dir"/*.log; do
+      [[ -f "$log" ]] || continue
+      echo "--- $log ---" >&2
+      tail -n 120 "$log" >&2
+    done
+  fi
   for pid in "$ai_pid" "$business_pid" "$api_pid"; do
     if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
       kill "$pid" 2>/dev/null || true
@@ -27,6 +36,7 @@ cleanup() {
   done
   wait "$ai_pid" "$business_pid" "$api_pid" 2>/dev/null || true
   rm -rf "$work"
+  return "$exit_code"
 }
 trap cleanup EXIT
 
@@ -82,17 +92,17 @@ export AI_WORKER__TEST_TASK_DELAY_MILLIS=1000
 
 base="http://127.0.0.1:$port"
 for _ in $(seq 1 120); do
-  if curl -fsS "$base/health/ready" >/dev/null 2>&1; then break; fi
+  if curl --fail-with-body -sS "$base/health/ready" >/dev/null 2>&1; then break; fi
   sleep 0.5
 done
-curl -fsS "$base/health/ready" >/dev/null
+curl --fail-with-body -sS "$base/health/ready" >/dev/null
 
 auth=(-H "Authorization: Bearer local-pg-e2e-only" -H "X-Tenant-Id: $tenant" -H "X-User-Id: $user")
 doc_key="document-$RANDOM-$(date +%s)"
-doc_json="$(curl -fsS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$key\",\"size_bytes\":$source_size}")"
+doc_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$key\",\"size_bytes\":$source_size}")"
 document_id="$(jq -r '.data.id' <<<"$doc_json")"
 [[ "$document_id" != "null" && -n "$document_id" ]]
-job_json="$(curl -fsS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: job-$RANDOM-$(date +%s)" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
+job_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: job-$RANDOM-$(date +%s)" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
 job_id="$(jq -r '.data.job_id' <<<"$job_json")"
 [[ "$job_id" != "null" && -n "$job_id" ]]
 
@@ -100,7 +110,7 @@ job_id="$(jq -r '.data.job_id' <<<"$job_json")"
 # fresh process reclaim the expired lease and resume from current_step.
 business_crash=0
 for _ in $(seq 1 120); do
-  status_json="$(curl -fsS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
+  status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
   status="$(jq -r '.data.status' <<<"$status_json")"
   if [[ "$status" == "running" ]]; then
     kill -9 "$business_pid" 2>/dev/null || true
@@ -119,7 +129,7 @@ done
 # reclaim resumes without creating a second task or candidate.
 ai_crash=0
 for _ in $(seq 1 600); do
-  status_json="$(curl -fsS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
+  status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
   status="$(jq -r '.data.status' <<<"$status_json")"
   if [[ "$status" == "waiting_for_ai" ]]; then
     task_status="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT status FROM document_ai_tasks WHERE tenant_id = '$tenant' AND job_id = '$job_id' ORDER BY created_at DESC LIMIT 1" | tr -d '[:space:]')"
@@ -139,7 +149,7 @@ done
 
 status=""
 for _ in $(seq 1 120); do
-  status_json="$(curl -fsS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
+  status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
   status="$(jq -r '.data.status' <<<"$status_json")"
   case "$status" in
     waiting_for_review) break ;;
@@ -149,22 +159,22 @@ for _ in $(seq 1 120); do
 done
 [[ "$status" == waiting_for_review ]]
 
-candidate_json="$(curl -fsS "$base/api/v1/processing-jobs/$job_id/candidate" "${auth[@]}")"
+candidate_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id/candidate" "${auth[@]}")"
 candidate_version="$(jq -r '.data.version' <<<"$candidate_json")"
 review_key="review-$RANDOM-$(date +%s)"
 review_body="{\"decision\":\"accepted\",\"candidate_version\":$candidate_version}"
-review_json="$(curl -fsS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
+review_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
 [[ "$(jq -r '.data.candidate_id' <<<"$review_json")" != "null" ]]
 # A lost HTTP response must be replayable after the job is terminal.
-replay_json="$(curl -fsS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
+replay_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
 [[ "$(jq -r '.data.candidate_id' <<<"$replay_json")" != "null" ]]
-final_json="$(curl -fsS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
+final_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
 [[ "$(jq -r '.data.status' <<<"$final_json")" == succeeded ]]
 
 job_ids=()
 for _ in $(seq 1 20); do
   key_suffix="job-$RANDOM-$(date +%s%N)"
-  queued_json="$(curl -fsS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: $key_suffix" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
+  queued_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: $key_suffix" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
   queued_id="$(jq -r '.data.job_id' <<<"$queued_json")"
   [[ "$queued_id" != "null" && -n "$queued_id" ]]
   job_ids+=("$queued_id")
@@ -172,7 +182,7 @@ done
 for queued_id in "${job_ids[@]}"; do
   queued_status=""
   for _ in $(seq 1 180); do
-    queued_status="$(curl -fsS "$base/api/v1/processing-jobs/$queued_id" "${auth[@]}" | jq -r '.data.status')"
+    queued_status="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$queued_id" "${auth[@]}" | jq -r '.data.status')"
     case "$queued_status" in
       waiting_for_review) break ;;
       failed|cancelled|rejected) exit 1 ;;
@@ -180,10 +190,10 @@ for queued_id in "${job_ids[@]}"; do
     sleep 0.5
   done
   [[ "$queued_status" == waiting_for_review ]]
-  queued_candidate="$(curl -fsS "$base/api/v1/processing-jobs/$queued_id/candidate" "${auth[@]}")"
+  queued_candidate="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$queued_id/candidate" "${auth[@]}")"
   queued_version="$(jq -r '.data.version' <<<"$queued_candidate")"
-  curl -fsS -X POST "$base/api/v1/processing-jobs/$queued_id/review" "${auth[@]}" -H "Idempotency-Key: review-$queued_id" -H 'Content-Type: application/json' -d "{\"decision\":\"accepted\",\"candidate_version\":$queued_version}" >/dev/null
-  [[ "$(curl -fsS "$base/api/v1/processing-jobs/$queued_id" "${auth[@]}" | jq -r '.data.status')" == succeeded ]]
+  curl --fail-with-body -sS -X POST "$base/api/v1/processing-jobs/$queued_id/review" "${auth[@]}" -H "Idempotency-Key: review-$queued_id" -H 'Content-Type: application/json' -d "{\"decision\":\"accepted\",\"candidate_version\":$queued_version}" >/dev/null
+  [[ "$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$queued_id" "${auth[@]}" | jq -r '.data.status')" == succeeded ]]
 done
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM document_extraction_candidates WHERE tenant_id = '$tenant' AND job_id = '$job_id'" | grep -qx '1'
