@@ -333,7 +333,7 @@ impl ProcessingJob {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
     pub fn rehydrate_with_fence(
         id: Uuid,
         tenant_id: Uuid,
@@ -368,12 +368,73 @@ impl ProcessingJob {
         if request_key.trim().is_empty() {
             return Err(ProcessingDomainError::EmptyRequestKey);
         }
+        if request_key.len() > 200
+            || failure_code.as_ref().is_some_and(|code| code.len() > 80)
+            || failure_message
+                .as_ref()
+                .is_some_and(|message| message.len() > 4096)
+        {
+            return Err(ProcessingDomainError::InvalidIdentity);
+        }
+        if attempt_count > max_attempts || updated_at < created_at || next_attempt_at < created_at {
+            return Err(ProcessingDomainError::InvalidTransition {
+                from: status.to_string(),
+                action: "rehydrate".to_string(),
+            });
+        }
         let lease = lease.map(|(owner, token, expires_at, fence_version)| LeaseState {
             owner,
             token,
             expires_at,
             fence_version,
         });
+        if lease.as_ref().is_some_and(|lease| {
+            lease.owner.trim().is_empty()
+                || lease.token.is_empty()
+                || lease.fence_version < 1
+                || lease.fence_version != fence_version
+                || lease.expires_at < created_at
+        }) {
+            return Err(ProcessingDomainError::LeaseLost);
+        }
+        let requires_lease = status == ProcessingJobStatus::Running;
+        let forbids_lease = matches!(
+            status,
+            ProcessingJobStatus::Queued
+                | ProcessingJobStatus::WaitingForAi
+                | ProcessingJobStatus::WaitingForReview
+                | ProcessingJobStatus::Succeeded
+                | ProcessingJobStatus::Failed
+                | ProcessingJobStatus::Cancelled
+                | ProcessingJobStatus::Rejected
+        );
+        if (requires_lease && lease.is_none()) || (forbids_lease && lease.is_some()) {
+            return Err(ProcessingDomainError::LeaseLost);
+        }
+        if status == ProcessingJobStatus::WaitingForAi
+            && current_step != ProcessingStepKind::ExtractFields
+        {
+            return Err(ProcessingDomainError::InvalidStep);
+        }
+        if status == ProcessingJobStatus::WaitingForReview
+            && current_step != ProcessingStepKind::AwaitReview
+        {
+            return Err(ProcessingDomainError::InvalidStep);
+        }
+        if matches!(
+            status,
+            ProcessingJobStatus::Queued | ProcessingJobStatus::Running
+        ) && current_step == ProcessingStepKind::AwaitReview
+        {
+            return Err(ProcessingDomainError::InvalidStep);
+        }
+        if matches!(
+            status,
+            ProcessingJobStatus::Succeeded | ProcessingJobStatus::Rejected
+        ) && current_step != ProcessingStepKind::AwaitReview
+        {
+            return Err(ProcessingDomainError::InvalidStep);
+        }
         Ok(Self {
             id,
             tenant_id,
@@ -658,6 +719,24 @@ impl ProcessingJob {
         self.next_attempt_at = now;
         self.touch(now)?;
         self.claim(owner, token, expires_at, now)
+    }
+
+    /// Resume after an AI task has committed its candidate. The next worker
+    /// claim is intentionally separate so the AI transaction never borrows a
+    /// Job lease for the following step.
+    pub fn resume_after_ai(&mut self, now: DateTime<Utc>) -> Result<(), ProcessingDomainError> {
+        if self.status != ProcessingJobStatus::WaitingForAi
+            || self.current_step != ProcessingStepKind::ExtractFields
+        {
+            return Err(ProcessingDomainError::InvalidTransition {
+                from: self.status.to_string(),
+                action: "resume_after_ai".to_string(),
+            });
+        }
+        self.current_step = ProcessingStepKind::ValidateCandidate;
+        self.status = ProcessingJobStatus::Queued;
+        self.next_attempt_at = now;
+        self.touch(now)
     }
 
     pub fn wait_for_review(

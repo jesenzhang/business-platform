@@ -366,3 +366,9 @@ Processing events use the `document.processing.*.v1` namespace and the full
 envelope from section 16. Payloads contain references and bounded counters,
 never document bytes or storage credentials. Consumers must tolerate duplicate
 and out-of-order execution events.
+
+Revision 1 keeps the public contract unchanged while moving cancellation and
+review finalization behind the atomic processing execution unit of work.
+Repeated review commands with the same candidate/version/decision replay the
+stored result; a different decision conflicts. Internal artifact references,
+checkpoints, lease identity, and task retry state remain private.

@@ -1,7 +1,7 @@
 # Durable Document Processing Architecture
 
 > 文档 ID：ARCH-DOCUMENT-PROCESSING-001
-> 版本：1.0
+> 版本：1.1
 > 状态：Baseline
 > 生效日期：2026-08-03
 > 适用范围：PLAN-0004 固定文档处理 MVP
@@ -52,6 +52,7 @@ Execution events use versioned envelopes:
 document.processing.requested.v1
 document.processing.started.v1
 document.processing.step-completed.v1
+document.processing.retry-scheduled.v1
 document.processing.waiting-for-review.v1
 document.processing.succeeded.v1
 document.processing.failed.v1
@@ -122,3 +123,22 @@ local process E2E, and PostgreSQL/MinIO CI E2E. Historical migrations are
 immutable and manifests are checksum-verified. Rollback is a code revert plus
 a forward-only correction migration; published migrations 001–009 are never
 edited in place.
+
+## 9. Revision 1 execution correctness
+
+Revision 1 makes the worker-facing application port an adapter-owned
+`ProcessingExecutionUnitOfWork`. A step transition, checkpoint, candidate or
+review write, audit event, and outbox event commit in one local transaction;
+workers do not compose the legacy command, step, candidate, or task stores for
+these transitions. PostgreSQL uses one transaction per unit of work and
+`FOR UPDATE`/`SKIP LOCKED`; SQLite uses `BEGIN IMMEDIATE` and remains
+single-process only.
+
+`ExtractText` writes a tenant/job-scoped text artifact with checksum, content
+revision, and bounded counters before a separate AI task is queued. The AI
+worker reads that artifact, and completion or bounded retry/reclaim updates the
+AI task and job atomically. Heartbeat guards own and join their heartbeat
+tasks; a lost fence fails closed. Business workers dispatch exactly one
+`current_step` per claim and drain in-flight work on shutdown. Migration 011
+and SQLite migration 002 add tenant/state/lease constraints, AI attempt
+uniqueness, and processing audit records without changing published history.

@@ -10,8 +10,15 @@ $storageDirectory = Join-Path $isolated "objects"
 $databasePath = Join-Path $isolated "processing.db"
 $logDirectory = Join-Path $isolated "logs"
 $databaseUrl = "sqlite:///$($databasePath.Replace('\', '/'))?mode=rwc"
+$targetDirectory = if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
+    Join-Path $repo "target"
+} else {
+    $env:CARGO_TARGET_DIR
+}
+$debugDirectory = Join-Path $targetDirectory "debug"
 $api = $null
 $worker = $null
+$crashObserved = $false
 
 if ($Port -eq 0) {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -45,8 +52,8 @@ function Start-LocalProcesses {
     $workerLog = Join-Path $logDirectory "business-worker.log"
     $apiErrorLog = Join-Path $logDirectory "business-api.error.log"
     $workerErrorLog = Join-Path $logDirectory "business-worker.error.log"
-    $script:api = Start-Process cargo -ArgumentList @("run", "-p", "business-api", "--quiet") -WorkingDirectory $repo -RedirectStandardOutput $apiLog -RedirectStandardError $apiErrorLog -PassThru -WindowStyle Hidden
-    $script:worker = Start-Process cargo -ArgumentList @("run", "-p", "business-worker", "--quiet") -WorkingDirectory $repo -RedirectStandardOutput $workerLog -RedirectStandardError $workerErrorLog -PassThru -WindowStyle Hidden
+    $script:api = Start-Process (Join-Path $debugDirectory "business-api.exe") -WorkingDirectory $repo -RedirectStandardOutput $apiLog -RedirectStandardError $apiErrorLog -PassThru -WindowStyle Hidden
+    $script:worker = Start-Process (Join-Path $debugDirectory "business-worker.exe") -WorkingDirectory $repo -RedirectStandardOutput $workerLog -RedirectStandardError $workerErrorLog -PassThru -WindowStyle Hidden
 }
 
 function Wait-Ready([string]$BaseUrl) {
@@ -67,6 +74,25 @@ function Wait-Ready([string]$BaseUrl) {
     throw "local API did not become ready"
 }
 
+function Wait-WorkerReady {
+    for ($attempt = 0; $attempt -lt 180; $attempt++) {
+        if ($worker.HasExited) {
+            throw "local worker exited during startup"
+        }
+        $stdout = if (Test-Path -LiteralPath (Join-Path $logDirectory "business-worker.log")) {
+            Get-Content -LiteralPath (Join-Path $logDirectory "business-worker.log") -Raw
+        } else { "" }
+        $stderr = if (Test-Path -LiteralPath (Join-Path $logDirectory "business-worker.error.log")) {
+            Get-Content -LiteralPath (Join-Path $logDirectory "business-worker.error.log") -Raw
+        } else { "" }
+        if ($stdout -match "business-worker ready" -or $stderr -match "business-worker ready") {
+            return
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    throw "local worker did not become ready"
+}
+
 function Get-Job([string]$BaseUrl, [hashtable]$Headers, [string]$JobId) {
     (Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/v1/processing-jobs/$JobId" -Headers $Headers -TimeoutSec 5).data
 }
@@ -78,6 +104,8 @@ try {
     $env:MIGRATION__DATABASE__URL = $databaseUrl
     cargo run -p migration --quiet -- --backend sqlite up
     if ($LASTEXITCODE -ne 0) { throw "SQLite migration failed" }
+    cargo build --quiet -p business-api -p business-worker
+    if ($LASTEXITCODE -ne 0) { throw "local API/worker build failed" }
 
     $env:BUSINESS_API__ENV = "development"
     $env:BUSINESS_API__SERVER__HOST = "127.0.0.1"
@@ -95,11 +123,13 @@ try {
     $env:BUSINESS_WORKER__STORAGE__BASE_DIR = $storageDirectory
     $env:BUSINESS_WORKER__CONCURRENCY = "1"
     $env:BUSINESS_WORKER__AI_MODE = "inline"
+    $env:BUSINESS_WORKER__TEST_STEP_DELAY_MILLIS = "1000"
     $env:RUST_LOG = "info"
 
     Start-LocalProcesses
     $baseUrl = "http://127.0.0.1:$Port"
     Wait-Ready $baseUrl
+    Wait-WorkerReady
 
     $tenant = [Guid]::NewGuid().ToString()
     $user = [Guid]::NewGuid().ToString()
@@ -110,23 +140,55 @@ try {
     }
     $documentHeaders = $headers.Clone()
     $documentHeaders["Idempotency-Key"] = "local-document-$([Guid]::NewGuid().ToString('N'))"
+    $sourceText = "Local processing title`n" + ("durable recovery padding`n" * 250000)
+    $sourceBytes = [Text.Encoding]::UTF8.GetBytes($sourceText)
     $documentBody = @{
         original_filename = "processing.txt"
         content_type = "text/plain"
         object_key = "incoming/processing.txt"
-        size_bytes = 22
+        size_bytes = $sourceBytes.Length
     } | ConvertTo-Json -Compress
     $document = (Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/documents" -Headers $documentHeaders -ContentType "application/json" -Body $documentBody -TimeoutSec 5).data
     $documentId = $document.id
     $objectPath = Join-Path $storageDirectory ("tenants/$tenant/documents/$documentId/v1/incoming/processing.txt")
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $objectPath) | Out-Null
-    [IO.File]::WriteAllText($objectPath, "Local processing title`nbody", [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($objectPath, $sourceText, [Text.UTF8Encoding]::new($false))
 
     $jobHeaders = $headers.Clone()
     $jobHeaders["Idempotency-Key"] = "local-job-$([Guid]::NewGuid().ToString('N'))"
     $jobBody = @{ content_revision = 1 } | ConvertTo-Json -Compress
     $job = (Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/documents/$documentId/processing-jobs" -Headers $jobHeaders -ContentType "application/json" -Body $jobBody -TimeoutSec 5).data
     $jobId = $job.job_id
+
+    $current = $null
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        $current = Get-Job $baseUrl $headers $jobId
+        if ($current.status -eq "running") {
+            $crashObserved = $true
+            Stop-ProcessTree $worker
+            Stop-ProcessTree $api
+            $worker = $null
+            $api = $null
+            Start-LocalProcesses
+            Wait-Ready $baseUrl
+            Wait-WorkerReady
+            break
+        }
+        if ($current.status -in @("waiting_for_review", "failed", "cancelled", "rejected")) {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $crashObserved) {
+        Write-Output "Local process E2E diagnostic: latest job status was $($current.status)"
+        if (Test-Path -LiteralPath (Join-Path $logDirectory "business-worker.error.log")) {
+            Get-Content -LiteralPath (Join-Path $logDirectory "business-worker.error.log")
+        }
+        if (Test-Path -LiteralPath (Join-Path $logDirectory "business-worker.log")) {
+            Get-Content -LiteralPath (Join-Path $logDirectory "business-worker.log")
+        }
+        throw "did not observe a running job before worker crash"
+    }
 
     $current = $null
     for ($attempt = 0; $attempt -lt 90; $attempt++) {
@@ -164,12 +226,14 @@ try {
     $api = $null
     Start-LocalProcesses
     Wait-Ready $baseUrl
+    Wait-WorkerReady
     $afterRestart = Get-Job $baseUrl $headers $jobId
     if ($afterRestart.status -ne "succeeded") {
         throw "job state was not durable across process restart"
     }
 
     Write-Output "Local document processing process E2E: PASS"
+    Write-Output "SQLite running-step crash recovery: PASS"
     Write-Output "SQLite database and object storage were isolated under: $isolated"
 } finally {
     Stop-ProcessTree $worker
@@ -191,6 +255,7 @@ try {
     Remove-Item Env:BUSINESS_WORKER__STORAGE__BASE_DIR -ErrorAction SilentlyContinue
     Remove-Item Env:BUSINESS_WORKER__CONCURRENCY -ErrorAction SilentlyContinue
     Remove-Item Env:BUSINESS_WORKER__AI_MODE -ErrorAction SilentlyContinue
+    Remove-Item Env:BUSINESS_WORKER__TEST_STEP_DELAY_MILLIS -ErrorAction SilentlyContinue
     Remove-Item Env:RUST_LOG -ErrorAction SilentlyContinue
     Pop-Location
     if (Test-Path -LiteralPath $isolated) {

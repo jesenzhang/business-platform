@@ -262,6 +262,12 @@ S3-compatible private bucket (MinIO in CI); the business worker and
 independent AI worker use durable job/AI-task tables, lease fencing, and
 graceful shutdown. MinIO is never represented as a local SQLite equivalent.
 
+Revision 1 requires PostgreSQL pool capacity for concurrent UoW transactions
+and runs the business and AI workers as independent processes. A worker stops
+new claims on shutdown, joins heartbeat/drain tasks, and leaves expired leases
+for the recovery scanner. SQLite remains one process, one inline worker, and
+uses `BEGIN IMMEDIATE`; production or separate-AI settings fail closed.
+
 ## 13. 数据服务
 
 ### 权威状态存储

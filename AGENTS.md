@@ -225,6 +225,12 @@ PR 必须说明：
 - PLAN-0004 changes require the durable-processing architecture document,
   ADR-0010/0011/0012, migration manifest updates for new files only, contract
   tests, and the full workspace/architecture gates before acceptance。
+- PLAN-0004 Revision 1 workers must use the adapter-owned
+  `ProcessingExecutionUnitOfWork` for Job/Step/AI Task/Candidate/Review plus
+  Audit/Outbox transitions. Separate AI reads the durable text artifact and
+  returns through the fenced completion port; it must not compose legacy write
+  stores or invoke inline extraction. Test-only worker delay knobs are
+  fail-closed in production and exist only for process crash-recovery E2E。
 
 ## 15. PLAN-0003 Revision 1 persistence rules
 

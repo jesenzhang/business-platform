@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use document::application::CreateDocumentMetadata;
 use document::query::{DocumentDetailQuery, DocumentListQuery};
 use document_processing::ports::{
-    CandidateStore, ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery,
+    CandidateStore, ProcessingExecutionUnitOfWork, ProcessingJobClaimPort,
+    ProcessingJobCommandPort, ProcessingJobQuery,
 };
 use sqlx::PgPool;
 
@@ -22,6 +23,7 @@ pub struct ProcessingServices {
     pub claims: Arc<dyn ProcessingJobClaimPort>,
     pub queries: Arc<dyn ProcessingJobQuery>,
     pub candidates: Arc<dyn CandidateStore>,
+    pub execution: Arc<dyn ProcessingExecutionUnitOfWork>,
 }
 
 pub struct SqliteReadinessProbe {

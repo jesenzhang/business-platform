@@ -131,6 +131,7 @@ jobs:
           cargo test -p ai-worker --all-features
           cargo test -p business-worker --all-features
           cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1
+          bash scripts/test-postgres-minio-multiprocess.sh
       - name: Architecture and diff checks
         shell: pwsh
         run: |

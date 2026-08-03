@@ -372,3 +372,11 @@ PostgreSQL `SKIP LOCKED` claim and stale-fence tests, candidate/review
 optimistic concurrency, process restart recovery, and redacted processing API
 contract tests. SQLite evidence must state single-process scope; it cannot be
 used as evidence for PostgreSQL distributed concurrency.
+
+Revision 1 adds fitness checks that worker binaries depend on
+`ProcessingExecutionUnitOfWork` for Job/Step/AI Task/Candidate/Review writes,
+that the fixed `current_step` pipeline is dispatched one step per claim, that
+heartbeat tasks are owned and joined, and that migration 011/SQLite 002 are
+manifested without historical edits. Contract tests cover atomic review
+replay/rollback, AI retry/reclaim, stale fences, artifact metadata, and the
+SQLite `BEGIN IMMEDIATE` single-writer boundary.

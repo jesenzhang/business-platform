@@ -35,6 +35,8 @@ pub struct AiWorkerConfig {
     pub storage: WorkerStorageConfig,
     #[serde(default = "default_worker_id")]
     pub worker_id: String,
+    #[serde(default = "default_concurrency")]
+    pub concurrency: u32,
     #[serde(default = "default_lease_duration")]
     pub lease_duration_secs: i64,
     #[serde(default = "default_heartbeat_interval")]
@@ -43,6 +45,9 @@ pub struct AiWorkerConfig {
     pub poll_interval_millis: u64,
     #[serde(default = "default_max_content_bytes")]
     pub max_content_bytes: usize,
+    /// Test-only deterministic delay used by the process crash-recovery E2E.
+    #[serde(default)]
+    pub test_task_delay_millis: u64,
     #[serde(default)]
     pub observability: ObservabilityConfig,
 }
@@ -103,6 +108,7 @@ impl AiWorkerConfig {
 
     pub fn validate(&self) -> Result<(), String> {
         if self.worker_id.trim().is_empty()
+            || self.concurrency == 0
             || self.lease_duration_secs <= 0
             || self.heartbeat_interval_secs <= 0
             || self.heartbeat_interval_secs * 2 >= self.lease_duration_secs
@@ -138,6 +144,9 @@ impl AiWorkerConfig {
         if self.max_content_bytes == 0 {
             return Err("max_content_bytes must be positive".to_string());
         }
+        if self.env == RuntimeEnvironment::Production && self.test_task_delay_millis != 0 {
+            return Err("test_task_delay_millis must be zero in production".to_string());
+        }
         if self.env == RuntimeEnvironment::Production && self.database.url.is_none() {
             return Err("production AI Worker requires a database URL".to_string());
         }
@@ -150,6 +159,9 @@ fn default_worker_id() -> String {
 }
 const fn default_lease_duration() -> i64 {
     30
+}
+const fn default_concurrency() -> u32 {
+    1
 }
 const fn default_heartbeat_interval() -> i64 {
     10

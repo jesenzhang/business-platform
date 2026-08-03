@@ -27,6 +27,13 @@ remains small and reviewable. Adding a new step or provider requires an
 explicit versioned decision and migration. Candidates remain non-authoritative
 until a review command accepts or rejects them.
 
+## Revision 1 clarification
+
+The fixed pipeline is advanced one `current_step` at a time through an
+adapter-owned execution unit of work. Text extraction persists a real,
+tenant-scoped artifact before `ExtractFields` is delegated to the independent
+AI task worker; the artifact reference is a checkpoint, never a public DTO.
+
 ## Rejected alternatives
 
 - In-memory `tokio::spawn` as the source of truth;

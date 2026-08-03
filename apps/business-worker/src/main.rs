@@ -2,27 +2,35 @@
 
 mod config;
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
+use bytes::Bytes;
 use chrono::Utc;
 use config::{AiMode, BusinessWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
-    AiTask, AiTaskPort, CandidateStore, ProcessingJobClaimPort, ProcessingJobCommandPort,
-    ProcessingStepStore, StepCheckpoint,
+    ClassifiedProcessingFailure, ExecutionFence, ProcessingExecutionUnitOfWork,
+    ProcessingFailureDisposition, ProcessingJobClaimPort, ProcessingJobQuery, StepCheckpoint,
+    TextArtifactReference,
 };
-use document_processing::{DeterministicLocalExtractor, FixedPipelineRunner, ProcessingSource};
+use document_processing::{
+    extract_text_artifact, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionError,
+    ExtractionRequest, ProcessingSource,
+};
 use object_storage::{LocalStorageClient, ObjectKey, ObjectStorageClient, S3Client, StorageError};
+use tokio::sync::oneshot;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::{sleep, Instant};
 use uuid::Uuid;
 
 struct WorkerServices {
-    commands: Arc<dyn ProcessingJobCommandPort>,
     claims: Arc<dyn ProcessingJobClaimPort>,
-    steps: Arc<dyn ProcessingStepStore>,
-    candidates: Arc<dyn CandidateStore>,
-    ai_tasks: Arc<dyn AiTaskPort>,
+    execution: Arc<dyn ProcessingExecutionUnitOfWork>,
+    queries: Arc<dyn ProcessingJobQuery>,
 }
 
 struct StorageSource {
@@ -62,6 +70,87 @@ impl ProcessingSource for StorageSource {
     }
 }
 
+impl StorageSource {
+    async fn put_text_artifact(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        artifact: &document_processing::TextArtifact,
+    ) -> Result<String, ExtractionError> {
+        let key = format!(
+            "tenants/{tenant_id}/processing-jobs/{job_id}/artifacts/text/{}.txt",
+            artifact.content_hash
+        );
+        let object_key = ObjectKey::new(&key).map_err(|_| ExtractionError::Internal)?;
+        self.storage
+            .put_object(
+                &object_key,
+                Bytes::from(artifact.text.as_bytes().to_vec()),
+                "text/plain; charset=utf-8",
+            )
+            .await
+            .map_err(|_| ExtractionError::Internal)?;
+        Ok(key)
+    }
+}
+
+struct LeaseHeartbeatGuard {
+    stop: Option<oneshot::Sender<()>>,
+    task: JoinHandle<()>,
+    lost: Arc<AtomicBool>,
+}
+
+impl LeaseHeartbeatGuard {
+    fn start(
+        execution: Arc<dyn ProcessingExecutionUnitOfWork>,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        fence: ExecutionFence,
+        heartbeat_interval_secs: i64,
+        lease_duration_secs: i64,
+    ) -> Self {
+        let (stop, mut stop_rx) = oneshot::channel();
+        let lost = Arc::new(AtomicBool::new(false));
+        let lost_for_task = Arc::clone(&lost);
+        let task = tokio::spawn(async move {
+            let interval_secs = u64::try_from(heartbeat_interval_secs.max(1)).unwrap_or(1);
+            let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
+            interval.tick().await;
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        if execution.heartbeat_job(tenant_id, job_id, &fence, Utc::now(), lease_duration_secs).await.is_err() {
+                            lost_for_task.store(true, Ordering::Release);
+                            break;
+                        }
+                    }
+                    _ = &mut stop_rx => break,
+                }
+            }
+        });
+        Self {
+            stop: Some(stop),
+            task,
+            lost,
+        }
+    }
+
+    fn ensure_alive(&self) -> Result<(), ExtractionError> {
+        if self.lost.load(Ordering::Acquire) {
+            Err(ExtractionError::LeaseLost)
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn stop(mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        let _ = self.task.await;
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = BusinessWorkerConfig::load()?;
@@ -75,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
     )?;
     let storage = build_storage(&config.storage).await?;
 
-    let (claims, commands, steps, candidates, ai_tasks, documents) =
+    let (claims, execution, queries, documents) =
         match config.database.backend {
             WorkerDatabaseBackend::Sqlite => {
                 let url =
@@ -91,10 +180,8 @@ async fn main() -> anyhow::Result<()> {
                 let document = Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(pool));
                 (
                     processing.clone() as Arc<dyn ProcessingJobClaimPort>,
-                    processing.clone() as Arc<dyn ProcessingJobCommandPort>,
-                    processing.clone() as Arc<dyn ProcessingStepStore>,
-                    processing.clone() as Arc<dyn CandidateStore>,
-                    processing as Arc<dyn AiTaskPort>,
+                    processing.clone() as Arc<dyn ProcessingExecutionUnitOfWork>,
+                    processing as Arc<dyn ProcessingJobQuery>,
                     document as Arc<dyn DocumentRepository>,
                 )
             }
@@ -115,26 +202,26 @@ async fn main() -> anyhow::Result<()> {
                 ));
                 (
                     processing.clone() as Arc<dyn ProcessingJobClaimPort>,
-                    processing.clone() as Arc<dyn ProcessingJobCommandPort>,
-                    processing.clone() as Arc<dyn ProcessingStepStore>,
-                    processing.clone() as Arc<dyn CandidateStore>,
-                    processing as Arc<dyn AiTaskPort>,
+                    processing.clone() as Arc<dyn ProcessingExecutionUnitOfWork>,
+                    processing as Arc<dyn ProcessingJobQuery>,
                     document as Arc<dyn DocumentRepository>,
                 )
             }
         };
     let source = StorageSource { documents, storage };
     let services = WorkerServices {
-        commands,
         claims,
-        steps,
-        candidates,
-        ai_tasks,
+        execution,
+        queries,
     };
 
     tracing::info!(worker_id = %config.worker_id, concurrency = config.concurrency, "business-worker ready");
     let mut shutdown = Box::pin(shutdown_signal());
     let mut next_poll = Instant::now();
+    let services = Arc::new(services);
+    let source = Arc::new(source);
+    let permits = Arc::new(tokio::sync::Semaphore::new(config.concurrency as usize));
+    let mut tasks = JoinSet::new();
     loop {
         tokio::select! {
             () = &mut shutdown => {
@@ -143,15 +230,26 @@ async fn main() -> anyhow::Result<()> {
             }
             () = sleep(next_poll.saturating_duration_since(Instant::now())) => {
                 let now = Utc::now();
-                let _ = services.claims.reclaim_expired(now).await;
-                if let Some(claimed) = services.claims.claim_next(&config.worker_id, now, config.lease_duration_secs).await? {
-                    tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, "processing job claimed");
-                    process_claimed(&services, &source, claimed, config.max_content_bytes, &config.worker_id, config.lease_duration_secs, config.ai_mode).await;
+                let _ = services.execution.reclaim_expired_jobs(now).await;
+                if let Ok(permit) = Arc::clone(&permits).try_acquire_owned() {
+                    if let Some(claimed) = services.claims.claim_next(&config.worker_id, now, config.lease_duration_secs).await? {
+                        tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, "processing job claimed");
+                        let services_for_task = Arc::clone(&services);
+                        let source_for_task = Arc::clone(&source);
+                        let config_for_task = config.clone();
+                        tasks.spawn(async move {
+                            let _permit = permit;
+                            process_claimed(&services_for_task, &source_for_task, claimed, &config_for_task).await;
+                        });
+                    } else {
+                        drop(permit);
+                    }
                 }
                 next_poll = Instant::now() + Duration::from_millis(config.poll_interval_millis);
             }
         }
     }
+    while tasks.join_next().await.is_some() {}
     Ok(())
 }
 
@@ -198,257 +296,334 @@ async fn build_storage(
     }
 }
 
-#[allow(clippy::too_many_lines)]
 async fn process_claimed(
     services: &WorkerServices,
     source: &StorageSource,
     claimed: document_processing::ports::ClaimedProcessingJob,
-    max_content_bytes: usize,
-    worker_id: &str,
-    lease_duration_secs: i64,
-    ai_mode: AiMode,
+    config: &BusinessWorkerConfig,
 ) {
-    let mut job = claimed.job;
-    let token = claimed.lease_token;
-    let fence = claimed.fence_version;
-    let result = async {
-        let (content_type, bytes) = source
-            .read_source(
-                job.tenant_id(),
-                job.document_id(),
-                job.document_content_revision(),
-            )
-            .await?;
-        let pipeline = FixedPipelineRunner;
-        let candidate = pipeline
-            .run_inline(
-                &job,
-                &content_type,
-                &bytes,
-                max_content_bytes,
-                &DeterministicLocalExtractor,
-            )
-            .await?;
-        let steps = if ai_mode == AiMode::Separate {
-            vec![
-                document_processing::ProcessingStepKind::ValidateSource,
-                document_processing::ProcessingStepKind::DetectType,
-                document_processing::ProcessingStepKind::ExtractText,
-            ]
-        } else {
-            vec![
-                document_processing::ProcessingStepKind::ValidateSource,
-                document_processing::ProcessingStepKind::DetectType,
-                document_processing::ProcessingStepKind::ExtractText,
-                document_processing::ProcessingStepKind::ExtractFields,
-            ]
-        };
-        for step in steps {
-            let now = Utc::now();
-            let expected = job.aggregate_version().value();
-            job.heartbeat(
-                worker_id,
-                &token,
-                fence,
-                now + chrono::Duration::seconds(lease_duration_secs),
-                now,
-            )
-            .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
+    let job = claimed.job;
+    let fence = ExecutionFence::new(
+        config.worker_id.clone(),
+        claimed.lease_token.clone(),
+        claimed.fence_version,
+    );
+    let heartbeat = LeaseHeartbeatGuard::start(
+        Arc::clone(&services.execution),
+        job.tenant_id(),
+        job.id(),
+        fence.clone(),
+        config.heartbeat_interval_secs,
+        config.lease_duration_secs,
+    );
+    if config.test_step_delay_millis > 0 {
+        sleep(Duration::from_millis(config.test_step_delay_millis)).await;
+    }
+    let step = job.current_step();
+    let result = process_step(services, source, &job, &fence, config, &heartbeat).await;
+    let heartbeat_lost = heartbeat.lost.load(Ordering::Acquire);
+    heartbeat.stop().await;
+    if let Err(error) = result {
+        if !matches!(error, ExtractionError::LeaseLost) && !heartbeat_lost {
+            let failure = classify_failure(&error, job.attempt_count());
+            let _ = services
+                .execution
+                .retry_or_fail_step(job.tenant_id(), job.id(), step, failure, &fence, Utc::now())
+                .await;
+        }
+        tracing::warn!(job_id = %job.id(), step = %step, failure_code = error.code(), "processing job step failed");
+    } else if !heartbeat_lost && job.status() == document_processing::ProcessingJobStatus::Running {
+        let _ = services
+            .execution
+            .release_job(job.tenant_id(), job.id(), &fence, Utc::now())
+            .await;
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+async fn process_step(
+    services: &WorkerServices,
+    source: &StorageSource,
+    job: &document_processing::ProcessingJob,
+    fence: &ExecutionFence,
+    config: &BusinessWorkerConfig,
+    heartbeat: &LeaseHeartbeatGuard,
+) -> Result<(), ExtractionError> {
+    use document_processing::ProcessingStepKind;
+    let now = Utc::now();
+    match job.current_step() {
+        ProcessingStepKind::ValidateSource => {
+            source
+                .read_source(
+                    job.tenant_id(),
+                    job.document_id(),
+                    job.document_content_revision(),
+                )
+                .await?;
+            heartbeat.ensure_alive()?;
             services
-                .commands
-                .save(&job, expected)
-                .await
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            let expected = job.aggregate_version().value();
-            job.start_step(worker_id, &token, fence, step, now)
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            services
-                .commands
-                .save(&job, expected)
-                .await
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            let step_version = job.aggregate_version().value();
-            services
-                .steps
-                .start(
-                    &StepCheckpoint {
-                        job_id: job.id(),
-                        tenant_id: job.tenant_id(),
-                        step_kind: step,
-                        attempt_number: job.attempt_count(),
-                        checkpoint_json: serde_json::json!({}),
-                        updated_at: now,
-                    },
-                    step_version,
+                .execution
+                .start_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::ValidateSource,
+                    fence,
+                    now,
                 )
                 .await
-                .map_err(|_| document_processing::ExtractionError::Internal)?;
-            let expected = job.aggregate_version().value();
-            job.complete_step(worker_id, &token, fence, step, Utc::now())
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
+                .map_err(map_repository_error)?;
             services
-                .commands
-                .save(&job, expected)
-                .await
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            let step_version = job.aggregate_version().value();
-            services
-                .steps
-                .complete(
-                    job.id(),
+                .execution
+                .complete_step(
                     job.tenant_id(),
-                    step,
-                    job.attempt_count(),
-                    step_version,
+                    job.id(),
+                    ProcessingStepKind::ValidateSource,
+                    None,
+                    fence,
                     Utc::now(),
                 )
                 .await
-                .map_err(|_| document_processing::ExtractionError::Internal)?;
+                .map_err(map_repository_error)?;
         }
-        if ai_mode == AiMode::Separate {
-            let now = Utc::now();
-            let expected = job.aggregate_version().value();
-            job.start_step(
-                worker_id,
-                &token,
-                fence,
-                document_processing::ProcessingStepKind::ExtractFields,
-                now,
-            )
-            .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
+        ProcessingStepKind::DetectType => {
+            let (content_type, _) = source
+                .read_source(
+                    job.tenant_id(),
+                    job.document_id(),
+                    job.document_content_revision(),
+                )
+                .await?;
+            if !matches!(
+                content_type.as_str(),
+                "text/plain" | "text/markdown" | "application/json"
+            ) {
+                return Err(ExtractionError::UnsupportedContentType);
+            }
+            heartbeat.ensure_alive()?;
             services
-                .commands
-                .save(&job, expected)
-                .await
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            let step_version = job.aggregate_version().value();
-            services
-                .steps
-                .start(
-                    &StepCheckpoint {
-                        job_id: job.id(),
-                        tenant_id: job.tenant_id(),
-                        step_kind: document_processing::ProcessingStepKind::ExtractFields,
-                        attempt_number: job.attempt_count(),
-                        checkpoint_json: serde_json::json!({
-                            "text_artifact_reference": format!("processing/{}/text", job.id())
-                        }),
-                        updated_at: now,
-                    },
-                    step_version,
+                .execution
+                .start_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::DetectType,
+                    fence,
+                    now,
                 )
                 .await
-                .map_err(|_| document_processing::ExtractionError::Internal)?;
+                .map_err(map_repository_error)?;
             services
-                .ai_tasks
-                .enqueue(&AiTask {
-                    id: Uuid::now_v7(),
-                    tenant_id: job.tenant_id(),
-                    job_id: job.id(),
-                    step_kind: document_processing::ProcessingStepKind::ExtractFields,
-                    status: "queued".to_string(),
-                    input_artifact_id: Some(format!("processing/{}/text", job.id())),
-                    attempt_count: 0,
-                    max_attempts: job.max_attempts(),
-                    lease_token: None,
-                    fence_version: 0,
-                    lease_expires_at: None,
-                })
+                .execution
+                .complete_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::DetectType,
+                    None,
+                    fence,
+                    Utc::now(),
+                )
                 .await
-                .map_err(|_| document_processing::ExtractionError::Internal)?;
-            let expected = job.aggregate_version().value();
-            job.wait_for_ai(worker_id, &token, fence, Utc::now())
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            services
-                .commands
-                .save(&job, expected)
-                .await
-                .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-            return Ok::<(), document_processing::ExtractionError>(());
+                .map_err(map_repository_error)?;
         }
-        services
-            .candidates
-            .save_candidate(&candidate.candidate)
-            .await
-            .map_err(|_| document_processing::ExtractionError::Internal)?;
-        let now = Utc::now();
-        let expected = job.aggregate_version().value();
-        job.start_step(
-            worker_id,
-            &token,
-            fence,
-            document_processing::ProcessingStepKind::ValidateCandidate,
-            now,
-        )
-        .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-        services
-            .commands
-            .save(&job, expected)
-            .await
-            .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-        let step_version = job.aggregate_version().value();
-        services
-            .steps
-            .start(
-                &StepCheckpoint {
+        ProcessingStepKind::ExtractText => {
+            let (content_type, bytes) = source
+                .read_source(
+                    job.tenant_id(),
+                    job.document_id(),
+                    job.document_content_revision(),
+                )
+                .await?;
+            let artifact = extract_text_artifact(
+                &content_type,
+                job.document_content_revision(),
+                &bytes,
+                config.max_content_bytes,
+            )?;
+            let key = source
+                .put_text_artifact(job.tenant_id(), job.id(), &artifact)
+                .await?;
+            let reference = TextArtifactReference {
+                key,
+                content_hash: artifact.content_hash,
+                content_revision: artifact.content_revision,
+                byte_count: artifact.byte_count,
+                line_count: artifact.line_count,
+                character_count: artifact.character_count,
+            };
+            heartbeat.ensure_alive()?;
+            services
+                .execution
+                .start_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::ExtractText,
+                    fence,
+                    now,
+                )
+                .await
+                .map_err(map_repository_error)?;
+            if config.ai_mode == AiMode::Separate {
+                services
+                    .execution
+                    .enqueue_ai_and_wait(job.tenant_id(), job.id(), reference, fence, Utc::now())
+                    .await
+                    .map_err(map_repository_error)?;
+            } else {
+                let checkpoint = StepCheckpoint {
                     job_id: job.id(),
                     tenant_id: job.tenant_id(),
-                    step_kind: document_processing::ProcessingStepKind::ValidateCandidate,
+                    step_kind: ProcessingStepKind::ExtractText,
                     attempt_number: job.attempt_count(),
-                    checkpoint_json: serde_json::json!({}),
-                    updated_at: now,
-                },
-                step_version,
-            )
-            .await
-            .map_err(|_| document_processing::ExtractionError::Internal)?;
-        let expected = job.aggregate_version().value();
-        job.complete_step(
-            worker_id,
-            &token,
-            fence,
-            document_processing::ProcessingStepKind::ValidateCandidate,
-            Utc::now(),
-        )
-        .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-        services
-            .commands
-            .save(&job, expected)
-            .await
-            .map_err(|_| document_processing::ExtractionError::LeaseLost)?;
-        let step_version = job.aggregate_version().value();
-        services
-            .steps
-            .complete(
-                job.id(),
-                job.tenant_id(),
-                document_processing::ProcessingStepKind::ValidateCandidate,
-                job.attempt_count(),
-                step_version,
-                Utc::now(),
-            )
-            .await
-            .map_err(|_| document_processing::ExtractionError::Internal)?;
-        Ok::<(), document_processing::ExtractionError>(())
-    }
-    .await;
-    if let Err(error) = result {
-        let now = Utc::now();
-        let expected = job.aggregate_version().value();
-        if job
-            .fail_permanent(
-                worker_id,
-                &token,
-                fence,
-                error.code().to_string(),
-                None,
-                now,
-            )
-            .is_ok()
-        {
-            let _ = services.commands.save(&job, expected).await;
+                    checkpoint_json: serde_json::json!({"text_artifact_reference": reference.key, "content_hash": reference.content_hash, "content_revision": reference.content_revision, "byte_count": reference.byte_count, "line_count": reference.line_count, "character_count": reference.character_count}),
+                    updated_at: Utc::now(),
+                };
+                services
+                    .execution
+                    .complete_step(
+                        job.tenant_id(),
+                        job.id(),
+                        ProcessingStepKind::ExtractText,
+                        Some(checkpoint),
+                        fence,
+                        Utc::now(),
+                    )
+                    .await
+                    .map_err(map_repository_error)?;
+            }
         }
-        tracing::warn!(job_id = %job.id(), failure_code = error.code(), "processing job failed");
+        ProcessingStepKind::ExtractFields => {
+            if config.ai_mode == AiMode::Separate {
+                return Err(ExtractionError::Internal);
+            }
+            heartbeat.ensure_alive()?;
+            services
+                .execution
+                .start_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::ExtractFields,
+                    fence,
+                    now,
+                )
+                .await
+                .map_err(map_repository_error)?;
+            services
+                .execution
+                .complete_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::ExtractFields,
+                    None,
+                    fence,
+                    Utc::now(),
+                )
+                .await
+                .map_err(map_repository_error)?;
+        }
+        ProcessingStepKind::ValidateCandidate => {
+            heartbeat.ensure_alive()?;
+            services
+                .execution
+                .start_step(
+                    job.tenant_id(),
+                    job.id(),
+                    ProcessingStepKind::ValidateCandidate,
+                    fence,
+                    now,
+                )
+                .await
+                .map_err(map_repository_error)?;
+            let candidate = match services
+                .queries
+                .detail(job.tenant_id(), job.id())
+                .await
+                .map_err(map_repository_error)?
+                .and_then(|detail| detail.candidate)
+            {
+                Some(candidate) => candidate,
+                None if config.ai_mode == AiMode::Inline => {
+                    let (content_type, bytes) = source
+                        .read_source(
+                            job.tenant_id(),
+                            job.document_id(),
+                            job.document_content_revision(),
+                        )
+                        .await?;
+                    let artifact = extract_text_artifact(
+                        &content_type,
+                        job.document_content_revision(),
+                        &bytes,
+                        config.max_content_bytes,
+                    )?;
+                    DeterministicLocalExtractor
+                        .extract(ExtractionRequest {
+                            tenant_id: job.tenant_id(),
+                            job_id: job.id(),
+                            content_revision: artifact.content_revision,
+                            content_type,
+                            text: artifact.text,
+                            line_count: artifact.line_count,
+                            character_count: artifact.character_count,
+                        })
+                        .await?
+                }
+                None => return Err(ExtractionError::Internal),
+            };
+            candidate
+                .payload
+                .validate(config.max_content_bytes)
+                .map_err(|_| ExtractionError::CandidateValidationFailed)?;
+            services
+                .execution
+                .save_candidate_and_wait_for_review(
+                    job.tenant_id(),
+                    job.id(),
+                    &candidate,
+                    fence,
+                    Utc::now(),
+                )
+                .await
+                .map_err(map_repository_error)?;
+        }
+        ProcessingStepKind::AwaitReview => return Ok(()),
+    }
+    Ok(())
+}
+
+fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedProcessingFailure {
+    let disposition = match error {
+        ExtractionError::AiProviderUnavailable | ExtractionError::Internal => {
+            let backoff_secs = match attempt_count {
+                0 => 1,
+                1 => 5,
+                _ => 30,
+            };
+            ProcessingFailureDisposition::Retry {
+                backoff: chrono::Duration::seconds(backoff_secs),
+            }
+        }
+        ExtractionError::Cancelled => ProcessingFailureDisposition::Cancelled,
+        ExtractionError::LeaseLost => ProcessingFailureDisposition::LeaseLost,
+        _ => ProcessingFailureDisposition::Permanent,
+    };
+    ClassifiedProcessingFailure {
+        code: error.code().to_string(),
+        message: None,
+        disposition,
+    }
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn map_repository_error(error: document_processing::ProcessingRepositoryError) -> ExtractionError {
+    match error {
+        document_processing::ProcessingRepositoryError::LeaseLost => ExtractionError::LeaseLost,
+        document_processing::ProcessingRepositoryError::NotFound
+        | document_processing::ProcessingRepositoryError::TenantMismatch
+        | document_processing::ProcessingRepositoryError::Conflict
+        | document_processing::ProcessingRepositoryError::IdempotencyConflict => {
+            ExtractionError::Internal
+        }
+        document_processing::ProcessingRepositoryError::Unavailable
+        | document_processing::ProcessingRepositoryError::Failed => ExtractionError::Internal,
     }
 }
 

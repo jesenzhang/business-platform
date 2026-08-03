@@ -374,3 +374,11 @@ Processing logs and metrics use the bounded fields `tenant_id`, `document_id`,
 short one-way hash prefix. The MVP records job creation/completion/failure/
 cancellation, duration, retry, lease-loss, queue-age, and pending-AI-task
 signals without logging raw document text, prompts, storage URLs, or secrets.
+
+Revision 1 additionally records UoW action names (`step_started`,
+`step_completed`, `ai_task_enqueued`, `ai_task_completed`, `ai_task_failed`,
+`review_finalized`, `processing_cancelled`, and reclaim/release actions) in the
+tenant-scoped processing audit table. Metrics distinguish retry/backoff,
+reclaim, heartbeat loss, stale-fence rejection, and graceful-drain duration;
+audit details remain structured and never contain object keys, raw text, lease
+tokens, prompts, credentials, or database URLs.

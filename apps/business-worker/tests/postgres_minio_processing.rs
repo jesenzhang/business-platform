@@ -32,7 +32,7 @@ async fn setup(pool: &PgPool) -> (Uuid, Uuid, Uuid, ObjectKey) {
 #[tokio::test]
 #[ignore = "requires PostgreSQL, migrations, and MinIO"]
 #[allow(clippy::too_many_lines)]
-async fn postgres_minio_processing_candidate_round_trip() {
+async fn postgres_minio_processing_adapter_round_trip() {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://postgres:postgres@localhost:5432/business_platform".to_string()
     });

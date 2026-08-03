@@ -5,6 +5,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use chrono::Utc;
+use document_processing::ports::FinalizeReviewCommand;
 use document_processing::{
     CandidateReview, ProcessingJob, ProcessingJobStatus, ProcessingRepositoryError, ReviewDecision,
 };
@@ -256,11 +257,11 @@ pub async fn cancel_job(
     headers: HeaderMap,
     Path(job_id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    let (tenant_id, _) = context(&auth).map_err(|error| trace(error, &headers))?;
+    let (tenant_id, user_id) = context(&auth).map_err(|error| trace(error, &headers))?;
     let services = processing_services(&state)?;
     let job = services
-        .commands
-        .request_cancel(tenant_id, job_id)
+        .execution
+        .cancel_processing(tenant_id, job_id, user_id, Utc::now())
         .await
         .map_err(|error| trace(map_error(&error), &headers))?;
     let detail = services
@@ -301,6 +302,18 @@ pub async fn review_candidate(
     Json(body): Json<ReviewRequest>,
 ) -> Result<Response, ApiError> {
     let (tenant_id, reviewer_id) = context(&auth).map_err(|error| trace(error, &headers))?;
+    if headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        return Err(trace(
+            ApiError::validation("Idempotency-Key is required"),
+            &headers,
+        ));
+    }
     let services = processing_services(&state)?;
     let detail = services
         .queries
@@ -312,22 +325,6 @@ pub async fn review_candidate(
         .candidate
         .as_ref()
         .ok_or_else(|| trace(ApiError::not_found("candidate", job_id), &headers))?;
-    if detail.job.status() != ProcessingJobStatus::WaitingForReview {
-        return Err(trace(
-            ApiError::from(shared_kernel::error::AppError::Conflict(
-                "processing job is not awaiting review".to_string(),
-            )),
-            &headers,
-        ));
-    }
-    if detail.review.is_some() {
-        return Err(trace(
-            ApiError::from(shared_kernel::error::AppError::Conflict(
-                "candidate has already been reviewed".to_string(),
-            )),
-            &headers,
-        ));
-    }
     if body.candidate_version != candidate.version() {
         return Err(trace(
             ApiError::from(shared_kernel::error::AppError::Conflict(
@@ -350,37 +347,17 @@ pub async fn review_candidate(
     review
         .validate(candidate)
         .map_err(|_| trace(ApiError::validation("invalid review"), &headers))?;
-    services
-        .candidates
-        .save_review(&review)
+    let finalized = services
+        .execution
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id,
+                job_id,
+                review,
+            },
+            Utc::now(),
+        )
         .await
         .map_err(|error| trace(map_error(&error), &headers))?;
-    let mut job = detail.job;
-    let expected = job.aggregate_version().value();
-    match body.decision {
-        ReviewDecision::Rejected => job.reject_review(Utc::now()).map_err(|_| {
-            trace(
-                ApiError::from(shared_kernel::error::AppError::Conflict(
-                    "review transition failed".to_string(),
-                )),
-                &headers,
-            )
-        })?,
-        ReviewDecision::Accepted | ReviewDecision::Edited => {
-            job.confirm_review(Utc::now()).map_err(|_| {
-                trace(
-                    ApiError::from(shared_kernel::error::AppError::Conflict(
-                        "review transition failed".to_string(),
-                    )),
-                    &headers,
-                )
-            })?;
-        }
-    }
-    services
-        .commands
-        .save(&job, expected)
-        .await
-        .map_err(|error| trace(map_error(&error), &headers))?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(review))).into_response())
+    Ok((StatusCode::OK, Json(ApiResponse::ok(finalized.review))).into_response())
 }

@@ -1,9 +1,13 @@
 use chrono::{Duration, Utc};
 use document_processing::ports::{
+    CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, ProcessingExecutionUnitOfWork,
     ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery, ProcessingStepStore,
-    StepCheckpoint,
+    StepCheckpoint, TextArtifactReference,
 };
-use document_processing::{ProcessingJob, ProcessingStepKind};
+use document_processing::{
+    CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionRequest,
+    ProcessingJob, ProcessingJobStatus, ProcessingStepKind, ReviewDecision,
+};
 use document_processing_postgres::PostgresProcessingStore;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -219,6 +223,295 @@ async fn postgres_processing_contract_claims_and_restarts() {
         )
         .await
         .is_ok());
+
+    sqlx::query("DELETE FROM document_processing_jobs WHERE tenant_id = $1 AND document_id = $2")
+        .bind(tenant)
+        .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
+        .bind(tenant)
+        .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+}
+
+#[tokio::test]
+#[ignore = "requires PostgreSQL and migrations"]
+#[allow(clippy::too_many_lines)]
+async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/business_platform".to_string()
+    });
+    let pool = PgPool::connect(&url)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let (tenant, document, user) = setup(&pool).await;
+    let store = PostgresProcessingStore::new(pool.clone());
+    let now = Utc::now() - Duration::seconds(1);
+    let job = ProcessingJob::queue(
+        tenant,
+        document,
+        1,
+        format!("uow-{}", Uuid::now_v7()),
+        user,
+        3,
+        now,
+    )
+    .unwrap_or_else(|_| unreachable!());
+    store.create(&job).await.unwrap_or_else(|_| unreachable!());
+    let claimed = store
+        .claim_next("uow-business", Utc::now(), 30)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    let mut claimed = claimed;
+    for step in [
+        ProcessingStepKind::ValidateSource,
+        ProcessingStepKind::DetectType,
+    ] {
+        let fence = ExecutionFence::new(
+            "uow-business",
+            claimed.lease_token.clone(),
+            claimed.fence_version,
+        );
+        store
+            .start_step(tenant, job.id(), step, &fence, Utc::now())
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        store
+            .complete_step(tenant, job.id(), step, None, &fence, Utc::now())
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        store
+            .release(
+                job.id(),
+                "uow-business",
+                &claimed.lease_token,
+                claimed.fence_version,
+                Utc::now(),
+            )
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        claimed = store
+            .claim_next("uow-business", Utc::now(), 30)
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!());
+        assert_eq!(claimed.job.current_step(), step.next().unwrap_or(step));
+    }
+
+    let fence = ExecutionFence::new(
+        "uow-business",
+        claimed.lease_token.clone(),
+        claimed.fence_version,
+    );
+    store
+        .start_step(
+            tenant,
+            job.id(),
+            ProcessingStepKind::ExtractText,
+            &fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let task = store
+        .enqueue_ai_and_wait(
+            tenant,
+            job.id(),
+            TextArtifactReference {
+                key: format!(
+                    "tenants/{tenant}/processing-jobs/{}/artifacts/text/hash.txt",
+                    job.id()
+                ),
+                content_hash: "hash".to_string(),
+                content_revision: 1,
+                byte_count: 10,
+                line_count: 1,
+                character_count: 10,
+            },
+            &fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let waiting = store
+        .detail(tenant, job.id())
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(waiting.job.status(), ProcessingJobStatus::WaitingForAi);
+
+    let ai_claim =
+        document_processing::ports::AiTaskPort::claim_next(&store, "uow-ai", Utc::now(), 30)
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!());
+    let ai_fence = ExecutionFence::new(
+        "uow-ai",
+        ai_claim.lease_token.clone().unwrap_or_default(),
+        ai_claim.fence_version,
+    );
+    let candidate = DeterministicLocalExtractor
+        .extract(ExtractionRequest {
+            tenant_id: tenant,
+            job_id: job.id(),
+            content_revision: 1,
+            content_type: "text/plain".to_string(),
+            text: "UoW title\nbody".to_string(),
+            line_count: 2,
+            character_count: 14,
+        })
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let resumed = store
+        .complete_ai_and_resume(
+            CompleteAiTaskCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                task_id: task.id,
+                fence: ai_fence,
+                candidate: candidate.clone(),
+            },
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(
+        resumed.current_step(),
+        ProcessingStepKind::ValidateCandidate
+    );
+    assert_eq!(resumed.status(), ProcessingJobStatus::Queued);
+
+    let candidate_claim = store
+        .claim_next("uow-business", Utc::now(), 30)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    let candidate_fence = ExecutionFence::new(
+        "uow-business",
+        candidate_claim.lease_token.clone(),
+        candidate_claim.fence_version,
+    );
+    store
+        .start_step(
+            tenant,
+            job.id(),
+            ProcessingStepKind::ValidateCandidate,
+            &candidate_fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let review_job = store
+        .save_candidate_and_wait_for_review(
+            tenant,
+            job.id(),
+            &candidate,
+            &candidate_fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(review_job.status(), ProcessingJobStatus::WaitingForReview);
+    let review = CandidateReview {
+        id: Uuid::now_v7(),
+        tenant_id: tenant,
+        candidate_id: candidate.id(),
+        reviewer_id: user,
+        decision: ReviewDecision::Accepted,
+        patch: None,
+        comment: None,
+        candidate_version: candidate.version(),
+        created_at: Utc::now(),
+    };
+    let finalized = store
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                review: review.clone(),
+            },
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert!(!finalized.replayed);
+    assert_eq!(finalized.job.status(), ProcessingJobStatus::Succeeded);
+    let replayed = store
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                review,
+            },
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert!(replayed.replayed);
+
+    let stale = store
+        .complete_step(
+            tenant,
+            job.id(),
+            ProcessingStepKind::ValidateCandidate,
+            None,
+            &fence,
+            Utc::now(),
+        )
+        .await;
+    assert!(matches!(
+        stale,
+        Err(document_processing::ProcessingRepositoryError::LeaseLost)
+    ));
+
+    let cancelled_job = ProcessingJob::queue(
+        tenant,
+        document,
+        1,
+        format!("cancel-{}", Uuid::now_v7()),
+        user,
+        3,
+        Utc::now(),
+    )
+    .unwrap_or_else(|_| unreachable!());
+    store
+        .create(&cancelled_job)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let cancelled = store
+        .cancel_processing(tenant, cancelled_job.id(), user, Utc::now())
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(cancelled.status(), ProcessingJobStatus::Cancelled);
+    let replay_cancel = store
+        .cancel_processing(tenant, cancelled_job.id(), user, Utc::now())
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(replay_cancel.status(), ProcessingJobStatus::Cancelled);
+
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM document_processing_audit_events WHERE tenant_id = $1 AND job_id = $2",
+    )
+    .bind(tenant)
+    .bind(job.id())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert!(audit_count >= 8);
+    let outbox_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM outbox_events WHERE tenant_id = $1 AND aggregate_id = $2",
+    )
+    .bind(tenant.to_string())
+    .bind(job.id().to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert!(outbox_count >= 8);
 
     sqlx::query("DELETE FROM document_processing_jobs WHERE tenant_id = $1 AND document_id = $2")
         .bind(tenant)

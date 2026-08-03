@@ -17,11 +17,12 @@
 > E2E, and architecture fitness. At that historical checkpoint Search remained
 > Deferred and PLAN-0004 had not started.
 >
-> 2026-08-03: PLAN-0004 is an Accepted Candidate. It is scoped to a fixed durable Document
-> Processing MVP and begins with Gate 0 debt cleanup. No PR or main integration
-> is used; SQLite remains local single-process and PostgreSQL is production
-> authority. The durable-processing architecture and ADR-0010 through ADR-0012
-> are now the accepted design baseline for this slice.
+> 2026-08-03: PLAN-0004 Revision 1 is active for execution-correctness hardening.
+> The scope remains the fixed durable Document Processing MVP; no PR or main
+> integration is used. SQLite remains local single-process and PostgreSQL is the
+> production multi-worker authority. The durable-processing architecture and
+> ADR-0010 through ADR-0012 remain the design baseline while the new candidate
+> awaits feature CI evidence.
 
 ## 1. 当前权威结论
 
@@ -72,8 +73,9 @@
 
 ## 3. 当前实现状态
 
-当前仓库已完成 Phase 1 Foundation Integrity；PLAN-0001 与 PLAN-0002 均已
-集成并归档，当前进入 Phase 2 preparation。
+当前仓库已完成 Phase 1 Foundation Integrity；PLAN-0001、PLAN-0002 与
+PLAN-0003 均已集成并归档，PLAN-0004 Revision 1 正在 Phase 3 First Durable
+Business Flow 收尾。
 
 已具备：
 
@@ -88,8 +90,10 @@
 - API 组合状态已通过真实 PostgreSQL HTTP 流程验证；
 - PostgreSQL adapter 已移出 `document` 核心，本地与 GitHub Actions Fitness Function 均已通过；
 - 当前领域 crate 尚未按 Bounded Context Map 完成统一语言和数据所有权落实；
-- `workflow` 仍未实现 Durable Task Execution 核心；
-- Worker、Migration 和 Agent Adapter 仍处于骨架阶段；
+- `workflow` 通用能力仍未实现 Durable Task Execution；PLAN-0004 的固定
+  Document Processing 执行边界已落在独立 processing adapters 中；
+- Worker 与 Migration 已具备该固定切片的运行实现，其他 Agent Adapter 能力
+  仍处于骨架阶段；
 - API/Event 契约尚未全部形成可生成 Schema；
 - 质量属性尚未形成性能和恢复证据；
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
@@ -168,7 +172,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Accepted Candidate（候选代码 CI 30811814533；证据提交 CI 30812079019）
+PLAN-0004：Active — Revision 1（候选代码等待 Feature CI；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作
@@ -195,4 +199,5 @@ PLAN-0002 进入 Accepted Candidate 前：
 - 质量属性目标被实测或调整；
 - PLAN-0002 完成并归档；
 - PLAN-0004 Gate 0 通过并进入 durable processing implementation；
+- PLAN-0004 Revision 1 完成执行正确性收尾并取得绿色 Feature CI；
 - 开始第一个遗留业务迁移切片。

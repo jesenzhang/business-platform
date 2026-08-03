@@ -203,6 +203,18 @@ Outbox 实现必须支持：
 
 Outbox 和 Inbox 是可靠性适配实现，不进入业务统一语言。
 
+### PLAN-0004 Revision 1 execution boundary
+
+Document Intelligence owns `ProcessingJob`, processing steps, AI tasks,
+extraction candidates, and reviews. Durable Task Execution supplies the lease,
+fence, retry, cancellation, and recovery mechanics without becoming a second
+business-state owner. Worker transitions that touch these records, Audit, or
+Outbox use one adapter-owned local transaction. PostgreSQL is the multi-worker
+authority; SQLite uses `BEGIN IMMEDIATE` and remains single-process/inline-AI
+only. Text artifacts remain in Object Storage and are referenced by bounded,
+tenant-scoped metadata; raw text and internal keys do not cross the public
+contract boundary.
+
 ## 10. Process Manager
 
 跨上下文长期流程由 Process Manager 或 Saga 协调。

@@ -198,7 +198,7 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
         Err(error) => return Err(error.into()),
     };
     if processing_versions.is_empty() {
-        println!("  [pending] 1 document_processing");
+        println!("  [pending] 1..2 document_processing");
     } else {
         for migration in document_processing_sqlite::MIGRATOR.iter() {
             let state = if processing_versions.contains(&migration.version) {

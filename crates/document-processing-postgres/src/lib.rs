@@ -10,9 +10,11 @@ use document_processing::domain::{
     ProcessingStepKind, ProcessingStepStatus,
 };
 use document_processing::ports::{
-    AiTask, AiTaskPort, CandidateStore, ClaimedProcessingJob, ProcessingJobClaimPort,
+    AiTask, AiTaskPort, CandidateStore, ClaimedProcessingJob, ClassifiedProcessingFailure,
+    CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, FinalizeReviewResult,
+    ProcessingExecutionUnitOfWork, ProcessingFailureDisposition, ProcessingJobClaimPort,
     ProcessingJobCommandPort, ProcessingJobDetail, ProcessingJobQuery, ProcessingRepositoryError,
-    ProcessingStepStore, StepCheckpoint,
+    ProcessingStepStore, StepCheckpoint, TextArtifactReference,
 };
 use sqlx::{FromRow, PgConnection, PgPool};
 use uuid::Uuid;
@@ -89,9 +91,13 @@ struct AiTaskRow {
     input_artifact_id: Option<String>,
     attempt_count: i32,
     max_attempts: i32,
+    next_attempt_at: DateTime<Utc>,
+    cancel_requested_at: Option<DateTime<Utc>>,
+    lease_owner: Option<String>,
     lease_token: Option<String>,
     fence_version: i64,
     lease_expires_at: Option<DateTime<Utc>>,
+    output_candidate_id: Option<Uuid>,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -661,16 +667,20 @@ fn to_ai_task(row: AiTaskRow) -> Result<AiTask, ProcessingRepositoryError> {
         input_artifact_id: row.input_artifact_id,
         attempt_count: row.attempt_count,
         max_attempts: row.max_attempts,
+        next_attempt_at: row.next_attempt_at,
+        cancel_requested_at: row.cancel_requested_at,
+        lease_owner: row.lease_owner,
         lease_token: row.lease_token,
         fence_version: row.fence_version,
         lease_expires_at: row.lease_expires_at,
+        output_candidate_id: row.output_candidate_id,
     })
 }
 
 #[async_trait]
 impl AiTaskPort for PostgresProcessingStore {
     async fn enqueue(&self, task: &AiTask) -> Result<(), ProcessingRepositoryError> {
-        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at) VALUES ($1, $2, $3, $4, 'queued', $5, $6, $7, $8, 0, $9, $9)")
+        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at) VALUES ($1, $2, $3, $4, 'queued', $5, $6, $7, $8, 0, $9, $9) ON CONFLICT (tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
             .bind(task.id)
             .bind(task.tenant_id)
             .bind(task.job_id)
@@ -691,8 +701,12 @@ impl AiTaskPort for PostgresProcessingStore {
         now: DateTime<Utc>,
         lease_duration_secs: i64,
     ) -> Result<Option<AiTask>, ProcessingRepositoryError> {
+        if worker_id.trim().is_empty() || lease_duration_secs <= 0 {
+            return Err(ProcessingRepositoryError::Failed);
+        }
         let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
-        let row = sqlx::query_as::<_, AiTaskRow>("SELECT id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, lease_token, fence_version, lease_expires_at FROM document_ai_tasks WHERE status = 'queued' AND next_attempt_at <= $1 ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1")
+        let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= $1 ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1");
+        let row = sqlx::query_as::<_, AiTaskRow>(&query)
             .bind(now)
             .fetch_optional(&mut *transaction)
             .await
@@ -701,10 +715,13 @@ impl AiTaskPort for PostgresProcessingStore {
             transaction.commit().await.map_err(map_sql_error)?;
             return Ok(None);
         };
-        let fence = row.fence_version.saturating_add(1);
+        let fence = row
+            .fence_version
+            .checked_add(1)
+            .ok_or(ProcessingRepositoryError::Failed)?;
         let token = Uuid::now_v7().to_string();
         let expires_at = now + Duration::seconds(lease_duration_secs);
-        sqlx::query("UPDATE document_ai_tasks SET status = 'running', lease_owner = $1, lease_token = $2, lease_expires_at = $3, fence_version = $4, attempt_count = attempt_count + 1, updated_at = $5 WHERE id = $6 AND status = 'queued' AND fence_version = $7")
+        let result = sqlx::query("UPDATE document_ai_tasks SET status = 'running', lease_owner = $1, lease_token = $2, lease_expires_at = $3, fence_version = $4, attempt_count = attempt_count + 1, updated_at = $5 WHERE id = $6 AND status = 'queued' AND attempt_count < max_attempts AND fence_version = $7")
             .bind(worker_id)
             .bind(&token)
             .bind(expires_at)
@@ -715,7 +732,11 @@ impl AiTaskPort for PostgresProcessingStore {
             .execute(&mut *transaction)
             .await
             .map_err(map_sql_error)?;
-        let updated = sqlx::query_as::<_, AiTaskRow>("SELECT id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, lease_token, fence_version, lease_expires_at FROM document_ai_tasks WHERE id = $1")
+        if result.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id = $1");
+        let updated = sqlx::query_as::<_, AiTaskRow>(&query)
             .bind(row.id)
             .fetch_one(&mut *transaction)
             .await
@@ -733,7 +754,10 @@ impl AiTaskPort for PostgresProcessingStore {
         now: DateTime<Utc>,
         lease_duration_secs: i64,
     ) -> Result<(), ProcessingRepositoryError> {
-        let result = sqlx::query("UPDATE document_ai_tasks SET lease_expires_at = $1, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6 AND lease_expires_at > $2")
+        if lease_duration_secs <= 0 {
+            return Err(ProcessingRepositoryError::Failed);
+        }
+        let result = sqlx::query("UPDATE document_ai_tasks SET lease_expires_at = $1, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
             .bind(now + Duration::seconds(lease_duration_secs))
             .bind(now)
             .bind(task_id)
@@ -758,7 +782,7 @@ impl AiTaskPort for PostgresProcessingStore {
         candidate_id: Uuid,
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingRepositoryError> {
-        let result = sqlx::query("UPDATE document_ai_tasks SET status = 'succeeded', output_candidate_id = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6")
+        let result = sqlx::query("UPDATE document_ai_tasks SET status = 'succeeded', output_candidate_id = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
             .bind(candidate_id)
             .bind(now)
             .bind(task_id)
@@ -783,7 +807,7 @@ impl AiTaskPort for PostgresProcessingStore {
         failure_code: &str,
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingRepositoryError> {
-        let result = sqlx::query("UPDATE document_ai_tasks SET status = CASE WHEN attempt_count < max_attempts THEN 'queued' ELSE 'failed' END, failure_code = $1, next_attempt_at = $2, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6")
+        let result = sqlx::query("UPDATE document_ai_tasks SET status = CASE WHEN attempt_count < max_attempts THEN 'queued' ELSE 'failed' END, failure_code = $1, next_attempt_at = $2, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $2 WHERE id = $3 AND status = 'running' AND lease_owner = $4 AND lease_token = $5 AND fence_version = $6 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
             .bind(failure_code)
             .bind(now)
             .bind(task_id)
@@ -798,4 +822,1146 @@ impl AiTaskPort for PostgresProcessingStore {
         }
         Ok(())
     }
+}
+
+const JOB_COLUMNS: &str = "id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at";
+const AI_TASK_COLUMNS: &str = "id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, lease_owner, lease_token, fence_version, lease_expires_at, output_candidate_id";
+
+async fn load_job_for_update(
+    connection: &mut PgConnection,
+    tenant_id: Uuid,
+    job_id: Uuid,
+) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
+    let query = format!(
+        "SELECT {JOB_COLUMNS} FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2 FOR UPDATE"
+    );
+    sqlx::query_as::<_, JobRow>(&query)
+        .bind(tenant_id)
+        .bind(job_id)
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(map_sql_error)?
+        .map(to_job)
+        .transpose()
+}
+
+async fn save_job_fenced(
+    connection: &mut PgConnection,
+    job: &ProcessingJob,
+    expected_version: i64,
+    fence: &ExecutionFence,
+    now: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    let lease = job.lease_snapshot();
+    let (owner, token, expires_at) = lease
+        .map_or((None, None, None), |(owner, token, expires_at, _)| {
+            (Some(owner), Some(token), Some(expires_at))
+        });
+    let result = sqlx::query("UPDATE document_processing_jobs SET status = $1, current_step = $2, attempt_count = $3, max_attempts = $4, next_attempt_at = $5, cancel_requested_at = $6, failure_code = $7, failure_message = $8, lease_owner = $9, lease_token = $10, lease_expires_at = $11, fence_version = $12, version = $13, updated_at = $14 WHERE tenant_id = $15 AND id = $16 AND version = $17 AND lease_owner = $18 AND lease_token = $19 AND fence_version = $20 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $21")
+        .bind(job.status().as_str())
+        .bind(job.current_step().as_str())
+        .bind(job.attempt_count())
+        .bind(job.max_attempts())
+        .bind(job.next_attempt_at())
+        .bind(job.cancel_requested_at())
+        .bind(job.failure_code())
+        .bind(job.failure_message())
+        .bind(owner)
+        .bind(token)
+        .bind(expires_at)
+        .bind(job.fence_version())
+        .bind(job.aggregate_version().value())
+        .bind(job.updated_at())
+        .bind(job.tenant_id())
+        .bind(job.id())
+        .bind(expected_version)
+        .bind(&fence.worker_id)
+        .bind(&fence.lease_token)
+        .bind(fence.fence_version)
+        .bind(now)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    if result.rows_affected() != 1 {
+        return Err(ProcessingRepositoryError::LeaseLost);
+    }
+    Ok(())
+}
+
+async fn insert_processing_outbox(
+    connection: &mut PgConnection,
+    job: &ProcessingJob,
+    event_type: &str,
+    payload: serde_json::Value,
+    occurred_at: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    sqlx::query("INSERT INTO outbox_events (event_id, event_type, tenant_id, aggregate_id, aggregate_type, payload, schema_version, occurred_at) VALUES ($1, $2, $3, $4, 'document_processing_job', $5, 'v1', $6)")
+        .bind(Uuid::now_v7())
+        .bind(event_type)
+        .bind(job.tenant_id().to_string())
+        .bind(job.id().to_string())
+        .bind(payload)
+        .bind(occurred_at)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    Ok(())
+}
+
+async fn insert_processing_audit(
+    connection: &mut PgConnection,
+    job: &ProcessingJob,
+    action: &str,
+    actor_id: Option<Uuid>,
+    details: serde_json::Value,
+    occurred_at: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    sqlx::query("INSERT INTO document_processing_audit_events (id, tenant_id, job_id, action, actor_id, details, occurred_at) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+        .bind(Uuid::now_v7())
+        .bind(job.tenant_id())
+        .bind(job.id())
+        .bind(action)
+        .bind(actor_id)
+        .bind(details)
+        .bind(occurred_at)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    Ok(())
+}
+
+async fn write_step_started(
+    connection: &mut PgConnection,
+    checkpoint: &StepCheckpoint,
+) -> Result<(), ProcessingRepositoryError> {
+    let result = sqlx::query("INSERT INTO document_processing_steps (job_id, tenant_id, step_kind, status, attempt_number, started_at, checkpoint_json, created_at, updated_at) VALUES ($1, $2, $3, 'running', $4, $5, $6, $5, $5) ON CONFLICT (job_id, step_kind, attempt_number) DO UPDATE SET status = 'running', started_at = EXCLUDED.started_at, checkpoint_json = EXCLUDED.checkpoint_json, updated_at = EXCLUDED.updated_at")
+        .bind(checkpoint.job_id)
+        .bind(checkpoint.tenant_id)
+        .bind(checkpoint.step_kind.as_str())
+        .bind(checkpoint.attempt_number)
+        .bind(checkpoint.updated_at)
+        .bind(&checkpoint.checkpoint_json)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    let _ = result;
+    Ok(())
+}
+
+async fn write_step_completed(
+    connection: &mut PgConnection,
+    tenant_id: Uuid,
+    job_id: Uuid,
+    step: ProcessingStepKind,
+    attempt_number: i32,
+    checkpoint: Option<&StepCheckpoint>,
+    now: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    let result = sqlx::query("UPDATE document_processing_steps SET status = 'succeeded', finished_at = $1, checkpoint_json = COALESCE($2, checkpoint_json), updated_at = $1 WHERE tenant_id = $3 AND job_id = $4 AND step_kind = $5 AND attempt_number = $6")
+        .bind(now)
+        .bind(checkpoint.map(|item| &item.checkpoint_json))
+        .bind(tenant_id)
+        .bind(job_id)
+        .bind(step.as_str())
+        .bind(attempt_number)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    if result.rows_affected() == 0 {
+        sqlx::query("INSERT INTO document_processing_steps (job_id, tenant_id, step_kind, status, attempt_number, finished_at, checkpoint_json, created_at, updated_at) VALUES ($1, $2, $3, 'succeeded', $4, $5, $6, $5, $5) ON CONFLICT (job_id, step_kind, attempt_number) DO UPDATE SET status = 'succeeded', finished_at = EXCLUDED.finished_at, checkpoint_json = COALESCE(EXCLUDED.checkpoint_json, document_processing_steps.checkpoint_json), updated_at = EXCLUDED.updated_at")
+            .bind(job_id)
+            .bind(tenant_id)
+            .bind(step.as_str())
+            .bind(attempt_number)
+            .bind(now)
+            .bind(checkpoint.map(|item| &item.checkpoint_json))
+            .execute(&mut *connection)
+            .await
+            .map_err(map_sql_error)?;
+    }
+    Ok(())
+}
+
+async fn write_step_failed(
+    connection: &mut PgConnection,
+    tenant_id: Uuid,
+    job_id: Uuid,
+    step: ProcessingStepKind,
+    attempt_number: i32,
+    failure_code: &str,
+    now: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    let result = sqlx::query("UPDATE document_processing_steps SET status = 'failed', failure_code = $1, finished_at = $2, updated_at = $2 WHERE tenant_id = $3 AND job_id = $4 AND step_kind = $5 AND attempt_number = $6")
+        .bind(failure_code)
+        .bind(now)
+        .bind(tenant_id)
+        .bind(job_id)
+        .bind(step.as_str())
+        .bind(attempt_number)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
+    if result.rows_affected() == 0 {
+        sqlx::query("INSERT INTO document_processing_steps (job_id, tenant_id, step_kind, status, attempt_number, failure_code, finished_at, created_at, updated_at) VALUES ($1, $2, $3, 'failed', $4, $5, $6, $6, $6) ON CONFLICT (job_id, step_kind, attempt_number) DO UPDATE SET status = 'failed', failure_code = EXCLUDED.failure_code, finished_at = EXCLUDED.finished_at, updated_at = EXCLUDED.updated_at")
+            .bind(job_id)
+            .bind(tenant_id)
+            .bind(step.as_str())
+            .bind(attempt_number)
+            .bind(failure_code)
+            .bind(now)
+            .execute(&mut *connection)
+            .await
+            .map_err(map_sql_error)?;
+    }
+    Ok(())
+}
+
+async fn insert_candidate_tx(
+    connection: &mut PgConnection,
+    candidate: &ExtractionCandidate,
+) -> Result<Uuid, ProcessingRepositoryError> {
+    let payload = serde_json::to_value(candidate).map_err(|_| ProcessingRepositoryError::Failed)?;
+    let evidence =
+        serde_json::to_value(&candidate.evidence).map_err(|_| ProcessingRepositoryError::Failed)?;
+    sqlx::query_scalar::<_, Uuid>("INSERT INTO document_extraction_candidates (id, tenant_id, job_id, schema_version, payload, evidence, provider, model, prompt_version, version, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (tenant_id, job_id) DO UPDATE SET payload = EXCLUDED.payload, evidence = EXCLUDED.evidence, provider = EXCLUDED.provider, model = EXCLUDED.model, prompt_version = EXCLUDED.prompt_version RETURNING id")
+        .bind(candidate.id())
+        .bind(candidate.tenant_id())
+        .bind(candidate.job_id())
+        .bind(&candidate.schema_version)
+        .bind(payload)
+        .bind(evidence)
+        .bind(&candidate.provider)
+        .bind(&candidate.model)
+        .bind(&candidate.prompt_version)
+        .bind(candidate.version())
+        .bind(candidate.created_at())
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(map_sql_error)
+}
+
+async fn load_ai_task_for_update(
+    connection: &mut PgConnection,
+    tenant_id: Uuid,
+    task_id: Uuid,
+) -> Result<Option<AiTask>, ProcessingRepositoryError> {
+    let query = format!(
+        "SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE tenant_id = $1 AND id = $2 FOR UPDATE"
+    );
+    sqlx::query_as::<_, AiTaskRow>(&query)
+        .bind(tenant_id)
+        .bind(task_id)
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(map_sql_error)?
+        .map(to_ai_task)
+        .transpose()
+}
+
+#[async_trait]
+#[allow(clippy::too_many_lines)]
+impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
+    async fn start_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        expected_step: ProcessingStepKind,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        let expected = job.aggregate_version().value();
+        job.start_step(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            expected_step,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        write_step_started(
+            &mut transaction,
+            &StepCheckpoint {
+                job_id,
+                tenant_id,
+                step_kind: expected_step,
+                attempt_number: job.attempt_count(),
+                checkpoint_json: serde_json::json!({}),
+                updated_at: now,
+            },
+        )
+        .await?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.started.v1",
+            serde_json::json!({"step": expected_step.as_str()}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "step_started",
+            None,
+            serde_json::json!({"step": expected_step.as_str()}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn complete_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        completed_step: ProcessingStepKind,
+        checkpoint: Option<StepCheckpoint>,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        let expected = job.aggregate_version().value();
+        let attempt_number = job.attempt_count();
+        if job.cancel_requested_at().is_some() {
+            job.cancel(
+                Some((&fence.worker_id, &fence.lease_token, fence.fence_version)),
+                now,
+            )
+            .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+            save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                "document.processing.cancelled.v1",
+                serde_json::json!({"step": completed_step.as_str()}),
+                now,
+            )
+            .await?;
+            transaction.commit().await.map_err(map_sql_error)?;
+            return Ok(job);
+        }
+        job.complete_step(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            completed_step,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        write_step_completed(
+            &mut transaction,
+            tenant_id,
+            job_id,
+            completed_step,
+            attempt_number,
+            checkpoint.as_ref(),
+            now,
+        )
+        .await?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.step-completed.v1",
+            serde_json::json!({"step": completed_step.as_str()}),
+            now,
+        )
+        .await?;
+        if job.status() == ProcessingJobStatus::WaitingForReview {
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                "document.processing.waiting-for-review.v1",
+                serde_json::json!({}),
+                now,
+            )
+            .await?;
+        }
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "step_completed",
+            None,
+            serde_json::json!({"step": completed_step.as_str()}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn retry_or_fail_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        step: ProcessingStepKind,
+        failure: ClassifiedProcessingFailure,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        let expected = job.aggregate_version().value();
+        let attempt_number = job.attempt_count();
+        let disposition = failure.disposition.clone();
+        match failure.disposition {
+            ProcessingFailureDisposition::Retry { backoff } => {
+                job.fail_transient(
+                    &fence.worker_id,
+                    &fence.lease_token,
+                    fence.fence_version,
+                    failure.code.clone(),
+                    failure.message.clone(),
+                    now,
+                    backoff,
+                )
+                .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+            }
+            ProcessingFailureDisposition::Permanent => job
+                .fail_permanent(
+                    &fence.worker_id,
+                    &fence.lease_token,
+                    fence.fence_version,
+                    failure.code.clone(),
+                    failure.message.clone(),
+                    now,
+                )
+                .map_err(|_| ProcessingRepositoryError::LeaseLost)?,
+            ProcessingFailureDisposition::Cancelled => job
+                .cancel(
+                    Some((&fence.worker_id, &fence.lease_token, fence.fence_version)),
+                    now,
+                )
+                .map_err(|_| ProcessingRepositoryError::LeaseLost)?,
+            ProcessingFailureDisposition::LeaseLost => {
+                return Err(ProcessingRepositoryError::LeaseLost)
+            }
+        }
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        write_step_failed(
+            &mut transaction,
+            tenant_id,
+            job_id,
+            step,
+            attempt_number,
+            &failure.code,
+            now,
+        )
+        .await?;
+        let event = if matches!(&disposition, ProcessingFailureDisposition::Retry { .. }) {
+            "document.processing.retry-scheduled.v1"
+        } else if job.status() == ProcessingJobStatus::Cancelled {
+            "document.processing.cancelled.v1"
+        } else if job.status() == ProcessingJobStatus::Failed {
+            "document.processing.failed.v1"
+        } else {
+            "document.processing.step-completed.v1"
+        };
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            event,
+            serde_json::json!({"step": step.as_str(), "failure_code": failure.code, "disposition": format!("{disposition:?}")}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "step_failed",
+            None,
+            serde_json::json!({"step": step.as_str()}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn enqueue_ai_and_wait(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        text_artifact: TextArtifactReference,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<AiTask, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if job.current_step() != ProcessingStepKind::ExtractText {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        let expected = job.aggregate_version().value();
+        job.complete_step(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            ProcessingStepKind::ExtractText,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        job.wait_for_ai(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        let task_id = Uuid::now_v7();
+        let task = AiTask {
+            id: task_id,
+            tenant_id,
+            job_id,
+            step_kind: ProcessingStepKind::ExtractFields,
+            status: "queued".to_string(),
+            input_artifact_id: Some(text_artifact.key.clone()),
+            attempt_count: 0,
+            max_attempts: job.max_attempts(),
+            next_attempt_at: now,
+            cancel_requested_at: None,
+            lease_owner: None,
+            lease_token: None,
+            fence_version: 0,
+            lease_expires_at: None,
+            output_candidate_id: None,
+        };
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        write_step_completed(
+            &mut transaction,
+            tenant_id,
+            job_id,
+            ProcessingStepKind::ExtractText,
+            job.attempt_count(),
+            Some(&StepCheckpoint {
+                job_id,
+                tenant_id,
+                step_kind: ProcessingStepKind::ExtractText,
+                attempt_number: job.attempt_count(),
+                checkpoint_json: serde_json::json!({
+                    "content_hash": text_artifact.content_hash,
+                    "content_revision": text_artifact.content_revision,
+                    "byte_count": text_artifact.byte_count,
+                    "line_count": text_artifact.line_count,
+                    "character_count": text_artifact.character_count,
+                    "text_artifact_reference": text_artifact.key,
+                }),
+                updated_at: now,
+            }),
+            now,
+        )
+        .await?;
+        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at) VALUES ($1, $2, $3, $4, 'queued', $5, 0, $6, $7, 0, $7, $7) ON CONFLICT (tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
+            .bind(task.id)
+            .bind(task.tenant_id)
+            .bind(task.job_id)
+            .bind(task.step_kind.as_str())
+            .bind(&task.input_artifact_id)
+            .bind(task.max_attempts)
+            .bind(now)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.waiting-for-ai.v1",
+            serde_json::json!({"task_id": task.id, "step": "extract_fields"}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "ai_task_enqueued",
+            None,
+            serde_json::json!({"task_id": task.id}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(task)
+    }
+
+    async fn complete_ai_and_resume(
+        &self,
+        completion: CompleteAiTaskCommand,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(task) =
+            load_ai_task_for_update(&mut transaction, completion.tenant_id, completion.task_id)
+                .await?
+        else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if task.job_id != completion.job_id
+            || task.status != "running"
+            || task.lease_owner.as_deref() != Some(&completion.fence.worker_id)
+            || task.lease_token.as_deref() != Some(&completion.fence.lease_token)
+            || task.fence_version != completion.fence.fence_version
+            || task.lease_expires_at.is_none_or(|expires| expires <= now)
+        {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        let Some(mut job) =
+            load_job_for_update(&mut transaction, completion.tenant_id, completion.job_id).await?
+        else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if job.status() != ProcessingJobStatus::WaitingForAi
+            || job.current_step() != ProcessingStepKind::ExtractFields
+        {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        if completion.candidate.tenant_id() != completion.tenant_id
+            || completion.candidate.job_id() != completion.job_id
+        {
+            return Err(ProcessingRepositoryError::TenantMismatch);
+        }
+        if job.cancel_requested_at().is_some() {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        let candidate_id = insert_candidate_tx(&mut transaction, &completion.candidate).await?;
+        let expected = job.aggregate_version().value();
+        job.resume_after_ai(now)
+            .map_err(|_| ProcessingRepositoryError::Conflict)?;
+        save_job_without_fence(&mut transaction, &job, expected).await?;
+        write_step_completed(
+            &mut transaction,
+            completion.tenant_id,
+            completion.job_id,
+            ProcessingStepKind::ExtractFields,
+            task.attempt_count,
+            None,
+            now,
+        )
+        .await?;
+        let task_update = sqlx::query("UPDATE document_ai_tasks SET status = 'succeeded', output_candidate_id = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $2 WHERE tenant_id = $3 AND id = $4 AND status = 'running' AND lease_owner = $5 AND lease_token = $6 AND fence_version = $7 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
+            .bind(candidate_id)
+            .bind(now)
+            .bind(completion.tenant_id)
+            .bind(completion.task_id)
+            .bind(&completion.fence.worker_id)
+            .bind(&completion.fence.lease_token)
+            .bind(completion.fence.fence_version)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        if task_update.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.step-completed.v1",
+            serde_json::json!({"step": "extract_fields", "candidate_id": candidate_id}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "ai_task_completed",
+            None,
+            serde_json::json!({"task_id": completion.task_id, "candidate_id": candidate_id}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn fail_ai_task(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        task_id: Uuid,
+        failure: ClassifiedProcessingFailure,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<AiTask, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(task) = load_ai_task_for_update(&mut transaction, tenant_id, task_id).await?
+        else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if task.job_id != job_id
+            || task.status != "running"
+            || task.lease_owner.as_deref() != Some(&fence.worker_id)
+            || task.lease_token.as_deref() != Some(&fence.lease_token)
+            || task.fence_version != fence.fence_version
+            || task.lease_expires_at.is_none_or(|expires| expires <= now)
+        {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        let (status, next_attempt_at) = match failure.disposition {
+            ProcessingFailureDisposition::Retry { backoff }
+                if task.attempt_count < task.max_attempts =>
+            {
+                ("queued", now + backoff)
+            }
+            ProcessingFailureDisposition::Retry { .. }
+            | ProcessingFailureDisposition::Permanent => ("failed", now),
+            ProcessingFailureDisposition::Cancelled => ("cancelled", now),
+            ProcessingFailureDisposition::LeaseLost => {
+                return Err(ProcessingRepositoryError::LeaseLost)
+            }
+        };
+        let result = sqlx::query("UPDATE document_ai_tasks SET status = $1, failure_code = $2, cancel_requested_at = CASE WHEN $1 = 'cancelled' THEN COALESCE(cancel_requested_at, $3) ELSE cancel_requested_at END, next_attempt_at = $3, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $3 WHERE tenant_id = $4 AND id = $5 AND status = 'running' AND lease_owner = $6 AND lease_token = $7 AND fence_version = $8 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $3")
+            .bind(status)
+            .bind(&failure.code)
+            .bind(next_attempt_at)
+            .bind(tenant_id)
+            .bind(task_id)
+            .bind(&fence.worker_id)
+            .bind(&fence.lease_token)
+            .bind(fence.fence_version)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        if result.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if status == "failed" || status == "cancelled" {
+            let job_status = if status == "cancelled" {
+                "cancelled"
+            } else {
+                "failed"
+            };
+            sqlx::query("UPDATE document_processing_jobs SET status = $1, cancel_requested_at = CASE WHEN $1 = 'cancelled' THEN COALESCE(cancel_requested_at, $2) ELSE cancel_requested_at END, failure_code = $3, failure_message = $4, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = $2 WHERE tenant_id = $5 AND id = $6 AND status = 'waiting_for_ai'")
+                .bind(job_status)
+                .bind(now)
+                .bind(&failure.code)
+                .bind(failure.message.as_deref())
+                .bind(tenant_id)
+                .bind(job_id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(map_sql_error)?;
+            job = load_job_for_update(&mut transaction, tenant_id, job_id)
+                .await?
+                .ok_or(ProcessingRepositoryError::NotFound)?;
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                if status == "cancelled" {
+                    "document.processing.cancelled.v1"
+                } else {
+                    "document.processing.failed.v1"
+                },
+                serde_json::json!({"task_id": task_id, "failure_code": failure.code}),
+                now,
+            )
+            .await?;
+        } else {
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                "document.processing.retry-scheduled.v1",
+                serde_json::json!({"task_id": task_id, "failure_code": failure.code, "next_attempt_at": next_attempt_at}),
+                now,
+            )
+            .await?;
+        }
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "ai_task_failed",
+            None,
+            serde_json::json!({"task_id": task_id, "failure_code": failure.code, "status": status}),
+            now,
+        )
+        .await?;
+        let updated = load_ai_task_for_update(&mut transaction, tenant_id, task_id)
+            .await?
+            .ok_or(ProcessingRepositoryError::NotFound)?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(updated)
+    }
+
+    async fn save_candidate_and_wait_for_review(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        candidate: &ExtractionCandidate,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        if candidate.tenant_id() != tenant_id || candidate.job_id() != job_id {
+            return Err(ProcessingRepositoryError::TenantMismatch);
+        }
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if job.current_step() != ProcessingStepKind::ValidateCandidate {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        let expected = job.aggregate_version().value();
+        insert_candidate_tx(&mut transaction, candidate).await?;
+        let attempt_number = job.attempt_count();
+        job.wait_for_review(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        write_step_completed(
+            &mut transaction,
+            tenant_id,
+            job_id,
+            ProcessingStepKind::ValidateCandidate,
+            attempt_number,
+            None,
+            now,
+        )
+        .await?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.waiting-for-review.v1",
+            serde_json::json!({"candidate_id": candidate.id()}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "candidate_waiting_for_review",
+            None,
+            serde_json::json!({"candidate_id": candidate.id()}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn finalize_review(
+        &self,
+        command: FinalizeReviewCommand,
+        now: DateTime<Utc>,
+    ) -> Result<FinalizeReviewResult, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) =
+            load_job_for_update(&mut transaction, command.tenant_id, command.job_id).await?
+        else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        let candidate = sqlx::query_as::<_, CandidateRow>("SELECT payload FROM document_extraction_candidates WHERE tenant_id = $1 AND id = $2 FOR UPDATE")
+            .bind(command.tenant_id)
+            .bind(command.review.candidate_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?
+            .ok_or(ProcessingRepositoryError::NotFound)?;
+        let candidate: ExtractionCandidate = serde_json::from_value(candidate.payload)
+            .map_err(|_| ProcessingRepositoryError::Failed)?;
+        if candidate.job_id() != command.job_id || command.review.tenant_id != command.tenant_id {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2 FOR UPDATE")
+            .bind(command.tenant_id)
+            .bind(command.review.candidate_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?
+        {
+            let existing = to_review(existing)?;
+            if existing.reviewer_id == command.review.reviewer_id
+                && existing.decision == command.review.decision
+                && existing.candidate_version == command.review.candidate_version
+                && existing.patch == command.review.patch
+                && existing.comment == command.review.comment
+            {
+                transaction.commit().await.map_err(map_sql_error)?;
+                return Ok(FinalizeReviewResult {
+                    job,
+                    review: existing,
+                    replayed: true,
+                });
+            }
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        if job.status() != ProcessingJobStatus::WaitingForReview {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        command
+            .review
+            .validate(&candidate)
+            .map_err(|_| ProcessingRepositoryError::Conflict)?;
+        let expected = job.aggregate_version().value();
+        match command.review.decision {
+            document_processing::ReviewDecision::Rejected => job
+                .reject_review(now)
+                .map_err(|_| ProcessingRepositoryError::Conflict)?,
+            document_processing::ReviewDecision::Accepted
+            | document_processing::ReviewDecision::Edited => job
+                .confirm_review(now)
+                .map_err(|_| ProcessingRepositoryError::Conflict)?,
+        }
+        save_job_without_fence(&mut transaction, &job, expected).await?;
+        sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+            .bind(command.review.id)
+            .bind(command.review.tenant_id)
+            .bind(command.review.candidate_id)
+            .bind(command.review.reviewer_id)
+            .bind(command.review.decision.as_str())
+            .bind(&command.review.patch)
+            .bind(&command.review.comment)
+            .bind(command.review.candidate_version)
+            .bind(command.review.created_at)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            if command.review.decision == document_processing::ReviewDecision::Rejected {
+                "document.processing.failed.v1"
+            } else {
+                "document.processing.succeeded.v1"
+            },
+            serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "review_finalized",
+            Some(command.review.reviewer_id),
+            serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(FinalizeReviewResult {
+            job,
+            review: command.review,
+            replayed: false,
+        })
+    }
+
+    async fn cancel_processing(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        requested_by: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        if job.status().is_terminal() {
+            transaction.commit().await.map_err(map_sql_error)?;
+            return Ok(job);
+        }
+        if job.cancel_requested_at().is_some() {
+            transaction.commit().await.map_err(map_sql_error)?;
+            return Ok(job);
+        }
+        let expected = job.aggregate_version().value();
+        job.request_cancel(now)
+            .map_err(|_| ProcessingRepositoryError::Failed)?;
+        if job.status() == ProcessingJobStatus::WaitingForAi {
+            job.cancel(None, now)
+                .map_err(|_| ProcessingRepositoryError::Failed)?;
+            sqlx::query("UPDATE document_ai_tasks SET status = 'cancelled', cancel_requested_at = COALESCE(cancel_requested_at, $1), lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $1 WHERE tenant_id = $2 AND job_id = $3 AND status IN ('queued', 'running')")
+                .bind(now)
+                .bind(tenant_id)
+                .bind(job_id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(map_sql_error)?;
+        }
+        save_job_without_fence(&mut transaction, &job, expected).await?;
+        insert_processing_outbox(
+            &mut transaction,
+            &job,
+            "document.processing.cancelled.v1",
+            serde_json::json!({"requested_by": requested_by}),
+            now,
+        )
+        .await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "processing_cancelled",
+            Some(requested_by),
+            serde_json::json!({}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(job)
+    }
+
+    async fn heartbeat_job(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<DateTime<Utc>, ProcessingRepositoryError> {
+        if lease_duration_secs <= 0 {
+            return Err(ProcessingRepositoryError::Failed);
+        }
+        let expires_at = now + Duration::seconds(lease_duration_secs);
+        let result = sqlx::query("UPDATE document_processing_jobs SET lease_expires_at = $1, updated_at = $2, version = version + 1 WHERE tenant_id = $3 AND id = $4 AND status = 'running' AND cancel_requested_at IS NULL AND lease_owner = $5 AND lease_token = $6 AND fence_version = $7 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
+            .bind(expires_at)
+            .bind(now)
+            .bind(tenant_id)
+            .bind(job_id)
+            .bind(&fence.worker_id)
+            .bind(&fence.lease_token)
+            .bind(fence.fence_version)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sql_error)?;
+        if result.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        Ok(expires_at)
+    }
+
+    async fn release_job(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let Some(mut job) = load_job_for_update(&mut transaction, tenant_id, job_id).await? else {
+            return Err(ProcessingRepositoryError::NotFound);
+        };
+        let expected = job.aggregate_version().value();
+        job.release(
+            &fence.worker_id,
+            &fence.lease_token,
+            fence.fence_version,
+            now,
+        )
+        .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
+        save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        insert_processing_audit(
+            &mut transaction,
+            &job,
+            "job_released",
+            None,
+            serde_json::json!({}),
+            now,
+        )
+        .await?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(())
+    }
+
+    async fn reclaim_expired_jobs(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, ProcessingRepositoryError> {
+        ProcessingJobClaimPort::reclaim_expired(self, now).await
+    }
+
+    async fn heartbeat_ai_task(
+        &self,
+        tenant_id: Uuid,
+        task_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<DateTime<Utc>, ProcessingRepositoryError> {
+        let expires_at = now + Duration::seconds(lease_duration_secs);
+        let result = sqlx::query("UPDATE document_ai_tasks SET lease_expires_at = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4 AND status = 'running' AND lease_owner = $5 AND lease_token = $6 AND fence_version = $7 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
+            .bind(expires_at)
+            .bind(now)
+            .bind(tenant_id)
+            .bind(task_id)
+            .bind(&fence.worker_id)
+            .bind(&fence.lease_token)
+            .bind(fence.fence_version)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sql_error)?;
+        if result.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::LeaseLost);
+        }
+        Ok(expires_at)
+    }
+
+    async fn reclaim_expired_ai_tasks(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, ProcessingRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= $1 FOR UPDATE SKIP LOCKED");
+        let rows = sqlx::query_as::<_, AiTaskRow>(&query)
+            .bind(now)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        let mut reclaimed = 0_u64;
+        for row in rows {
+            let task = to_ai_task(row)?;
+            if task.attempt_count < task.max_attempts {
+                sqlx::query("UPDATE document_ai_tasks SET status = 'queued', lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, next_attempt_at = $1, updated_at = $1 WHERE tenant_id = $2 AND id = $3 AND status = 'running' AND fence_version = $4")
+                    .bind(now)
+                    .bind(task.tenant_id)
+                    .bind(task.id)
+                    .bind(task.fence_version)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(map_sql_error)?;
+            } else {
+                sqlx::query("UPDATE document_ai_tasks SET status = 'failed', failure_code = 'ai_provider_unavailable', lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = $1 WHERE tenant_id = $2 AND id = $3 AND status = 'running' AND fence_version = $4")
+                    .bind(now)
+                    .bind(task.tenant_id)
+                    .bind(task.id)
+                    .bind(task.fence_version)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(map_sql_error)?;
+                sqlx::query("UPDATE document_processing_jobs SET status = 'failed', failure_code = 'ai_provider_unavailable', version = version + 1, updated_at = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL WHERE tenant_id = $2 AND id = $3 AND status = 'waiting_for_ai'")
+                    .bind(now)
+                    .bind(task.tenant_id)
+                    .bind(task.job_id)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(map_sql_error)?;
+            }
+            reclaimed = reclaimed.saturating_add(1);
+        }
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(reclaimed)
+    }
+}
+
+async fn save_job_without_fence(
+    connection: &mut PgConnection,
+    job: &ProcessingJob,
+    expected_version: i64,
+) -> Result<(), ProcessingRepositoryError> {
+    save_job(connection, job, expected_version).await
 }

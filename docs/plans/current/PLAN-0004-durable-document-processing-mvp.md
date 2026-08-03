@@ -71,8 +71,8 @@ retryable. Lease tokens, worker ownership, storage keys, checkpoints, raw text,
 provider responses, and secrets never cross the public DTO boundary.
 
 Versioned events include `document.processing.requested.v1`, `started.v1`,
-`step-completed.v1`, `waiting-for-review.v1`, `succeeded.v1`, `failed.v1`, and
-`cancelled.v1`. Events carry event, tenant, job/document, correlation,
+`step-completed.v1`, `waiting-for-ai.v1`, `waiting-for-review.v1`,
+`retry-scheduled.v1`, `succeeded.v1`, `failed.v1`, and `cancelled.v1`. Events carry event, tenant, job/document, correlation,
 causation, trace, schema-version, and occurred-at fields, but no raw content,
 object key, signed URL, or provider secret. Job/step/outbox changes commit in
 one local transaction; consumers remain at-least-once and idempotent.
@@ -95,8 +95,8 @@ one local transaction; consumers remain at-least-once and idempotent.
   is bounded by configured maximum bytes.
 - Availability and recovery are demonstrated by restart, lease expiry, stale
   fence rejection, and object/database consistency tests. Rollback is code
-  revert plus forward-only migration correction; published migrations 001–008
-  are immutable.
+  revert plus forward-only migration correction; published PostgreSQL migrations
+  001–010 and published SQLite migrations remain immutable.
 
 ## Fitness functions and documentation
 
@@ -160,22 +160,25 @@ CI run IDs, candidate SHA, and explicit `PASS`, `PARTIAL`, `NOT RUN`, or
 `BLOCKED` status. A failure blocks progression; under the requested
 `blockers-only` stop strategy, non-blocking polish is deferred.
 
-### 2026-08-03 local candidate verification
+### Historical Revision 0 candidate
 
-- Candidate code SHA: `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`.
-- WP-00: `PASS` — `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --all-features`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-architecture.ps1`, and `git diff --check` all passed locally.
-- Domain and adapter contracts: `PASS` — document, processing domain, SQLite processing, SQLite document concurrency/operational, API, and migration tests passed.
-- Durable recovery evidence: `PASS` — SQLite process restart passed locally; PostgreSQL claim/reclaim/stale-fence/concurrency and MinIO source/candidate tests passed in Feature CI.
-- Local process E2E: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1` completed the API/worker/review/restart flow in an isolated temporary directory.
-- Feature CI: `PASS` — GitHub Actions Run `30811814533` for candidate code SHA `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`; Format, Check, Clippy, Unit tests, Architecture Fitness, and PostgreSQL + MinIO + E2E contracts all passed.
-- Windows PostgreSQL/MinIO: `NOT RUN`; GitHub Linux evidence is the accepted environment-dependent gate for this candidate.
+The previous candidate (`dddb50cd7851e479e309a3b0d0ef5f34a465dadf`, Feature CI
+`30811814533`, evidence CI `30812079019`) is retained as historical evidence.
+Revision 1 supersedes that candidate and must establish fresh evidence before
+the plan returns to `Accepted Candidate`.
 
-### 2026-08-03 accepted-candidate evidence
+### Revision 1 local verification — 2026-08-03
 
-- Status: `Accepted Candidate`.
-- Candidate code SHA: `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`.
-- Feature CI Run IDs: candidate code `30811814533` (`PASS`); evidence commit `30812079019` (`PASS`).
-- SQLite local E2E: `PASS`.
-- GitHub Linux PostgreSQL/MinIO: `PASS`.
-- Windows PostgreSQL/MinIO: `NOT RUN`.
-- Scope risks accepted by this MVP: deterministic local extraction only; no general DAG, OCR platform, model gateway, or SQLite distributed-worker claim.
+- Local code gates: `PASS` — `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --all-features`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`, `cargo test -p migration --test migration_test --all-features`, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-architecture.ps1`, and `git diff --check`.
+- Domain, SQLite UoW, API, and migration contracts: `PASS`.
+- SQLite process E2E including a killed running-step worker and restart: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1`.
+- Windows PostgreSQL/MinIO multi-process E2E: `NOT RUN` — no local PostgreSQL/MinIO runtime is installed; GitHub Linux is the required environment-dependent gate.
+- Feature CI for the Revision 1 candidate: `BLOCKED` until the pushed evidence commit receives a green run.
+
+### Revision 1 accepted-candidate evidence
+
+This section must be filled only after the Revision 1 code/evidence commit has
+a green Feature CI run. It must record the final HEAD SHA, CI run ID, GitHub
+Linux PostgreSQL/MinIO multi-process result, local SQLite E2E result, the
+Architecture Fitness result, Windows `NOT RUN`, and any explicitly accepted
+MVP risks.

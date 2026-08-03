@@ -24,3 +24,10 @@ state. Formal business writes remain in the owning application use case.
 The candidate schema can evolve independently from Document metadata and review
 conflicts are visible instead of overwritten. The MVP intentionally does not
 apply candidate fields to Contract, Customer, or Finance data.
+
+## Revision 1 clarification
+
+Candidate persistence plus the `WaitingForReview` transition is one execution
+unit of work. Review finalization validates tenant, candidate identity, and
+version while holding the job/candidate/review records in one transaction;
+replaying the same review is idempotent, while a different review conflicts.

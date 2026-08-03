@@ -17,6 +17,7 @@ type PersistenceAdapters = (
     Arc<dyn document_processing::ports::ProcessingJobClaimPort>,
     Arc<dyn document_processing::ports::ProcessingJobQuery>,
     Arc<dyn document_processing::ports::CandidateStore>,
+    Arc<dyn document_processing::ports::ProcessingExecutionUnitOfWork>,
 );
 
 #[tokio::main]
@@ -48,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
         processing_claims,
         processing_queries,
         processing_candidates,
+        processing_execution,
     ): PersistenceAdapters = match config.database.backend {
         DatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
@@ -72,6 +74,7 @@ async fn main() -> anyhow::Result<()> {
                     pool.clone(),
                 )),
                 Arc::new(PostgresReadinessProbe::new(pool.clone())),
+                processing_store.clone(),
                 processing_store.clone(),
                 processing_store.clone(),
                 processing_store.clone(),
@@ -100,6 +103,7 @@ async fn main() -> anyhow::Result<()> {
                 processing_store.clone(),
                 processing_store.clone(),
                 processing_store.clone(),
+                processing_store.clone(),
                 processing_store,
             )
         }
@@ -119,6 +123,7 @@ async fn main() -> anyhow::Result<()> {
             claims: processing_claims,
             queries: processing_queries,
             candidates: processing_candidates,
+            execution: processing_execution,
         }),
         readiness,
     });

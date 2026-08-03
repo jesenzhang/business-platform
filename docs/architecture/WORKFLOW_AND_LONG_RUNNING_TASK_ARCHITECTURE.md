@@ -445,3 +445,10 @@ revision and storage reference; Document Intelligence owns candidate and
 review state. PostgreSQL is the production multi-worker authority and SQLite
 is explicitly local single-process. Workers stop claiming on shutdown and
 rely on lease expiry/reclaim after a crash.
+
+Revision 1 closes the transaction boundary around each execution transition:
+the worker calls an adapter-owned `ProcessingExecutionUnitOfWork`, dispatches
+one `current_step` per claim, and persists the text artifact before enqueuing
+`ExtractFields`. AI completion, bounded retry/backoff, reclaim, candidate
+creation, cancellation, audit, and outbox effects are atomic. Heartbeat tasks
+are joined during drain, and stale fences fail closed.

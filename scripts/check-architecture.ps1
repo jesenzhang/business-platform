@@ -51,6 +51,25 @@ Assert-NotContains "crates/document/src/query" @("sqlx::", "FromRow") "document 
 Assert-NotContains "crates/document/src/domain" @("#[derive(FromRow", "sqlx::FromRow") "document domain row-model violation"
 Assert-NotContains "apps/migration/src" @("sqlx::migrate!") "migration app must use the shared runtime migration catalog"
 Assert-NotContains "apps/business-api/src" @("expected_migration", "PostgresReadinessProbe::new(pool,") "readiness must derive compatibility from the shared migration catalog"
+Assert-NotContains "apps/business-worker/src" @(
+    "ProcessingJobCommandPort",
+    "ProcessingStepStore",
+    "CandidateStore",
+    "AiTaskPort",
+    "FixedPipelineRunner"
+) "business-worker must use the execution unit of work for writes"
+Assert-NotContains "apps/ai-worker/src" @(
+    "CandidateStore",
+    "ProcessingJobCommandPort",
+    "ProcessingStepStore",
+    "FixedPipelineRunner"
+) "ai-worker must use the execution unit of work for writes"
+$processingPorts = Get-Content -Raw (Join-Path $root "crates/document-processing/src/ports.rs")
+foreach ($requiredProcessingPort in @("ProcessingExecutionUnitOfWork", "ExecutionFence", "TextArtifactReference")) {
+    if ($processingPorts -notmatch [regex]::Escape($requiredProcessingPort)) {
+        throw "Processing execution port missing: $requiredProcessingPort"
+    }
+}
 
 $aggregatePath = Join-Path $root "crates/document/src/domain/entity.rs"
 $aggregateContent = Get-Content -Raw $aggregatePath

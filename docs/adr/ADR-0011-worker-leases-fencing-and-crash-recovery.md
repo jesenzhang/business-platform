@@ -25,3 +25,12 @@ Crash recovery is deterministic and stale writes cannot win after reclaim.
 Heartbeat cadence is configuration validated to be below half the lease.
 Multi-worker PostgreSQL and local SQLite tests remain separate evidence. A
 future distributed SQLite mode would require a new ADR and deployment model.
+
+## Revision 1 clarification
+
+The complete lease identity (tenant, owner, opaque token, fence version, and
+unexpired lease) is required by every execution unit of work. Heartbeat guards
+are owned by the worker operation and joined during shutdown. AI reclaim either
+schedules a bounded retry with backoff or atomically marks both task and
+waiting job failed; a stale worker cannot persist a candidate or transition a
+job after reclaim.

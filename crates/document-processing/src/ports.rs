@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
 use crate::domain::{
@@ -49,6 +49,78 @@ pub struct StepCheckpoint {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Lease identity carried by every durable worker-side business transition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionFence {
+    pub worker_id: String,
+    pub lease_token: String,
+    pub fence_version: i64,
+}
+
+impl ExecutionFence {
+    #[must_use]
+    pub fn new(
+        worker_id: impl Into<String>,
+        lease_token: impl Into<String>,
+        fence_version: i64,
+    ) -> Self {
+        Self {
+            worker_id: worker_id.into(),
+            lease_token: lease_token.into(),
+            fence_version,
+        }
+    }
+}
+
+/// Persisted reference and bounded metadata for the extracted text artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextArtifactReference {
+    pub key: String,
+    pub content_hash: String,
+    pub content_revision: i64,
+    pub byte_count: u64,
+    pub line_count: u32,
+    pub character_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessingFailureDisposition {
+    Retry { backoff: Duration },
+    Permanent,
+    Cancelled,
+    LeaseLost,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassifiedProcessingFailure {
+    pub code: String,
+    pub message: Option<String>,
+    pub disposition: ProcessingFailureDisposition,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompleteAiTaskCommand {
+    pub tenant_id: Uuid,
+    pub job_id: Uuid,
+    pub task_id: Uuid,
+    pub fence: ExecutionFence,
+    pub candidate: ExtractionCandidate,
+}
+
+#[derive(Debug, Clone)]
+pub struct FinalizeReviewCommand {
+    pub tenant_id: Uuid,
+    pub job_id: Uuid,
+    pub review: CandidateReview,
+}
+
+#[derive(Debug, Clone)]
+pub struct FinalizeReviewResult {
+    pub job: ProcessingJob,
+    pub review: CandidateReview,
+    pub replayed: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct AiTask {
     pub id: Uuid,
@@ -59,9 +131,13 @@ pub struct AiTask {
     pub input_artifact_id: Option<String>,
     pub attempt_count: i32,
     pub max_attempts: i32,
+    pub next_attempt_at: DateTime<Utc>,
+    pub cancel_requested_at: Option<DateTime<Utc>>,
+    pub lease_owner: Option<String>,
     pub lease_token: Option<String>,
     pub fence_version: i64,
     pub lease_expires_at: Option<DateTime<Utc>>,
+    pub output_candidate_id: Option<Uuid>,
 }
 
 #[async_trait]
@@ -211,6 +287,127 @@ pub trait CandidateStore: Send + Sync {
         job_id: Uuid,
     ) -> Result<Option<ExtractionCandidate>, ProcessingRepositoryError>;
     async fn save_review(&self, review: &CandidateReview) -> Result<(), ProcessingRepositoryError>;
+}
+
+/// Business-level transaction boundary for worker and review transitions.
+///
+/// Implementations own the database transaction. Callers must not compose the
+/// legacy write stores to emulate these methods because that creates crash
+/// windows between the Job, Step, Candidate, Review, Audit, and Outbox writes.
+#[async_trait]
+pub trait ProcessingExecutionUnitOfWork: Send + Sync {
+    async fn start_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        expected_step: ProcessingStepKind,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn complete_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        completed_step: ProcessingStepKind,
+        checkpoint: Option<StepCheckpoint>,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn retry_or_fail_step(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        step: ProcessingStepKind,
+        failure: ClassifiedProcessingFailure,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn enqueue_ai_and_wait(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        text_artifact: TextArtifactReference,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<AiTask, ProcessingRepositoryError>;
+
+    async fn complete_ai_and_resume(
+        &self,
+        completion: CompleteAiTaskCommand,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn fail_ai_task(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        task_id: Uuid,
+        failure: ClassifiedProcessingFailure,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<AiTask, ProcessingRepositoryError>;
+
+    async fn save_candidate_and_wait_for_review(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        candidate: &ExtractionCandidate,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn finalize_review(
+        &self,
+        command: FinalizeReviewCommand,
+        now: DateTime<Utc>,
+    ) -> Result<FinalizeReviewResult, ProcessingRepositoryError>;
+
+    async fn cancel_processing(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        requested_by: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn heartbeat_job(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<DateTime<Utc>, ProcessingRepositoryError>;
+
+    async fn release_job(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProcessingRepositoryError>;
+
+    async fn reclaim_expired_jobs(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, ProcessingRepositoryError>;
+
+    async fn heartbeat_ai_task(
+        &self,
+        tenant_id: Uuid,
+        task_id: Uuid,
+        fence: &ExecutionFence,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<DateTime<Utc>, ProcessingRepositoryError>;
+
+    async fn reclaim_expired_ai_tasks(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, ProcessingRepositoryError>;
 }
 
 #[derive(Debug, Clone)]

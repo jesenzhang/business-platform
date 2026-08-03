@@ -87,6 +87,9 @@ pub struct BusinessWorkerConfig {
     pub poll_interval_millis: u64,
     #[serde(default = "default_max_content_bytes")]
     pub max_content_bytes: usize,
+    /// Test-only deterministic delay used by the process crash-recovery E2E.
+    #[serde(default)]
+    pub test_step_delay_millis: u64,
     #[serde(default)]
     pub ai_mode: AiMode,
     #[serde(default)]
@@ -145,6 +148,9 @@ impl BusinessWorkerConfig {
         }
         if self.max_content_bytes == 0 {
             return Err("max_content_bytes must be positive".to_string());
+        }
+        if self.env == RuntimeEnvironment::Production && self.test_step_delay_millis != 0 {
+            return Err("test_step_delay_millis must be zero in production".to_string());
         }
         Ok(())
     }
@@ -210,6 +216,7 @@ mod tests {
                 heartbeat_interval_secs: 10,
                 poll_interval_millis: 10,
                 max_content_bytes: 1024,
+                test_step_delay_millis: 0,
                 ai_mode: AiMode::Inline,
                 observability: ObservabilityConfig::default(),
             }
