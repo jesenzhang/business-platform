@@ -176,7 +176,7 @@ async fn verify_filters(
             .execute(PersistNewDocument {
                 document,
                 idempotency_key: format!("contract-filter-{index}"),
-                request_fingerprint: format!("filter-{index}").repeat(16),
+                request_fingerprint: format!("filter-{index}").repeat(8),
                 fingerprint_version: 1,
             })
             .await
@@ -320,7 +320,7 @@ async fn verify_cursor(
             .execute(PersistNewDocument {
                 document,
                 idempotency_key: format!("contract-cursor-{index}"),
-                request_fingerprint: format!("cursor-{index}").repeat(16),
+                request_fingerprint: format!("cursor-{index}").repeat(8),
                 fingerprint_version: 1,
             })
             .await
