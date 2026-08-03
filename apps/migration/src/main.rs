@@ -5,8 +5,8 @@
 //!   cargo run -p migration -- --backend sqlite status
 //!
 //! The database URL comes from process configuration (with the legacy
-//! `DATABASE_URL` fallback). PostgreSQL uses the shared `runtime-migration`
-//! catalog; SQLite owns an independent catalog in `document-sqlite`.
+//! `DATABASE_URL` fallback). `PostgreSQL` uses the shared `runtime-migration`
+//! catalog; `SQLite` owns an independent catalog in `document-sqlite`.
 
 use anyhow::Context;
 use sqlx::migrate::MigrateDatabase;

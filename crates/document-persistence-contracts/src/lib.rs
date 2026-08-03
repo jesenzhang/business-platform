@@ -31,7 +31,7 @@ pub async fn verify_document_persistence_contract(
     let command = PersistNewDocument {
         document: first.clone(),
         idempotency_key: "contract-key-a".to_string(),
-        request_fingerprint: "fingerprint-a".to_string(),
+        request_fingerprint: "a".repeat(64),
         fingerprint_version: 1,
     };
     let created = unit_of_work
@@ -49,7 +49,7 @@ pub async fn verify_document_persistence_contract(
         return Err("idempotent replay did not return the original document".to_string());
     }
     let mut conflict = command;
-    conflict.request_fingerprint = "different".to_string();
+    conflict.request_fingerprint = "b".repeat(64);
     if unit_of_work.execute(conflict).await != Err(ApplicationPortError::IdempotencyConflict) {
         return Err("idempotency conflict was not rejected".to_string());
     }
@@ -76,7 +76,7 @@ pub async fn verify_document_persistence_contract(
         .execute(PersistNewDocument {
             document: invalid.clone(),
             idempotency_key: "contract-negative-size".to_string(),
-            request_fingerprint: "contract-negative-size".to_string(),
+            request_fingerprint: "c".repeat(64),
             fingerprint_version: 1,
         })
         .await;
@@ -104,7 +104,7 @@ pub async fn verify_document_persistence_contract(
             .execute(PersistNewDocument {
                 document,
                 idempotency_key: format!("contract-key-{index}"),
-                request_fingerprint: format!("fingerprint-{index}"),
+                request_fingerprint: index.to_string().repeat(64),
                 fingerprint_version: 1,
             })
             .await
