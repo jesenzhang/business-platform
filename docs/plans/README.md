@@ -22,7 +22,7 @@ plans/
 
 ## 当前计划
 
-- [`current/PLAN-0001-foundation-hardening.md`](current/PLAN-0001-foundation-hardening.md)：修正初始骨架的安全和架构阻断项，建立可验证的服务基座。
+- [`archive/2026/PLAN-0001-foundation-hardening.md`](archive/2026/PLAN-0001-foundation-hardening.md)：`Integrated`，修正初始骨架的安全和架构阻断项，建立可验证的服务基座。
 
 ## 归档
 

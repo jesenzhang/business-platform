@@ -98,11 +98,15 @@ docs/
 ## 8. 当前实施
 
 - 当前计划：[`plans/current/PLAN-0002-foundation-integrity-and-closeout.md`](plans/current/PLAN-0002-foundation-integrity-and-closeout.md)
+- 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-PLAN-0002 当前状态为 `Active`。它承接 PLAN-0001 合并后的配置、完整性、可靠性和架构门禁收尾工作。
+当前阶段为 Phase 1 Foundation Integrity。PLAN-0002 当前状态为 `Active`，
+采用 local solo fast-forward 且不创建 PR；本地静态与普通测试已通过，
+真实 PostgreSQL/MinIO 与 Linux CI 最终证据仍为阻断项。通过后下一阶段为
+Phase 2：First Durable AI Business Flow，但本任务不启动 PLAN-0003。
 
 ## 9. 合并后的后续任务规则
 

@@ -1,6 +1,6 @@
 # PLAN-0001：初始服务基座加固
 
-> 状态：Implemented
+> 状态：Integrated
 > 日期：2026-07-30
 > 来源：`REVIEW-2026-07-30-001`
 > 目标分支：feat/PLAN-0001-foundation-hardening
@@ -169,7 +169,7 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 - [x] 总体架构、代码架构和代码实现一致；
 - [x] 基础设施契约测试可重复运行；
 - [x] 首个 Document 垂直切片证明 API 可复用应用层；Worker/Agent 适配器作为后续能力接入；
-- [ ] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。（待 PR 合并后执行）
+- [x] 本计划移入 `docs/plans/archive/2026/` 并记录最终提交。
 
 ## 9. 候选提交
 
@@ -235,3 +235,12 @@ CI/架构和文档主题形成提交：
 - 本地开发机未安装 PostgreSQL/MinIO，无法复现真实依赖测试；CI 已提供通过证据。
 - LocalStorage 无法跨平台消除 canonicalize/open 之间的 symlink race，
   仅允许受信开发环境。
+
+## 11. Integration closeout
+
+- PR：`#3`
+- Candidate head：`b39462e4f9786fdec44d01353d0f2118a0513f62`
+- Main merge：`64dbf8b4157c1bfde2f2b319f4657321b2f52f6b`
+- Merged at：`2026-07-31T01:52:38Z`
+- CI run：`30596249195`
+- Follow-up：`PLAN-0002-foundation-integrity-and-closeout`

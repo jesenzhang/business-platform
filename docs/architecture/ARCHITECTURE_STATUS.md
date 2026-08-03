@@ -1,14 +1,14 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-07-31
-> 当前阶段：Phase 0 → 基础服务加固
+> 最后更新：2026-08-03
+> 当前阶段：Phase 1 Foundation Integrity
 > 当前计划：`PLAN-0002-foundation-integrity-and-closeout`
-> 当前架构 PR：PLAN-0002 尚未创建（Active）
+> 集成方式：local solo fast-forward，无 PR
 
-> 2026-07-31: PLAN-0002 WP-01 and WP-02 are implemented locally. Runtime
-> configuration is process-specific, `shared-kernel` has no infrastructure
-> topology, and connection URLs are redacted values.
+> 2026-08-03: PLAN-0001 is Integrated and archived. PLAN-0002 implementation
+> is locally complete through WP-10, but remains Active because PostgreSQL,
+> MinIO, and Linux CI final evidence is blocked by the available environment.
 
 ## 1. 当前权威结论
 
@@ -57,8 +57,8 @@
 
 ## 3. 当前实现状态
 
-当前仓库仍是 Phase 0 工程骨架；PLAN-0001 已合并为 `main` 基线，PLAN-0002
-正在收敛配置边界、数据完整性、消息终态和全 Workspace 架构门禁。
+当前仓库处于 Phase 1 Foundation Integrity；PLAN-0001 已合并并归档，PLAN-0002
+正在等待真实基础设施和 Linux CI 最终证据。
 
 已具备：
 
@@ -80,10 +80,13 @@
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
 - 生产 Runbook 尚未完成。
 
-## 4. PLAN-0001 实施约束
+## 4. PLAN-0001 集成结果
 
-`PLAN-0001` 当前为 `Implemented`，其实现分支已同步最新
-`origin/main`，在合并前必须满足：
+`PLAN-0001` 当前为 `Integrated / Archived`。其候选提交
+`b39462e4f9786fdec44d01353d0f2118a0513f62` 通过 PR #3 集成为 main
+提交 `64dbf8b4157c1bfde2f2b319f4657321b2f52f6b`；完整证据见归档计划。
+
+已采用的约束继续有效：
 
 1. 首个 document metadata 垂直切片属于 Document Management Context；
 2. Document Management 拥有文档身份、版本和元数据；
@@ -134,7 +137,7 @@ PLAN-0001 之后所有计划必须包含：
 ## 7. 当前判定
 
 ```text
-完整服务端架构 Baseline：已形成，PR #2 可进入合并评审
+完整服务端架构 Baseline：已形成并生效
 业务能力和 Context Map：已形成初始 Baseline
 数据所有权和一致性：已形成 Baseline
 长时任务架构：已形成 Baseline，代码尚未实现
@@ -147,30 +150,31 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 分层依赖：部分符合
 基础设施隔离：部分符合
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
-PLAN-0001：Implemented
+PLAN-0001：Integrated / Archived
+PLAN-0002：Active / infrastructure evidence BLOCKED
 ```
 
-## 8. 合并后的采用动作
+## 8. PLAN-0002 采用动作
 
-PR #3 完成前：
+PLAN-0002 进入 Accepted Candidate 前：
 
 1. 运行 `scripts/check-architecture.ps1`；
 2. 运行固定 Rust 1.94.1 的 fmt/check/clippy/test；
 3. 启动 PostgreSQL/MinIO，执行 migration upgrade、Outbox fencing、
    Document E2E 和对象存储契约测试；
-4. 在 PLAN-0001 PR 中提供逐项证据；
+4. 在 PLAN-0002 归档记录中提供逐项证据；
 5. 任何冲突以 Baseline 或新 ADR 解决，不静默保留。
 
 ## 9. 下一次更新条件
 
 出现以下事件时更新本文：
 
-- PR #2 合并；
-- PLAN-0001 形成 PR；
+- PLAN-0002 成为 Accepted Candidate；
+- PLAN-0002 本地 fast-forward 集成并完成 main CI；
 - 首个垂直切片通过架构验收；
 - 架构适配测试进入 CI；
 - Bounded Context 或数据所有权调整；
 - 新增部署单元或重大基础设施；
 - 质量属性目标被实测或调整；
-- PLAN-0001 完成并归档；
+- PLAN-0002 完成并归档；
 - 开始第一个遗留业务迁移切片。

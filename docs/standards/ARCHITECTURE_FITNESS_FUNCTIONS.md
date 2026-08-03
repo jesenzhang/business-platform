@@ -54,7 +54,9 @@ cargo test --workspace --all-features
 
 ## 4. 依赖方向检查
 
-建立 `scripts/check-architecture.ps1` 或等价工具，读取 `cargo metadata` 和源代码目录。
+`cargo run -p architecture-check -- check` 读取正式 `cargo metadata`，并由
+`scripts/check-architecture.ps1` 组合源代码、迁移和文档边界检查。合法与非法
+依赖图 fixtures 由 `cargo test -p architecture-check` 验证。
 
 Required 规则：
 
