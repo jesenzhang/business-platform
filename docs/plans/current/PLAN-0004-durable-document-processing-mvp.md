@@ -1,6 +1,6 @@
 # PLAN-0004: Durable Document Processing MVP
 
-> Status: Active — Revision 1
+> Status: Accepted Candidate — Revision 1
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Intelligence
 > Base: `97f6a41608aa136ac05176f37c6e7d3bda0e25a7`
@@ -173,12 +173,31 @@ the plan returns to `Accepted Candidate`.
 - Domain, SQLite UoW, API, and migration contracts: `PASS`.
 - SQLite process E2E including a killed running-step worker and restart: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1`.
 - Windows PostgreSQL/MinIO multi-process E2E: `NOT RUN` — no local PostgreSQL/MinIO runtime is installed; GitHub Linux is the required environment-dependent gate.
-- Feature CI for the Revision 1 candidate: `BLOCKED` until the pushed evidence commit receives a green run.
+- Feature CI for the Revision 1 candidate: `PASS` — GitHub Actions run
+  `30831418950` at implementation SHA `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`.
+  Format, Check, Clippy, Unit tests, Architecture Fitness, and PostgreSQL +
+  MinIO + E2E contracts all passed.
 
 ### Revision 1 accepted-candidate evidence
 
-This section must be filled only after the Revision 1 code/evidence commit has
-a green Feature CI run. It must record the final HEAD SHA, CI run ID, GitHub
-Linux PostgreSQL/MinIO multi-process result, local SQLite E2E result, the
-Architecture Fitness result, Windows `NOT RUN`, and any explicitly accepted
-MVP risks.
+The Revision 1 implementation candidate is `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`.
+Its Feature CI run is `30831418950` and is green across all six jobs.
+
+- GitHub Linux PostgreSQL/MinIO multi-process E2E: `PASS` — API, Business
+  Worker, AI Worker, real PostgreSQL and MinIO covered source upload, durable
+  text artifacts, business-worker crash recovery, AI-worker reclaim, review
+  replay, and twenty same-document jobs.
+- Local SQLite process E2E: `PASS` — the killed running-step worker was
+  restarted and recovered to review.
+- Architecture Fitness: `PASS` — local and CI checks passed.
+- Windows PostgreSQL/MinIO: `NOT RUN` — the runtime is not installed locally;
+  GitHub Linux is the environment-dependent evidence.
+- Accepted MVP risks: deterministic extraction remains the only provider
+  implementation; PDF/image/Office/archive inputs remain explicitly
+  unsupported; SQLite remains local single-process and Separate AI is
+  PostgreSQL-only. These are bounded MVP constraints, not deferred correctness
+  work.
+
+Revision 1 is therefore an `Accepted Candidate`. The feature branch remains
+the delivery boundary; no PR, main merge, branch deletion, or PLAN-0005 work
+was performed.

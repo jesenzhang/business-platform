@@ -17,12 +17,12 @@
 > E2E, and architecture fitness. At that historical checkpoint Search remained
 > Deferred and PLAN-0004 had not started.
 >
-> 2026-08-03: PLAN-0004 Revision 1 is active for execution-correctness hardening.
-> The scope remains the fixed durable Document Processing MVP; no PR or main
-> integration is used. SQLite remains local single-process and PostgreSQL is the
-> production multi-worker authority. The durable-processing architecture and
-> ADR-0010 through ADR-0012 remain the design baseline while the new candidate
-> awaits feature CI evidence.
+> 2026-08-03: PLAN-0004 Revision 1 reached Accepted Candidate at
+> implementation `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`. Feature CI run
+> `30831418950` passed all six jobs, including PostgreSQL, MinIO, the
+> multi-process crash/reclaim E2E, and Architecture Fitness. SQLite remains
+> local single-process and PostgreSQL is the production multi-worker authority;
+> no PR or main integration is used.
 
 ## 1. 当前权威结论
 
@@ -74,8 +74,8 @@
 ## 3. 当前实现状态
 
 当前仓库已完成 Phase 1 Foundation Integrity；PLAN-0001、PLAN-0002 与
-PLAN-0003 均已集成并归档，PLAN-0004 Revision 1 正在 Phase 3 First Durable
-Business Flow 收尾。
+PLAN-0003 均已集成并归档，PLAN-0004 Revision 1 已达到 Phase 3 First Durable
+Business Flow 的 Accepted Candidate。
 
 已具备：
 
@@ -172,7 +172,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Active — Revision 1（候选代码等待 Feature CI；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0004：Accepted Candidate — Revision 1（Feature CI `30831418950` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作
@@ -199,5 +199,5 @@ PLAN-0002 进入 Accepted Candidate 前：
 - 质量属性目标被实测或调整；
 - PLAN-0002 完成并归档；
 - PLAN-0004 Gate 0 通过并进入 durable processing implementation；
-- PLAN-0004 Revision 1 完成执行正确性收尾并取得绿色 Feature CI；
+- PLAN-0004 Revision 1 集成并归档，或开始下一项明确计划；
 - 开始第一个遗留业务迁移切片。
