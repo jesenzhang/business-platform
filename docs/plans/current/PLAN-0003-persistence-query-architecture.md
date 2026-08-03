@@ -1,6 +1,6 @@
 # PLAN-0003: Persistence, Query and Multi-Database Architecture
 
-> Status: Active
+> Status: Accepted Candidate
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Management
 > Base: `3f953c10c18ecd1666e35550c50f7cca6dc3ff93`
@@ -66,3 +66,21 @@ corrected only by new forward migrations.
 - Cargo metadata/source Architecture Fitness: PASS.
 - Windows PostgreSQL/MinIO: NOT RUN because Docker is unavailable. GitHub Linux
   remains the required authority for PostgreSQL, MinIO and Document E2E.
+
+## Candidate evidence (2026-08-03)
+
+- Candidate code SHA: `79bc57e642fbeab1500dc449a50cd7c7b1893d29`.
+- Feature CI run `30786233808`: PASS, 6/6 jobs.
+- Format, workspace check, Clippy `-D warnings`, Unit and Architecture Fitness:
+  PASS.
+- PostgreSQL migration 008, shared persistence/query contracts, keyset EXPLAIN,
+  migration compatibility, Inbox/Outbox, and Document PostgreSQL E2E: PASS.
+- SQLite shared contracts, rollback, WAL/busy timeout, local file recovery and
+  migration CLI: PASS locally and in Linux CI where applicable.
+- MinIO metadata/Content-Type, real presigned GET, streaming and LocalStorage
+  regression contracts: PASS.
+- Completion checklist: all 15 PLAN-0003 items PASS. PostgreSQL remains the
+  production authority; SQLite remains local/single-process and non-equivalent
+  for distributed concurrency.
+- The final Candidate SHA is the subsequent evidence commit and is intentionally
+  not self-referenced here.

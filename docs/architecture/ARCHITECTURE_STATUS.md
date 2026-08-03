@@ -11,7 +11,7 @@
 > run 30784568762 passed all six jobs, including PostgreSQL, MinIO, Document
 > E2E, and architecture fitness. The repository is in Phase 2 preparation.
 >
-> 2026-08-03: PLAN-0003 is Active. It establishes database-neutral Document
+> 2026-08-03: PLAN-0003 is an Accepted Candidate. It establishes database-neutral Document
 > query ports, PostgreSQL/SQLite adapters, independent migrations and shared
 > persistence contracts. It is not integrated.
 
@@ -159,7 +159,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
-PLAN-0003：Active
+PLAN-0003：Accepted Candidate
 ```
 
 ## 8. PLAN-0002 采用动作
