@@ -1,0 +1,27 @@
+[package]
+name = "document-processing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+bounded_context = "document-processing"
+context = "document-processing"
+layer = "domain"
+role = "core"
+data_owner = "document-processing"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

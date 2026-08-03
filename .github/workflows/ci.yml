@@ -116,6 +116,9 @@ jobs:
       - name: Run real infrastructure and E2E tests
         run: |
           cargo test -p document-sqlite --all-features
+          cargo test -p document-processing --all-features
+          cargo test -p document-processing-sqlite --all-features --tests
+          cargo test -p document-processing-postgres --test contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p document-persistence-contracts --all-features
           cargo test -p document-postgres --test query_contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p runtime-migration --all-features
@@ -125,6 +128,9 @@ jobs:
           cargo test -p object-storage --lib --all-features
           cargo test -p object-storage --test minio_contract --all-features -- --include-ignored --test-threads=1
           cargo test -p business-api --test documents_postgres --all-features -- --include-ignored --test-threads=1
+          cargo test -p ai-worker --all-features
+          cargo test -p business-worker --all-features
+          cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1
       - name: Architecture and diff checks
         shell: pwsh
         run: |

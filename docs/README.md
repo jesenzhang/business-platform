@@ -32,6 +32,7 @@
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
+| Durable Document Processing | [`architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md`](architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md) | Baseline | PLAN-0004 的 Job、固定 Pipeline、Worker、Review 和恢复边界 |
 
 以上文档共同构成完整服务端架构，不能只选择其中一份解释系统设计。
 
@@ -54,6 +55,9 @@
 - [`adr/ADR-0004-rust-msrv-toolchain.md`](adr/ADR-0004-rust-msrv-toolchain.md)：Rust 1.94.1 为当前锁定依赖的最低验证工具链。
 - [`adr/ADR-0008-cqrs-query-model-and-read-projections.md`](adr/ADR-0008-cqrs-query-model-and-read-projections.md)：命令/查询分离与可重建 Read Projection。
 - [`adr/ADR-0009-multi-database-persistence-adapters.md`](adr/ADR-0009-multi-database-persistence-adapters.md)：PostgreSQL 生产权威与 SQLite 本地适配策略。
+- [`adr/ADR-0010-durable-processing-job-and-fixed-pipeline.md`](adr/ADR-0010-durable-processing-job-and-fixed-pipeline.md)：持久化 Job 与固定处理 Pipeline。
+- [`adr/ADR-0011-worker-leases-fencing-and-crash-recovery.md`](adr/ADR-0011-worker-leases-fencing-and-crash-recovery.md)：Worker Lease、Fencing 与崩溃恢复。
+- [`adr/ADR-0012-document-candidate-and-human-review.md`](adr/ADR-0012-document-candidate-and-human-review.md)：候选结果与人工复核边界。
 
 ## 5. 文档目录
 

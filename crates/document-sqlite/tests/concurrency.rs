@@ -3,24 +3,39 @@ use std::sync::Arc;
 use document::domain::DocumentMetadata;
 use document::ports::{CreateDocumentUnitOfWork, PersistNewDocument};
 use document_sqlite::{SqliteCreateDocumentUnitOfWork, MIGRATOR};
+use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqlitePoolOptions;
 use tokio::sync::Barrier;
 use uuid::Uuid;
 
-async fn setup() -> sqlx::SqlitePool {
-    let pool = SqlitePoolOptions::new()
+fn file_url() -> String {
+    let path = std::env::temp_dir().join(format!("business-platform-{}.db", Uuid::now_v7()));
+    format!("sqlite://{}", path.to_string_lossy().replace('\\', "/"))
+}
+
+async fn setup() -> (String, sqlx::SqlitePool, sqlx::SqlitePool) {
+    let url = file_url();
+    assert!(sqlx::Sqlite::create_database(&url).await.is_ok());
+    let pool_a = SqlitePoolOptions::new()
         .max_connections(4)
-        .connect("sqlite::memory:")
+        .connect(&url)
         .await;
-    let Ok(pool) = pool else {
+    let Ok(pool_a) = pool_a else {
         unreachable!("temporary SQLite pool must connect");
     };
-    let migration = MIGRATOR.run(&pool).await;
+    let migration = MIGRATOR.run(&pool_a).await;
     assert!(
         migration.is_ok(),
         "SQLite migrations must apply: {migration:?}"
     );
-    pool
+    let pool_b = SqlitePoolOptions::new()
+        .max_connections(4)
+        .connect(&url)
+        .await;
+    let Ok(pool_b) = pool_b else {
+        unreachable!("independent SQLite pool must connect");
+    };
+    (url, pool_a, pool_b)
 }
 
 fn command(
@@ -50,8 +65,9 @@ fn command(
 
 #[tokio::test]
 async fn concurrent_same_key_is_one_create_and_nine_replays() {
-    let pool = setup().await;
-    let adapter = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool.clone()));
+    let (url, pool_a, pool_b) = setup().await;
+    let adapter_a = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool_a.clone()));
+    let adapter_b = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool_b.clone()));
     let fixture = command(
         Uuid::now_v7(),
         "concurrent.pdf",
@@ -60,8 +76,12 @@ async fn concurrent_same_key_is_one_create_and_nine_replays() {
     );
     let barrier = Arc::new(Barrier::new(10));
     let mut handles = Vec::new();
-    for _ in 0..10 {
-        let adapter = Arc::clone(&adapter);
+    for index in 0..10 {
+        let adapter = if index % 2 == 0 {
+            Arc::clone(&adapter_a)
+        } else {
+            Arc::clone(&adapter_b)
+        };
         let barrier = Arc::clone(&barrier);
         let fixture = fixture.clone();
         handles.push(tokio::spawn(async move {
@@ -94,35 +114,48 @@ async fn concurrent_same_key_is_one_create_and_nine_replays() {
         "document_idempotency",
     ] {
         let query = format!("SELECT COUNT(*) FROM {table}");
-        let count = sqlx::query_scalar::<_, i64>(&query).fetch_one(&pool).await;
+        let count = sqlx::query_scalar::<_, i64>(&query)
+            .fetch_one(&pool_a)
+            .await;
         assert_eq!(count.ok(), Some(1), "exactly one {table} row expected");
     }
 
-    drop(adapter);
-    let restarted = SqliteCreateDocumentUnitOfWork::new(pool.clone());
+    pool_a.close().await;
+    pool_b.close().await;
+    let restarted_pool = document_sqlite::connect(&url, 4).await;
+    let Ok(restarted_pool) = restarted_pool else {
+        unreachable!("SQLite restart pool must connect");
+    };
+    let restarted = SqliteCreateDocumentUnitOfWork::new(restarted_pool.clone());
     let replay = restarted.execute(fixture).await;
     assert!(replay.is_ok(), "restart replay must succeed: {replay:?}");
     let Ok(replay) = replay else { unreachable!() };
     assert!(replay.replayed);
     let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM documents")
-        .fetch_one(&pool)
+        .fetch_one(&restarted_pool)
         .await;
     assert_eq!(count.ok(), Some(1));
 
-    drop(pool);
+    restarted_pool.close().await;
+    let _ = std::fs::remove_file(url.trim_start_matches("sqlite://"));
 }
 
 #[tokio::test]
 async fn concurrent_different_fingerprints_have_one_conflict_and_one_side_effect() {
-    let pool = setup().await;
-    let adapter = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool.clone()));
+    let (url, pool_a, pool_b) = setup().await;
+    let adapter_a = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool_a.clone()));
+    let adapter_b = Arc::new(SqliteCreateDocumentUnitOfWork::new(pool_b.clone()));
     let tenant = Uuid::now_v7();
     let first = command(tenant, "first.pdf", "conflicting-key", "fingerprint-a");
     let second = command(tenant, "second.pdf", "conflicting-key", "fingerprint-b");
     let barrier = Arc::new(Barrier::new(2));
     let mut handles = Vec::new();
-    for fixture in [first, second] {
-        let adapter = Arc::clone(&adapter);
+    for (index, fixture) in [first, second].into_iter().enumerate() {
+        let adapter = if index == 0 {
+            Arc::clone(&adapter_a)
+        } else {
+            Arc::clone(&adapter_b)
+        };
         let barrier = Arc::clone(&barrier);
         handles.push(tokio::spawn(async move {
             barrier.wait().await;
@@ -151,9 +184,13 @@ async fn concurrent_different_fingerprints_have_one_conflict_and_one_side_effect
         "document_idempotency",
     ] {
         let query = format!("SELECT COUNT(*) FROM {table}");
-        let count = sqlx::query_scalar::<_, i64>(&query).fetch_one(&pool).await;
+        let count = sqlx::query_scalar::<_, i64>(&query)
+            .fetch_one(&pool_a)
+            .await;
         assert_eq!(count.ok(), Some(1), "exactly one {table} row expected");
     }
 
-    drop(pool);
+    pool_a.close().await;
+    pool_b.close().await;
+    let _ = std::fs::remove_file(url.trim_start_matches("sqlite://"));
 }

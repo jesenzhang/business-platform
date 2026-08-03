@@ -80,6 +80,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
                 pool.clone(),
             )),
         },
+        processing: None,
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
     });
     routes::create_router(

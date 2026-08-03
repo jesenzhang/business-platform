@@ -1,5 +1,6 @@
 pub mod documents;
 pub mod health;
+pub mod processing;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,6 +40,19 @@ pub fn create_router(
 
     let protected_routes = Router::new()
         .nest("/api/v1/documents", documents::router())
+        .route("/api/v1/processing-jobs/{job_id}", get(processing::get_job))
+        .route(
+            "/api/v1/processing-jobs/{job_id}/cancel",
+            axum::routing::post(processing::cancel_job),
+        )
+        .route(
+            "/api/v1/processing-jobs/{job_id}/candidate",
+            get(processing::get_candidate),
+        )
+        .route(
+            "/api/v1/processing-jobs/{job_id}/review",
+            axum::routing::post(processing::review_candidate),
+        )
         .layer(middleware::from_fn_with_state(auth_config, auth_middleware));
 
     let public_routes = Router::new()

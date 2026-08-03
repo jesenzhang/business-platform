@@ -16,6 +16,14 @@ async fn file_database_uses_wal_and_busy_timeout_and_survives_reopen() {
         .await;
     assert_eq!(journal_mode.ok().as_deref(), Some("wal"));
     assert_eq!(busy_timeout.ok(), Some(5_000));
+    let revision =
+        sqlx::query_scalar::<_, i64>("SELECT content_revision FROM documents WHERE id = 'missing'")
+            .fetch_optional(&pool)
+            .await;
+    assert!(
+        revision.is_ok(),
+        "content revision migration must be present"
+    );
     let invalid_state = sqlx::query(
         "INSERT INTO documents (id, tenant_id, original_filename, content_type, object_key, status, version, created_by, created_at, updated_at) VALUES ('bad', 'tenant', 'bad.pdf', 'application/pdf', 'bad.pdf', 'unknown', 1, 'user', '2026-08-03T00:00:00Z', '2026-08-03T00:00:00Z')",
     ).execute(&pool).await;

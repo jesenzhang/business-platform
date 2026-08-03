@@ -34,6 +34,9 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0005`](ADR-0005-process-specific-runtime-configuration.md) | Process-specific runtime configuration | Accepted | Process-local roots, redacted connection URLs, and explicit environment prefixes |
 | [`ADR-0008`](ADR-0008-cqrs-query-model-and-read-projections.md) | CQRS Query Model and Read Projections | Accepted | Dedicated Query Objects/Read DTOs, controlled cross-context reads, rebuildable projections |
 | [`ADR-0009`](ADR-0009-multi-database-persistence-adapters.md) | Multi-Database Persistence Adapters | Accepted | PostgreSQL production authority, SQLite local adapter, independent migrations and shared contracts |
+| [`ADR-0010`](ADR-0010-durable-processing-job-and-fixed-pipeline.md) | Durable Processing Job and Fixed Pipeline | Accepted | Durable job state with a versioned fixed MVP pipeline, not a general workflow engine |
+| [`ADR-0011`](ADR-0011-worker-leases-fencing-and-crash-recovery.md) | Worker Leases, Fencing, and Crash Recovery | Accepted | PostgreSQL claim/fencing and SQLite single-process recovery semantics |
+| [`ADR-0012`](ADR-0012-document-candidate-and-human-review.md) | Document Candidate and Human Review | Accepted | Versioned extraction candidates remain suggestions until optimistic human review |
 
 ## 4. ADR-0003 的完整 Baseline
 

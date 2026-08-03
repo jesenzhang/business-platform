@@ -20,9 +20,6 @@ use business_api::routes::create_router;
 use business_api::state::{
     AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
 };
-use document::domain::{
-    DocumentPage, DocumentQueryRepository, ListDocumentsQuery, RepositoryError,
-};
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
@@ -36,24 +33,6 @@ use tower::ServiceExt;
 const DEV_SECRET: &str = "test-dev-secret";
 
 struct EmptyPorts;
-
-#[async_trait]
-impl DocumentQueryRepository for EmptyPorts {
-    async fn find_by_id(
-        &self,
-        _tenant_id: uuid::Uuid,
-        _document_id: uuid::Uuid,
-    ) -> Result<Option<document::domain::DocumentMetadata>, RepositoryError> {
-        Ok(None)
-    }
-
-    async fn list(&self, _query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError> {
-        Ok(DocumentPage {
-            items: Vec::new(),
-            total: 0,
-        })
-    }
-}
 
 #[async_trait]
 impl CreateDocumentUnitOfWork for EmptyPorts {
@@ -140,6 +119,7 @@ fn test_router(dev_auth_enabled: bool) -> axum::Router {
             detail: ports.clone(),
             list: ports.clone(),
         },
+        processing: None,
         readiness: ports,
     });
     let auth_config = AuthMiddlewareConfig {

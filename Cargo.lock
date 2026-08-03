@@ -68,11 +68,21 @@ name = "ai-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "chrono",
+ "document",
+ "document-postgres",
+ "document-processing",
+ "document-processing-postgres",
+ "document-processing-sqlite",
+ "object-storage",
  "observability",
  "runtime-config",
  "serde",
+ "sqlx",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -757,6 +767,10 @@ dependencies = [
  "chrono",
  "document",
  "document-postgres",
+ "document-processing",
+ "document-processing-contracts",
+ "document-processing-postgres",
+ "document-processing-sqlite",
  "document-sqlite",
  "http-body-util",
  "observability",
@@ -778,11 +792,24 @@ name = "business-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "document",
+ "document-postgres",
+ "document-processing",
+ "document-processing-postgres",
+ "document-processing-sqlite",
+ "document-sqlite",
+ "object-storage",
  "observability",
  "runtime-config",
  "serde",
+ "serde_json",
+ "sqlx",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1192,6 +1219,60 @@ dependencies = [
  "document",
  "document-persistence-contracts",
  "runtime-migration",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "document-processing"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "document-processing-contracts"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "document-processing",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "document-processing-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "document-processing",
+ "document-processing-contracts",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "document-processing-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "document-processing",
+ "document-processing-contracts",
  "serde_json",
  "sqlx",
  "tokio",
@@ -2252,6 +2333,7 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "document-processing-sqlite",
  "document-sqlite",
  "runtime-config",
  "runtime-migration",

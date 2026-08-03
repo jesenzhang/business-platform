@@ -1,0 +1,24 @@
+[package]
+name = "document-processing-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+bounded_context = "document-processing"
+context = "document-processing"
+layer = "contracts"
+role = "contract-tests"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+document-processing = { path = "../document-processing" }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

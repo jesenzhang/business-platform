@@ -14,13 +14,14 @@
 > 2026-08-03: PLAN-0003 Revision 1 is Integrated and archived at
 > `f6dbc693da42d0f9a7566739f5a4169c6a86f880` via local solo fast-forward. Main
 > CI run 30796583865 passed all six jobs, including PostgreSQL, MinIO, Document
-> E2E, and architecture fitness. Search remains Deferred and PLAN-0004 has not
-> started.
+> E2E, and architecture fitness. At that historical checkpoint Search remained
+> Deferred and PLAN-0004 had not started.
 >
 > 2026-08-03: PLAN-0004 is Active. It is scoped to a fixed durable Document
 > Processing MVP and begins with Gate 0 debt cleanup. No PR or main integration
 > is used; SQLite remains local single-process and PostgreSQL is production
-> authority.
+> authority. The durable-processing architecture and ADR-0010 through ADR-0012
+> are now the accepted design baseline for this slice.
 
 ## 1. 当前权威结论
 
@@ -154,7 +155,7 @@ PLAN-0001 之后所有计划必须包含：
 完整服务端架构 Baseline：已形成并生效
 业务能力和 Context Map：已形成初始 Baseline
 数据所有权和一致性：已形成 Baseline
-长时任务架构：已形成 Baseline，代码尚未实现
+长时任务架构：已形成 Baseline，PLAN-0004 固定 Job/Lease/Pipeline 已实现候选切片
 API/Event 契约：已形成 Baseline，Schema 尚待落地
 安全架构：已形成 Baseline，代码部分符合
 质量属性：已形成初始目标，运行证据尚待建立
@@ -167,7 +168,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Active
+PLAN-0004：Active（Accepted Candidate 待 feature CI 证据）
 ```
 
 ## 8. PLAN-0002 采用动作

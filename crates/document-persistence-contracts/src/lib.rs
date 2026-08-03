@@ -6,7 +6,10 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use document::domain::{DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata};
+use document::domain::{
+    AggregateVersion, ContentRevision, DocumentContentReference, DocumentMetadata, DocumentStatus,
+    RehydrateDocumentMetadata,
+};
 use document::ports::{ApplicationPortError, CreateDocumentUnitOfWork, PersistNewDocument};
 use document::query::{
     DocumentDetailQuery, DocumentListFilter, DocumentListQuery, DocumentListRequest,
@@ -362,9 +365,14 @@ fn verify_invalid_stored_data() {
         tenant_id: Uuid::now_v7(),
         original_filename: "invalid.pdf".to_string(),
         content_type: "application/pdf".to_string(),
-        object_key: "uploads/invalid.pdf".to_string(),
+        object_key: format!(
+            "tenants/{}/documents/{}/v1/invalid.pdf",
+            Uuid::now_v7(),
+            Uuid::now_v7()
+        ),
         status: DocumentStatus::Active,
-        version: 0,
+        aggregate_version: AggregateVersion::new(1).unwrap_or_else(|_| unreachable!()),
+        content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
         size_bytes: Some(1),
         created_by: Uuid::now_v7(),
         created_at: Utc::now(),
@@ -389,9 +397,17 @@ fn rehydrated_document(
         tenant_id,
         original_filename: filename.into(),
         content_type: "application/octet-stream".to_string(),
-        object_key: format!("uploads/{id}.bin"),
+        object_key: DocumentContentReference::new(
+            tenant_id,
+            id,
+            ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
+            format!("uploads/{id}.bin"),
+        )
+        .map_err(|error| error.to_string())?
+        .as_storage_key(),
         status,
-        version: 1,
+        aggregate_version: AggregateVersion::new(1).unwrap_or_else(|_| unreachable!()),
+        content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
         size_bytes: Some(1),
         created_by,
         created_at,

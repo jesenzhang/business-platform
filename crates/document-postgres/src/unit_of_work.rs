@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use document::domain::{DocumentMetadata, RehydrateDocumentMetadata};
+use document::domain::{
+    AggregateVersion, ContentRevision, DocumentMetadata, RehydrateDocumentMetadata,
+};
+use document::domain::{DocumentRepository, RepositoryError};
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
@@ -39,7 +42,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
             r"
             SELECT i.request_fingerprint, i.fingerprint_version,
                    d.id, d.tenant_id, d.original_filename, d.content_type,
-                   d.object_key, d.status, d.version, d.size_bytes, d.created_by,
+                   d.object_key, d.status, d.version, d.content_revision, d.size_bytes, d.created_by,
                    d.created_at, d.updated_at
             FROM document_idempotency i
             JOIN documents d ON d.id = i.document_id
@@ -80,6 +83,93 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+struct RepositoryDocumentRow {
+    id: uuid::Uuid,
+    tenant_id: uuid::Uuid,
+    original_filename: String,
+    content_type: String,
+    object_key: String,
+    status: String,
+    version: i64,
+    content_revision: i64,
+    size_bytes: Option<i64>,
+    created_by: uuid::Uuid,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl RepositoryDocumentRow {
+    fn into_document(self) -> Result<DocumentMetadata, RepositoryError> {
+        DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
+            id: self.id,
+            tenant_id: self.tenant_id,
+            original_filename: self.original_filename,
+            content_type: self.content_type,
+            object_key: self.object_key,
+            status: document::domain::DocumentStatus::try_from(self.status.as_str())
+                .map_err(|_| RepositoryError::Failed)?,
+            aggregate_version: AggregateVersion::new(self.version)
+                .map_err(|_| RepositoryError::Failed)?,
+            content_revision: ContentRevision::new(self.content_revision)
+                .map_err(|_| RepositoryError::Failed)?,
+            size_bytes: self.size_bytes,
+            created_by: self.created_by,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        })
+        .map_err(|_| RepositoryError::Failed)
+    }
+}
+
+#[async_trait]
+impl DocumentRepository for PostgresCreateDocumentUnitOfWork {
+    async fn load(
+        &self,
+        tenant_id: uuid::Uuid,
+        document_id: uuid::Uuid,
+    ) -> Result<Option<DocumentMetadata>, RepositoryError> {
+        sqlx::query_as::<_, RepositoryDocumentRow>(
+            "SELECT id, tenant_id, original_filename, content_type, object_key, status, version, content_revision, size_bytes, created_by, created_at, updated_at FROM documents WHERE tenant_id = $1 AND id = $2",
+        )
+        .bind(tenant_id)
+        .bind(document_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|_| RepositoryError::Unavailable)?
+        .map(RepositoryDocumentRow::into_document)
+        .transpose()
+    }
+
+    async fn save(
+        &self,
+        document: &DocumentMetadata,
+        expected_version: AggregateVersion,
+    ) -> Result<(), RepositoryError> {
+        let result = sqlx::query(
+            "UPDATE documents SET original_filename = $1, content_type = $2, object_key = $3, status = $4, version = $5, content_revision = $6, size_bytes = $7, updated_at = $8 WHERE tenant_id = $9 AND id = $10 AND version = $11",
+        )
+        .bind(document.original_filename())
+        .bind(document.content_type())
+        .bind(document.object_key())
+        .bind(document.status().as_str())
+        .bind(document.aggregate_version().value())
+        .bind(document.content_revision().value())
+        .bind(document.size_bytes())
+        .bind(document.updated_at())
+        .bind(document.tenant_id())
+        .bind(document.id())
+        .bind(expected_version.value())
+        .execute(&self.pool)
+        .await
+        .map_err(|_| RepositoryError::Unavailable)?;
+        if result.rows_affected() != 1 {
+            return Err(RepositoryError::Conflict);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
 struct ExistingCreateRow {
     request_fingerprint: String,
     fingerprint_version: i16,
@@ -90,6 +180,7 @@ struct ExistingCreateRow {
     object_key: String,
     status: String,
     version: i64,
+    content_revision: i64,
     size_bytes: Option<i64>,
     created_by: uuid::Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -106,7 +197,10 @@ impl ExistingCreateRow {
             object_key: self.object_key,
             status: document::domain::DocumentStatus::try_from(self.status.as_str())
                 .map_err(|_| ApplicationPortError::Failed)?,
-            version: self.version,
+            aggregate_version: AggregateVersion::new(self.version)
+                .map_err(|_| ApplicationPortError::Failed)?,
+            content_revision: ContentRevision::new(self.content_revision)
+                .map_err(|_| ApplicationPortError::Failed)?,
             size_bytes: self.size_bytes,
             created_by: self.created_by,
             created_at: self.created_at,
@@ -124,8 +218,8 @@ async fn insert_document(
         r"
         INSERT INTO documents
             (id, tenant_id, original_filename, content_type, object_key,
-             status, version, size_bytes, created_by, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             status, version, content_revision, size_bytes, created_by, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ",
     )
     .bind(document.id())
@@ -135,6 +229,7 @@ async fn insert_document(
     .bind(document.object_key())
     .bind(document.status().as_str())
     .bind(document.version())
+    .bind(document.content_revision().value())
     .bind(document.size_bytes())
     .bind(document.created_by())
     .bind(document.created_at())

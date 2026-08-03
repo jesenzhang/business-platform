@@ -434,3 +434,14 @@ Document Version
 - [ ] 消息不是权威任务状态；
 - [ ] 业务正式写入通过所属上下文用例；
 - [ ] 崩溃恢复和重复执行经过测试。
+
+## 25. PLAN-0004 durable document processing profile
+
+PLAN-0004 instantiates this baseline with a persisted `ProcessingJob` and the
+fixed six-step pipeline documented in
+[`DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md`](DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md).
+The job row is execution-state authority; Document Management owns content
+revision and storage reference; Document Intelligence owns candidate and
+review state. PostgreSQL is the production multi-worker authority and SQLite
+is explicitly local single-process. Workers stop claiming on shutdown and
+rely on lease expiry/reclaim after a crash.

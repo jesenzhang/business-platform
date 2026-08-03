@@ -365,3 +365,12 @@ Production：结构化日志、采样 trace、完整关键指标和审计。
 - [ ] Audit 与普通日志分离；
 - [ ] 质量属性场景可由指标验证；
 - [ ] 最近部署版本可关联异常。
+
+## 20. PLAN-0004 processing fields
+
+Processing logs and metrics use the bounded fields `tenant_id`, `document_id`,
+`job_id`, `step_kind`, `attempt_number`, `worker_id`, `lease_fence`, `status`,
+`duration_ms`, and `failure_code`. A lease token is represented only by a
+short one-way hash prefix. The MVP records job creation/completion/failure/
+cancellation, duration, retry, lease-loss, queue-age, and pending-AI-task
+signals without logging raw document text, prompts, storage URLs, or secrets.

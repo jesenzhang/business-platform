@@ -13,9 +13,14 @@ type PersistenceAdapters = (
     Arc<dyn document::query::DocumentDetailQuery>,
     Arc<dyn document::query::DocumentListQuery>,
     Arc<dyn ReadinessProbe>,
+    Arc<dyn document_processing::ports::ProcessingJobCommandPort>,
+    Arc<dyn document_processing::ports::ProcessingJobClaimPort>,
+    Arc<dyn document_processing::ports::ProcessingJobQuery>,
+    Arc<dyn document_processing::ports::CandidateStore>,
 );
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     let config =
         BusinessApiConfig::load().map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
@@ -34,8 +39,16 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!(service = %config.observability.service_name, "Starting business-api");
 
-    let (unit_of_work, detail, list, readiness): PersistenceAdapters = match config.database.backend
-    {
+    let (
+        unit_of_work,
+        detail,
+        list,
+        readiness,
+        processing_commands,
+        processing_claims,
+        processing_queries,
+        processing_candidates,
+    ): PersistenceAdapters = match config.database.backend {
         DatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
                 .max_connections(config.database.max_connections)
@@ -45,6 +58,9 @@ async fn main() -> anyhow::Result<()> {
                 ))
                 .connect(config.database.url.expose())
                 .await?;
+            let processing_store = Arc::new(
+                document_processing_postgres::PostgresProcessingStore::new(pool.clone()),
+            );
             (
                 Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
                     pool.clone(),
@@ -55,7 +71,11 @@ async fn main() -> anyhow::Result<()> {
                 Arc::new(document_postgres::PostgresDocumentListQuery::new(
                     pool.clone(),
                 )),
-                Arc::new(PostgresReadinessProbe::new(pool)),
+                Arc::new(PostgresReadinessProbe::new(pool.clone())),
+                processing_store.clone(),
+                processing_store.clone(),
+                processing_store.clone(),
+                processing_store,
             )
         }
         DatabaseBackend::Sqlite => {
@@ -64,6 +84,10 @@ async fn main() -> anyhow::Result<()> {
                 config.database.max_connections,
             )
             .await?;
+            document_processing_sqlite::run_migrations(&pool).await?;
+            let processing_store = Arc::new(
+                document_processing_sqlite::SqliteProcessingStore::new(pool.clone()),
+            );
             (
                 Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(
                     pool.clone(),
@@ -72,7 +96,11 @@ async fn main() -> anyhow::Result<()> {
                     pool.clone(),
                 )),
                 Arc::new(document_sqlite::SqliteDocumentListQuery::new(pool.clone())),
-                Arc::new(SqliteReadinessProbe::new(pool)),
+                Arc::new(SqliteReadinessProbe::new(pool.clone())),
+                processing_store.clone(),
+                processing_store.clone(),
+                processing_store.clone(),
+                processing_store,
             )
         }
     };
@@ -86,6 +114,12 @@ async fn main() -> anyhow::Result<()> {
             detail,
             list,
         },
+        processing: Some(business_api::state::ProcessingServices {
+            commands: processing_commands,
+            claims: processing_claims,
+            queries: processing_queries,
+            candidates: processing_candidates,
+        }),
         readiness,
     });
 

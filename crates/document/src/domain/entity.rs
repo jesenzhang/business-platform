@@ -4,7 +4,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::error::DocumentDomainError;
-use super::object_key::DocumentObjectKey;
+use super::object_key::DocumentContentReference;
+use super::version::{AggregateVersion, ContentRevision};
 
 /// Error returned when persistence contains an unknown document status.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -53,9 +54,10 @@ impl TryFrom<&str> for DocumentStatus {
 /// Invariants:
 /// - `original_filename` is non-empty
 /// - `content_type` is non-empty
-/// - `object_key` is a valid, non-empty storage key (no path traversal)
-/// - `version` starts at 1 and increments on mutation
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+/// - `content_reference` is a canonical, tenant-owned storage reference
+/// - `aggregate_version` starts at 1 and increments on business mutation
+/// - `content_revision` changes only when file content is replaced
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentMetadata {
     /// Unique identifier (`UUIDv7`, time-ordered).
     id: Uuid,
@@ -65,13 +67,14 @@ pub struct DocumentMetadata {
     original_filename: String,
     /// MIME content type.
     content_type: String,
-    /// Validated object storage key.
-    #[serde(skip_serializing)]
-    object_key: String,
+    /// Validated tenant-owned content reference.
+    content_reference: DocumentContentReference,
     /// Lifecycle status.
     status: DocumentStatus,
     /// Optimistic locking version.
-    version: i64,
+    aggregate_version: AggregateVersion,
+    /// File-content revision used by object storage paths.
+    content_revision: ContentRevision,
     /// File size in bytes (may be unknown at creation).
     size_bytes: Option<i64>,
     /// User who created this document.
@@ -92,7 +95,8 @@ pub struct RehydrateDocumentMetadata {
     pub content_type: String,
     pub object_key: String,
     pub status: DocumentStatus,
-    pub version: i64,
+    pub aggregate_version: AggregateVersion,
+    pub content_revision: ContentRevision,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
@@ -121,8 +125,13 @@ impl DocumentMetadata {
     }
 
     #[must_use]
-    pub fn object_key(&self) -> &str {
-        &self.object_key
+    pub fn object_key(&self) -> String {
+        self.content_reference.as_storage_key()
+    }
+
+    #[must_use]
+    pub fn content_reference(&self) -> &DocumentContentReference {
+        &self.content_reference
     }
 
     #[must_use]
@@ -132,7 +141,17 @@ impl DocumentMetadata {
 
     #[must_use]
     pub const fn version(&self) -> i64 {
-        self.version
+        self.aggregate_version.value()
+    }
+
+    #[must_use]
+    pub const fn aggregate_version(&self) -> AggregateVersion {
+        self.aggregate_version
+    }
+
+    #[must_use]
+    pub const fn content_revision(&self) -> ContentRevision {
+        self.content_revision
     }
 
     #[must_use]
@@ -160,7 +179,16 @@ impl DocumentMetadata {
         if state.tenant_id.is_nil() || state.created_by.is_nil() || state.id.is_nil() {
             return Err(DocumentDomainError::InvalidIdentity);
         }
-        if state.version <= 0 {
+        let content_reference = DocumentContentReference::parse_storage_key(
+            state.tenant_id,
+            state.id,
+            &state.object_key,
+        )
+        .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
+        if content_reference.content_revision() != state.content_revision {
+            return Err(DocumentDomainError::ContentRevisionMismatch);
+        }
+        if state.aggregate_version.value() <= 0 {
             return Err(DocumentDomainError::InvalidVersion);
         }
         if state.size_bytes.is_some_and(|size| size < 0) {
@@ -175,21 +203,15 @@ impl DocumentMetadata {
         if state.updated_at < state.created_at {
             return Err(DocumentDomainError::InvalidTimestamps);
         }
-        DocumentObjectKey::new(
-            state.tenant_id,
-            state.id,
-            state.version,
-            state.object_key.clone(),
-        )
-        .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
         Ok(Self {
             id: state.id,
             tenant_id: state.tenant_id,
             original_filename: state.original_filename,
             content_type: state.content_type,
-            object_key: state.object_key,
+            content_reference,
             status: state.status,
-            version: state.version,
+            aggregate_version: state.aggregate_version,
+            content_revision: state.content_revision,
             size_bytes: state.size_bytes,
             created_by: state.created_by,
             created_at: state.created_at,
@@ -228,18 +250,23 @@ impl DocumentMetadata {
 
         let now = Utc::now();
         let id = Uuid::now_v7();
-        let object_key = DocumentObjectKey::new(tenant_id, id, 1, object_key)
-            .map_err(|e| DocumentDomainError::InvalidObjectKey(e.to_string()))?
-            .as_storage_key();
+        let aggregate_version =
+            AggregateVersion::new(1).map_err(|_| DocumentDomainError::InvalidVersion)?;
+        let content_revision =
+            ContentRevision::new(1).map_err(|_| DocumentDomainError::InvalidContentRevision)?;
+        let content_reference =
+            DocumentContentReference::new(tenant_id, id, content_revision, object_key)
+                .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
 
         Ok(Self {
             id,
             tenant_id,
             original_filename,
             content_type,
-            object_key,
+            content_reference,
             status: DocumentStatus::Active,
-            version: 1,
+            aggregate_version,
+            content_revision,
             size_bytes,
             created_by,
             created_at: now,
@@ -289,11 +316,29 @@ impl DocumentMetadata {
         Ok(())
     }
 
+    /// Replace the file content while preserving lifecycle state.
+    pub fn replace_content(&mut self, logical_path: String) -> Result<(), DocumentDomainError> {
+        let content_revision = self
+            .content_revision
+            .increment()
+            .map_err(|_| DocumentDomainError::InvalidContentRevision)?;
+        let content_reference =
+            DocumentContentReference::new(self.tenant_id, self.id, content_revision, logical_path)
+                .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
+        self.bump_version()?;
+        self.content_revision = content_revision;
+        self.content_reference = content_reference;
+        Ok(())
+    }
+
     fn bump_version(&mut self) -> Result<(), DocumentDomainError> {
-        if self.version == i64::MAX {
+        self.aggregate_version = self
+            .aggregate_version
+            .increment()
+            .map_err(|_| DocumentDomainError::InvalidVersion)?;
+        if self.aggregate_version.value() <= 0 {
             return Err(DocumentDomainError::InvalidVersion);
         }
-        self.version += 1;
         self.updated_at = Utc::now();
         Ok(())
     }
@@ -309,7 +354,7 @@ mod tests {
             Uuid::now_v7(),
             "report.pdf".to_string(),
             "application/pdf".to_string(),
-            "documents/tenant-1/report.pdf".to_string(),
+            "incoming/report.pdf".to_string(),
             Uuid::now_v7(),
             Some(1024),
         );
@@ -458,6 +503,30 @@ mod tests {
     }
 
     #[test]
+    fn lifecycle_version_does_not_change_content_revision() {
+        let mut document = DocumentMetadata::create(
+            Uuid::now_v7(),
+            "report.txt".to_string(),
+            "text/plain".to_string(),
+            "report.txt".to_string(),
+            Uuid::now_v7(),
+            None,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        let reference = document.object_key();
+        assert_eq!(document.content_revision().value(), 1);
+        document.archive().unwrap_or_else(|_| unreachable!());
+        document.restore().unwrap_or_else(|_| unreachable!());
+        assert_eq!(document.content_revision().value(), 1);
+        assert_eq!(document.object_key(), reference);
+        document
+            .replace_content("replacement.txt".to_string())
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(document.content_revision().value(), 2);
+        assert_ne!(document.object_key(), reference);
+    }
+
+    #[test]
     fn rehydrate_rejects_invalid_persisted_state() {
         let now = Utc::now();
         let invalid = RehydrateDocumentMetadata {
@@ -465,9 +534,11 @@ mod tests {
             tenant_id: Uuid::now_v7(),
             original_filename: "report.pdf".to_string(),
             content_type: "application/pdf".to_string(),
-            object_key: "report.pdf".to_string(),
+            object_key: "not-a-storage-key".to_string(),
             status: DocumentStatus::Active,
-            version: 0,
+            aggregate_version: AggregateVersion::new(0)
+                .unwrap_or_else(|_| AggregateVersion::new(1).unwrap_or_else(|_| unreachable!())),
+            content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
             size_bytes: Some(-1),
             created_by: Uuid::now_v7(),
             created_at: now,

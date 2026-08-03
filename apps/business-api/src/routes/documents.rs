@@ -40,6 +40,7 @@ pub struct DocumentResponse {
     pub content_type: String,
     pub status: String,
     pub version: i64,
+    pub content_revision: i64,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -55,6 +56,7 @@ impl From<document::domain::DocumentMetadata> for DocumentResponse {
             content_type: document.content_type().to_string(),
             status: document.status().as_str().to_string(),
             version: document.version(),
+            content_revision: document.content_revision().value(),
             size_bytes: document.size_bytes(),
             created_by: document.created_by(),
             created_at: document.created_at(),
@@ -72,6 +74,7 @@ impl From<document::query::DocumentDetailView> for DocumentResponse {
             content_type: document.content_type,
             status: document.status.as_str().to_string(),
             version: document.version,
+            content_revision: document.content_revision,
             size_bytes: document.size_bytes,
             created_by: document.created_by,
             created_at: document.created_at,
@@ -128,6 +131,10 @@ pub fn router() -> axum::Router<Arc<AppState>> {
             axum::routing::post(create_document).get(list_documents),
         )
         .route("/{id}", axum::routing::get(get_document))
+        .route(
+            "/{id}/processing-jobs",
+            axum::routing::post(crate::routes::processing::create_for_document),
+        )
 }
 
 use std::sync::Arc;

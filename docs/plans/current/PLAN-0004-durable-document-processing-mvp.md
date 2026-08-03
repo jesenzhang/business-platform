@@ -123,3 +123,13 @@ Gate 0 and later verification entries are appended here with exact commands,
 CI run IDs, candidate SHA, and explicit `PASS`, `PARTIAL`, `NOT RUN`, or
 `BLOCKED` status. A failure blocks progression; under the requested
 `blockers-only` stop strategy, non-blocking polish is deferred.
+
+### 2026-08-03 local candidate verification
+
+- Candidate SHA: pending feature-branch commit.
+- WP-00: `PASS` — `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --all-features`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-architecture.ps1`, and `git diff --check` all passed locally.
+- Domain and adapter contracts: `PASS` — document, processing domain, SQLite processing, SQLite document concurrency/operational, API, and migration tests passed.
+- Durable recovery evidence: `PASS` locally for SQLite process restart; PostgreSQL claim/reclaim/stale-fence and MinIO source/candidate tests are wired as ignored integration tests for the feature CI PostgreSQL/MinIO service.
+- Local process E2E: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1` completed the API/worker/review/restart flow in an isolated temporary directory.
+- Feature CI: `NOT RUN` — branch push and GitHub run evidence are still required before changing this plan to `Accepted Candidate`.
+- Windows PostgreSQL/MinIO: `NOT RUN`; GitHub Linux evidence is required for that environment-dependent gate.

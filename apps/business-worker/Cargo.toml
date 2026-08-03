@@ -9,8 +9,23 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+chrono = { workspace = true }
 runtime-config = { workspace = true }
 observability = { workspace = true }
+document-processing = { path = "../../crates/document-processing" }
+document-processing-postgres = { path = "../../crates/document-processing-postgres" }
+document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }
+document-sqlite = { workspace = true }
+sqlx = { workspace = true }
+document = { workspace = true }
+document-postgres = { workspace = true }
+object-storage = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
 
 [lints]
 workspace = true

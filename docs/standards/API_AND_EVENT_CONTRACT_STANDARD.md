@@ -352,3 +352,17 @@ payload
 - 回调和第三方协议。
 
 破坏性变化或全局策略变化必须通过 ADR。
+
+## 25. Durable processing contract profile
+
+`/api/v1/documents/{document_id}/processing-jobs` accepts a fixed
+`content_revision` and requires `Idempotency-Key`. Job detail, candidate, and
+review responses redact lease identity, worker ownership, object locations,
+checkpoints, raw text, provider responses, and secrets. Review commands carry
+the candidate version and return a conflict instead of overwriting a newer
+decision.
+
+Processing events use the `document.processing.*.v1` namespace and the full
+envelope from section 16. Payloads contain references and bounded counters,
+never document bytes or storage credentials. Consumers must tolerate duplicate
+and out-of-order execution events.

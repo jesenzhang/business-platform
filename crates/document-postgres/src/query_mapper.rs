@@ -11,6 +11,7 @@ pub(crate) struct DetailRow {
     pub content_type: String,
     pub status: String,
     pub version: i64,
+    pub content_revision: i64,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
@@ -29,6 +30,7 @@ impl TryFrom<DetailRow> for DocumentDetailView {
             content_type: row.content_type,
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
+            content_revision: row.content_revision,
             size_bytes: row.size_bytes,
             created_by: row.created_by,
             created_at: row.created_at,
@@ -44,6 +46,7 @@ pub(crate) struct ListRow {
     pub content_type: String,
     pub status: String,
     pub version: i64,
+    pub content_revision: i64,
     pub size_bytes: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -60,6 +63,7 @@ impl TryFrom<ListRow> for DocumentListItem {
             content_type: row.content_type,
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
+            content_revision: row.content_revision,
             size_bytes: row.size_bytes,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -72,6 +76,7 @@ fn validate_detail(row: &DetailRow) -> Result<(), QueryError> {
         || row.tenant_id.is_nil()
         || row.created_by.is_nil()
         || row.version <= 0
+        || row.content_revision <= 0
         || row.size_bytes.is_some_and(|size| size < 0)
         || row.original_filename.trim().is_empty()
         || row.content_type.trim().is_empty()
@@ -85,6 +90,7 @@ fn validate_detail(row: &DetailRow) -> Result<(), QueryError> {
 fn validate_list(row: &ListRow) -> Result<(), QueryError> {
     if row.id.is_nil()
         || row.version <= 0
+        || row.content_revision <= 0
         || row.size_bytes.is_some_and(|size| size < 0)
         || row.original_filename.trim().is_empty()
         || row.content_type.trim().is_empty()
@@ -118,6 +124,7 @@ mod tests {
             content_type: "application/pdf".to_string(),
             status: "active".to_string(),
             version: 1,
+            content_revision: 1,
             size_bytes: Some(1),
             created_by: Uuid::now_v7(),
             created_at: now,

@@ -154,6 +154,9 @@ async fn run_sqlite_up(database_url: &str) -> anyhow::Result<()> {
         .run(&pool)
         .await
         .context("failed to apply SQLite migrations")?;
+    document_processing_sqlite::run_migrations(&pool)
+        .await
+        .context("failed to apply document processing SQLite migrations")?;
     tracing::info!("All SQLite migrations applied successfully");
     Ok(())
 }
@@ -183,6 +186,32 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
             migration.version, migration.description
         );
     }
+    println!("\nDocument processing migrations:");
+    let processing_versions = match sqlx::query_scalar::<_, i64>(
+        "SELECT version FROM document_processing_migrations ORDER BY version",
+    )
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(versions) => versions,
+        Err(error) if is_processing_missing_migration_table(&error) => Vec::new(),
+        Err(error) => return Err(error.into()),
+    };
+    if processing_versions.is_empty() {
+        println!("  [pending] 1 document_processing");
+    } else {
+        for migration in document_processing_sqlite::MIGRATOR.iter() {
+            let state = if processing_versions.contains(&migration.version) {
+                "applied"
+            } else {
+                "pending"
+            };
+            println!(
+                "  [{state}] {} {}",
+                migration.version, migration.description
+            );
+        }
+    }
     Ok(())
 }
 
@@ -199,6 +228,16 @@ fn is_sqlite_missing_migration_table(error: &sqlx::Error) -> bool {
         error,
         sqlx::Error::Database(database_error)
             if is_missing_migration_table_message(database_error.message())
+    )
+}
+
+fn is_processing_missing_migration_table(error: &sqlx::Error) -> bool {
+    matches!(
+        error,
+        sqlx::Error::Database(database_error)
+            if database_error.message().to_ascii_lowercase().contains(
+                "no such table: document_processing_migrations"
+            )
     )
 }
 

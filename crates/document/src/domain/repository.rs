@@ -1,26 +1,13 @@
+//! Aggregate persistence port for Document Management.
+
 use async_trait::async_trait;
 use thiserror::Error;
 use uuid::Uuid;
 
 use super::entity::DocumentMetadata;
+use super::version::AggregateVersion;
 
-/// Bounded query used by the list use case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ListDocumentsQuery {
-    pub tenant_id: Uuid,
-    pub limit: i64,
-    pub offset: i64,
-}
-
-/// A page of tenant-scoped documents.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentPage {
-    pub items: Vec<DocumentMetadata>,
-    pub total: i64,
-}
-
-/// Stable repository error classification; `SQLx` stays in the adapter.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum RepositoryError {
     #[error("document repository unavailable")]
     Unavailable,
@@ -30,14 +17,19 @@ pub enum RepositoryError {
     Failed,
 }
 
-/// Read-only persistence port for document metadata.
+/// Command-side aggregate persistence. Query-side reads remain in the formal
+/// `DocumentDetailQuery` and `DocumentListQuery` ports.
 #[async_trait]
-pub trait DocumentQueryRepository: Send + Sync {
-    async fn find_by_id(
+pub trait DocumentRepository: Send + Sync {
+    async fn load(
         &self,
         tenant_id: Uuid,
         document_id: Uuid,
     ) -> Result<Option<DocumentMetadata>, RepositoryError>;
 
-    async fn list(&self, query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError>;
+    async fn save(
+        &self,
+        document: &DocumentMetadata,
+        expected_version: AggregateVersion,
+    ) -> Result<(), RepositoryError>;
 }

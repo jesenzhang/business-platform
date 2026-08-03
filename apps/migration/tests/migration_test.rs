@@ -91,6 +91,44 @@ fn outbox_reconciliation_migration_is_forward_only_and_fenced() {
     assert!(migration.contains("published = (status = 'published')"));
 }
 
+#[test]
+fn content_revision_migration_is_forward_only_and_constrained() {
+    let migration = include_str!("../../../migrations/009_document_content_revision.sql");
+    assert!(migration.contains("ADD COLUMN content_revision BIGINT NOT NULL DEFAULT 1"));
+    assert!(migration.contains("documents_content_revision_positive_check"));
+    assert!(!migration.contains("DROP COLUMN"));
+}
+
+#[tokio::test]
+async fn sqlite_processing_catalog_is_independent_from_document_catalog() {
+    let pool = sqlx::SqlitePool::connect("sqlite::memory:")
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    document_sqlite::MIGRATOR
+        .run(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    document_processing_sqlite::run_migrations(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    document_processing_sqlite::run_migrations(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let processing_tables: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'document_processing_jobs'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    let catalog_rows: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM document_processing_migrations WHERE version = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap_or_else(|_| unreachable!());
+    assert_eq!(processing_tables, 1);
+    assert_eq!(catalog_rows, 1);
+}
+
 /// Apply migrations to a fresh database. Requires `DATABASE_URL`.
 #[tokio::test]
 #[ignore = "requires running PostgreSQL"]

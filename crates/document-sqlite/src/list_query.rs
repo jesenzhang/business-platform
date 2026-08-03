@@ -22,7 +22,7 @@ impl DocumentListQuery for SqliteDocumentListQuery {
     async fn execute(&self, request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
         let limit = request.limit.clamp(1, 200);
         let mut builder = QueryBuilder::<Sqlite>::new(
-            "SELECT id, original_filename, content_type, status, version, size_bytes, created_at, updated_at FROM documents WHERE tenant_id = ",
+            "SELECT id, original_filename, content_type, status, version, content_revision, size_bytes, created_at, updated_at FROM documents WHERE tenant_id = ",
         );
         builder.push_bind(request.tenant_id.to_string());
         if let Some(status) = request.filter.status {

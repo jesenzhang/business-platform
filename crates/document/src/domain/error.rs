@@ -58,6 +58,14 @@ pub enum DocumentDomainError {
     #[error("document version must be positive")]
     InvalidVersion,
 
+    /// A persisted aggregate contains an invalid content revision.
+    #[error("document content revision must be positive")]
+    InvalidContentRevision,
+
+    /// The storage key revision differs from the persisted content revision.
+    #[error("document content reference revision does not match persisted revision")]
+    ContentRevisionMismatch,
+
     /// A persisted aggregate contains timestamps in the wrong order.
     #[error("document updated_at must not be before created_at")]
     InvalidTimestamps,

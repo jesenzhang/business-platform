@@ -18,6 +18,7 @@ serde = { workspace = true }
 runtime-config = { workspace = true }
 runtime-migration = { workspace = true }
 document-sqlite = { workspace = true }
+document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }
 
 [dev-dependencies]
 uuid = { workspace = true }

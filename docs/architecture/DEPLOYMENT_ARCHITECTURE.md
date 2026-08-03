@@ -253,6 +253,15 @@ AI Worker 扩容必须受 Provider 和费用上限约束。
 
 内存不足和磁盘不足必须有告警和明确失败行为。
 
+### PLAN-0004 runtime profile
+
+The local profile runs SQLite, local object storage, and one inline
+`business-worker` in an isolated directory. SQLite rejects production mode,
+parallel workers, and separate AI mode. Production selects PostgreSQL and an
+S3-compatible private bucket (MinIO in CI); the business worker and
+independent AI worker use durable job/AI-task tables, lease fencing, and
+graceful shutdown. MinIO is never represented as a local SQLite equivalent.
+
 ## 13. 数据服务
 
 ### 权威状态存储

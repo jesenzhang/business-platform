@@ -60,3 +60,13 @@ Hierarchy selection: Adjacency List + Recursive CTE by default; Closure Table fo
 frequent ancestor/descendant permission queries; Materialized Path for read-heavy
 rarely moved paths; Nested Set only by ADR. Approval/task execution uses state
 machines and Process Managers, not hierarchy tables.
+
+## Durable processing query profile
+
+Processing job and candidate reads remain dedicated Query ports and safe Read
+DTOs; an Aggregate Repository only loads/saves a job aggregate and never grows
+list/search/report/export methods. Job execution status is authoritative in
+the processing tables, while candidate and review records are tenant-scoped
+read models of the Document Intelligence context. The SQLite processing
+adapter is local single-process and uses its own migration catalog; the
+PostgreSQL adapter uses the runtime catalog and production locking semantics.

@@ -30,6 +30,10 @@ observability = { workspace = true }
 document = { workspace = true }
 document-postgres = { workspace = true }
 document-sqlite = { workspace = true }
+document-processing = { path = "../../crates/document-processing" }
+document-processing-contracts = { path = "../../crates/document-processing-contracts" }
+document-processing-postgres = { path = "../../crates/document-processing-postgres" }
+document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

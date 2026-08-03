@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use document::domain::{DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata};
 use document::query::{DocumentDetailView, DocumentListItem, DocumentStatusView, QueryError};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -10,9 +9,9 @@ pub(crate) struct DocumentRow {
     pub tenant_id: String,
     pub original_filename: String,
     pub content_type: String,
-    pub object_key: String,
     pub status: String,
     pub version: i64,
+    pub content_revision: i64,
     pub size_bytes: Option<i64>,
     pub created_by: String,
     pub created_at: String,
@@ -29,28 +28,6 @@ fn timestamp(value: &str) -> Result<DateTime<Utc>, QueryError> {
         .map_err(|_| QueryError::InvalidStoredData)
 }
 
-impl TryFrom<DocumentRow> for DocumentMetadata {
-    type Error = QueryError;
-
-    fn try_from(row: DocumentRow) -> Result<Self, Self::Error> {
-        DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
-            id: uuid(&row.id)?,
-            tenant_id: uuid(&row.tenant_id)?,
-            original_filename: row.original_filename,
-            content_type: row.content_type,
-            object_key: row.object_key,
-            status: DocumentStatus::try_from(row.status.as_str())
-                .map_err(|_| QueryError::InvalidStoredData)?,
-            version: row.version,
-            size_bytes: row.size_bytes,
-            created_by: uuid(&row.created_by)?,
-            created_at: timestamp(&row.created_at)?,
-            updated_at: timestamp(&row.updated_at)?,
-        })
-        .map_err(|_| QueryError::InvalidStoredData)
-    }
-}
-
 impl TryFrom<DocumentRow> for DocumentDetailView {
     type Error = QueryError;
 
@@ -63,6 +40,7 @@ impl TryFrom<DocumentRow> for DocumentDetailView {
             content_type: row.content_type,
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
+            content_revision: row.content_revision,
             size_bytes: row.size_bytes,
             created_by: uuid(&row.created_by)?,
             created_at: timestamp(&row.created_at)?,
@@ -78,6 +56,7 @@ pub(crate) struct ListRow {
     pub content_type: String,
     pub status: String,
     pub version: i64,
+    pub content_revision: i64,
     pub size_bytes: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
@@ -94,6 +73,7 @@ impl TryFrom<ListRow> for DocumentListItem {
             content_type: row.content_type,
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
+            content_revision: row.content_revision,
             size_bytes: row.size_bytes,
             created_at: timestamp(&row.created_at)?,
             updated_at: timestamp(&row.updated_at)?,
@@ -106,6 +86,7 @@ fn validate_document_row(row: &DocumentRow) -> Result<(), QueryError> {
         || row.tenant_id.is_empty()
         || row.created_by.is_empty()
         || row.version <= 0
+        || row.content_revision <= 0
         || row.size_bytes.is_some_and(|size| size < 0)
         || row.original_filename.trim().is_empty()
         || row.content_type.trim().is_empty()
@@ -123,6 +104,7 @@ fn validate_document_row(row: &DocumentRow) -> Result<(), QueryError> {
 fn validate_list_row(row: &ListRow) -> Result<(), QueryError> {
     if row.id.is_empty()
         || row.version <= 0
+        || row.content_revision <= 0
         || row.size_bytes.is_some_and(|size| size < 0)
         || row.original_filename.trim().is_empty()
         || row.content_type.trim().is_empty()
@@ -158,9 +140,9 @@ mod tests {
             tenant_id: Uuid::now_v7().to_string(),
             original_filename: "report.pdf".to_string(),
             content_type: "application/pdf".to_string(),
-            object_key: "uploads/report.pdf".to_string(),
             status: "active".to_string(),
             version: 1,
+            content_revision: 1,
             size_bytes: Some(1),
             created_by: Uuid::now_v7().to_string(),
             created_at: now.clone(),

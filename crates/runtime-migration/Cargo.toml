@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "platform-runtime"
+layer = "platform-infrastructure"
+
 [dependencies]
 sqlx = { workspace = true }
 

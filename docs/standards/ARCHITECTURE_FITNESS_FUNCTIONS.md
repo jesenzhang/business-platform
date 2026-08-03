@@ -362,3 +362,13 @@ or Application, and `AppState` fields containing `AppConfig`,
 - HTTP list cursors are opaque v1 tokens and storage-internal object locations
   are absent from response DTOs. Shared LIKE escaping and invalid-row
   fail-closed mapper tests run for both adapters.
+
+## 24. PLAN-0004 durable processing gates
+
+When the document-processing slice is present, Required evidence additionally
+includes the metadata-driven core/adapter dependency check, fixed-pipeline
+domain tests, SQLite `BEGIN IMMEDIATE` cross-adapter idempotency tests,
+PostgreSQL `SKIP LOCKED` claim and stale-fence tests, candidate/review
+optimistic concurrency, process restart recovery, and redacted processing API
+contract tests. SQLite evidence must state single-process scope; it cannot be
+used as evidence for PostgreSQL distributed concurrency.

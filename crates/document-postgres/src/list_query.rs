@@ -35,7 +35,7 @@ impl DocumentListQuery for PostgresDocumentListQuery {
         let cursor_created_at = request.cursor.map(|cursor| cursor.created_at);
         let cursor_id = request.cursor.map(|cursor| cursor.id);
         let rows = sqlx::query_as::<_, ListRow>(
-            r"SELECT id, original_filename, content_type, status, version,
+            r"SELECT id, original_filename, content_type, status, version, content_revision,
                      size_bytes, created_at, updated_at
               FROM documents
               WHERE tenant_id = $1

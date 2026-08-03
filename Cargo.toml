@@ -21,6 +21,10 @@ members = [
     "crates/document-postgres",
     "crates/document-sqlite",
     "crates/document-persistence-contracts",
+    "crates/document-processing",
+    "crates/document-processing-contracts",
+    "crates/document-processing-postgres",
+    "crates/document-processing-sqlite",
     "crates/notification",
     "crates/audit",
     "crates/workflow",
@@ -86,6 +90,7 @@ opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
 
 # Utilities
+bytes = "1"
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"

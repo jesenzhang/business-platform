@@ -1,0 +1,27 @@
+[package]
+name = "document-processing-sqlite"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+bounded_context = "document-processing"
+context = "document-processing"
+layer = "infrastructure"
+role = "sqlite-adapter"
+data_owner = "document-processing"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+document-processing = { path = "../document-processing" }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+document-processing-contracts = { path = "../document-processing-contracts" }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

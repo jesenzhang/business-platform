@@ -16,9 +16,7 @@ use business_api::state::{
     AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
 };
 use document::application::CreateDocumentMetadata;
-use document::domain::{
-    DocumentMetadata, DocumentPage, DocumentQueryRepository, ListDocumentsQuery, RepositoryError,
-};
+use document::domain::DocumentMetadata;
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
@@ -59,44 +57,6 @@ impl Default for FakeStore {
         Self {
             state: RwLock::new(FakeState::default()),
         }
-    }
-}
-
-#[async_trait]
-impl DocumentQueryRepository for FakeStore {
-    async fn find_by_id(
-        &self,
-        tenant_id: Uuid,
-        document_id: Uuid,
-    ) -> Result<Option<DocumentMetadata>, RepositoryError> {
-        Ok(self
-            .state
-            .read()
-            .await
-            .documents
-            .iter()
-            .find(|document| document.tenant_id() == tenant_id && document.id() == document_id)
-            .cloned())
-    }
-
-    async fn list(&self, query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError> {
-        let mut items: Vec<_> = self
-            .state
-            .read()
-            .await
-            .documents
-            .iter()
-            .filter(|document| document.tenant_id() == query.tenant_id)
-            .cloned()
-            .collect();
-        items.sort_by_key(|document| std::cmp::Reverse(document.created_at()));
-        let total = i64::try_from(items.len()).unwrap_or(0);
-        let items = items
-            .into_iter()
-            .skip(usize::try_from(query.offset).unwrap_or(0))
-            .take(usize::try_from(query.limit).unwrap_or(20))
-            .collect();
-        Ok(DocumentPage { items, total })
     }
 }
 
@@ -175,6 +135,7 @@ impl DocumentDetailQuery for FakeStore {
                 content_type: item.content_type().to_string(),
                 status: view_status(item.status()),
                 version: item.version(),
+                content_revision: item.content_revision().value(),
                 size_bytes: item.size_bytes(),
                 created_by: item.created_by(),
                 created_at: item.created_at(),
@@ -199,6 +160,7 @@ impl DocumentListQuery for FakeStore {
                 content_type: item.content_type().to_string(),
                 status: view_status(item.status()),
                 version: item.version(),
+                content_revision: item.content_revision().value(),
                 size_bytes: item.size_bytes(),
                 created_at: item.created_at(),
                 updated_at: item.updated_at(),
@@ -259,6 +221,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             detail: store.clone(),
             list: store,
         },
+        processing: None,
         readiness: Arc::new(ReadyProbe),
     });
     routes::create_router(

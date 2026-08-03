@@ -204,6 +204,28 @@ PR 必须说明：
 
 文档生命周期遵循 `docs/governance/DOCUMENT_MANAGEMENT.md`。
 
+## 15. PLAN-0004 durable document processing rules
+
+- `document-processing` is a separate Document Intelligence bounded context;
+  Document Management remains the owner of content revisions and storage
+  references, and candidates are not formal business facts。
+- The MVP uses only the fixed
+  `ValidateSource → DetectType → ExtractText → ExtractFields →
+  ValidateCandidate → AwaitReview` pipeline. Do not add a general DAG,
+  scheduler, workflow designer, OCR platform, or model gateway in this plan。
+- `ProcessingJob` execution state, step checkpoints, AI tasks, leases, fence
+  versions, retries, cancellation, and recovery are durable. Every worker
+  write is lease- and version-fenced; a stale worker must fail closed。
+- PostgreSQL is the production multi-worker authority. SQLite is local,
+  single-process only, uses `BEGIN IMMEDIATE`, and must reject production,
+  parallel, or separate-AI configuration。
+- `business-worker` and `ai-worker` stop claims on graceful shutdown. Raw
+  text, storage keys, signed URLs, prompts, credentials, lease tokens, and
+  database URLs never enter public DTOs or logs。
+- PLAN-0004 changes require the durable-processing architecture document,
+  ADR-0010/0011/0012, migration manifest updates for new files only, contract
+  tests, and the full workspace/architecture gates before acceptance。
+
 ## 15. PLAN-0003 Revision 1 persistence rules
 
 PLAN-0003 Revision 1 的 Document Management 参考切片必须遵循以下额外门禁：

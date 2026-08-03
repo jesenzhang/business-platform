@@ -61,6 +61,10 @@ if (-not $aggregateMatch.Success) {
 if ($aggregateMatch.Groups["body"].Value -match '(?m)^\s*pub\s+(?!fn\b)') {
     throw "DocumentMetadata exposes a public field; aggregate state must remain private"
 }
+$aggregateDeclaration = [regex]::Match($aggregateContent, '#\[derive\((?<derive>[^\]]+)\)\]\s*pub struct DocumentMetadata')
+if ($aggregateDeclaration.Success -and $aggregateDeclaration.Groups["derive"].Value -match 'Serialize') {
+    throw "DocumentMetadata must not implement serde::Serialize"
+}
 
 foreach ($adapterPath in @("crates/document-postgres/src", "crates/document-sqlite/src")) {
     $adapterFiles = Get-ChildItem (Join-Path $root $adapterPath) -Filter "*.rs" -File
@@ -78,6 +82,23 @@ foreach ($searchPath in @(
 )) {
     if (Test-Path (Join-Path $root $searchPath)) {
         throw "Deferred Document Search adapter still exists: $searchPath"
+    }
+}
+
+foreach ($legacyPath in @(
+    "crates/document/src/application/get.rs",
+    "crates/document/src/application/list.rs",
+    "crates/document-postgres/src/repository.rs",
+    "crates/document-sqlite/src/repository.rs"
+)) {
+    if (Test-Path (Join-Path $root $legacyPath)) {
+        throw "Legacy aggregate query/repository path still exists: $legacyPath"
+    }
+}
+foreach ($legacySymbol in @("DocumentQueryRepository", "ListDocumentsQuery", "DocumentPage", "QueryDocumentError")) {
+    $matches = rg --files-with-matches --glob "*.rs" --glob "*.toml" $legacySymbol $root 2>$null
+    if ($LASTEXITCODE -eq 0 -and $matches) {
+        throw "Legacy document query symbol still exists: $legacySymbol"
     }
 }
 
@@ -105,7 +126,7 @@ foreach ($pattern in @("AppConfig", "DatabaseConfig", "SecretUrl", "PgPool", "Sq
 
 $repositoryPath = Join-Path $root "crates/document/src/domain/repository.rs"
 $repositoryContent = Get-Content -Raw $repositoryPath
-foreach ($forbiddenMethod in @("dashboard", "report", "export")) {
+foreach ($forbiddenMethod in @("list", "search", "page", "offset", "total", "dashboard", "report", "export")) {
     if ($repositoryContent -match "async\s+fn\s+$forbiddenMethod") {
         throw "Aggregate repository contains non-aggregate query method '$forbiddenMethod'"
     }
@@ -145,10 +166,46 @@ for ($i = 1; $i -lt $migrationVersions.Count; $i++) {
     }
 }
 
+function Assert-MigrationManifest([string]$MigrationDirectory, [string]$ManifestPath) {
+    $directory = Join-Path $root $MigrationDirectory
+    $manifest = Join-Path $root $ManifestPath
+    if (-not (Test-Path $manifest)) {
+        throw "Migration manifest missing: $ManifestPath"
+    }
+    $entries = @{}
+    foreach ($line in Get-Content $manifest) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        if ($line -notmatch '^([0-9a-f]{64})\s{2}(.+\.sql)$') {
+            throw "Invalid migration manifest line: $line"
+        }
+        $entries[$Matches[2]] = $Matches[1]
+    }
+    $sqlFiles = @(Get-ChildItem $directory -Filter "*.sql" -File | Sort-Object Name)
+    if ($entries.Count -ne $sqlFiles.Count) {
+        throw "Migration manifest does not cover exactly all SQL files: $ManifestPath"
+    }
+    foreach ($file in $sqlFiles) {
+        if (-not $entries.ContainsKey($file.Name)) {
+            throw "Migration missing from manifest: $($file.Name)"
+        }
+        $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actual -ne $entries[$file.Name]) {
+            throw "Migration hash mismatch: $($file.FullName)"
+        }
+    }
+}
+
+Assert-MigrationManifest "migrations" "migrations/MANIFEST.sha256"
+Assert-MigrationManifest "crates/document-sqlite/migrations" "crates/document-sqlite/migrations/MANIFEST.sha256"
+Assert-MigrationManifest "crates/document-processing-sqlite/migrations" "crates/document-processing-sqlite/migrations/MANIFEST.sha256"
+
 foreach ($required in @(
     "docs/README.md",
     "docs/adr/README.md",
     "docs/architecture/ARCHITECTURE_STATUS.md",
+    "docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md",
     "docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md",
     "docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md",
     "docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md",

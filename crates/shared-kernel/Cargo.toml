@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "shared-kernel"
+layer = "shared-kernel"
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }

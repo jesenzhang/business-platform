@@ -24,7 +24,7 @@ impl DocumentDetailQuery for SqliteDocumentDetailQuery {
         document_id: Uuid,
     ) -> Result<Option<DocumentDetailView>, QueryError> {
         sqlx::query_as::<_, DocumentRow>(
-            "SELECT id, tenant_id, original_filename, content_type, object_key, status, version, size_bytes, created_by, created_at, updated_at FROM documents WHERE tenant_id = ?1 AND id = ?2",
+            "SELECT id, tenant_id, original_filename, content_type, status, version, content_revision, size_bytes, created_by, created_at, updated_at FROM documents WHERE tenant_id = ?1 AND id = ?2",
         )
         .bind(tenant_id.to_string())
         .bind(document_id.to_string())

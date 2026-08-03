@@ -3,12 +3,10 @@
 mod detail_query;
 mod list_query;
 mod mapper;
-mod repository;
 mod unit_of_work;
 
 pub use detail_query::SqliteDocumentDetailQuery;
 pub use list_query::SqliteDocumentListQuery;
-pub use repository::SqliteDocumentQueryRepository;
 pub use unit_of_work::SqliteCreateDocumentUnitOfWork;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");

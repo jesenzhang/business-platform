@@ -3,6 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use document::application::CreateDocumentMetadata;
 use document::query::{DocumentDetailQuery, DocumentListQuery};
+use document_processing::ports::{
+    CandidateStore, ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery,
+};
 use sqlx::PgPool;
 
 /// Application services injected by the composition root.
@@ -11,6 +14,14 @@ pub struct DocumentServices {
     pub create: Arc<CreateDocumentMetadata>,
     pub detail: Arc<dyn DocumentDetailQuery>,
     pub list: Arc<dyn DocumentListQuery>,
+}
+
+#[derive(Clone)]
+pub struct ProcessingServices {
+    pub commands: Arc<dyn ProcessingJobCommandPort>,
+    pub claims: Arc<dyn ProcessingJobClaimPort>,
+    pub queries: Arc<dyn ProcessingJobQuery>,
+    pub candidates: Arc<dyn CandidateStore>,
 }
 
 pub struct SqliteReadinessProbe {
@@ -77,6 +88,7 @@ pub struct ReadinessReport {
 #[derive(Clone)]
 pub struct AppState {
     pub documents: DocumentServices,
+    pub processing: Option<ProcessingServices>,
     pub readiness: Arc<dyn ReadinessProbe>,
 }
 
