@@ -344,17 +344,48 @@ impl ObjectStorageClient for LocalStorageClient {
                     .map_err(|error| StorageError::Io(error.to_string()))?,
             )?;
         }
-        let mut file = tokio::fs::File::create(&path)
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| StorageError::Config("object key has no file name".to_string()))?;
+        let temporary = path.with_file_name(format!(".{file_name}.{}.tmp", uuid::Uuid::now_v7()));
+        let mut file = tokio::fs::File::create(&temporary)
             .await
             .map_err(|error| StorageError::Io(error.to_string()))?;
-        while let Some(chunk) = body.next().await {
-            file.write_all(&chunk?)
+        let write_result = async {
+            while let Some(chunk) = body.next().await {
+                file.write_all(&chunk?)
+                    .await
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+            }
+            file.flush()
                 .await
                 .map_err(|error| StorageError::Io(error.to_string()))?;
+            file.sync_all()
+                .await
+                .map_err(|error| StorageError::Io(error.to_string()))
         }
-        file.flush()
-            .await
-            .map_err(|error| StorageError::Io(error.to_string()))?;
+        .await;
+        drop(file);
+        if let Err(error) = write_result {
+            let _ = tokio::fs::remove_file(&temporary).await;
+            return Err(error);
+        }
+        if tokio::fs::rename(&temporary, &path).await.is_err() {
+            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+                tokio::fs::remove_file(&path)
+                    .await
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+                tokio::fs::rename(&temporary, &path)
+                    .await
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+            } else {
+                let _ = tokio::fs::remove_file(&temporary).await;
+                return Err(StorageError::Io(
+                    "failed to commit temporary object".to_string(),
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -466,5 +497,34 @@ mod tests {
             .put_object(&key, Bytes::from_static(b"escape"), "text/plain")
             .await;
         assert!(matches!(result, Err(StorageError::Config(_))));
+    }
+
+    #[tokio::test]
+    async fn local_storage_failed_stream_does_not_publish_partial_object() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let client = LocalStorageClient::new(directory.path())
+            .await
+            .expect("client");
+        let key = ObjectKey::new("atomic/file.bin").expect("key");
+        let chunks = stream::iter([
+            Ok(Bytes::from_static(b"partial")),
+            Err(StorageError::Io("cancelled".to_string())),
+        ]);
+
+        let result = client
+            .put_stream(
+                &key,
+                Box::pin(chunks),
+                100,
+                "application/octet-stream",
+                &BTreeMap::new(),
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(!client.exists(&key).await.expect("exists"));
+        let parent = directory.path().join("atomic");
+        let mut entries = tokio::fs::read_dir(parent).await.expect("read directory");
+        assert!(entries.next_entry().await.expect("next entry").is_none());
     }
 }

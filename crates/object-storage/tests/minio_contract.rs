@@ -5,7 +5,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
+use futures_util::{stream, StreamExt};
 use object_storage::{ObjectKey, ObjectStorageClient, S3Client};
 
 const ENDPOINT: &str = "http://localhost:9000";
@@ -95,6 +98,12 @@ async fn presigned_url_is_valid() {
         url.contains("X-Amz-Expires=300"),
         "URL should contain expiry: {url}"
     );
+    let response = reqwest::get(&url).await.unwrap();
+    assert!(response.status().is_success());
+    assert_eq!(
+        response.bytes().await.unwrap(),
+        Bytes::from_static(b"presigned content")
+    );
 
     // cleanup
     client.delete_object(&key).await.unwrap();
@@ -134,12 +143,69 @@ async fn content_type_is_preserved() {
         .await
         .unwrap();
 
-    // Verify the object is retrievable (content-type is set server-side;
-    // a full verification would require a HEAD request checking Content-Type).
-    let fetched = client.get_object(&key).await.unwrap();
-    assert_eq!(fetched, Bytes::from_static(br#"{"key":"value"}"#));
+    let head = client.head(&key).await.unwrap();
+    assert_eq!(head.content_type.as_deref(), Some("application/json"));
 
     client.delete_object(&key).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires running MinIO (docker compose up)"]
+async fn user_metadata_is_preserved() {
+    let client = test_client();
+    let key = ObjectKey::new("contract/metadata/data.bin").unwrap();
+    let metadata = BTreeMap::from([
+        ("checksum".to_string(), "sha256:test".to_string()),
+        ("source".to_string(), "contract".to_string()),
+    ]);
+    client
+        .put_stream(
+            &key,
+            Box::pin(stream::once(async { Ok(Bytes::from_static(b"metadata")) })),
+            8,
+            "application/octet-stream",
+            &metadata,
+        )
+        .await
+        .unwrap();
+
+    let head = client.head(&key).await.unwrap();
+    assert_eq!(
+        head.metadata.get("checksum"),
+        Some(&"sha256:test".to_string())
+    );
+    assert_eq!(head.metadata.get("source"), Some(&"contract".to_string()));
+    client.delete(&key).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires running MinIO (docker compose up)"]
+async fn large_object_is_streamed_without_small_object_buffering() {
+    const CHUNK_SIZE: usize = 1024 * 1024;
+    const CHUNKS: usize = 20;
+    let client = test_client();
+    let key = ObjectKey::new("contract/stream/large.bin").unwrap();
+    let chunks = (0..CHUNKS).map(|_| Ok(Bytes::from(vec![0x5a; CHUNK_SIZE])));
+    client
+        .put_stream(
+            &key,
+            Box::pin(stream::iter(chunks)),
+            (CHUNK_SIZE * CHUNKS) as u64,
+            "application/octet-stream",
+            &BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+    let object = client.open_stream(&key).await.unwrap();
+    assert_eq!(object.metadata.content_length, (CHUNK_SIZE * CHUNKS) as u64);
+    let received = object
+        .body
+        .map(|chunk| chunk.unwrap().len())
+        .fold(0usize, |total, length| async move { total + length })
+        .await;
+    assert_eq!(received, CHUNK_SIZE * CHUNKS);
+    client.delete(&key).await.unwrap();
 }
 
 #[tokio::test]
