@@ -1,6 +1,6 @@
 # PLAN-0002: Foundation Integrity and PLAN-0001 Closeout
 
-> Status: Accepted Candidate
+> Status: Integrated
 > Date: 2026-07-31
 > Owner: Platform Foundation
 > Predecessor: PLAN-0001-foundation-hardening
@@ -29,10 +29,8 @@ complete object-storage contracts, and workspace-wide architecture gates.
 
 ## Acceptance evidence
 
-PLAN-0002 is an `Accepted Candidate`. Integration is local solo fast-forward
-with no PR. Candidate code and infrastructure evidence are recorded below; the
-final candidate SHA is the subsequent evidence commit and is intentionally not
-self-referenced from this file.
+PLAN-0002 is `Integrated / Archived`. Integration used local solo fast-forward
+with no PR. Candidate, integration, and CI evidence are recorded below.
 
 ## WP-01 and WP-02 evidence
 
@@ -98,6 +96,17 @@ self-referenced from this file.
 - Linux MinIO complete contracts: PASS in GitHub Actions run `30784034902`.
 - Linux Format, Check, Clippy, Unit, Architecture Fitness, and Cargo Metadata
   architecture checker: PASS in GitHub Actions run `30784034902`.
+
+## Integration record (2026-08-03)
+
+- Final candidate SHA: `ad47544505b66d577ccdcb8f300812c294d3d7bf`.
+- `origin/main` integration SHA: `ad47544505b66d577ccdcb8f300812c294d3d7bf`.
+- Integration method: local solo `git merge --ff-only`; no pull request and no
+  merge commit.
+- Main integration CI run: `30784568762`, PASS (6/6 jobs), including Linux
+  PostgreSQL, MinIO, Document E2E, and architecture fitness.
+- WP-01 through WP-10: PASS.
+- Integrated at: 2026-08-03 04:31 UTC.
 
 ## Remaining risks and rollback
 

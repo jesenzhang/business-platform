@@ -3,12 +3,13 @@
 > 文档类型：Living Document
 > 最后更新：2026-08-03
 > 当前阶段：Phase 1 Foundation Integrity
-> 当前计划：`PLAN-0002-foundation-integrity-and-closeout`
+> 当前计划：无（Phase 2 preparation）
 > 集成方式：local solo fast-forward，无 PR
 
-> 2026-08-03: PLAN-0001 is Integrated and archived. PLAN-0002 is an Accepted
-> Candidate after feature-branch CI run 30784034902 passed all six jobs,
-> including PostgreSQL, MinIO, Document E2E, and architecture fitness.
+> 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
+> was fast-forwarded at `ad47544505b66d577ccdcb8f300812c294d3d7bf`; main CI
+> run 30784568762 passed all six jobs, including PostgreSQL, MinIO, Document
+> E2E, and architecture fitness. The repository is in Phase 2 preparation.
 
 ## 1. 当前权威结论
 
@@ -57,8 +58,8 @@
 
 ## 3. 当前实现状态
 
-当前仓库处于 Phase 1 Foundation Integrity；PLAN-0001 已合并并归档，PLAN-0002
-已取得功能分支真实基础设施和 Linux CI 证据，等待本地 fast-forward 集成。
+当前仓库已完成 Phase 1 Foundation Integrity；PLAN-0001 与 PLAN-0002 均已
+集成并归档，当前进入 Phase 2 preparation。
 
 已具备：
 
@@ -151,7 +152,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 基础设施隔离：部分符合
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
 PLAN-0001：Integrated / Archived
-PLAN-0002：Accepted Candidate
+PLAN-0002：Integrated / Archived
 ```
 
 ## 8. PLAN-0002 采用动作

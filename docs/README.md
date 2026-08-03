@@ -97,16 +97,18 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：[`plans/current/PLAN-0002-foundation-integrity-and-closeout.md`](plans/current/PLAN-0002-foundation-integrity-and-closeout.md)
+- 当前计划：无（Phase 2 preparation）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
+- 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-当前阶段为 Phase 1 Foundation Integrity。PLAN-0002 当前状态为
-`Accepted Candidate`，采用 local solo fast-forward 且不创建 PR；功能分支
-CI run 30784034902 已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。
-集成完成后进入 Phase 2 preparation。
+Phase 1 Foundation Integrity 已完成。PLAN-0002 采用 local solo
+fast-forward 且不创建 PR，集成 SHA 为
+`ad47544505b66d577ccdcb8f300812c294d3d7bf`；main CI run 30784568762
+已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前进入 Phase 2
+preparation。
 
 ## 9. 合并后的后续任务规则
 
