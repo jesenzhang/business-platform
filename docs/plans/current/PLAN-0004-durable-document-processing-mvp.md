@@ -138,7 +138,7 @@ CI run IDs, candidate SHA, and explicit `PASS`, `PARTIAL`, `NOT RUN`, or
 
 - Status: `Accepted Candidate`.
 - Candidate code SHA: `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`.
-- Feature CI Run ID: `30811814533` (`PASS`); the evidence commit itself must remain green before this plan is considered complete.
+- Feature CI Run IDs: candidate code `30811814533` (`PASS`); evidence commit `30812079019` (`PASS`).
 - SQLite local E2E: `PASS`.
 - GitHub Linux PostgreSQL/MinIO: `PASS`.
 - Windows PostgreSQL/MinIO: `NOT RUN`.

@@ -168,7 +168,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Accepted Candidate（Feature CI run 30811814533；证据提交后再验证）
+PLAN-0004：Accepted Candidate（候选代码 CI 30811814533；证据提交 CI 30812079019）
 ```
 
 ## 8. PLAN-0002 采用动作
