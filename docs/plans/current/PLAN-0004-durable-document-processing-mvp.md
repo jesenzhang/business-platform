@@ -174,14 +174,14 @@ the plan returns to `Accepted Candidate`.
 - SQLite process E2E including a killed running-step worker and restart: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1`.
 - Windows PostgreSQL/MinIO multi-process E2E: `NOT RUN` — no local PostgreSQL/MinIO runtime is installed; GitHub Linux is the required environment-dependent gate.
 - Feature CI for the Revision 1 candidate: `PASS` — GitHub Actions run
-  `30831418950` at implementation SHA `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`.
+  `30833527820` at implementation SHA `a0bb0ad9374e87b1225e26ccbfbd44f4d616ebf2`.
   Format, Check, Clippy, Unit tests, Architecture Fitness, and PostgreSQL +
   MinIO + E2E contracts all passed.
 
 ### Revision 1 accepted-candidate evidence
 
-The Revision 1 implementation candidate is `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`.
-Its Feature CI run is `30831418950` and is green across all six jobs.
+The Revision 1 implementation candidate is `a0bb0ad9374e87b1225e26ccbfbd44f4d616ebf2`.
+Its Feature CI run is `30833527820` and is green across all six jobs.
 
 - GitHub Linux PostgreSQL/MinIO multi-process E2E: `PASS` — API, Business
   Worker, AI Worker, real PostgreSQL and MinIO covered source upload, durable
@@ -189,6 +189,9 @@ Its Feature CI run is `30831418950` and is green across all six jobs.
   replay, and twenty same-document jobs.
 - Local SQLite process E2E: `PASS` — the killed running-step worker was
   restarted and recovered to review.
+- Review atomic rollback and running-job cancellation contracts: `PASS` —
+  test-only PostgreSQL/SQLite fault injection rolls back the Review and Job
+  together; a running Job cancellation is observed by the next fenced step.
 - Architecture Fitness: `PASS` — local and CI checks passed.
 - Windows PostgreSQL/MinIO: `NOT RUN` — the runtime is not installed locally;
   GitHub Linux is the environment-dependent evidence.

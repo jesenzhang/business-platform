@@ -18,8 +18,8 @@
 > Deferred and PLAN-0004 had not started.
 >
 > 2026-08-03: PLAN-0004 Revision 1 reached Accepted Candidate at
-> implementation `2ca80ed77ffa63cc085e45e560709c96a2e96a3d`. Feature CI run
-> `30831418950` passed all six jobs, including PostgreSQL, MinIO, the
+> implementation `a0bb0ad9374e87b1225e26ccbfbd44f4d616ebf2`. Feature CI run
+> `30833527820` passed all six jobs, including PostgreSQL, MinIO, the
 > multi-process crash/reclaim E2E, and Architecture Fitness. SQLite remains
 > local single-process and PostgreSQL is the production multi-worker authority;
 > no PR or main integration is used.
@@ -172,7 +172,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Accepted Candidate — Revision 1（Feature CI `30831418950` 全绿；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0004：Accepted Candidate — Revision 1（Feature CI `30833527820` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作
