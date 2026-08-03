@@ -11,10 +11,12 @@
 > run 30784568762 passed all six jobs, including PostgreSQL, MinIO, Document
 > E2E, and architecture fitness. The repository is in Phase 2 preparation.
 >
-> 2026-08-03: PLAN-0003 is Active — Revision 1. It hardens the Document
-> aggregate seam, redacts storage internals from HTTP, defers incomplete Search,
-> and proves SQLite local idempotency/concurrency and cross-adapter query
-> semantics. It is not integrated.
+> 2026-08-03: PLAN-0003 is an Accepted Candidate — Revision 1. Feature CI run
+> 30796180766 passed all six jobs, including PostgreSQL, MinIO, Document E2E,
+> and architecture fitness. It hardens the Document aggregate seam, redacts
+> storage internals from HTTP, defers incomplete Search, and proves SQLite
+> local idempotency/concurrency and cross-adapter query semantics. It is not
+> integrated.
 
 ## 1. 当前权威结论
 
@@ -160,7 +162,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
-PLAN-0003：Active — Revision 1
+PLAN-0003：Accepted Candidate — Revision 1
 ```
 
 ## 8. PLAN-0002 采用动作

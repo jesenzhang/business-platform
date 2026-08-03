@@ -1,6 +1,6 @@
 # PLAN-0003: Persistence, Query and Multi-Database Architecture
 
-> Status: Active — Revision 1
+> Status: Accepted Candidate
 > Revision: 1
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Management
@@ -109,4 +109,22 @@ corrected only by new forward migrations.
   production authority; SQLite remains local/single-process and non-equivalent
   for distributed concurrency.
 - The final Candidate SHA is the subsequent evidence commit and is intentionally
+  not self-referenced here.
+
+## Candidate evidence (2026-08-03)
+
+- Candidate code SHA: `0e3f0df36cead846deb52a95a80320c62bdeb630`.
+- Revision 1 feature CI run `30796180766`: PASS, 6/6 jobs.
+- Format, workspace check, Clippy `-D warnings`, Unit and Architecture Fitness:
+  PASS.
+- PostgreSQL migration, shared persistence/query contracts, keyset EXPLAIN,
+  migration compatibility, Inbox/Outbox, and Document PostgreSQL E2E: PASS.
+- SQLite contracts, rollback, WAL/busy timeout, mapper rejection, pool bounds,
+  concurrent idempotency/conflict/restart evidence, and API redaction/cursor
+  contracts: PASS.
+- MinIO metadata/Content-Type, presigned GET, streaming, and LocalStorage
+  regression contracts: PASS.
+- Revision 1 completion checklist is satisfied; PostgreSQL remains the
+  production authority and SQLite remains local/single-process.
+- The final Candidate SHA is this evidence commit's parent and is intentionally
   not self-referenced here.
