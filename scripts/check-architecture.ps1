@@ -96,11 +96,8 @@ foreach ($legacyPath in @(
     }
 }
 foreach ($legacySymbol in @("DocumentQueryRepository", "ListDocumentsQuery", "DocumentPage", "QueryDocumentError")) {
-    $matches = Get-ChildItem -Path $root -Recurse -File -Include "*.rs", "*.toml" |
-        Where-Object { $_.FullName -notmatch "[\\/]\.git[\\/]" -and $_.FullName -notmatch "[\\/]target[\\/]" } |
-        Select-String -SimpleMatch -Pattern $legacySymbol |
-        Select-Object -ExpandProperty Path -Unique
-    if ($matches) {
+    $matches = git -C $root grep -n -F -- $legacySymbol -- '*.rs' '*.toml' 2>$null
+    if ($LASTEXITCODE -eq 0 -and $matches) {
         throw "Legacy document query symbol still exists: $legacySymbol"
     }
 }
