@@ -187,19 +187,39 @@ function Assert-MigrationManifest([string]$MigrationDirectory, [string]$Manifest
         throw "Migration manifest does not cover exactly all SQL files: $ManifestPath"
     }
 
-    function Get-NormalizedMigrationHash([string]$Path, [string]$NewLine) {
-        $content = Get-Content -Raw -Encoding UTF8 $Path
-        $normalized = $content -replace "`r`n", "`n" -replace "`r", "`n"
-        if ($NewLine -eq "CRLF") {
-            $normalized = $normalized -replace "`n", "`r`n"
-        }
-        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($normalized)
+    function Get-BytesSha256([byte[]]$Bytes) {
         $sha = [System.Security.Cryptography.SHA256]::Create()
         try {
-            return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+            return (($sha.ComputeHash($Bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
         } finally {
             $sha.Dispose()
         }
+    }
+
+    function Get-NormalizedMigrationHashes([string]$Path) {
+        $bytes = [System.IO.File]::ReadAllBytes($Path)
+        $lf = [System.Collections.Generic.List[byte]]::new()
+        for ($index = 0; $index -lt $bytes.Length; $index++) {
+            if ($bytes[$index] -eq 0x0D) {
+                if ($index + 1 -lt $bytes.Length -and $bytes[$index + 1] -eq 0x0A) {
+                    $index++
+                }
+                [void]$lf.Add(0x0A)
+            } else {
+                [void]$lf.Add($bytes[$index])
+            }
+        }
+        $crlf = [System.Collections.Generic.List[byte]]::new()
+        foreach ($byte in $lf) {
+            if ($byte -eq 0x0A) {
+                [void]$crlf.Add(0x0D)
+            }
+            [void]$crlf.Add($byte)
+        }
+        return @(
+            (Get-BytesSha256 ([byte[]]$lf.ToArray())),
+            (Get-BytesSha256 ([byte[]]$crlf.ToArray()))
+        )
     }
 
     foreach ($file in $sqlFiles) {
@@ -207,9 +227,8 @@ function Assert-MigrationManifest([string]$MigrationDirectory, [string]$Manifest
             throw "Migration missing from manifest: $($file.Name)"
         }
         $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        $lf = Get-NormalizedMigrationHash $file.FullName "LF"
-        $crlf = Get-NormalizedMigrationHash $file.FullName "CRLF"
-        if ($entries[$file.Name] -notin @($actual, $lf, $crlf)) {
+        $normalized = Get-NormalizedMigrationHashes $file.FullName
+        if ($entries[$file.Name] -notin @($actual) + $normalized) {
             throw "Migration hash mismatch: $($file.FullName)"
         }
     }
