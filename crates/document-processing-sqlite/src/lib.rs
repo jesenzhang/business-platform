@@ -17,7 +17,11 @@ use document_processing::ports::{
     ProcessingJobCommandPort, ProcessingJobDetail, ProcessingJobQuery, ProcessingRepositoryError,
     ProcessingStepStore, StepCheckpoint, TextArtifactReference,
 };
-use sqlx::{FromRow, SqliteConnection, SqlitePool};
+use sqlx::pool::PoolConnection;
+use sqlx::sqlite::SqliteTransactionManager;
+use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, TransactionManager};
+use std::borrow::Cow;
+use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
@@ -1039,15 +1043,46 @@ impl AiTaskPort for SqliteProcessingStore {
 
 const JOB_COLUMNS: &str = "id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at";
 
+struct ImmediateSqliteConnection {
+    inner: PoolConnection<Sqlite>,
+}
+
+impl Deref for ImmediateSqliteConnection {
+    type Target = SqliteConnection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ImmediateSqliteConnection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl Drop for ImmediateSqliteConnection {
+    fn drop(&mut self) {
+        SqliteTransactionManager::start_rollback(&mut self.inner);
+    }
+}
+
 async fn begin_immediate(
     pool: &SqlitePool,
-) -> Result<sqlx::pool::PoolConnection<sqlx::Sqlite>, ProcessingRepositoryError> {
+) -> Result<ImmediateSqliteConnection, ProcessingRepositoryError> {
     let mut connection = pool.acquire().await.map_err(map_sql_error)?;
-    sqlx::query("BEGIN IMMEDIATE")
-        .execute(&mut *connection)
+    SqliteTransactionManager::begin(&mut connection, Some(Cow::Borrowed("BEGIN IMMEDIATE")))
         .await
         .map_err(map_sql_error)?;
-    Ok(connection)
+    Ok(ImmediateSqliteConnection { inner: connection })
+}
+
+async fn commit_immediate(
+    connection: &mut ImmediateSqliteConnection,
+) -> Result<(), ProcessingRepositoryError> {
+    SqliteTransactionManager::commit(&mut **connection)
+        .await
+        .map_err(map_sql_error)
 }
 
 async fn load_job_for_update(
@@ -1344,10 +1379,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -1381,10 +1413,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
                 now,
             )
             .await?;
-            sqlx::query("COMMIT")
-                .execute(&mut *connection)
-                .await
-                .map_err(map_sql_error)?;
+            commit_immediate(&mut connection).await?;
             return Ok(job);
         }
         job.complete_step(
@@ -1433,10 +1462,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -1527,10 +1553,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -1635,10 +1658,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(task)
     }
 
@@ -1725,10 +1745,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -1833,10 +1850,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
         let updated = load_ai_task_for_update(&mut connection, tenant_id, task_id)
             .await?
             .ok_or(ProcessingRepositoryError::NotFound)?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(updated)
     }
 
@@ -1896,10 +1910,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -1909,112 +1920,119 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
         now: DateTime<Utc>,
     ) -> Result<FinalizeReviewResult, ProcessingRepositoryError> {
         let mut connection = begin_immediate(&self.pool).await?;
-        let Some(mut job) =
-            load_job_for_update(&mut connection, command.tenant_id, command.job_id).await?
-        else {
-            return Err(ProcessingRepositoryError::NotFound);
-        };
-        let candidate_row = sqlx::query_as::<_, CandidateRow>(
-            "SELECT payload FROM document_extraction_candidates WHERE tenant_id = ?1 AND id = ?2",
-        )
-        .bind(command.tenant_id.to_string())
-        .bind(command.review.candidate_id.to_string())
-        .fetch_optional(&mut *connection)
-        .await
-        .map_err(map_sql_error)?
-        .ok_or(ProcessingRepositoryError::NotFound)?;
-        let candidate: ExtractionCandidate = serde_json::from_str(&candidate_row.payload)
-            .map_err(|_| ProcessingRepositoryError::Failed)?;
-        if candidate.job_id() != command.job_id || command.review.tenant_id != command.tenant_id {
-            return Err(ProcessingRepositoryError::Conflict);
-        }
-        if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at FROM document_extraction_reviews WHERE tenant_id = ?1 AND candidate_id = ?2")
+        let result = async {
+            let Some(mut job) =
+                load_job_for_update(&mut connection, command.tenant_id, command.job_id).await?
+            else {
+                return Err(ProcessingRepositoryError::NotFound);
+            };
+            let candidate_row = sqlx::query_as::<_, CandidateRow>(
+                "SELECT payload FROM document_extraction_candidates WHERE tenant_id = ?1 AND id = ?2",
+            )
             .bind(command.tenant_id.to_string())
             .bind(command.review.candidate_id.to_string())
             .fetch_optional(&mut *connection)
             .await
             .map_err(map_sql_error)?
-        {
-            let existing = to_review(existing)?;
-            if existing.reviewer_id == command.review.reviewer_id
-                && existing.decision == command.review.decision
-                && existing.candidate_version == command.review.candidate_version
-                && existing.patch == command.review.patch
-                && existing.comment == command.review.comment
+            .ok_or(ProcessingRepositoryError::NotFound)?;
+            let candidate: ExtractionCandidate = serde_json::from_str(&candidate_row.payload)
+                .map_err(|_| ProcessingRepositoryError::Failed)?;
+            if candidate.job_id() != command.job_id
+                || command.review.tenant_id != command.tenant_id
             {
-                sqlx::query("COMMIT")
-                    .execute(&mut *connection)
-                    .await
-                    .map_err(map_sql_error)?;
-                return Ok(FinalizeReviewResult {
-                    job,
-                    review: existing,
-                    replayed: true,
-                });
+                return Err(ProcessingRepositoryError::Conflict);
             }
-            return Err(ProcessingRepositoryError::Conflict);
+            if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at FROM document_extraction_reviews WHERE tenant_id = ?1 AND candidate_id = ?2")
+                .bind(command.tenant_id.to_string())
+                .bind(command.review.candidate_id.to_string())
+                .fetch_optional(&mut *connection)
+                .await
+                .map_err(map_sql_error)?
+            {
+                let existing = to_review(existing)?;
+                if existing.reviewer_id == command.review.reviewer_id
+                    && existing.decision == command.review.decision
+                    && existing.candidate_version == command.review.candidate_version
+                    && existing.patch == command.review.patch
+                    && existing.comment == command.review.comment
+                {
+                    return Ok(FinalizeReviewResult {
+                        job,
+                        review: existing,
+                        replayed: true,
+                    });
+                }
+                return Err(ProcessingRepositoryError::Conflict);
+            }
+            if job.status() != ProcessingJobStatus::WaitingForReview {
+                return Err(ProcessingRepositoryError::Conflict);
+            }
+            command
+                .review
+                .validate(&candidate)
+                .map_err(|_| ProcessingRepositoryError::Conflict)?;
+            let expected = job.aggregate_version().value();
+            match command.review.decision {
+                document_processing::ReviewDecision::Rejected => job
+                    .reject_review(now)
+                    .map_err(|_| ProcessingRepositoryError::Conflict)?,
+                document_processing::ReviewDecision::Accepted
+                | document_processing::ReviewDecision::Edited => job
+                    .confirm_review(now)
+                    .map_err(|_| ProcessingRepositoryError::Conflict)?,
+            }
+            save_job_without_fence(&mut connection, &job, expected).await?;
+            sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)")
+                .bind(command.review.id.to_string())
+                .bind(command.review.tenant_id.to_string())
+                .bind(command.review.candidate_id.to_string())
+                .bind(command.review.reviewer_id.to_string())
+                .bind(command.review.decision.as_str())
+                .bind(command.review.patch.as_ref().map(ToString::to_string))
+                .bind(&command.review.comment)
+                .bind(command.review.candidate_version)
+                .bind(command.review.created_at.to_rfc3339())
+                .execute(&mut *connection)
+                .await
+                .map_err(map_sql_error)?;
+            insert_processing_outbox(
+                &mut connection,
+                &job,
+                if command.review.decision == document_processing::ReviewDecision::Rejected {
+                    "document.processing.failed.v1"
+                } else {
+                    "document.processing.succeeded.v1"
+                },
+                serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
+                now,
+            )
+            .await?;
+            insert_processing_audit(
+                &mut connection,
+                &job,
+                "review_finalized",
+                Some(command.review.reviewer_id),
+                serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
+                now,
+            )
+            .await?;
+            Ok(FinalizeReviewResult {
+                job,
+                review: command.review,
+                replayed: false,
+            })
         }
-        if job.status() != ProcessingJobStatus::WaitingForReview {
-            return Err(ProcessingRepositoryError::Conflict);
+        .await;
+        match result {
+            Ok(result) => {
+                commit_immediate(&mut connection).await?;
+                Ok(result)
+            }
+            Err(error) => {
+                let _ = SqliteTransactionManager::rollback(&mut *connection).await;
+                Err(error)
+            }
         }
-        command
-            .review
-            .validate(&candidate)
-            .map_err(|_| ProcessingRepositoryError::Conflict)?;
-        let expected = job.aggregate_version().value();
-        match command.review.decision {
-            document_processing::ReviewDecision::Rejected => job
-                .reject_review(now)
-                .map_err(|_| ProcessingRepositoryError::Conflict)?,
-            document_processing::ReviewDecision::Accepted
-            | document_processing::ReviewDecision::Edited => job
-                .confirm_review(now)
-                .map_err(|_| ProcessingRepositoryError::Conflict)?,
-        }
-        save_job_without_fence(&mut connection, &job, expected).await?;
-        sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)")
-            .bind(command.review.id.to_string())
-            .bind(command.review.tenant_id.to_string())
-            .bind(command.review.candidate_id.to_string())
-            .bind(command.review.reviewer_id.to_string())
-            .bind(command.review.decision.as_str())
-            .bind(command.review.patch.as_ref().map(ToString::to_string))
-            .bind(&command.review.comment)
-            .bind(command.review.candidate_version)
-            .bind(command.review.created_at.to_rfc3339())
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
-        insert_processing_outbox(
-            &mut connection,
-            &job,
-            if command.review.decision == document_processing::ReviewDecision::Rejected {
-                "document.processing.failed.v1"
-            } else {
-                "document.processing.succeeded.v1"
-            },
-            serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
-            now,
-        )
-        .await?;
-        insert_processing_audit(
-            &mut connection,
-            &job,
-            "review_finalized",
-            Some(command.review.reviewer_id),
-            serde_json::json!({"review_id": command.review.id, "decision": command.review.decision.as_str()}),
-            now,
-        )
-        .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
-        Ok(FinalizeReviewResult {
-            job,
-            review: command.review,
-            replayed: false,
-        })
     }
 
     async fn cancel_processing(
@@ -2029,17 +2047,11 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             return Err(ProcessingRepositoryError::NotFound);
         };
         if job.status().is_terminal() {
-            sqlx::query("COMMIT")
-                .execute(&mut *connection)
-                .await
-                .map_err(map_sql_error)?;
+            commit_immediate(&mut connection).await?;
             return Ok(job);
         }
         if job.cancel_requested_at().is_some() {
-            sqlx::query("COMMIT")
-                .execute(&mut *connection)
-                .await
-                .map_err(map_sql_error)?;
+            commit_immediate(&mut connection).await?;
             return Ok(job);
         }
         let expected = job.aggregate_version().value();
@@ -2074,10 +2086,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(job)
     }
 
@@ -2139,10 +2148,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(())
     }
 
@@ -2179,10 +2185,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
                 reclaimed = reclaimed.saturating_add(1);
             }
         }
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(reclaimed)
     }
 
@@ -2257,10 +2260,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             }
             reclaimed = reclaimed.saturating_add(1);
         }
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sql_error)?;
+        commit_immediate(&mut connection).await?;
         Ok(reclaimed)
     }
 }

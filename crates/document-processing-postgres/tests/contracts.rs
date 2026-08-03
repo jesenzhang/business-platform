@@ -428,6 +428,60 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
         candidate_version: candidate.version(),
         created_at: Utc::now(),
     };
+    sqlx::query("DROP TRIGGER IF EXISTS test_processing_review_failure_trigger ON document_extraction_reviews")
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("CREATE OR REPLACE FUNCTION test_processing_review_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.comment = 'inject-review-failure' THEN RAISE EXCEPTION 'injected review failure'; END IF; RETURN NEW; END; $$")
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("CREATE TRIGGER test_processing_review_failure_trigger AFTER INSERT ON document_extraction_reviews FOR EACH ROW EXECUTE FUNCTION test_processing_review_failure()")
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let mut rollback_review = review.clone();
+    rollback_review.id = Uuid::now_v7();
+    rollback_review.comment = Some("inject-review-failure".to_string());
+    let rollback = store
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                review: rollback_review,
+            },
+            Utc::now(),
+        )
+        .await;
+    assert!(rollback.is_err());
+    let review_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2",
+    )
+    .bind(tenant)
+    .bind(candidate.id())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert_eq!(review_count, 0);
+    let after_rollback = store
+        .detail(tenant, job.id())
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(
+        after_rollback.job.status(),
+        ProcessingJobStatus::WaitingForReview
+    );
+    sqlx::query(
+        "DROP TRIGGER test_processing_review_failure_trigger ON document_extraction_reviews",
+    )
+    .execute(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    sqlx::query("DROP FUNCTION test_processing_review_failure()")
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
     let finalized = store
         .finalize_review(
             FinalizeReviewCommand {

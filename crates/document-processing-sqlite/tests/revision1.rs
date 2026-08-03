@@ -2,7 +2,7 @@ use chrono::Utc;
 use document_processing::ports::{
     AiTaskPort, CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand,
     ProcessingExecutionUnitOfWork, ProcessingJobClaimPort, ProcessingJobCommandPort,
-    TextArtifactReference,
+    ProcessingJobQuery, TextArtifactReference,
 };
 use document_processing::{
     CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionRequest,
@@ -185,6 +185,47 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         candidate_version: candidate.version(),
         created_at: Utc::now(),
     };
+    pool.execute("DROP TRIGGER IF EXISTS test_processing_review_failure_trigger")
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    pool.execute("CREATE TRIGGER test_processing_review_failure_trigger AFTER INSERT ON document_extraction_reviews WHEN NEW.comment = 'inject-review-failure' BEGIN SELECT RAISE(ABORT, 'injected review failure'); END")
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let mut rollback_review = review.clone();
+    rollback_review.id = Uuid::now_v7();
+    rollback_review.comment = Some("inject-review-failure".to_string());
+    let rollback = store
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                review: rollback_review,
+            },
+            Utc::now(),
+        )
+        .await;
+    assert!(rollback.is_err());
+    let review_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM document_extraction_reviews WHERE tenant_id = ?1 AND candidate_id = ?2",
+    )
+    .bind(tenant.to_string())
+    .bind(candidate.id().to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert_eq!(review_count, 0);
+    let after_rollback = store
+        .detail(tenant, job.id())
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(
+        after_rollback.job.status(),
+        document_processing::ProcessingJobStatus::WaitingForReview
+    );
+    pool.execute("DROP TRIGGER test_processing_review_failure_trigger")
+        .await
+        .unwrap_or_else(|_| unreachable!());
     let finalized = store
         .finalize_review(
             FinalizeReviewCommand {
@@ -213,4 +254,60 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         .await
         .unwrap_or_else(|_| unreachable!());
     assert!(replay.replayed);
+
+    let cancel_job = ProcessingJob::queue(
+        tenant,
+        document,
+        1,
+        format!("cancel-running-{}", Uuid::now_v7()),
+        user,
+        3,
+        Utc::now(),
+    )
+    .unwrap_or_else(|_| unreachable!());
+    store
+        .create(&cancel_job)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let cancel_claim =
+        ProcessingJobClaimPort::claim_next(&store, "cancel-business", Utc::now(), 60)
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!());
+    let cancel_requested = store
+        .cancel_processing(tenant, cancel_job.id(), user, Utc::now())
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(
+        cancel_requested.status(),
+        document_processing::ProcessingJobStatus::Running
+    );
+    assert!(cancel_requested.cancel_requested_at().is_some());
+    let cancelled = store
+        .complete_step(
+            tenant,
+            cancel_job.id(),
+            ProcessingStepKind::ValidateSource,
+            None,
+            &ExecutionFence::new(
+                "cancel-business",
+                cancel_claim.lease_token,
+                cancel_claim.fence_version,
+            ),
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(
+        cancelled.status(),
+        document_processing::ProcessingJobStatus::Cancelled
+    );
+    let cancel_replay = store
+        .cancel_processing(tenant, cancel_job.id(), user, Utc::now())
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(
+        cancel_replay.status(),
+        document_processing::ProcessingJobStatus::Cancelled
+    );
 }
