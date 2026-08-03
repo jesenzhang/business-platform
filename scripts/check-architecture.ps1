@@ -97,7 +97,11 @@ foreach ($legacyPath in @(
 }
 foreach ($legacySymbol in @("DocumentQueryRepository", "ListDocumentsQuery", "DocumentPage", "QueryDocumentError")) {
     $matches = git -C $root grep -n -F -- $legacySymbol -- '*.rs' '*.toml' 2>$null
-    if ($LASTEXITCODE -eq 0 -and $matches) {
+    $gitExitCode = $LASTEXITCODE
+    if ($gitExitCode -gt 1) {
+        throw "Legacy document query scan failed for: $legacySymbol"
+    }
+    if ($gitExitCode -eq 0 -and $matches) {
         throw "Legacy document query symbol still exists: $legacySymbol"
     }
 }
@@ -254,3 +258,4 @@ foreach ($required in @(
 }
 
 Write-Output "Architecture fitness: PASS"
+exit 0
