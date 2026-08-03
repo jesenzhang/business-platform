@@ -100,7 +100,7 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：无（PLAN-0003 已集成；未启动 PLAN-0004）
+- 当前计划：[`plans/current/PLAN-0004-durable-document-processing-mvp.md`](plans/current/PLAN-0004-durable-document-processing-mvp.md)
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
@@ -112,7 +112,8 @@ Phase 1 Foundation Integrity 与 Phase 2 Persistence and Query Hardening 均已
 完成。PLAN-0002 与 PLAN-0003 均采用 local solo fast-forward 且不创建 PR；
 PLAN-0003 集成 SHA 为
 `f6dbc693da42d0f9a7566739f5a4169c6a86f880`，main CI run 30796583865 已通过
-真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前未启动 PLAN-0004。
+真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前开始 Phase 3 First
+Durable Business Flow，由 PLAN-0004 负责；本计划不启动 PLAN-0005。
 
 ## 9. 合并后的后续任务规则
 

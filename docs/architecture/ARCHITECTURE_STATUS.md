@@ -2,8 +2,8 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-08-03
-> 当前阶段：Phase 2 Persistence and Query Hardening — complete
-> 当前计划：无（PLAN-0003 已集成；未启动 PLAN-0004）
+> 当前阶段：Phase 3 First Durable Business Flow
+> 当前计划：`PLAN-0004-durable-document-processing-mvp`
 > 集成方式：local solo fast-forward，无 PR
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -16,6 +16,11 @@
 > CI run 30796583865 passed all six jobs, including PostgreSQL, MinIO, Document
 > E2E, and architecture fitness. Search remains Deferred and PLAN-0004 has not
 > started.
+>
+> 2026-08-03: PLAN-0004 is Active. It is scoped to a fixed durable Document
+> Processing MVP and begins with Gate 0 debt cleanup. No PR or main integration
+> is used; SQLite remains local single-process and PostgreSQL is production
+> authority.
 
 ## 1. 当前权威结论
 
@@ -162,6 +167,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
+PLAN-0004：Active
 ```
 
 ## 8. PLAN-0002 采用动作
@@ -187,4 +193,5 @@ PLAN-0002 进入 Accepted Candidate 前：
 - 新增部署单元或重大基础设施；
 - 质量属性目标被实测或调整；
 - PLAN-0002 完成并归档；
+- PLAN-0004 Gate 0 通过并进入 durable processing implementation；
 - 开始第一个遗留业务迁移切片。
