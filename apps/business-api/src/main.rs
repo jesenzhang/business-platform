@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
             )),
             list: Arc::new(document::application::ListDocumentMetadata::new(repository)),
         },
-        readiness: Arc::new(PostgresReadinessProbe::new(pool, 7)),
+        readiness: Arc::new(PostgresReadinessProbe::new(pool)),
     });
 
     let auth_config = AuthMiddlewareConfig {

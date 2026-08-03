@@ -16,6 +16,10 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 runtime-config = { workspace = true }
+runtime-migration = { workspace = true }
+
+[dev-dependencies]
+uuid = { workspace = true }
 
 [lints]
 workspace = true

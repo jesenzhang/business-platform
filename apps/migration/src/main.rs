@@ -6,7 +6,7 @@
 //!
 //! The database is taken from `DATABASE_URL`, falling back to the local
 //! development default. Migrations live in the workspace-root `migrations/`
-//! directory and are embedded at compile time via `sqlx::migrate!`.
+//! directory and are embedded once by the shared `runtime-migration` catalog.
 
 use anyhow::Context;
 use sqlx::migrate::MigrateDatabase;
@@ -55,13 +55,8 @@ async fn run_up(database_url: &str) -> anyhow::Result<()> {
         .await
         .context("failed to connect to database")?;
 
-    // `sqlx::migrate!` requires a literal and resolves it relative to this
-    // crate's manifest directory (`apps/migration`), so the workspace-root
-    // `migrations/` directory is two levels up.
-    let migrator = sqlx::migrate!("../../migrations");
-
     tracing::info!("Applying migrations");
-    migrator
+    runtime_migration::MIGRATOR
         .run(&pool)
         .await
         .context("failed to apply migrations")?;
@@ -76,8 +71,6 @@ async fn run_status(database_url: &str) -> anyhow::Result<()> {
     let pool = sqlx::PgPool::connect(database_url)
         .await
         .context("failed to connect to database")?;
-
-    let migrator = sqlx::migrate!("../../migrations");
 
     let applied = sqlx::query(
         "SELECT version, description, installed_on FROM _sqlx_migrations ORDER BY version",
@@ -106,7 +99,7 @@ async fn run_status(database_url: &str) -> anyhow::Result<()> {
     }
 
     println!("\nAvailable migrations:");
-    for migration in migrator.iter() {
+    for migration in runtime_migration::MIGRATOR.iter() {
         let state = if applied_versions.contains(&migration.version) {
             "applied"
         } else {

@@ -6,6 +6,8 @@ members = [
     "apps/ai-worker",
     "apps/agent-adapter",
     "apps/migration",
+    "crates/runtime-migration",
+    "crates/architecture-check",
     "crates/runtime-config",
     "crates/shared-kernel",
     "crates/identity",
@@ -100,6 +102,7 @@ http = "1"
 # Internal crates
 shared-kernel = { path = "crates/shared-kernel" }
 runtime-config = { path = "crates/runtime-config" }
+runtime-migration = { path = "crates/runtime-migration" }
 observability = { path = "crates/observability" }
 object-storage = { path = "crates/object-storage" }
 messaging = { path = "crates/messaging" }

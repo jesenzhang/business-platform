@@ -39,16 +39,12 @@ pub struct AppState {
 
 pub struct PostgresReadinessProbe {
     pool: PgPool,
-    expected_migration: i64,
 }
 
 impl PostgresReadinessProbe {
     #[must_use]
-    pub fn new(pool: PgPool, expected_migration: i64) -> Self {
-        Self {
-            pool,
-            expected_migration,
-        }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 }
 
@@ -73,13 +69,10 @@ impl ReadinessProbe for PostgresReadinessProbe {
                 .fetch_one(&self.pool)
                 .await
                 .unwrap_or_default();
-        let migrations = if migration_version >= self.expected_migration {
-            "compatible"
-        } else {
-            "incompatible"
-        };
+        let compatibility = runtime_migration::classify(migration_version);
+        let migrations = compatibility.as_str();
         ReadinessReport {
-            status: if migrations == "compatible" {
+            status: if compatibility.is_ready() {
                 ReadinessStatus::Ready
             } else {
                 ReadinessStatus::NotReady

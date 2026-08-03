@@ -78,7 +78,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             get: Arc::new(GetDocumentMetadata::new(repository.clone())),
             list: Arc::new(ListDocumentMetadata::new(repository)),
         },
-        readiness: Arc::new(PostgresReadinessProbe::new(pool, 7)),
+        readiness: Arc::new(PostgresReadinessProbe::new(pool)),
     });
     routes::create_router(
         state,

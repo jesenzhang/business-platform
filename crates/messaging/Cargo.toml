@@ -17,6 +17,7 @@ shared-kernel = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+runtime-migration = { workspace = true }
 
 [lints]
 workspace = true
