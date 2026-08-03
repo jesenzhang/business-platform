@@ -1,6 +1,6 @@
 # PLAN-0004: Durable Document Processing MVP
 
-> Status: Active
+> Status: Accepted Candidate
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Intelligence
 > Base: `97f6a41608aa136ac05176f37c6e7d3bda0e25a7`
@@ -126,10 +126,20 @@ CI run IDs, candidate SHA, and explicit `PASS`, `PARTIAL`, `NOT RUN`, or
 
 ### 2026-08-03 local candidate verification
 
-- Candidate SHA: pending feature-branch commit.
+- Candidate code SHA: `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`.
 - WP-00: `PASS` — `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --all-features`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-architecture.ps1`, and `git diff --check` all passed locally.
 - Domain and adapter contracts: `PASS` — document, processing domain, SQLite processing, SQLite document concurrency/operational, API, and migration tests passed.
-- Durable recovery evidence: `PASS` locally for SQLite process restart; PostgreSQL claim/reclaim/stale-fence and MinIO source/candidate tests are wired as ignored integration tests for the feature CI PostgreSQL/MinIO service.
+- Durable recovery evidence: `PASS` — SQLite process restart passed locally; PostgreSQL claim/reclaim/stale-fence/concurrency and MinIO source/candidate tests passed in Feature CI.
 - Local process E2E: `PASS` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local-document-processing.ps1` completed the API/worker/review/restart flow in an isolated temporary directory.
-- Feature CI: `NOT RUN` — branch push and GitHub run evidence are still required before changing this plan to `Accepted Candidate`.
-- Windows PostgreSQL/MinIO: `NOT RUN`; GitHub Linux evidence is required for that environment-dependent gate.
+- Feature CI: `PASS` — GitHub Actions Run `30811814533` for candidate code SHA `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`; Format, Check, Clippy, Unit tests, Architecture Fitness, and PostgreSQL + MinIO + E2E contracts all passed.
+- Windows PostgreSQL/MinIO: `NOT RUN`; GitHub Linux evidence is the accepted environment-dependent gate for this candidate.
+
+### 2026-08-03 accepted-candidate evidence
+
+- Status: `Accepted Candidate`.
+- Candidate code SHA: `dddb50cd7851e479e309a3b0d0ef5f34a465dadf`.
+- Feature CI Run ID: `30811814533` (`PASS`); the evidence commit itself must remain green before this plan is considered complete.
+- SQLite local E2E: `PASS`.
+- GitHub Linux PostgreSQL/MinIO: `PASS`.
+- Windows PostgreSQL/MinIO: `NOT RUN`.
+- Scope risks accepted by this MVP: deterministic local extraction only; no general DAG, OCR platform, model gateway, or SQLite distributed-worker claim.

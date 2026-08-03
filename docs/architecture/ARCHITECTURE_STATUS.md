@@ -17,7 +17,7 @@
 > E2E, and architecture fitness. At that historical checkpoint Search remained
 > Deferred and PLAN-0004 had not started.
 >
-> 2026-08-03: PLAN-0004 is Active. It is scoped to a fixed durable Document
+> 2026-08-03: PLAN-0004 is an Accepted Candidate. It is scoped to a fixed durable Document
 > Processing MVP and begins with Gate 0 debt cleanup. No PR or main integration
 > is used; SQLite remains local single-process and PostgreSQL is production
 > authority. The durable-processing architecture and ADR-0010 through ADR-0012
@@ -168,7 +168,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
-PLAN-0004：Active（Accepted Candidate 待 feature CI 证据）
+PLAN-0004：Accepted Candidate（Feature CI run 30811814533；证据提交后再验证）
 ```
 
 ## 8. PLAN-0002 采用动作
