@@ -1,11 +1,13 @@
 # PLAN-0004: Durable Document Processing MVP
 
-> Status: Accepted Candidate
+> Status: Active — Revision 1
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Intelligence
 > Base: `97f6a41608aa136ac05176f37c6e7d3bda0e25a7`
 > Integration Mode: local solo fast-forward
 > Pull Request: not used
+> Revision Goal: Execution Correctness Hardening
+> Previous Candidate: `27cd250`
 
 ## Goal and architecture preflight
 
@@ -116,6 +118,40 @@ Architecture Fitness, and documentation. Windows PostgreSQL/MinIO may be
 `NOT RUN` only when GitHub Linux evidence is green. The feature branch is
 pushed for CI evidence; no PR, main merge, branch deletion, PLAN-0005, or
 published-migration edits are allowed in this plan.
+
+## PLAN-0004 Revision 1: Execution Correctness Hardening
+
+Revision 1 reopens this candidate to close correctness gaps in the Separate AI
+production path. The bounded context and data ownership remain unchanged:
+Document Management owns content revisions and storage references; Document
+Intelligence owns ProcessingJob, steps, AI tasks, candidates, and reviews; the
+Durable Task Execution concern owns leases, fencing, retries, cancellation, and
+recovery state.
+
+The revision is limited to the fixed pipeline and does not introduce a DAG,
+scheduler, OCR/Office support, real model provider, or general model gateway.
+Every worker write is lease-, fence-, tenant-, and expiry-checked. Business
+transitions that touch Job, Step, AI Task, Candidate, Review, Audit, or Outbox
+must use one adapter-owned database transaction. SQLite remains local,
+single-process, inline-AI only; PostgreSQL remains the multi-worker authority.
+
+### Revision 1 work packages
+
+| ID | Scope | Completion evidence |
+|---|---|---|
+| R1-01 | Atomic processing transaction ports | Worker depends on business-level execution UoW, not composed write stores |
+| R1-02 | Step-aware pipeline execution and recovery | current_step dispatch, durable text artifact, checkpoint-aware restart |
+| R1-03 | Lease/fence/heartbeat enforcement | database expiry predicates, heartbeat guard, stale-writer tests |
+| R1-04 | Separate AI lifecycle, retry, and reclaim | AI task uniqueness, reclaim, bounded retry/backoff, atomic completion |
+| R1-05 | Review and cancellation atomicity | review idempotency/rollback and cancellation propagation tests |
+| R1-06 | Worker concurrency and graceful shutdown | PostgreSQL slots, SQLite restriction, cancellation/drain tests |
+| R1-07 | Real PostgreSQL/MinIO multi-process E2E | API + Business Worker + AI Worker + PostgreSQL + MinIO process evidence |
+| R1-08 | Candidate evidence | final code SHA, feature CI, E2E and accepted-risk record |
+
+Revision 1 must return to `Accepted Candidate` only after all listed evidence,
+the full existing regression suite, Architecture Fitness, and a green CI run
+for the evidence commit. Windows PostgreSQL/MinIO remains `NOT RUN` when the
+GitHub Linux infrastructure evidence is green.
 
 ## Verification record
 
