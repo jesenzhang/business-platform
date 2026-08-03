@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "feat/PLAN-*"
   pull_request:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -68,6 +72,7 @@ jobs:
   integration:
     name: PostgreSQL + MinIO + E2E contracts
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16.4
@@ -110,9 +115,11 @@ jobs:
         run: cargo run -p migration -- up
       - name: Run real infrastructure and E2E tests
         run: |
+          cargo test -p runtime-migration --all-features
           cargo test -p migration --test migration_test --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test inbox_idempotency --all-features -- --include-ignored --test-threads=1
+          cargo test -p object-storage --lib --all-features
           cargo test -p object-storage --test minio_contract --all-features -- --include-ignored --test-threads=1
           cargo test -p business-api --test documents_postgres --all-features -- --include-ignored --test-threads=1
       - name: Architecture and diff checks
