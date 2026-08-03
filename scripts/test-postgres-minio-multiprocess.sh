@@ -48,10 +48,10 @@ for _ in $(seq 1 250000); do
   printf 'durable recovery padding\n' >> "$work/source.txt"
 done
 source_size="$(wc -c < "$work/source.txt" | tr -d ' ')"
-key="tenants/$tenant/documents/source/v1/source.txt"
+logical_key="source.txt"
 docker run --network host --rm -v "$work:/work:ro" --entrypoint /bin/sh \
   minio/mc:RELEASE.2024-06-12T14-34-03Z -c \
-  "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc mb --ignore-existing local/$MINIO_BUCKET >/dev/null && mc cp /work/source.txt local/$MINIO_BUCKET/$key >/dev/null"
+  "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc mb --ignore-existing local/$MINIO_BUCKET >/dev/null"
 
 export BUSINESS_API__ENV=development
 export BUSINESS_API__SERVER__HOST=127.0.0.1
@@ -99,9 +99,13 @@ curl --fail-with-body -sS "$base/health/ready" >/dev/null
 
 auth=(-H "Authorization: Bearer local-pg-e2e-only" -H "X-Tenant-Id: $tenant" -H "X-User-Id: $user")
 doc_key="document-$RANDOM-$(date +%s)"
-doc_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$key\",\"size_bytes\":$source_size}")"
+doc_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$logical_key\",\"size_bytes\":$source_size}")"
 document_id="$(jq -r '.data.id' <<<"$doc_json")"
 [[ "$document_id" != "null" && -n "$document_id" ]]
+key="tenants/$tenant/documents/$document_id/v1/$logical_key"
+docker run --network host --rm -v "$work:/work:ro" --entrypoint /bin/sh \
+  minio/mc:RELEASE.2024-06-12T14-34-03Z -c \
+  "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc cp /work/source.txt local/$MINIO_BUCKET/$key >/dev/null"
 job_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: job-$RANDOM-$(date +%s)" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
 job_id="$(jq -r '.data.job_id' <<<"$job_json")"
 [[ "$job_id" != "null" && -n "$job_id" ]]
