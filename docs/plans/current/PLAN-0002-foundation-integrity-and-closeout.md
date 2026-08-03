@@ -1,6 +1,6 @@
 # PLAN-0002: Foundation Integrity and PLAN-0001 Closeout
 
-> Status: Active
+> Status: Accepted Candidate
 > Date: 2026-07-31
 > Owner: Platform Foundation
 > Predecessor: PLAN-0001-foundation-hardening
@@ -29,10 +29,10 @@ complete object-storage contracts, and workspace-wide architecture gates.
 
 ## Acceptance evidence
 
-PLAN-0002 remains `Active` until every listed work package has passing local
-and GitHub Actions evidence. Integration is local solo fast-forward with no PR.
-It becomes `Accepted Candidate` only when the final infrastructure and CI
-evidence below is complete.
+PLAN-0002 is an `Accepted Candidate`. Integration is local solo fast-forward
+with no PR. Candidate code and infrastructure evidence are recorded below; the
+final candidate SHA is the subsequent evidence commit and is intentionally not
+self-referenced from this file.
 
 ## WP-01 and WP-02 evidence
 
@@ -50,30 +50,29 @@ evidence below is complete.
 
 ## WP-03 through WP-10 evidence
 
-- WP-03 Document invariants and typed fingerprints: PARTIAL. Domain tests cover
+- WP-03 Document invariants and typed fingerprints: PASS. Domain tests cover
   negative sizes, missing-versus-zero size fingerprints, and fail-closed status
-  parsing. PostgreSQL adapter compilation passed; its real database evidence is
-  blocked with the infrastructure suite.
-- WP-04 Forward-only integrity migration: PARTIAL. Migration 007 and isolated
-  upgrade/fail-closed contract tests exist. Execution against PostgreSQL is
-  blocked with the infrastructure suite.
+  parsing. PostgreSQL repository and HTTP evidence passed in CI run 30784034902.
+- WP-04 Forward-only integrity migration: PASS. Migration 007 and isolated
+  empty, repeat, upgrade, constraint, and fail-closed tests passed against
+  PostgreSQL in CI run 30784034902.
 - WP-05 Readiness migration compatibility: PASS. `runtime-migration` owns the
   sole embedded catalog used by the CLI and API readiness. Unit tests cover
   empty, behind, equal, and ahead versions; only equal is ready.
-- WP-06 Inbox idempotency: PARTIAL. The transactional helper and sequential,
-  concurrent, rollback, and multi-consumer PostgreSQL contracts exist. Their
-  real database execution is blocked with the infrastructure suite.
-- WP-07 Outbox reconciliation: PARTIAL. Exhausted pending/retry rows reconcile
-  to `failed`, and stale claim fencing remains enforced. PostgreSQL execution
-  of the ignored contracts is blocked with the infrastructure suite.
-- WP-08 Object storage: PARTIAL. The port and adapters support streaming,
+- WP-06 Inbox idempotency: PASS. Sequential, concurrent, rollback, and
+  multi-consumer transactional contracts passed against PostgreSQL in CI run
+  30784034902.
+- WP-07 Outbox reconciliation: PASS. Exhausted pending/retry rows reconcile to
+  `failed`; concurrent claims, expired leases, and stale fencing passed against
+  PostgreSQL in CI run 30784034902.
+- WP-08 Object storage: PASS. The port and adapters support streaming,
   metadata, content type, head, presign, and bounded convenience reads.
   LocalStorage failure/cancellation does not publish partial objects and passed
-  locally. MinIO metadata, real presigned GET, and 20 MiB streaming contracts
-  exist but their real MinIO execution is blocked.
-- WP-09 Architecture metadata fitness: PARTIAL. Legal/illegal graph fixtures,
+  locally and remotely. MinIO metadata, Content-Type, real presigned GET, and
+  20 MiB streaming contracts passed in CI run 30784034902.
+- WP-09 Architecture metadata fitness: PASS. Legal/illegal graph fixtures,
   the formal `architecture-check` entry point, and the PowerShell composition
-  gate pass locally. Linux/main CI evidence is not yet available.
+  gate passed locally and in CI run 30784034902.
 - WP-10 PLAN-0001 closeout: PASS. PLAN-0001 is `Integrated`, archived under
   `docs/plans/archive/2026/`, and records PR #3, candidate/main SHAs, merge time,
   CI run 30596249195, and PLAN-0002 follow-up ownership.
@@ -81,7 +80,8 @@ evidence below is complete.
 ## Final verification record (2026-08-03)
 
 - Base SHA: `64dbf8b4157c1bfde2f2b319f4657321b2f52f6b`.
-- Candidate SHA: not assigned; final candidate commit is intentionally blocked.
+- Candidate code SHA: `2dd1c88f25411a40ace6e9aadf0a48062549a5e2`.
+- GitHub Actions feature-branch run: `30784034902`, PASS (6/6 jobs).
 - `rustc 1.94.1` / `cargo 1.94.1`: PASS.
 - `cargo fmt --all -- --check`: PASS.
 - `cargo check --workspace --all-targets --all-features`: PASS.
@@ -91,21 +91,20 @@ evidence below is complete.
 - `cargo test -p architecture-check`: PASS, 3 passed.
 - `cargo run -p architecture-check -- check`: PASS.
 - `scripts/check-architecture.ps1`: PASS.
-- PostgreSQL migration/document/Inbox/Outbox contracts: BLOCKED. Docker is not
-  installed; the existing WSL Ubuntu software source did not complete package
-  refresh and was terminated without leaving a running installer.
-- MinIO contracts: BLOCKED for the same missing local infrastructure runtime.
-- Linux CI equivalent verification: NOT RUN. This workflow triggers on main or
-  pull request; PR creation is prohibited and main cannot be pushed before the
-  required infrastructure gate passes.
+- Windows PostgreSQL/MinIO contracts: NOT RUN. Docker is not installed; this is
+  an accepted local-environment limitation, not a substitute for remote proof.
+- Linux PostgreSQL migration/document/Inbox/Outbox contracts: PASS in GitHub
+  Actions run `30784034902`.
+- Linux MinIO complete contracts: PASS in GitHub Actions run `30784034902`.
+- Linux Format, Check, Clippy, Unit, Architecture Fitness, and Cargo Metadata
+  architecture checker: PASS in GitHub Actions run `30784034902`.
 
 ## Remaining risks and rollback
 
 - Accepted risk from PLAN-0001 remains: LocalStorage cannot remove the final
   cross-platform symlink race and is restricted to trusted development use.
-- Unaccepted blocking risk: new PostgreSQL and MinIO contracts have not executed
-  against real services. PLAN-0002 must not be marked `Accepted Candidate` or
-  merged until they pass and the corresponding Linux CI evidence is green.
+- Windows cannot reproduce the PostgreSQL/MinIO suite without Docker. GitHub
+  Linux is the accepted authoritative infrastructure evidence for this plan.
 - Code changes remain independently revertible by work-package commit. Database
   migration 007 is forward-only; any production correction must use a new
   migration rather than editing or rolling back published history.

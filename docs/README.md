@@ -103,10 +103,10 @@ docs/
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-当前阶段为 Phase 1 Foundation Integrity。PLAN-0002 当前状态为 `Active`，
-采用 local solo fast-forward 且不创建 PR；本地静态与普通测试已通过，
-真实 PostgreSQL/MinIO 与 Linux CI 最终证据仍为阻断项。通过后下一阶段为
-Phase 2：First Durable AI Business Flow，但本任务不启动 PLAN-0003。
+当前阶段为 Phase 1 Foundation Integrity。PLAN-0002 当前状态为
+`Accepted Candidate`，采用 local solo fast-forward 且不创建 PR；功能分支
+CI run 30784034902 已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。
+集成完成后进入 Phase 2 preparation。
 
 ## 9. 合并后的后续任务规则
 
