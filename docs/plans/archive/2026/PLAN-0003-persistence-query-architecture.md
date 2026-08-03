@@ -1,6 +1,6 @@
 # PLAN-0003: Persistence, Query and Multi-Database Architecture
 
-> Status: Accepted Candidate
+> Status: Integrated
 > Revision: 1
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Management
@@ -108,8 +108,7 @@ corrected only by new forward migrations.
 - Completion checklist: all 15 PLAN-0003 items PASS. PostgreSQL remains the
   production authority; SQLite remains local/single-process and non-equivalent
   for distributed concurrency.
-- The final Candidate SHA is the subsequent evidence commit and is intentionally
-  not self-referenced here.
+- Prior candidate marker commit: `b5774a90cc3d5b55e305fdf5008ccfe49074c7f6`.
 
 ## Candidate evidence (2026-08-03)
 
@@ -126,5 +125,25 @@ corrected only by new forward migrations.
   regression contracts: PASS.
 - Revision 1 completion checklist is satisfied; PostgreSQL remains the
   production authority and SQLite remains local/single-process.
-- The final Candidate SHA is this evidence commit's parent and is intentionally
-  not self-referenced here.
+- Candidate marker commit: `f6dbc693da42d0f9a7566739f5a4169c6a86f880`.
+
+## Integration record (2026-08-03)
+
+- Final candidate SHA: `f6dbc693da42d0f9a7566739f5a4169c6a86f880`.
+- `origin/main` integration SHA: `f6dbc693da42d0f9a7566739f5a4169c6a86f880`.
+- Integration method: local solo `git merge --ff-only`; no pull request and no
+  merge commit.
+- Main integration CI run `30796583865`: PASS, 6/6 jobs, including Linux
+  PostgreSQL, MinIO, Document E2E, and architecture fitness.
+- Feature CI run `30796408182` for the candidate marker: PASS, 6/6 jobs.
+- PLAN-0003 Revision 1 acceptance checklist: PASS.
+- Integrated at: 2026-08-03 08:16 UTC.
+
+## Remaining risks and rollback
+
+- PostgreSQL remains the production authority; SQLite remains local and
+  single-process, with distributed concurrency explicitly out of scope.
+- Search remains Deferred until a complete full-text/`pg_trgm` or dedicated
+  search-index capability is designed and accepted.
+- Database migrations are forward-only; corrections require a new migration.
+- Code changes remain independently revertible by work-package commit.

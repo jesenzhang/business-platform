@@ -100,21 +100,19 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：[`plans/current/PLAN-0003-persistence-query-architecture.md`](plans/current/PLAN-0003-persistence-query-architecture.md)
+- 当前计划：无（PLAN-0003 已集成；未启动 PLAN-0004）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
+- 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-Phase 1 Foundation Integrity 已完成。PLAN-0002 采用 local solo
-fast-forward 且不创建 PR，集成 SHA 为
-`ad47544505b66d577ccdcb8f300812c294d3d7bf`；main CI run 30784568762
-已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前由 PLAN-0003
-执行 Phase 2 persistence/query preparation；PLAN-0003 当前处于
-`Accepted Candidate`，候选代码 SHA 为
-`0e3f0df36cead846deb52a95a80320c62bdeb630`，feature CI run 30796180766
-已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁，尚未集成。
+Phase 1 Foundation Integrity 与 Phase 2 Persistence and Query Hardening 均已
+完成。PLAN-0002 与 PLAN-0003 均采用 local solo fast-forward 且不创建 PR；
+PLAN-0003 集成 SHA 为
+`f6dbc693da42d0f9a7566739f5a4169c6a86f880`，main CI run 30796583865 已通过
+真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前未启动 PLAN-0004。
 
 ## 9. 合并后的后续任务规则
 

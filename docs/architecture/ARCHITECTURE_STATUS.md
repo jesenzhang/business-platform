@@ -2,8 +2,8 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-08-03
-> 当前阶段：Phase 2 Persistence and Query Hardening
-> 当前计划：`PLAN-0003-persistence-query-architecture`
+> 当前阶段：Phase 2 Persistence and Query Hardening — complete
+> 当前计划：无（PLAN-0003 已集成；未启动 PLAN-0004）
 > 集成方式：local solo fast-forward，无 PR
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -11,12 +11,11 @@
 > run 30784568762 passed all six jobs, including PostgreSQL, MinIO, Document
 > E2E, and architecture fitness. The repository is in Phase 2 preparation.
 >
-> 2026-08-03: PLAN-0003 is an Accepted Candidate — Revision 1. Feature CI run
-> 30796180766 passed all six jobs, including PostgreSQL, MinIO, Document E2E,
-> and architecture fitness. It hardens the Document aggregate seam, redacts
-> storage internals from HTTP, defers incomplete Search, and proves SQLite
-> local idempotency/concurrency and cross-adapter query semantics. It is not
-> integrated.
+> 2026-08-03: PLAN-0003 Revision 1 is Integrated and archived at
+> `f6dbc693da42d0f9a7566739f5a4169c6a86f880` via local solo fast-forward. Main
+> CI run 30796583865 passed all six jobs, including PostgreSQL, MinIO, Document
+> E2E, and architecture fitness. Search remains Deferred and PLAN-0004 has not
+> started.
 
 ## 1. 当前权威结论
 
@@ -162,7 +161,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
-PLAN-0003：Accepted Candidate — Revision 1
+PLAN-0003：Integrated / Archived
 ```
 
 ## 8. PLAN-0002 采用动作
