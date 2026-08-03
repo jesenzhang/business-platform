@@ -111,8 +111,8 @@ Phase 1 Foundation Integrity 已完成。PLAN-0002 采用 local solo
 fast-forward 且不创建 PR，集成 SHA 为
 `ad47544505b66d577ccdcb8f300812c294d3d7bf`；main CI run 30784568762
 已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前由 PLAN-0003
-执行 Phase 2 persistence/query preparation；该计划为 `Accepted Candidate`
-且尚未集成。
+执行 Phase 2 persistence/query preparation；PLAN-0003 当前处于
+`Active — Revision 1`，尚未集成。
 
 ## 9. 合并后的后续任务规则
 

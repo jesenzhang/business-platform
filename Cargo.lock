@@ -753,6 +753,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum 0.8.9",
+ "base64 0.22.1",
  "chrono",
  "document",
  "document-postgres",
@@ -1177,6 +1178,7 @@ dependencies = [
 name = "document-persistence-contracts"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "document",
  "uuid",
 ]

@@ -121,9 +121,10 @@ async fn run_postgres_status(database_url: &str) -> anyhow::Result<()> {
                 println!("  [applied] {version} {description}");
             }
         }
-        Err(_) => {
+        Err(error) if is_postgres_missing_migration_table(&error) => {
             println!("No migrations have been applied yet (migration table not found).");
         }
+        Err(error) => return Err(error.into()),
     }
 
     println!("\nAvailable migrations:");
@@ -162,10 +163,14 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
         .await
         .context("failed to connect to SQLite database")?;
     let applied_versions =
-        sqlx::query_scalar::<_, i64>("SELECT version FROM _sqlx_migrations ORDER BY version")
+        match sqlx::query_scalar::<_, i64>("SELECT version FROM _sqlx_migrations ORDER BY version")
             .fetch_all(&pool)
             .await
-            .unwrap_or_default();
+        {
+            Ok(versions) => versions,
+            Err(error) if is_sqlite_missing_migration_table(&error) => Vec::new(),
+            Err(error) => return Err(error.into()),
+        };
     println!("SQLite migrations:");
     for migration in document_sqlite::MIGRATOR.iter() {
         let state = if applied_versions.contains(&migration.version) {
@@ -179,6 +184,28 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
         );
     }
     Ok(())
+}
+
+fn is_postgres_missing_migration_table(error: &sqlx::Error) -> bool {
+    matches!(
+        error,
+        sqlx::Error::Database(database_error)
+            if database_error.code().as_deref() == Some("42P01")
+    )
+}
+
+fn is_sqlite_missing_migration_table(error: &sqlx::Error) -> bool {
+    matches!(
+        error,
+        sqlx::Error::Database(database_error)
+            if is_missing_migration_table_message(database_error.message())
+    )
+}
+
+fn is_missing_migration_table_message(message: &str) -> bool {
+    let normalized = message.trim().to_ascii_lowercase();
+    normalized == "no such table: _sqlx_migrations"
+        || normalized == "no such table _sqlx_migrations"
 }
 
 #[cfg(test)]
@@ -195,5 +222,19 @@ mod tests {
         ];
         let parsed = parse_arguments(&arguments);
         assert!(matches!(parsed, Ok((DatabaseBackend::Sqlite, "up"))));
+    }
+
+    #[test]
+    fn only_missing_catalog_errors_are_suppressed() {
+        assert!(is_missing_migration_table_message(
+            "no such table: _sqlx_migrations"
+        ));
+        assert!(!is_missing_migration_table_message("permission denied"));
+        assert!(!is_sqlite_missing_migration_table(&sqlx::Error::Protocol(
+            "permission denied".to_string(),
+        )));
+        assert!(!is_postgres_missing_migration_table(
+            &sqlx::Error::Protocol("connection refused".to_string(),)
+        ));
     }
 }

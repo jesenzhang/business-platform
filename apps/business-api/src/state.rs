@@ -110,8 +110,14 @@ impl ReadinessProbe for PostgresReadinessProbe {
         let migration_version =
             sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations")
                 .fetch_one(&self.pool)
-                .await
-                .unwrap_or_default();
+                .await;
+        let Ok(migration_version) = migration_version else {
+            return ReadinessReport {
+                status: ReadinessStatus::NotReady,
+                database,
+                migrations: "unknown",
+            };
+        };
         let compatibility = runtime_migration::classify(migration_version);
         let migrations = compatibility.as_str();
         ReadinessReport {

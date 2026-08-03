@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use document::domain::{DocumentMetadata, DocumentStatus};
+use document::domain::{DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata};
 use document::query::{DocumentDetailView, DocumentListItem, DocumentStatusView, QueryError};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -33,7 +33,7 @@ impl TryFrom<DocumentRow> for DocumentMetadata {
     type Error = QueryError;
 
     fn try_from(row: DocumentRow) -> Result<Self, Self::Error> {
-        Ok(Self {
+        DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
             id: uuid(&row.id)?,
             tenant_id: uuid(&row.tenant_id)?,
             original_filename: row.original_filename,
@@ -47,6 +47,7 @@ impl TryFrom<DocumentRow> for DocumentMetadata {
             created_at: timestamp(&row.created_at)?,
             updated_at: timestamp(&row.updated_at)?,
         })
+        .map_err(|_| QueryError::InvalidStoredData)
     }
 }
 
@@ -54,6 +55,7 @@ impl TryFrom<DocumentRow> for DocumentDetailView {
     type Error = QueryError;
 
     fn try_from(row: DocumentRow) -> Result<Self, Self::Error> {
+        validate_document_row(&row)?;
         Ok(Self {
             id: uuid(&row.id)?,
             tenant_id: uuid(&row.tenant_id)?,
@@ -85,6 +87,7 @@ impl TryFrom<ListRow> for DocumentListItem {
     type Error = QueryError;
 
     fn try_from(row: ListRow) -> Result<Self, Self::Error> {
+        validate_list_row(&row)?;
         Ok(Self {
             id: uuid(&row.id)?,
             original_filename: row.original_filename,
@@ -98,6 +101,42 @@ impl TryFrom<ListRow> for DocumentListItem {
     }
 }
 
+fn validate_document_row(row: &DocumentRow) -> Result<(), QueryError> {
+    if row.id.is_empty()
+        || row.tenant_id.is_empty()
+        || row.created_by.is_empty()
+        || row.version <= 0
+        || row.size_bytes.is_some_and(|size| size < 0)
+        || row.original_filename.trim().is_empty()
+        || row.content_type.trim().is_empty()
+    {
+        return Err(QueryError::InvalidStoredData);
+    }
+    let created_at = timestamp(&row.created_at)?;
+    let updated_at = timestamp(&row.updated_at)?;
+    if updated_at < created_at {
+        return Err(QueryError::InvalidStoredData);
+    }
+    Ok(())
+}
+
+fn validate_list_row(row: &ListRow) -> Result<(), QueryError> {
+    if row.id.is_empty()
+        || row.version <= 0
+        || row.size_bytes.is_some_and(|size| size < 0)
+        || row.original_filename.trim().is_empty()
+        || row.content_type.trim().is_empty()
+    {
+        return Err(QueryError::InvalidStoredData);
+    }
+    let created_at = timestamp(&row.created_at)?;
+    let updated_at = timestamp(&row.updated_at)?;
+    if updated_at < created_at {
+        return Err(QueryError::InvalidStoredData);
+    }
+    Ok(())
+}
+
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn map_query_error(error: sqlx::Error) -> QueryError {
     match error {
@@ -105,5 +144,59 @@ pub(crate) fn map_query_error(error: sqlx::Error) -> QueryError {
             QueryError::Unavailable
         }
         _ => QueryError::Failed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn document_row() -> DocumentRow {
+        let now = Utc::now().to_rfc3339();
+        DocumentRow {
+            id: Uuid::now_v7().to_string(),
+            tenant_id: Uuid::now_v7().to_string(),
+            original_filename: "report.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            object_key: "uploads/report.pdf".to_string(),
+            status: "active".to_string(),
+            version: 1,
+            size_bytes: Some(1),
+            created_by: Uuid::now_v7().to_string(),
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn query_mapper_fails_closed_for_invalid_stored_values() {
+        let mut negative_size = document_row();
+        negative_size.size_bytes = Some(-1);
+        assert_eq!(
+            DocumentDetailView::try_from(negative_size),
+            Err(QueryError::InvalidStoredData)
+        );
+
+        let mut invalid_version = document_row();
+        invalid_version.version = 0;
+        assert_eq!(
+            DocumentDetailView::try_from(invalid_version),
+            Err(QueryError::InvalidStoredData)
+        );
+
+        let mut invalid_timestamp = document_row();
+        invalid_timestamp.updated_at = (Utc::now() - chrono::Duration::seconds(1)).to_rfc3339();
+        invalid_timestamp.created_at = Utc::now().to_rfc3339();
+        assert_eq!(
+            DocumentDetailView::try_from(invalid_timestamp),
+            Err(QueryError::InvalidStoredData)
+        );
+
+        let mut unknown_status = document_row();
+        unknown_status.status = "future".to_string();
+        assert_eq!(
+            DocumentDetailView::try_from(unknown_status),
+            Err(QueryError::InvalidStoredData)
+        );
     }
 }

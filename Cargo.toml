@@ -95,6 +95,7 @@ async-trait = "0.1"
 config = "0.14"
 validator = { version = "0.19", features = ["derive"] }
 sha2 = "0.10"
+base64 = "0.22"
 futures-util = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 http-body = "1"

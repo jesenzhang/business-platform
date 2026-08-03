@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "document-management"
+layer = "infrastructure-adapter"
+migration_catalog = "document-sqlite"
+
 [dependencies]
 document = { workspace = true }
 sqlx = { workspace = true }
@@ -11,9 +16,9 @@ async-trait = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true }
 document-persistence-contracts = { path = "../document-persistence-contracts" }
 
 [lints]

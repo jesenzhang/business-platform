@@ -27,7 +27,11 @@ impl DocumentListQuery for PostgresDocumentListQuery {
             .filter
             .status
             .map(document::query::DocumentStatusFilter::as_str);
-        let filename = request.filter.filename_contains.as_deref();
+        let filename = request
+            .filter
+            .filename_contains
+            .as_deref()
+            .map(document::query::escape_like_literal);
         let cursor_created_at = request.cursor.map(|cursor| cursor.created_at);
         let cursor_id = request.cursor.map(|cursor| cursor.id);
         let rows = sqlx::query_as::<_, ListRow>(
@@ -36,7 +40,7 @@ impl DocumentListQuery for PostgresDocumentListQuery {
               FROM documents
               WHERE tenant_id = $1
                 AND ($2::text IS NULL OR status = $2)
-                AND ($3::text IS NULL OR original_filename ILIKE '%' || $3 || '%')
+                AND ($3::text IS NULL OR original_filename ILIKE '%' || $3 || '%' ESCAPE '\')
                 AND ($4::timestamptz IS NULL OR created_at >= $4)
                 AND ($5::timestamptz IS NULL OR created_at < $5)
                 AND ($6::timestamptz IS NULL OR (created_at, id) < ($6, $7))

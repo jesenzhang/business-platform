@@ -99,8 +99,19 @@ impl BusinessApiConfig {
         if self.server.body_limit_bytes == 0 {
             messages.push("server.body_limit_bytes must be > 0".to_string());
         }
-        if self.database.max_connections == 0 || self.database.max_connections > 200 {
-            messages.push("database.max_connections must be > 0 and <= 200".to_string());
+        if self.database.max_connections == 0 {
+            messages.push("database.max_connections must be > 0".to_string());
+        } else if self.database.backend == DatabaseBackend::Sqlite
+            && self.database.max_connections > document_sqlite::MAX_SQLITE_CONNECTIONS
+        {
+            messages.push(format!(
+                "database.max_connections must be <= {} for sqlite",
+                document_sqlite::MAX_SQLITE_CONNECTIONS
+            ));
+        } else if self.database.backend == DatabaseBackend::Postgres
+            && self.database.max_connections > 200
+        {
+            messages.push("database.max_connections must be <= 200 for postgres".to_string());
         }
         if self.database.acquire_timeout_secs == 0 {
             messages.push("database.acquire_timeout_secs must be > 0".to_string());
@@ -251,5 +262,18 @@ mod tests {
             unreachable!()
         };
         assert!(error.to_string().contains("database.backend"));
+    }
+
+    #[test]
+    fn sqlite_pool_limit_is_fail_closed() {
+        let mut config = valid_config();
+        config.database.backend = DatabaseBackend::Sqlite;
+        config.database.url = SecretUrl::parse("sqlite://data/business-platform.db")
+            .unwrap_or_else(|_| unreachable!());
+        config.database.max_connections = document_sqlite::MAX_SQLITE_CONNECTIONS + 1;
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error.to_string().contains("max_connections"));
     }
 }

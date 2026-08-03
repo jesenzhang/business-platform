@@ -1,5 +1,6 @@
 #![allow(clippy::expect_used)]
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -36,9 +37,29 @@ const TENANT_A: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const TENANT_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const USER_A: &str = "11111111-1111-1111-1111-111111111111";
 
-#[derive(Default)]
 struct FakeStore {
-    documents: RwLock<Vec<DocumentMetadata>>,
+    state: RwLock<FakeState>,
+}
+
+#[derive(Default)]
+struct FakeState {
+    documents: Vec<DocumentMetadata>,
+    idempotency: HashMap<(Uuid, String), StoredIdempotency>,
+}
+
+#[derive(Clone)]
+struct StoredIdempotency {
+    request_fingerprint: String,
+    fingerprint_version: i16,
+    document_id: Uuid,
+}
+
+impl Default for FakeStore {
+    fn default() -> Self {
+        Self {
+            state: RwLock::new(FakeState::default()),
+        }
+    }
 }
 
 #[async_trait]
@@ -49,24 +70,26 @@ impl DocumentQueryRepository for FakeStore {
         document_id: Uuid,
     ) -> Result<Option<DocumentMetadata>, RepositoryError> {
         Ok(self
-            .documents
+            .state
             .read()
             .await
+            .documents
             .iter()
-            .find(|document| document.tenant_id == tenant_id && document.id == document_id)
+            .find(|document| document.tenant_id() == tenant_id && document.id() == document_id)
             .cloned())
     }
 
     async fn list(&self, query: ListDocumentsQuery) -> Result<DocumentPage, RepositoryError> {
         let mut items: Vec<_> = self
-            .documents
+            .state
             .read()
             .await
+            .documents
             .iter()
-            .filter(|document| document.tenant_id == query.tenant_id)
+            .filter(|document| document.tenant_id() == query.tenant_id)
             .cloned()
             .collect();
-        items.sort_by_key(|document| std::cmp::Reverse(document.created_at));
+        items.sort_by_key(|document| std::cmp::Reverse(document.created_at()));
         let total = i64::try_from(items.len()).unwrap_or(0);
         let items = items
             .into_iter()
@@ -83,18 +106,39 @@ impl CreateDocumentUnitOfWork for FakeStore {
         &self,
         command: PersistNewDocument,
     ) -> Result<CreateDocumentResult, ApplicationPortError> {
-        let mut documents = self.documents.write().await;
-        if let Some(existing) = documents
-            .iter()
-            .find(|document| document.tenant_id == command.document.tenant_id)
-            .cloned()
-        {
+        let mut state = self.state.write().await;
+        let key = (
+            command.document.tenant_id(),
+            command.idempotency_key.clone(),
+        );
+        if let Some(existing_key) = state.idempotency.get(&key) {
+            if existing_key.request_fingerprint != command.request_fingerprint
+                || existing_key.fingerprint_version != command.fingerprint_version
+            {
+                return Err(ApplicationPortError::IdempotencyConflict);
+            }
+            let Some(existing) = state
+                .documents
+                .iter()
+                .find(|document| document.id() == existing_key.document_id)
+                .cloned()
+            else {
+                return Err(ApplicationPortError::Failed);
+            };
             return Ok(CreateDocumentResult {
                 document: existing,
                 replayed: true,
             });
         }
-        documents.push(command.document.clone());
+        state.documents.push(command.document.clone());
+        state.idempotency.insert(
+            key,
+            StoredIdempotency {
+                request_fingerprint: command.request_fingerprint,
+                fingerprint_version: command.fingerprint_version,
+                document_id: command.document.id(),
+            },
+        );
         Ok(CreateDocumentResult {
             document: command.document,
             replayed: false,
@@ -118,22 +162,23 @@ impl DocumentDetailQuery for FakeStore {
         document_id: Uuid,
     ) -> Result<Option<DocumentDetailView>, QueryError> {
         Ok(self
-            .documents
+            .state
             .read()
             .await
+            .documents
             .iter()
-            .find(|item| item.tenant_id == tenant_id && item.id == document_id)
+            .find(|item| item.tenant_id() == tenant_id && item.id() == document_id)
             .map(|item| DocumentDetailView {
-                id: item.id,
-                tenant_id: item.tenant_id,
-                original_filename: item.original_filename.clone(),
-                content_type: item.content_type.clone(),
-                status: view_status(item.status),
-                version: item.version,
-                size_bytes: item.size_bytes,
-                created_by: item.created_by,
-                created_at: item.created_at,
-                updated_at: item.updated_at,
+                id: item.id(),
+                tenant_id: item.tenant_id(),
+                original_filename: item.original_filename().to_string(),
+                content_type: item.content_type().to_string(),
+                status: view_status(item.status()),
+                version: item.version(),
+                size_bytes: item.size_bytes(),
+                created_by: item.created_by(),
+                created_at: item.created_at(),
+                updated_at: item.updated_at(),
             }))
     }
 }
@@ -142,20 +187,21 @@ impl DocumentDetailQuery for FakeStore {
 impl DocumentListQuery for FakeStore {
     async fn execute(&self, request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
         let mut items = self
-            .documents
+            .state
             .read()
             .await
+            .documents
             .iter()
-            .filter(|item| item.tenant_id == request.tenant_id)
+            .filter(|item| item.tenant_id() == request.tenant_id)
             .map(|item| DocumentListItem {
-                id: item.id,
-                original_filename: item.original_filename.clone(),
-                content_type: item.content_type.clone(),
-                status: view_status(item.status),
-                version: item.version,
-                size_bytes: item.size_bytes,
-                created_at: item.created_at,
-                updated_at: item.updated_at,
+                id: item.id(),
+                original_filename: item.original_filename().to_string(),
+                content_type: item.content_type().to_string(),
+                status: view_status(item.status()),
+                version: item.version(),
+                size_bytes: item.size_bytes(),
+                created_at: item.created_at(),
+                updated_at: item.updated_at(),
             })
             .collect::<Vec<_>>();
         items.sort_by_key(|item| std::cmp::Reverse((item.created_at, item.id)));
@@ -283,6 +329,139 @@ async fn create_is_idempotent_and_returns_trace_id_on_error() {
         .await
         .expect("router must respond");
     assert_eq!(second.status(), StatusCode::OK);
+}
+
+async fn response_json(response: axum::response::Response) -> serde_json::Value {
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body must collect")
+        .to_bytes();
+    let text = String::from_utf8_lossy(&bytes);
+    for key in ["object_key", "storage_key", "bucket", "internal_path"] {
+        assert!(
+            !text.contains(&format!("\"{key}\"")),
+            "response leaked {key}: {text}"
+        );
+    }
+    serde_json::from_slice(&bytes).expect("valid JSON")
+}
+
+#[tokio::test]
+async fn document_http_responses_never_expose_storage_locations() {
+    let router = test_router(Arc::new(FakeStore::default()));
+    let body = serde_json::json!({
+        "original_filename": "visible.pdf",
+        "content_type": "application/pdf",
+        "object_key": "private/visible.pdf"
+    })
+    .to_string();
+    let create = router
+        .clone()
+        .oneshot(request("POST", "/api/v1/documents", TENANT_A, Some(body)))
+        .await
+        .expect("router must respond");
+    let payload = response_json(create).await;
+    let id = payload["data"]["id"].as_str().expect("document id");
+
+    let get = router
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/api/v1/documents/{id}"),
+            TENANT_A,
+            None,
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(get.status(), StatusCode::OK);
+    let _ = response_json(get).await;
+
+    let list = router
+        .oneshot(request("GET", "/api/v1/documents", TENANT_A, None))
+        .await
+        .expect("router must respond");
+    assert_eq!(list.status(), StatusCode::OK);
+    let _ = response_json(list).await;
+}
+
+#[tokio::test]
+async fn fake_idempotency_is_scoped_by_tenant_and_fingerprint() {
+    let router = test_router(Arc::new(FakeStore::default()));
+    let first_body = serde_json::json!({
+        "original_filename": "first.pdf",
+        "content_type": "application/pdf",
+        "object_key": "first.pdf"
+    })
+    .to_string();
+    let first = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/v1/documents",
+            TENANT_A,
+            Some(first_body.clone()),
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(first.status(), StatusCode::CREATED);
+
+    let other_tenant = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/v1/documents",
+            TENANT_B,
+            Some(first_body),
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(other_tenant.status(), StatusCode::CREATED);
+
+    let conflicting_body = serde_json::json!({
+        "original_filename": "different.pdf",
+        "content_type": "application/pdf",
+        "object_key": "different.pdf"
+    })
+    .to_string();
+    let conflict = router
+        .oneshot(request(
+            "POST",
+            "/api/v1/documents",
+            TENANT_A,
+            Some(conflicting_body),
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(conflict.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn invalid_or_legacy_http_cursors_are_rejected() {
+    let router = test_router(Arc::new(FakeStore::default()));
+    let invalid = router
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/api/v1/documents?cursor=not-base64",
+            TENANT_A,
+            None,
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+
+    let legacy = router
+        .oneshot(request(
+            "GET",
+            "/api/v1/documents?cursor_created_at=2026-01-01T00%3A00%3A00Z&cursor_id=00000000-0000-0000-0000-000000000001",
+            TENANT_A,
+            None,
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(legacy.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

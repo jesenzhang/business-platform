@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "document-management"
+layer = "infrastructure-adapter"
+migration_catalog = "runtime-migration"
+
 [dependencies]
 document = { workspace = true }
 sqlx = { workspace = true }

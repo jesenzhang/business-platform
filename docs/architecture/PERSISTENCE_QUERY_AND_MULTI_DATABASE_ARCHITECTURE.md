@@ -28,7 +28,21 @@ and event-driven Projections are allowed in Infrastructure Adapters.
 
 Detail, list, search, export and dashboard are distinct query interfaces. An
 Aggregate Repository never carries reporting or dashboard queries. SQLx/ORM
-types and SQL stay inside Infrastructure Adapters.
+types and SQL stay inside Infrastructure Adapters. The Document Search
+capability is explicitly Deferred in PLAN-0003 Revision 1; when it is started,
+the recommended implementation is PostgreSQL full-text/`pg_trgm` or a
+dedicated search index behind a versioned query port, rather than a partial
+LIKE adapter.
+
+Document aggregate state is private and can only be created through the domain
+factory or `rehydrate`, which validates persisted invariants. Infrastructure
+adapters never construct the aggregate with a struct literal. HTTP read DTOs
+exclude `object_key` and other storage-internal locations. Filename filters
+escape `\\`, `%`, and `_` and use `LIKE ... ESCAPE '\\'` in SQLite and
+`ILIKE ... ESCAPE '\\'` in PostgreSQL. These filters provide ASCII
+case-insensitive matching; they do not promise full Unicode case equivalence.
+The HTTP cursor is an opaque versioned v1 token; the database cursor remains a
+stable `(created_at, id)` keyset.
 
 ## Cross-context reads and writes
 
@@ -63,8 +77,10 @@ Domain/Application expose shared ports. PostgreSQL and SQLite are independent
 Adapters with independent migrations and shared behavior Contract Tests.
 PostgreSQL is the production authority. SQLite supports local development and
 single-process tests only: no distributed claim, `SKIP LOCKED` equivalence,
-production HA, or identical concurrency guarantee is claimed. Production
-configuration rejects SQLite before connecting.
+production HA, or identical concurrency guarantee is claimed. Its pool is
+bounded to 1..4 connections and the atomic write adapter uses explicit
+single-writer serialization, WAL and busy timeout. Production configuration
+rejects SQLite before connecting.
 
 Shared tests cover semantic behavior. PostgreSQL-specific tests preserve
 SKIP LOCKED, lease/fencing, concurrent Inbox/Outbox and migration compatibility.
@@ -72,8 +88,12 @@ SQLite-specific tests cover WAL, busy timeout, single writer/transaction
 rollback, process-lock behavior and local file recovery. Different concurrency
 semantics do not weaken PostgreSQL tests.
 
-PostgreSQL migrations remain in `/migrations`; SQLite migrations live with
-`document-sqlite/migrations`. The migration CLI selects a backend explicitly.
+PostgreSQL migrations remain in `/migrations` and are embedded only by the
+shared `runtime-migration` catalog; SQLite migrations live with
+`document-sqlite/migrations` and are embedded only by that adapter. The
+migration CLI selects a backend explicitly. Status treats only a missing
+`_sqlx_migrations` table as an empty catalog; permission, connectivity and
+other database errors fail the command.
 The formal API process does not automatically migrate PostgreSQL or SQLite;
 development database creation remains an explicit CLI operation.
 

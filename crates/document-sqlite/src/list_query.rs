@@ -31,7 +31,11 @@ impl DocumentListQuery for SqliteDocumentListQuery {
         if let Some(filename) = request.filter.filename_contains {
             builder
                 .push(" AND original_filename LIKE ")
-                .push_bind(format!("%{filename}%"));
+                .push_bind(format!(
+                    "%{}%",
+                    document::query::escape_like_literal(&filename)
+                ))
+                .push(" ESCAPE '\\'");
         }
         if let Some(after) = request.filter.created_after {
             builder

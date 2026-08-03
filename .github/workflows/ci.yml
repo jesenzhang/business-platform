@@ -117,7 +117,7 @@ jobs:
         run: |
           cargo test -p document-sqlite --all-features
           cargo test -p document-persistence-contracts --all-features
-          cargo test -p document-postgres --test query_contracts --all-features
+          cargo test -p document-postgres --test query_contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p runtime-migration --all-features
           cargo test -p migration --test migration_test --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1

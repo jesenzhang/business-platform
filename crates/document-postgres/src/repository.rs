@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use document::domain::{
-    DocumentMetadata, DocumentPage, DocumentQueryRepository, DocumentStatus, ListDocumentsQuery,
-    RepositoryError,
+    DocumentDomainError, DocumentMetadata, DocumentPage, DocumentQueryRepository, DocumentStatus,
+    ListDocumentsQuery, RehydrateDocumentMetadata, RepositoryError,
 };
 use sqlx::{FromRow, PgPool, Row};
 use uuid::Uuid;
@@ -23,16 +23,17 @@ pub(crate) struct DocumentRow {
 }
 
 impl TryFrom<DocumentRow> for DocumentMetadata {
-    type Error = document::domain::DocumentStatusParseError;
+    type Error = DocumentDomainError;
 
     fn try_from(row: DocumentRow) -> Result<Self, Self::Error> {
-        Ok(Self {
+        DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
             id: row.id,
             tenant_id: row.tenant_id,
             original_filename: row.original_filename,
             content_type: row.content_type,
             object_key: row.object_key,
-            status: DocumentStatus::try_from(row.status.as_str())?,
+            status: DocumentStatus::try_from(row.status.as_str())
+                .map_err(|_| DocumentDomainError::InvalidStatus)?,
             version: row.version,
             size_bytes: row.size_bytes,
             created_by: row.created_by,

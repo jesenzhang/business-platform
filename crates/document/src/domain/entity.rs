@@ -58,30 +58,145 @@ impl TryFrom<&str> for DocumentStatus {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DocumentMetadata {
     /// Unique identifier (`UUIDv7`, time-ordered).
-    pub id: Uuid,
+    id: Uuid,
     /// Owning tenant.
-    pub tenant_id: Uuid,
+    tenant_id: Uuid,
     /// Original filename as uploaded by the user.
-    pub original_filename: String,
+    original_filename: String,
     /// MIME content type.
-    pub content_type: String,
+    content_type: String,
     /// Validated object storage key.
-    pub object_key: String,
+    #[serde(skip_serializing)]
+    object_key: String,
     /// Lifecycle status.
-    pub status: DocumentStatus,
+    status: DocumentStatus,
     /// Optimistic locking version.
-    pub version: i64,
+    version: i64,
     /// File size in bytes (may be unknown at creation).
-    pub size_bytes: Option<i64>,
+    size_bytes: Option<i64>,
     /// User who created this document.
-    pub created_by: Uuid,
+    created_by: Uuid,
     /// Creation timestamp.
-    pub created_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
     /// Last modification timestamp.
+    updated_at: DateTime<Utc>,
+}
+
+/// Validated state supplied by an Infrastructure Adapter when rebuilding an
+/// aggregate from durable storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RehydrateDocumentMetadata {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub original_filename: String,
+    pub content_type: String,
+    pub object_key: String,
+    pub status: DocumentStatus,
+    pub version: i64,
+    pub size_bytes: Option<i64>,
+    pub created_by: Uuid,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl DocumentMetadata {
+    #[must_use]
+    pub const fn id(&self) -> Uuid {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
+
+    #[must_use]
+    pub fn original_filename(&self) -> &str {
+        &self.original_filename
+    }
+
+    #[must_use]
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    #[must_use]
+    pub fn object_key(&self) -> &str {
+        &self.object_key
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> DocumentStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn version(&self) -> i64 {
+        self.version
+    }
+
+    #[must_use]
+    pub const fn size_bytes(&self) -> Option<i64> {
+        self.size_bytes
+    }
+
+    #[must_use]
+    pub const fn created_by(&self) -> Uuid {
+        self.created_by
+    }
+
+    #[must_use]
+    pub const fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    #[must_use]
+    pub const fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    /// Rebuild an aggregate after validating every persisted invariant.
+    pub fn rehydrate(state: RehydrateDocumentMetadata) -> Result<Self, DocumentDomainError> {
+        if state.tenant_id.is_nil() || state.created_by.is_nil() || state.id.is_nil() {
+            return Err(DocumentDomainError::InvalidIdentity);
+        }
+        if state.version <= 0 {
+            return Err(DocumentDomainError::InvalidVersion);
+        }
+        if state.size_bytes.is_some_and(|size| size < 0) {
+            return Err(DocumentDomainError::InvalidSize);
+        }
+        if state.original_filename.trim().is_empty() {
+            return Err(DocumentDomainError::EmptyFilename);
+        }
+        if state.content_type.trim().is_empty() {
+            return Err(DocumentDomainError::EmptyContentType);
+        }
+        if state.updated_at < state.created_at {
+            return Err(DocumentDomainError::InvalidTimestamps);
+        }
+        DocumentObjectKey::new(
+            state.tenant_id,
+            state.id,
+            state.version,
+            state.object_key.clone(),
+        )
+        .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
+        Ok(Self {
+            id: state.id,
+            tenant_id: state.tenant_id,
+            original_filename: state.original_filename,
+            content_type: state.content_type,
+            object_key: state.object_key,
+            status: state.status,
+            version: state.version,
+            size_bytes: state.size_bytes,
+            created_by: state.created_by,
+            created_at: state.created_at,
+            updated_at: state.updated_at,
+        })
+    }
+
     /// Factory method: create new document metadata with validation.
     ///
     /// # Errors
@@ -95,6 +210,9 @@ impl DocumentMetadata {
         created_by: Uuid,
         size_bytes: Option<i64>,
     ) -> Result<Self, DocumentDomainError> {
+        if tenant_id.is_nil() || created_by.is_nil() {
+            return Err(DocumentDomainError::InvalidIdentity);
+        }
         if size_bytes.is_some_and(|size| size < 0) {
             return Err(DocumentDomainError::InvalidSize);
         }
@@ -128,6 +246,57 @@ impl DocumentMetadata {
             updated_at: now,
         })
     }
+
+    /// Archive an active document.
+    pub fn archive(&mut self) -> Result<(), DocumentDomainError> {
+        if self.status != DocumentStatus::Active {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "archive",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.status = DocumentStatus::Archived;
+        Ok(())
+    }
+
+    /// Restore an archived document to active state.
+    pub fn restore(&mut self) -> Result<(), DocumentDomainError> {
+        if self.status != DocumentStatus::Archived {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "restore",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.status = DocumentStatus::Active;
+        Ok(())
+    }
+
+    /// Soft-delete an active or archived document.
+    pub fn mark_deleted(&mut self) -> Result<(), DocumentDomainError> {
+        if !matches!(
+            self.status,
+            DocumentStatus::Active | DocumentStatus::Archived
+        ) {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "mark_deleted",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.status = DocumentStatus::Deleted;
+        Ok(())
+    }
+
+    fn bump_version(&mut self) -> Result<(), DocumentDomainError> {
+        if self.version == i64::MAX {
+            return Err(DocumentDomainError::InvalidVersion);
+        }
+        self.version += 1;
+        self.updated_at = Utc::now();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -147,11 +316,11 @@ mod tests {
 
         assert!(doc.is_ok());
         let doc = doc.unwrap_or_else(|_| unreachable!());
-        assert_eq!(doc.original_filename, "report.pdf");
-        assert_eq!(doc.content_type, "application/pdf");
-        assert_eq!(doc.status, DocumentStatus::Active);
-        assert_eq!(doc.version, 1);
-        assert_eq!(doc.size_bytes, Some(1024));
+        assert_eq!(doc.original_filename(), "report.pdf");
+        assert_eq!(doc.content_type(), "application/pdf");
+        assert_eq!(doc.status(), DocumentStatus::Active);
+        assert_eq!(doc.version(), 1);
+        assert_eq!(doc.size_bytes(), Some(1024));
     }
 
     #[test]
@@ -260,5 +429,50 @@ mod tests {
     #[test]
     fn unknown_database_status_is_not_accepted_as_active() {
         assert!(DocumentStatus::try_from("unknown").is_err());
+    }
+
+    #[test]
+    fn lifecycle_transitions_are_versioned_and_terminal_delete_is_enforced() {
+        let mut document = DocumentMetadata::create(
+            Uuid::now_v7(),
+            "report.pdf".to_string(),
+            "application/pdf".to_string(),
+            "report.pdf".to_string(),
+            Uuid::now_v7(),
+            None,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert!(document.archive().is_ok());
+        assert_eq!(document.status(), DocumentStatus::Archived);
+        assert_eq!(document.version(), 2);
+        assert!(document.restore().is_ok());
+        assert_eq!(document.status(), DocumentStatus::Active);
+        assert_eq!(document.version(), 3);
+        assert!(document.mark_deleted().is_ok());
+        assert_eq!(document.status(), DocumentStatus::Deleted);
+        assert_eq!(document.version(), 4);
+        assert!(matches!(
+            document.restore(),
+            Err(DocumentDomainError::InvalidStatusTransition { .. })
+        ));
+    }
+
+    #[test]
+    fn rehydrate_rejects_invalid_persisted_state() {
+        let now = Utc::now();
+        let invalid = RehydrateDocumentMetadata {
+            id: Uuid::now_v7(),
+            tenant_id: Uuid::now_v7(),
+            original_filename: "report.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            object_key: "report.pdf".to_string(),
+            status: DocumentStatus::Active,
+            version: 0,
+            size_bytes: Some(-1),
+            created_by: Uuid::now_v7(),
+            created_at: now,
+            updated_at: now - chrono::Duration::seconds(1),
+        };
+        assert!(DocumentMetadata::rehydrate(invalid).is_err());
     }
 }

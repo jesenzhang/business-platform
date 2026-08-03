@@ -1,10 +1,12 @@
+#![allow(clippy::expect_used)]
+
 use std::sync::Arc;
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL"]
 async fn postgres_satisfies_shared_document_persistence_contract() {
-    let Ok(database_url) = std::env::var("DATABASE_URL") else {
-        return;
-    };
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set when running the PostgreSQL query contract");
     let pool = sqlx::PgPool::connect(&database_url).await;
     let Ok(pool) = pool else { unreachable!() };
     assert!(runtime_migration::MIGRATOR.run(&pool).await.is_ok());

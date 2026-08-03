@@ -1,21 +1,26 @@
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use document::domain::{DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata};
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
 use sqlx::{Sqlite, SqlitePool, Transaction};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use uuid::Uuid;
-
-use crate::mapper::DocumentRow;
 
 pub struct SqliteCreateDocumentUnitOfWork {
     pool: SqlitePool,
+    write_lock: Arc<Mutex<()>>,
 }
 
 impl SqliteCreateDocumentUnitOfWork {
     #[must_use]
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            write_lock: Arc::new(Mutex::new(())),
+        }
     }
 }
 
@@ -42,11 +47,15 @@ impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
         &self,
         command: PersistNewDocument,
     ) -> Result<CreateDocumentResult, ApplicationPortError> {
+        // SQLite has one writer.  Serializing the complete atomic unit of work
+        // turns concurrent retries into deterministic idempotent replays and
+        // avoids treating normal writer contention as an outage.
+        let _write_guard = self.write_lock.lock().await;
         let mut tx = self.pool.begin().await.map_err(map_error)?;
         let existing = sqlx::query_as::<_, ExistingCreateRow>(
             "SELECT i.request_fingerprint, i.fingerprint_version, d.id, d.tenant_id, d.original_filename, d.content_type, d.object_key, d.status, d.version, d.size_bytes, d.created_by, d.created_at, d.updated_at FROM document_idempotency i JOIN documents d ON d.id = i.document_id WHERE i.tenant_id = ?1 AND i.idempotency_key = ?2",
         )
-        .bind(command.document.tenant_id.to_string())
+        .bind(command.document.tenant_id().to_string())
         .bind(&command.idempotency_key)
         .fetch_optional(&mut *tx)
         .await
@@ -57,20 +66,22 @@ impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
             {
                 return Err(ApplicationPortError::IdempotencyConflict);
             }
-            let document = DocumentRow {
-                id: existing.id,
-                tenant_id: existing.tenant_id,
+            let document = DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
+                id: Uuid::parse_str(&existing.id).map_err(|_| ApplicationPortError::Failed)?,
+                tenant_id: Uuid::parse_str(&existing.tenant_id)
+                    .map_err(|_| ApplicationPortError::Failed)?,
                 original_filename: existing.original_filename,
                 content_type: existing.content_type,
                 object_key: existing.object_key,
-                status: existing.status,
+                status: DocumentStatus::try_from(existing.status.as_str())
+                    .map_err(|_| ApplicationPortError::Failed)?,
                 version: existing.version,
                 size_bytes: existing.size_bytes,
-                created_by: existing.created_by,
-                created_at: existing.created_at,
-                updated_at: existing.updated_at,
-            }
-            .try_into()
+                created_by: Uuid::parse_str(&existing.created_by)
+                    .map_err(|_| ApplicationPortError::Failed)?,
+                created_at: parse_timestamp(&existing.created_at)?,
+                updated_at: parse_timestamp(&existing.updated_at)?,
+            })
             .map_err(|_| ApplicationPortError::Failed)?;
             tx.commit().await.map_err(map_error)?;
             return Ok(CreateDocumentResult {
@@ -83,9 +94,9 @@ impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
         insert_audit(&mut tx, &command).await?;
         insert_outbox(&mut tx, &command).await?;
         sqlx::query("INSERT INTO document_idempotency (tenant_id, idempotency_key, request_fingerprint, fingerprint_version, document_id) VALUES (?1, ?2, ?3, ?4, ?5)")
-            .bind(command.document.tenant_id.to_string()).bind(&command.idempotency_key)
+            .bind(command.document.tenant_id().to_string()).bind(&command.idempotency_key)
             .bind(&command.request_fingerprint).bind(command.fingerprint_version)
-            .bind(command.document.id.to_string()).execute(&mut *tx).await.map_err(map_error)?;
+            .bind(command.document.id().to_string()).execute(&mut *tx).await.map_err(map_error)?;
         tx.commit().await.map_err(map_error)?;
         Ok(CreateDocumentResult {
             document: command.document,
@@ -100,11 +111,11 @@ async fn insert_document(
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
     sqlx::query("INSERT INTO documents (id, tenant_id, original_filename, content_type, object_key, status, version, size_bytes, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)")
-        .bind(document.id.to_string()).bind(document.tenant_id.to_string())
-        .bind(&document.original_filename).bind(&document.content_type).bind(&document.object_key)
-        .bind(document.status.as_str()).bind(document.version).bind(document.size_bytes)
-        .bind(document.created_by.to_string()).bind(document.created_at.to_rfc3339())
-        .bind(document.updated_at.to_rfc3339()).execute(&mut **tx).await.map_err(map_error)?;
+        .bind(document.id().to_string()).bind(document.tenant_id().to_string())
+        .bind(document.original_filename()).bind(document.content_type()).bind(document.object_key())
+        .bind(document.status().as_str()).bind(document.version()).bind(document.size_bytes())
+        .bind(document.created_by().to_string()).bind(document.created_at().to_rfc3339())
+        .bind(document.updated_at().to_rfc3339()).execute(&mut **tx).await.map_err(map_error)?;
     Ok(())
 }
 
@@ -113,10 +124,10 @@ async fn insert_audit(
     command: &PersistNewDocument,
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
-    let details = serde_json::json!({"original_filename": document.original_filename, "content_type": document.content_type});
+    let details = serde_json::json!({"original_filename": document.original_filename(), "content_type": document.content_type()});
     sqlx::query("INSERT INTO audit_events (id, tenant_id, user_id, action, resource_type, resource_id, details, created_at) VALUES (?1, ?2, ?3, 'document.created', 'document', ?4, ?5, ?6)")
-        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id.to_string())
-        .bind(document.created_by.to_string()).bind(document.id.to_string())
+        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id().to_string())
+        .bind(document.created_by().to_string()).bind(document.id().to_string())
         .bind(details.to_string()).bind(Utc::now().to_rfc3339()).execute(&mut **tx).await.map_err(map_error)?;
     Ok(())
 }
@@ -126,10 +137,10 @@ async fn insert_outbox(
     command: &PersistNewDocument,
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
-    let payload = serde_json::json!({"document_id": document.id, "original_filename": document.original_filename});
+    let payload = serde_json::json!({"document_id": document.id(), "original_filename": document.original_filename()});
     sqlx::query("INSERT INTO outbox_events (event_id, event_type, tenant_id, aggregate_id, aggregate_type, payload, schema_version, occurred_at) VALUES (?1, 'document.created', ?2, ?3, 'document', ?4, 'v1', ?5)")
-        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id.to_string())
-        .bind(document.id.to_string()).bind(payload.to_string()).bind(Utc::now().to_rfc3339())
+        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id().to_string())
+        .bind(document.id().to_string()).bind(payload.to_string()).bind(Utc::now().to_rfc3339())
         .execute(&mut **tx).await.map_err(map_error)?;
     Ok(())
 }
@@ -142,4 +153,10 @@ fn map_error(error: sqlx::Error) -> ApplicationPortError {
         }
         _ => ApplicationPortError::Failed,
     }
+}
+
+fn parse_timestamp(value: &str) -> Result<DateTime<Utc>, ApplicationPortError> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+        .map_err(|_| ApplicationPortError::Failed)
 }

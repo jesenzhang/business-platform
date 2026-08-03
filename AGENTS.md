@@ -203,3 +203,21 @@ PR 必须说明：
 - 修改迁移、备份、恢复和 Runbook。
 
 文档生命周期遵循 `docs/governance/DOCUMENT_MANAGEMENT.md`。
+
+## 15. PLAN-0003 Revision 1 persistence rules
+
+PLAN-0003 Revision 1 的 Document Management 参考切片必须遵循以下额外门禁：
+
+- `DocumentMetadata` 聚合字段保持私有；持久化适配器只能通过经过校验的
+  `rehydrate` 恢复，不能直接构造聚合；生命周期变更必须校验状态并递增版本。
+- HTTP 响应不得返回 `object_key`、`storage_key`、bucket 名称或内部文件路径；
+  列表游标必须是版本化、不可依赖数据库字段的 opaque token。
+- Document Search 当前为 Deferred；不得保留不完整 Search Port 或适配器。后续
+  搜索应评估 PostgreSQL full-text/`pg_trgm` 或独立搜索索引。
+- SQLite 仅用于本地单进程；连接池上限为 4，写入使用显式 single-writer 语义，
+  并验证同 key 幂等、指纹冲突、审计/Outbox 原子性和重启重放。
+- LIKE 文本必须转义 `\\`、`%`、`_` 并声明 `ESCAPE '\\'`；契约只保证 ASCII
+  大小写不敏感，不声明完整 Unicode 大小写等价。
+- PostgreSQL 测试在本地无数据库时使用带原因的 `#[ignore]`，CI 必须
+  `--include-ignored`；迁移 status 只可忽略明确的 migration table 缺失，其他
+  权限、连接和数据库错误必须失败。

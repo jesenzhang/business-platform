@@ -56,7 +56,7 @@ async fn sqlite_rolls_back_the_document_when_atomic_side_effect_fails() {
     let result = document::ports::CreateDocumentUnitOfWork::execute(&adapter, command).await;
     assert!(result.is_err());
     let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM documents WHERE id = ?1")
-        .bind(document.id.to_string())
+        .bind(document.id().to_string())
         .fetch_one(&pool)
         .await;
     assert_eq!(count.ok(), Some(0));

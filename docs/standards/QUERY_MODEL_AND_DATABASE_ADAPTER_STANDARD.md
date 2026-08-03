@@ -22,6 +22,14 @@ large lists use keyset/cursor pagination. Sorting is stable and includes a uniqu
 tie-breaker. A critical query records index rationale, scale assumption, EXPLAIN
 evidence, maximum rows, timeout, tenant predicate and permission predicate.
 
+Document Search is Deferred until a complete capability is designed. The next
+implementation should use PostgreSQL full-text/`pg_trgm` or a dedicated search
+index behind a versioned port; adapters must not expose a partial search port.
+Document filename filters are literal LIKE filters: escape `\\`, `%`, and `_`
+and specify `ESCAPE '\\'`. SQLite/PostgreSQL matching is ASCII
+case-insensitive only; full Unicode case equivalence is not part of this
+contract.
+
 ## SQL and ORM
 
 Default: SQLx + explicit SQL + Data Mapper. ORM/SQLx Row types are not Domain

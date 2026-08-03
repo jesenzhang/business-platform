@@ -1,11 +1,9 @@
 use async_trait::async_trait;
-use document::domain::DocumentMetadata;
+use document::domain::{DocumentMetadata, RehydrateDocumentMetadata};
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
 use sqlx::PgPool;
-
-use crate::repository::DocumentRow;
 
 pub struct PostgresCreateDocumentUnitOfWork {
     pool: PgPool,
@@ -25,7 +23,11 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
         command: PersistNewDocument,
     ) -> Result<CreateDocumentResult, ApplicationPortError> {
         let mut transaction = self.pool.begin().await.map_err(map_sqlx_error)?;
-        let lock_key = format!("{}:{}", command.document.tenant_id, command.idempotency_key);
+        let lock_key = format!(
+            "{}:{}",
+            command.document.tenant_id(),
+            command.idempotency_key
+        );
 
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(lock_key)
@@ -44,7 +46,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
             WHERE i.tenant_id = $1 AND i.idempotency_key = $2
             ",
         )
-        .bind(command.document.tenant_id)
+        .bind(command.document.tenant_id())
         .bind(&command.idempotency_key)
         .fetch_optional(&mut *transaction)
         .await
@@ -96,20 +98,20 @@ struct ExistingCreateRow {
 
 impl ExistingCreateRow {
     fn into_document(self) -> Result<DocumentMetadata, ApplicationPortError> {
-        DocumentRow {
+        DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
             id: self.id,
             tenant_id: self.tenant_id,
             original_filename: self.original_filename,
             content_type: self.content_type,
             object_key: self.object_key,
-            status: self.status,
+            status: document::domain::DocumentStatus::try_from(self.status.as_str())
+                .map_err(|_| ApplicationPortError::Failed)?,
             version: self.version,
             size_bytes: self.size_bytes,
             created_by: self.created_by,
             created_at: self.created_at,
             updated_at: self.updated_at,
-        }
-        .try_into()
+        })
         .map_err(|_| ApplicationPortError::Failed)
     }
 }
@@ -126,17 +128,17 @@ async fn insert_document(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ",
     )
-    .bind(document.id)
-    .bind(document.tenant_id)
-    .bind(&document.original_filename)
-    .bind(&document.content_type)
-    .bind(&document.object_key)
-    .bind(document.status.as_str())
-    .bind(document.version)
-    .bind(document.size_bytes)
-    .bind(document.created_by)
-    .bind(document.created_at)
-    .bind(document.updated_at)
+    .bind(document.id())
+    .bind(document.tenant_id())
+    .bind(document.original_filename())
+    .bind(document.content_type())
+    .bind(document.object_key())
+    .bind(document.status().as_str())
+    .bind(document.version())
+    .bind(document.size_bytes())
+    .bind(document.created_by())
+    .bind(document.created_at())
+    .bind(document.updated_at())
     .execute(&mut **transaction)
     .await
     .map_err(map_sqlx_error)?;
@@ -154,13 +156,13 @@ async fn insert_audit(
         VALUES ($1, $2, 'document.created', 'document', $3, $4)
         ",
     )
-    .bind(document.tenant_id)
-    .bind(document.created_by)
-    .bind(document.id.to_string())
+    .bind(document.tenant_id())
+    .bind(document.created_by())
+    .bind(document.id().to_string())
     .bind(serde_json::json!({
-        "original_filename": document.original_filename,
-        "content_type": document.content_type,
-        "object_key": document.object_key,
+        "original_filename": document.original_filename(),
+        "content_type": document.content_type(),
+        "object_key": document.object_key(),
     }))
     .execute(&mut **transaction)
     .await
@@ -179,14 +181,14 @@ async fn insert_outbox(
            VALUES ($1, 'document.created', $2, $3, 'document', $4, 'v1', $5, FALSE)",
     )
     .bind(uuid::Uuid::now_v7())
-    .bind(document.tenant_id.to_string())
-    .bind(document.id.to_string())
+    .bind(document.tenant_id().to_string())
+    .bind(document.id().to_string())
     .bind(serde_json::json!({
-        "document_id": document.id,
-        "original_filename": document.original_filename,
-        "content_type": document.content_type,
-        "object_key": document.object_key,
-        "created_by": document.created_by,
+        "document_id": document.id(),
+        "original_filename": document.original_filename(),
+        "content_type": document.content_type(),
+        "object_key": document.object_key(),
+        "created_by": document.created_by(),
     }))
     .bind(chrono::Utc::now())
     .execute(&mut **transaction)
@@ -206,11 +208,11 @@ async fn insert_idempotency(
         VALUES ($1, $2, $3, $4, $5)
         ",
     )
-    .bind(command.document.tenant_id)
+    .bind(command.document.tenant_id())
     .bind(&command.idempotency_key)
     .bind(&command.request_fingerprint)
     .bind(command.fingerprint_version)
-    .bind(command.document.id)
+    .bind(command.document.id())
     .execute(&mut **transaction)
     .await
     .map_err(map_sqlx_error)?;

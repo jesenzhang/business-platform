@@ -51,6 +51,46 @@ Assert-NotContains "crates/document/src/query" @("sqlx::", "FromRow") "document 
 Assert-NotContains "crates/document/src/domain" @("#[derive(FromRow", "sqlx::FromRow") "document domain row-model violation"
 Assert-NotContains "apps/migration/src" @("sqlx::migrate!") "migration app must use the shared runtime migration catalog"
 Assert-NotContains "apps/business-api/src" @("expected_migration", "PostgresReadinessProbe::new(pool,") "readiness must derive compatibility from the shared migration catalog"
+
+$aggregatePath = Join-Path $root "crates/document/src/domain/entity.rs"
+$aggregateContent = Get-Content -Raw $aggregatePath
+$aggregateMatch = [regex]::Match($aggregateContent, 'pub struct DocumentMetadata\s*\{(?<body>[\s\S]*?)\n\}')
+if (-not $aggregateMatch.Success) {
+    throw "Unable to locate DocumentMetadata for aggregate encapsulation fitness"
+}
+if ($aggregateMatch.Groups["body"].Value -match '(?m)^\s*pub\s+(?!fn\b)') {
+    throw "DocumentMetadata exposes a public field; aggregate state must remain private"
+}
+
+foreach ($adapterPath in @("crates/document-postgres/src", "crates/document-sqlite/src")) {
+    $adapterFiles = Get-ChildItem (Join-Path $root $adapterPath) -Filter "*.rs" -File
+    foreach ($file in $adapterFiles) {
+        $adapterContent = Get-Content -Raw $file.FullName
+        if ($adapterContent -match '(?<!for )(?<!Rehydrate)DocumentMetadata\s*\{') {
+            throw "Adapter constructs DocumentMetadata directly; use rehydrate: $($file.FullName)"
+        }
+    }
+}
+
+foreach ($searchPath in @(
+    "crates/document/src/query/search.rs",
+    "crates/document-postgres/src/search_query.rs"
+)) {
+    if (Test-Path (Join-Path $root $searchPath)) {
+        throw "Deferred Document Search adapter still exists: $searchPath"
+    }
+}
+
+$routeContent = Get-Content -Raw (Join-Path $root "apps/business-api/src/routes/documents.rs")
+foreach ($legacyCursorField in @("cursor_created_at", "cursor_id")) {
+    if ($routeContent -match [regex]::Escape($legacyCursorField)) {
+        throw "HTTP route still accepts legacy double cursor field '$legacyCursorField'"
+    }
+}
+$responseMatch = [regex]::Match($routeContent, 'struct DocumentResponse\s*\{(?<body>[\s\S]*?)\n\}')
+if ($responseMatch.Success -and $responseMatch.Groups["body"].Value -match 'object_key') {
+    throw "Document HTTP response contains an internal object key"
+}
 $statePath = Join-Path $root "apps/business-api/src/state.rs"
 $stateContent = Get-Content -Raw $statePath
 $appStateMatch = [regex]::Match($stateContent, 'pub struct AppState\s*\{(?<body>[\s\S]*?)\n\}')

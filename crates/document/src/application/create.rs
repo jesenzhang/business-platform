@@ -162,7 +162,7 @@ mod tests {
             .expect("fake port should succeed");
 
         assert!(!result.replayed);
-        assert_eq!(result.document.tenant_id, tenant_id);
+        assert_eq!(result.document.tenant_id(), tenant_id);
         assert_eq!(unit_of_work.calls.lock().expect("test lock").len(), 1);
         assert_eq!(
             unit_of_work.calls.lock().expect("test lock")[0].fingerprint_version,

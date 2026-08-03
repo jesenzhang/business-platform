@@ -3,6 +3,8 @@
 use thiserror::Error;
 use uuid::Uuid;
 
+use super::entity::DocumentStatus;
+
 /// Errors that can occur within the document domain.
 #[derive(Debug, Error)]
 pub enum DocumentDomainError {
@@ -38,4 +40,29 @@ pub enum DocumentDomainError {
         /// The version actually stored.
         actual: i64,
     },
+
+    /// A state transition was requested that the lifecycle does not allow.
+    #[error("invalid document status transition: {operation} from {status:?}")]
+    InvalidStatusTransition {
+        /// The requested lifecycle operation.
+        operation: &'static str,
+        /// The current status.
+        status: DocumentStatus,
+    },
+
+    /// A persisted aggregate contains an invalid identity.
+    #[error("document tenant and creator identifiers must not be nil")]
+    InvalidIdentity,
+
+    /// A persisted aggregate contains an invalid version.
+    #[error("document version must be positive")]
+    InvalidVersion,
+
+    /// A persisted aggregate contains timestamps in the wrong order.
+    #[error("document updated_at must not be before created_at")]
+    InvalidTimestamps,
+
+    /// A persisted status value is not part of the lifecycle.
+    #[error("unknown document status")]
+    InvalidStatus,
 }

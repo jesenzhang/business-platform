@@ -164,9 +164,16 @@ Command 必须明确主体、租户、目标、期望版本和幂等语义。
 - 所有列表有默认和最大分页；
 - 排序字段使用允许列表；
 - 返回稳定排序和 continuation token/cursor；
+- HTTP cursors are opaque, versioned tokens. PLAN-0003 uses a v1 JSON payload
+  encoded as unpadded base64url; malformed, oversized or unknown-version tokens
+  return 400. Database keyset fields are never accepted as separate public
+  query parameters.
 - 过滤语义公开且版本化；
 - 禁止把任意 SQL 条件暴露为过滤接口；
 - 跨租户过滤永远不可用。
+
+Document responses must not expose `object_key`, bucket names, storage keys or
+internal filesystem paths. Those values remain adapter/application internals.
 
 ## 11. 乐观锁
 

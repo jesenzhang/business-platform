@@ -22,9 +22,8 @@ const SECRET: &str = "test-dev-secret";
 const USER_ID: &str = "11111111-1111-1111-1111-111111111111";
 
 async fn setup_pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://postgres:postgres@localhost:5432/business_platform_test".to_string()
-    });
+    let url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set when running the PostgreSQL E2E test");
     PgPoolOptions::new()
         .max_connections(10)
         .connect(&url)
@@ -33,7 +32,7 @@ async fn setup_pool() -> sqlx::PgPool {
 }
 
 async fn run_migrations(pool: &sqlx::PgPool) {
-    sqlx::migrate!("../../migrations")
+    runtime_migration::MIGRATOR
         .run(pool)
         .await
         .expect("failed to run migrations");

@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "document-management"
+layer = "domain-and-application"
+data_owner = "document-management"
+
 [dependencies]
 shared-kernel = { workspace = true }
 serde = { workspace = true }

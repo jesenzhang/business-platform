@@ -2,6 +2,26 @@ use chrono::{DateTime, Utc};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Escape a value used as a literal inside a SQL `LIKE` pattern.
+///
+/// Adapters use backslash as the explicit escape character.  This keeps
+/// `%`, `_`, and the escape character itself from becoming caller-controlled
+/// wildcards while preserving Unicode text for the database's own collation.
+#[must_use]
+pub fn escape_like_literal(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '\\' | '%' | '_' => {
+                escaped.push('\\');
+                escaped.push(character);
+            }
+            _ => escaped.push(character),
+        }
+    }
+    escaped
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentStatusView {
@@ -102,4 +122,18 @@ pub enum QueryError {
     InvalidStoredData,
     #[error("document query failed")]
     Failed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like_literal;
+
+    #[test]
+    fn like_literals_escape_all_pattern_metacharacters() {
+        assert_eq!(
+            escape_like_literal(r"100%_back\slash"),
+            r"100\%\_back\\slash"
+        );
+        assert_eq!(escape_like_literal("中文合同.pdf"), "中文合同.pdf");
+    }
 }

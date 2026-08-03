@@ -354,3 +354,11 @@ or Application, and `AppState` fields containing `AppConfig`,
 - Production configuration rejects SQLite before infrastructure access.
 - PostgreSQL and SQLite run common semantic persistence contracts; their
   database-specific concurrency and recovery contracts remain separate.
+- `DocumentMetadata` fields are private; adapters use the validated
+  `rehydrate` seam and no adapter may construct the aggregate directly.
+- The Document Search port remains Deferred; no partial Search adapter may be
+  exported. PostgreSQL uses the shared `runtime-migration` catalog while the
+  SQLite adapter owns its local catalog.
+- HTTP list cursors are opaque v1 tokens and storage-internal object locations
+  are absent from response DTOs. Shared LIKE escaping and invalid-row
+  fail-closed mapper tests run for both adapters.

@@ -2,6 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use shared_kernel::TenantContext;
 use uuid::Uuid;
@@ -20,11 +21,11 @@ pub struct CreateDocumentRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ListDocumentsParams {
     #[serde(default = "default_page_size", alias = "page_size")]
     pub limit: u32,
-    pub cursor_created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub cursor_id: Option<Uuid>,
+    pub cursor: Option<String>,
     pub status: Option<String>,
     pub filename_contains: Option<String>,
     pub created_after: Option<chrono::DateTime<chrono::Utc>>,
@@ -37,8 +38,6 @@ pub struct DocumentResponse {
     pub tenant_id: Uuid,
     pub original_filename: String,
     pub content_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub object_key: Option<String>,
     pub status: String,
     pub version: i64,
     pub size_bytes: Option<i64>,
@@ -50,17 +49,16 @@ pub struct DocumentResponse {
 impl From<document::domain::DocumentMetadata> for DocumentResponse {
     fn from(document: document::domain::DocumentMetadata) -> Self {
         Self {
-            id: document.id,
-            tenant_id: document.tenant_id,
-            original_filename: document.original_filename,
-            content_type: document.content_type,
-            object_key: Some(document.object_key),
-            status: document.status.as_str().to_string(),
-            version: document.version,
-            size_bytes: document.size_bytes,
-            created_by: document.created_by,
-            created_at: document.created_at,
-            updated_at: document.updated_at,
+            id: document.id(),
+            tenant_id: document.tenant_id(),
+            original_filename: document.original_filename().to_string(),
+            content_type: document.content_type().to_string(),
+            status: document.status().as_str().to_string(),
+            version: document.version(),
+            size_bytes: document.size_bytes(),
+            created_by: document.created_by(),
+            created_at: document.created_at(),
+            updated_at: document.updated_at(),
         }
     }
 }
@@ -72,7 +70,6 @@ impl From<document::query::DocumentDetailView> for DocumentResponse {
             tenant_id: document.tenant_id,
             original_filename: document.original_filename,
             content_type: document.content_type,
-            object_key: None,
             status: document.status.as_str().to_string(),
             version: document.version,
             size_bytes: document.size_bytes,
@@ -81,6 +78,47 @@ impl From<document::query::DocumentDetailView> for DocumentResponse {
             updated_at: document.updated_at,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+struct DocumentListResponse {
+    items: Vec<document::query::DocumentListItem>,
+    next_cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CursorToken {
+    version: u8,
+    created_at: chrono::DateTime<chrono::Utc>,
+    id: Uuid,
+}
+
+fn encode_cursor(cursor: document::query::DocumentListCursor) -> String {
+    let token = CursorToken {
+        version: 1,
+        created_at: cursor.created_at,
+        id: cursor.id,
+    };
+    let payload = serde_json::to_vec(&token).unwrap_or_default();
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload)
+}
+
+fn decode_cursor(value: &str) -> Result<document::query::DocumentListCursor, ApiError> {
+    if value.is_empty() || value.len() > 512 {
+        return Err(ApiError::validation("invalid cursor"));
+    }
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| ApiError::validation("invalid cursor"))?;
+    let token: CursorToken =
+        serde_json::from_slice(&bytes).map_err(|_| ApiError::validation("invalid cursor"))?;
+    if token.version != 1 || token.id.is_nil() {
+        return Err(ApiError::validation("invalid cursor"));
+    }
+    Ok(document::query::DocumentListCursor {
+        created_at: token.created_at,
+        id: token.id,
+    })
 }
 
 pub fn router() -> axum::Router<Arc<AppState>> {
@@ -192,18 +230,12 @@ pub async fn list_documents(
             ))
         }
     };
-    let cursor = match (params.cursor_created_at, params.cursor_id) {
-        (Some(created_at), Some(id)) => {
-            Some(document::query::DocumentListCursor { created_at, id })
-        }
-        (None, None) => None,
-        _ => {
-            return Err(trace_error(
-                ApiError::validation("cursor_created_at and cursor_id must be provided together"),
-                &headers,
-            ))
-        }
-    };
+    let cursor = params
+        .cursor
+        .as_deref()
+        .map(decode_cursor)
+        .transpose()
+        .map_err(|error| trace_error(error, &headers))?;
     let result = state
         .documents
         .list
@@ -220,9 +252,45 @@ pub async fn list_documents(
         })
         .await
         .map_err(|error| trace_error(ApiError::from(error), &headers))?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(result))).into_response())
+    let response = DocumentListResponse {
+        items: result.items,
+        next_cursor: result.next_cursor.map(encode_cursor),
+    };
+    Ok((StatusCode::OK, Json(ApiResponse::ok(response))).into_response())
 }
 
 fn default_page_size() -> u32 {
     20
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cursor_is_an_opaque_versioned_token() {
+        let cursor = document::query::DocumentListCursor {
+            created_at: chrono::Utc::now(),
+            id: Uuid::now_v7(),
+        };
+        let encoded = encode_cursor(cursor);
+        assert!(!encoded.contains('|'));
+        assert!(!encoded.contains("created_at"));
+        let decoded = decode_cursor(&encoded);
+        assert_eq!(decoded.ok(), Some(cursor));
+    }
+
+    #[test]
+    fn cursor_rejects_malformed_or_unknown_versions() {
+        assert!(decode_cursor("not-base64").is_err());
+        let payload = serde_json::json!({
+            "version": 2,
+            "created_at": chrono::Utc::now(),
+            "id": Uuid::now_v7(),
+        });
+        let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(serde_json::to_vec(&payload).unwrap_or_default());
+        assert!(decode_cursor(&encoded).is_err());
+        assert!(decode_cursor(&"a".repeat(513)).is_err());
+    }
 }
