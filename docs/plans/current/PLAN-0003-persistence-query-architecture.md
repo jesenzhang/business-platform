@@ -1,6 +1,7 @@
 # PLAN-0003: Persistence, Query and Multi-Database Architecture
 
-> Status: Accepted Candidate
+> Status: Active — Revision 1
+> Revision: 1
 > Date: 2026-08-03
 > Owner: Platform Foundation / Document Management
 > Base: `3f953c10c18ecd1666e35550c50f7cca6dc3ff93`
@@ -67,7 +68,7 @@ corrected only by new forward migrations.
 - Windows PostgreSQL/MinIO: NOT RUN because Docker is unavailable. GitHub Linux
   remains the required authority for PostgreSQL, MinIO and Document E2E.
 
-## Candidate evidence (2026-08-03)
+## Prior candidate evidence (2026-08-03)
 
 - Candidate code SHA: `79bc57e642fbeab1500dc449a50cd7c7b1893d29`.
 - Feature CI run `30786233808`: PASS, 6/6 jobs.
