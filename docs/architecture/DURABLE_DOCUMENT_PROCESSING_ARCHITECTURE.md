@@ -1,9 +1,9 @@
 # Durable Document Processing Architecture
 
-> 文档 ID：ARCH-DOCUMENT-PROCESSING-001  
-> 版本：1.0  
-> 状态：Baseline  
-> 生效日期：2026-08-03  
+> 文档 ID：ARCH-DOCUMENT-PROCESSING-001
+> 版本：1.0
+> 状态：Baseline
+> 生效日期：2026-08-03
 > 适用范围：PLAN-0004 固定文档处理 MVP
 
 ## 1. Scope and bounded contexts
