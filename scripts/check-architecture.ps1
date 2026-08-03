@@ -186,12 +186,30 @@ function Assert-MigrationManifest([string]$MigrationDirectory, [string]$Manifest
     if ($entries.Count -ne $sqlFiles.Count) {
         throw "Migration manifest does not cover exactly all SQL files: $ManifestPath"
     }
+
+    function Get-NormalizedMigrationHash([string]$Path, [string]$NewLine) {
+        $content = Get-Content -Raw -Encoding UTF8 $Path
+        $normalized = $content -replace "`r`n", "`n" -replace "`r", "`n"
+        if ($NewLine -eq "CRLF") {
+            $normalized = $normalized -replace "`n", "`r`n"
+        }
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($normalized)
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+        } finally {
+            $sha.Dispose()
+        }
+    }
+
     foreach ($file in $sqlFiles) {
         if (-not $entries.ContainsKey($file.Name)) {
             throw "Migration missing from manifest: $($file.Name)"
         }
         $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($actual -ne $entries[$file.Name]) {
+        $lf = Get-NormalizedMigrationHash $file.FullName "LF"
+        $crlf = Get-NormalizedMigrationHash $file.FullName "CRLF"
+        if ($entries[$file.Name] -notin @($actual, $lf, $crlf)) {
             throw "Migration hash mismatch: $($file.FullName)"
         }
     }
