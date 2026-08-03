@@ -3,7 +3,6 @@ use document::domain::DocumentMetadata;
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
-use messaging::{DomainEvent, ReliableOutbox};
 use sqlx::PgPool;
 
 use crate::repository::DocumentRow;
@@ -173,22 +172,27 @@ async fn insert_outbox(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     document: &DocumentMetadata,
 ) -> Result<(), ApplicationPortError> {
-    let event = DomainEvent::new(
-        "document.created",
-        document.tenant_id.to_string(),
-        document.id.to_string(),
-        "document",
-        serde_json::json!({
-            "document_id": document.id,
-            "original_filename": document.original_filename,
-            "content_type": document.content_type,
-            "object_key": document.object_key,
-            "created_by": document.created_by,
-        }),
-    );
-    ReliableOutbox::append_in_tx(transaction, &event)
-        .await
-        .map_err(map_sqlx_error)
+    sqlx::query(
+        r"INSERT INTO outbox_events
+           (event_id, event_type, tenant_id, aggregate_id, aggregate_type,
+            payload, schema_version, occurred_at, published)
+           VALUES ($1, 'document.created', $2, $3, 'document', $4, 'v1', $5, FALSE)",
+    )
+    .bind(uuid::Uuid::now_v7())
+    .bind(document.tenant_id.to_string())
+    .bind(document.id.to_string())
+    .bind(serde_json::json!({
+        "document_id": document.id,
+        "original_filename": document.original_filename,
+        "content_type": document.content_type,
+        "object_key": document.object_key,
+        "created_by": document.created_by,
+    }))
+    .bind(chrono::Utc::now())
+    .execute(&mut **transaction)
+    .await
+    .map_err(map_sqlx_error)?;
+    Ok(())
 }
 
 async fn insert_idempotency(

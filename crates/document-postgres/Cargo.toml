@@ -6,7 +6,6 @@ rust-version.workspace = true
 
 [dependencies]
 document = { workspace = true }
-messaging = { workspace = true }
 sqlx = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
@@ -15,6 +14,8 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+document-persistence-contracts = { path = "../document-persistence-contracts" }
+runtime-migration = { workspace = true }
 
 [lints]
 workspace = true

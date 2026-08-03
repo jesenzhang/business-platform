@@ -10,6 +10,7 @@ cors_origins = []
 dev_auth_enabled = false
 
 [database]
+backend = "postgres"
 max_connections = 50
 min_connections = 5
 

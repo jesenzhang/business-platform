@@ -1,0 +1,145 @@
+use async_trait::async_trait;
+use chrono::Utc;
+use document::ports::{
+    ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
+};
+use sqlx::{Sqlite, SqlitePool, Transaction};
+use uuid::Uuid;
+
+use crate::mapper::DocumentRow;
+
+pub struct SqliteCreateDocumentUnitOfWork {
+    pool: SqlitePool,
+}
+
+impl SqliteCreateDocumentUnitOfWork {
+    #[must_use]
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct ExistingCreateRow {
+    request_fingerprint: String,
+    fingerprint_version: i64,
+    id: String,
+    tenant_id: String,
+    original_filename: String,
+    content_type: String,
+    object_key: String,
+    status: String,
+    version: i64,
+    size_bytes: Option<i64>,
+    created_by: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[async_trait]
+impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
+    async fn execute(
+        &self,
+        command: PersistNewDocument,
+    ) -> Result<CreateDocumentResult, ApplicationPortError> {
+        let mut tx = self.pool.begin().await.map_err(map_error)?;
+        let existing = sqlx::query_as::<_, ExistingCreateRow>(
+            "SELECT i.request_fingerprint, i.fingerprint_version, d.id, d.tenant_id, d.original_filename, d.content_type, d.object_key, d.status, d.version, d.size_bytes, d.created_by, d.created_at, d.updated_at FROM document_idempotency i JOIN documents d ON d.id = i.document_id WHERE i.tenant_id = ?1 AND i.idempotency_key = ?2",
+        )
+        .bind(command.document.tenant_id.to_string())
+        .bind(&command.idempotency_key)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_error)?;
+        if let Some(existing) = existing {
+            if existing.request_fingerprint != command.request_fingerprint
+                || existing.fingerprint_version != i64::from(command.fingerprint_version)
+            {
+                return Err(ApplicationPortError::IdempotencyConflict);
+            }
+            let document = DocumentRow {
+                id: existing.id,
+                tenant_id: existing.tenant_id,
+                original_filename: existing.original_filename,
+                content_type: existing.content_type,
+                object_key: existing.object_key,
+                status: existing.status,
+                version: existing.version,
+                size_bytes: existing.size_bytes,
+                created_by: existing.created_by,
+                created_at: existing.created_at,
+                updated_at: existing.updated_at,
+            }
+            .try_into()
+            .map_err(|_| ApplicationPortError::Failed)?;
+            tx.commit().await.map_err(map_error)?;
+            return Ok(CreateDocumentResult {
+                document,
+                replayed: true,
+            });
+        }
+
+        insert_document(&mut tx, &command).await?;
+        insert_audit(&mut tx, &command).await?;
+        insert_outbox(&mut tx, &command).await?;
+        sqlx::query("INSERT INTO document_idempotency (tenant_id, idempotency_key, request_fingerprint, fingerprint_version, document_id) VALUES (?1, ?2, ?3, ?4, ?5)")
+            .bind(command.document.tenant_id.to_string()).bind(&command.idempotency_key)
+            .bind(&command.request_fingerprint).bind(command.fingerprint_version)
+            .bind(command.document.id.to_string()).execute(&mut *tx).await.map_err(map_error)?;
+        tx.commit().await.map_err(map_error)?;
+        Ok(CreateDocumentResult {
+            document: command.document,
+            replayed: false,
+        })
+    }
+}
+
+async fn insert_document(
+    tx: &mut Transaction<'_, Sqlite>,
+    command: &PersistNewDocument,
+) -> Result<(), ApplicationPortError> {
+    let document = &command.document;
+    sqlx::query("INSERT INTO documents (id, tenant_id, original_filename, content_type, object_key, status, version, size_bytes, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)")
+        .bind(document.id.to_string()).bind(document.tenant_id.to_string())
+        .bind(&document.original_filename).bind(&document.content_type).bind(&document.object_key)
+        .bind(document.status.as_str()).bind(document.version).bind(document.size_bytes)
+        .bind(document.created_by.to_string()).bind(document.created_at.to_rfc3339())
+        .bind(document.updated_at.to_rfc3339()).execute(&mut **tx).await.map_err(map_error)?;
+    Ok(())
+}
+
+async fn insert_audit(
+    tx: &mut Transaction<'_, Sqlite>,
+    command: &PersistNewDocument,
+) -> Result<(), ApplicationPortError> {
+    let document = &command.document;
+    let details = serde_json::json!({"original_filename": document.original_filename, "content_type": document.content_type});
+    sqlx::query("INSERT INTO audit_events (id, tenant_id, user_id, action, resource_type, resource_id, details, created_at) VALUES (?1, ?2, ?3, 'document.created', 'document', ?4, ?5, ?6)")
+        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id.to_string())
+        .bind(document.created_by.to_string()).bind(document.id.to_string())
+        .bind(details.to_string()).bind(Utc::now().to_rfc3339()).execute(&mut **tx).await.map_err(map_error)?;
+    Ok(())
+}
+
+async fn insert_outbox(
+    tx: &mut Transaction<'_, Sqlite>,
+    command: &PersistNewDocument,
+) -> Result<(), ApplicationPortError> {
+    let document = &command.document;
+    let payload = serde_json::json!({"document_id": document.id, "original_filename": document.original_filename});
+    sqlx::query("INSERT INTO outbox_events (event_id, event_type, tenant_id, aggregate_id, aggregate_type, payload, schema_version, occurred_at) VALUES (?1, 'document.created', ?2, ?3, 'document', ?4, 'v1', ?5)")
+        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id.to_string())
+        .bind(document.id.to_string()).bind(payload.to_string()).bind(Utc::now().to_rfc3339())
+        .execute(&mut **tx).await.map_err(map_error)?;
+    Ok(())
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn map_error(error: sqlx::Error) -> ApplicationPortError {
+    match error {
+        sqlx::Error::PoolTimedOut | sqlx::Error::PoolClosed | sqlx::Error::Io(_) => {
+            ApplicationPortError::Unavailable
+        }
+        _ => ApplicationPortError::Failed,
+    }
+}

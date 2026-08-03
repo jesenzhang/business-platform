@@ -115,3 +115,9 @@ impl From<document::application::QueryDocumentError> for ApiError {
         Self::from(AppError::Database(error.to_string()))
     }
 }
+
+impl From<document::query::QueryError> for ApiError {
+    fn from(error: document::query::QueryError) -> Self {
+        Self::from(AppError::Database(error.to_string()))
+    }
+}

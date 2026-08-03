@@ -32,6 +32,8 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0003`](ADR-0003-domain-driven-layered-backend.md) | 服务端采用领域驱动的分层架构 | Accepted | 战略 DDD、数据所有权、显式一致性、端口适配、质量属性与自动架构门禁 |
 | [`ADR-0004`](ADR-0004-rust-msrv-toolchain.md) | Rust MSRV 与固定工具链 | Accepted | 当前锁定依赖的最低验证版本为 Rust 1.94.1 |
 | [`ADR-0005`](ADR-0005-process-specific-runtime-configuration.md) | Process-specific runtime configuration | Accepted | Process-local roots, redacted connection URLs, and explicit environment prefixes |
+| [`ADR-0008`](ADR-0008-cqrs-query-model-and-read-projections.md) | CQRS Query Model and Read Projections | Accepted | Dedicated Query Objects/Read DTOs, controlled cross-context reads, rebuildable projections |
+| [`ADR-0009`](ADR-0009-multi-database-persistence-adapters.md) | Multi-Database Persistence Adapters | Accepted | PostgreSQL production authority, SQLite local adapter, independent migrations and shared contracts |
 
 ## 4. ADR-0003 的完整 Baseline
 

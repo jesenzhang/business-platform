@@ -6,11 +6,12 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
-    AuthConfig, BusinessApiConfig, DatabaseConfig, ObservabilityConfig, ServerConfig,
+    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
+    ServerConfig,
 };
 use business_api::routes;
 use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
-use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
+use document::application::CreateDocumentMetadata;
 use http_body_util::BodyExt;
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use sqlx::postgres::PgPoolOptions;
@@ -49,6 +50,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             body_limit_bytes: 1024 * 1024,
         },
         database: DatabaseConfig {
+            backend: DatabaseBackend::Postgres,
             url: SecretUrl::parse("postgres://localhost/test").expect("test URL should parse"),
             max_connections: 10,
             min_connections: 0,
@@ -66,17 +68,18 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             dev_auth_enabled: true,
         },
     };
-    let repository = Arc::new(document_postgres::PostgresDocumentQueryRepository::new(
-        pool.clone(),
-    ));
     let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
         pool.clone(),
     ));
     let state = Arc::new(AppState {
         documents: DocumentServices {
             create: Arc::new(CreateDocumentMetadata::new(unit_of_work)),
-            get: Arc::new(GetDocumentMetadata::new(repository.clone())),
-            list: Arc::new(ListDocumentMetadata::new(repository)),
+            detail: Arc::new(document_postgres::PostgresDocumentDetailQuery::new(
+                pool.clone(),
+            )),
+            list: Arc::new(document_postgres::PostgresDocumentListQuery::new(
+                pool.clone(),
+            )),
         },
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
     });

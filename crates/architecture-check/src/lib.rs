@@ -53,6 +53,10 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
             "document" => &[
                 "axum",
                 "sqlx",
+                "sqlite",
+                "postgres",
+                "sea-orm",
+                "diesel",
                 "reqwest",
                 "aws-sdk-s3",
                 "object-storage",
@@ -66,6 +70,26 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                     "{} has forbidden direct dependency {}",
                     package.name, dependency
                 ));
+            }
+        }
+        if matches!(
+            package.name.as_str(),
+            "document-postgres" | "document-sqlite"
+        ) {
+            for dependency in &package.dependencies {
+                if dependency
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| path.replace('\\', "/").contains("/crates/"))
+                    && dependency.name != "document"
+                    && dependency.name != "document-persistence-contracts"
+                    && dependency.name != "runtime-migration"
+                {
+                    violations.push(format!(
+                        "{} has forbidden inward workspace dependency {}",
+                        package.name, dependency.name
+                    ));
+                }
             }
         }
     }
@@ -113,6 +137,14 @@ mod tests {
     fn rejects_core_dependency_on_application() {
         let metadata = parse(
             r#"{"packages":[{"name":"workflow","manifest_path":"C:/repo/crates/workflow/Cargo.toml","dependencies":[{"name":"business-api","path":"C:/repo/apps/business-api"}]}]}"#,
+        );
+        assert!(validate(&metadata).is_err());
+    }
+
+    #[test]
+    fn rejects_database_adapter_dependency_on_an_unrelated_core_crate() {
+        let metadata = parse(
+            r#"{"packages":[{"name":"document-sqlite","manifest_path":"C:/repo/crates/document-sqlite/Cargo.toml","dependencies":[{"name":"document","path":"C:/repo/crates/document"},{"name":"messaging","path":"C:/repo/crates/messaging"}]}]}"#,
         );
         assert!(validate(&metadata).is_err());
     }

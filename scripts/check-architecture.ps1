@@ -46,6 +46,9 @@ Assert-NotContains "crates/document/Cargo.toml" @("axum", "sqlx", "aws-sdk", "ob
 Assert-NotContains "crates/document/src/domain" @("IntoResponse", "sqlx::", "FromRow") "document domain protocol/SQL violation"
 Assert-NotContains "crates/document/src/domain" @("std::env") "document domain environment access violation"
 Assert-NotContains "crates/document/src/application" @("std::env") "document application environment access violation"
+Assert-NotContains "crates/document/src/application" @("SELECT ", "INSERT ", "UPDATE ", "DELETE FROM", "sqlx::", "FromRow") "document application SQL violation"
+Assert-NotContains "crates/document/src/query" @("sqlx::", "FromRow") "document query DTO adapter leak"
+Assert-NotContains "crates/document/src/domain" @("#[derive(FromRow", "sqlx::FromRow") "document domain row-model violation"
 Assert-NotContains "apps/migration/src" @("sqlx::migrate!") "migration app must use the shared runtime migration catalog"
 Assert-NotContains "apps/business-api/src" @("expected_migration", "PostgresReadinessProbe::new(pool,") "readiness must derive compatibility from the shared migration catalog"
 $statePath = Join-Path $root "apps/business-api/src/state.rs"
@@ -54,9 +57,17 @@ $appStateMatch = [regex]::Match($stateContent, 'pub struct AppState\s*\{(?<body>
 if (-not $appStateMatch.Success) {
     throw "Unable to locate AppState for architecture fitness"
 }
-foreach ($pattern in @("AppConfig", "DatabaseConfig", "SecretUrl", "PgPool")) {
+foreach ($pattern in @("AppConfig", "DatabaseConfig", "SecretUrl", "PgPool", "SqlitePool")) {
     if ($appStateMatch.Groups["body"].Value -match [regex]::Escape($pattern)) {
         throw "HTTP application state infrastructure leak (AppState contains '$pattern')"
+    }
+}
+
+$repositoryPath = Join-Path $root "crates/document/src/domain/repository.rs"
+$repositoryContent = Get-Content -Raw $repositoryPath
+foreach ($forbiddenMethod in @("dashboard", "report", "export")) {
+    if ($repositoryContent -match "async\s+fn\s+$forbiddenMethod") {
+        throw "Aggregate repository contains non-aggregate query method '$forbiddenMethod'"
     }
 }
 
@@ -99,7 +110,9 @@ foreach ($required in @(
     "docs/adr/README.md",
     "docs/architecture/ARCHITECTURE_STATUS.md",
     "docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md",
-    "docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md"
+    "docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md",
+    "docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md",
+    "docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md"
 )) {
     if (-not (Test-Path (Join-Path $root $required))) {
         throw "Required architecture entry missing: $required"

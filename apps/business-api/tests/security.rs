@@ -13,7 +13,8 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
-    AuthConfig, BusinessApiConfig, DatabaseConfig, ObservabilityConfig, ServerConfig,
+    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
+    ServerConfig,
 };
 use business_api::routes::create_router;
 use business_api::state::{
@@ -24,6 +25,10 @@ use document::domain::{
 };
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
+};
+use document::query::{
+    DocumentDetailQuery, DocumentDetailView, DocumentListPage, DocumentListQuery,
+    DocumentListRequest, QueryError,
 };
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tower::ServiceExt;
@@ -61,6 +66,27 @@ impl CreateDocumentUnitOfWork for EmptyPorts {
 }
 
 #[async_trait]
+impl DocumentDetailQuery for EmptyPorts {
+    async fn execute(
+        &self,
+        _tenant_id: uuid::Uuid,
+        _document_id: uuid::Uuid,
+    ) -> Result<Option<DocumentDetailView>, QueryError> {
+        Ok(None)
+    }
+}
+
+#[async_trait]
+impl DocumentListQuery for EmptyPorts {
+    async fn execute(&self, _request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
+        Ok(DocumentListPage {
+            items: Vec::new(),
+            next_cursor: None,
+        })
+    }
+}
+
+#[async_trait]
 impl ReadinessProbe for EmptyPorts {
     async fn check(&self) -> ReadinessReport {
         ReadinessReport {
@@ -82,6 +108,7 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             body_limit_bytes: 1024,
         },
         database: DatabaseConfig {
+            backend: DatabaseBackend::Postgres,
             url: SecretUrl::parse("postgres://user:pass@localhost:5432/db")
                 .expect("test URL should parse"),
             max_connections: 1,
@@ -110,12 +137,8 @@ fn test_router(dev_auth_enabled: bool) -> axum::Router {
             create: Arc::new(document::application::CreateDocumentMetadata::new(
                 ports.clone(),
             )),
-            get: Arc::new(document::application::GetDocumentMetadata::new(
-                ports.clone(),
-            )),
-            list: Arc::new(document::application::ListDocumentMetadata::new(
-                ports.clone(),
-            )),
+            detail: ports.clone(),
+            list: ports.clone(),
         },
         readiness: ports,
     });

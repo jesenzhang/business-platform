@@ -112,9 +112,12 @@ jobs:
         run: |
           docker run --network host --rm --entrypoint /bin/sh minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
       - name: Apply migrations
-        run: cargo run -p migration -- up
+        run: cargo run -p migration -- --backend postgres up
       - name: Run real infrastructure and E2E tests
         run: |
+          cargo test -p document-sqlite --all-features
+          cargo test -p document-persistence-contracts --all-features
+          cargo test -p document-postgres --test query_contracts --all-features
           cargo test -p runtime-migration --all-features
           cargo test -p migration --test migration_test --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1

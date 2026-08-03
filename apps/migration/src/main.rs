@@ -1,12 +1,12 @@
 //! Database migration CLI.
 //!
 //! Usage:
-//!   cargo run -p migration -- up       Apply all pending migrations
-//!   cargo run -p migration -- status   Show migration status
+//!   cargo run -p migration -- --backend postgres up
+//!   cargo run -p migration -- --backend sqlite status
 //!
-//! The database is taken from `DATABASE_URL`, falling back to the local
-//! development default. Migrations live in the workspace-root `migrations/`
-//! directory and are embedded once by the shared `runtime-migration` catalog.
+//! The database URL comes from process configuration (with the legacy
+//! `DATABASE_URL` fallback). PostgreSQL uses the shared `runtime-migration`
+//! catalog; SQLite owns an independent catalog in `document-sqlite`.
 
 use anyhow::Context;
 use sqlx::migrate::MigrateDatabase;
@@ -25,18 +25,28 @@ async fn main() -> anyhow::Result<()> {
 
     let config = config::MigrationConfig::load()
         .map_err(|error| anyhow::anyhow!("failed to load migration configuration: {error}"))?;
-    if let Err(error) = config.validate() {
+    let arguments = std::env::args().skip(1).collect::<Vec<_>>();
+    let (backend, command) = parse_arguments(&arguments)?;
+    let schemes: &[&str] = match backend {
+        DatabaseBackend::Postgres => &["postgres", "postgresql"],
+        DatabaseBackend::Sqlite => &["sqlite"],
+    };
+    if let Err(error) = config.validate_scheme(schemes) {
         eprintln!("Migration configuration validation failed:\n{error}");
         std::process::exit(1);
     }
 
-    let command = std::env::args().nth(1).unwrap_or_default();
-
-    match command.as_str() {
-        "up" => run_up(config.database.url.expose()).await,
-        "status" => run_status(config.database.url.expose()).await,
+    match (backend, command) {
+        (DatabaseBackend::Postgres, "up") => run_postgres_up(config.database.url.expose()).await,
+        (DatabaseBackend::Postgres, "status") => {
+            run_postgres_status(config.database.url.expose()).await
+        }
+        (DatabaseBackend::Sqlite, "up") => run_sqlite_up(config.database.url.expose()).await,
+        (DatabaseBackend::Sqlite, "status") => {
+            run_sqlite_status(config.database.url.expose()).await
+        }
         _ => {
-            eprintln!("Usage: migration <up|status>");
+            eprintln!("Usage: migration --backend <postgres|sqlite> <up|status>");
             eprintln!("  up      Apply all pending migrations");
             eprintln!("  status  Show applied and pending migrations");
             std::process::exit(1);
@@ -44,8 +54,26 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DatabaseBackend {
+    Postgres,
+    Sqlite,
+}
+
+fn parse_arguments(arguments: &[String]) -> anyhow::Result<(DatabaseBackend, &str)> {
+    if arguments.len() != 3 || arguments[0] != "--backend" {
+        anyhow::bail!("Usage: migration --backend <postgres|sqlite> <up|status>");
+    }
+    let backend = match arguments[1].as_str() {
+        "postgres" => DatabaseBackend::Postgres,
+        "sqlite" => DatabaseBackend::Sqlite,
+        value => anyhow::bail!("unsupported database backend: {value}"),
+    };
+    Ok((backend, arguments[2].as_str()))
+}
+
 /// Apply all pending migrations, creating the database if it does not exist.
-async fn run_up(database_url: &str) -> anyhow::Result<()> {
+async fn run_postgres_up(database_url: &str) -> anyhow::Result<()> {
     if !sqlx::Postgres::database_exists(database_url).await? {
         tracing::info!("Creating database");
         sqlx::Postgres::create_database(database_url).await?;
@@ -67,7 +95,7 @@ async fn run_up(database_url: &str) -> anyhow::Result<()> {
 
 /// Print applied migrations (from `_sqlx_migrations`) and the full set of
 /// migrations known to the binary, labelling those not yet applied as pending.
-async fn run_status(database_url: &str) -> anyhow::Result<()> {
+async fn run_postgres_status(database_url: &str) -> anyhow::Result<()> {
     let pool = sqlx::PgPool::connect(database_url)
         .await
         .context("failed to connect to database")?;
@@ -112,4 +140,60 @@ async fn run_status(database_url: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_sqlite_up(database_url: &str) -> anyhow::Result<()> {
+    if !sqlx::Sqlite::database_exists(database_url).await? {
+        sqlx::Sqlite::create_database(database_url).await?;
+    }
+    let pool = sqlx::SqlitePool::connect(database_url)
+        .await
+        .context("failed to connect to SQLite database")?;
+    document_sqlite::MIGRATOR
+        .run(&pool)
+        .await
+        .context("failed to apply SQLite migrations")?;
+    tracing::info!("All SQLite migrations applied successfully");
+    Ok(())
+}
+
+async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
+    let pool = sqlx::SqlitePool::connect(database_url)
+        .await
+        .context("failed to connect to SQLite database")?;
+    let applied_versions =
+        sqlx::query_scalar::<_, i64>("SELECT version FROM _sqlx_migrations ORDER BY version")
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_default();
+    println!("SQLite migrations:");
+    for migration in document_sqlite::MIGRATOR.iter() {
+        let state = if applied_versions.contains(&migration.version) {
+            "applied"
+        } else {
+            "pending"
+        };
+        println!(
+            "  [{state}] {} {}",
+            migration.version, migration.description
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn requires_explicit_backend() {
+        assert!(parse_arguments(&["up".to_string()]).is_err());
+        let arguments = [
+            "--backend".to_string(),
+            "sqlite".to_string(),
+            "up".to_string(),
+        ];
+        let parsed = parse_arguments(&arguments);
+        assert!(matches!(parsed, Ok((DatabaseBackend::Sqlite, "up"))));
+    }
 }

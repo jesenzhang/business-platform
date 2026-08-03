@@ -3,13 +3,17 @@
 > 文档类型：Living Document
 > 最后更新：2026-08-03
 > 当前阶段：Phase 1 Foundation Integrity
-> 当前计划：无（Phase 2 preparation）
+> 当前计划：`PLAN-0003-persistence-query-architecture`
 > 集成方式：local solo fast-forward，无 PR
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
 > was fast-forwarded at `ad47544505b66d577ccdcb8f300812c294d3d7bf`; main CI
 > run 30784568762 passed all six jobs, including PostgreSQL, MinIO, Document
 > E2E, and architecture fitness. The repository is in Phase 2 preparation.
+>
+> 2026-08-03: PLAN-0003 is Active. It establishes database-neutral Document
+> query ports, PostgreSQL/SQLite adapters, independent migrations and shared
+> persistence contracts. It is not integrated.
 
 ## 1. 当前权威结论
 
@@ -45,12 +49,14 @@
 - `docs/architecture/OBSERVABILITY_ARCHITECTURE.md`
 - `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`
 - `docs/architecture/CODE_ARCHITECTURE.md`
+- `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`
 
 标准：
 
 - `docs/standards/API_AND_EVENT_CONTRACT_STANDARD.md`
 - `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`
 - `docs/standards/RUST_CODING_STANDARD.md`
+- `docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`
 
 决策：
 
@@ -153,6 +159,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待落地
 自动化架构门禁：已实现，本地与 GitHub Actions 均 PASS
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
+PLAN-0003：Active
 ```
 
 ## 8. PLAN-0002 采用动作

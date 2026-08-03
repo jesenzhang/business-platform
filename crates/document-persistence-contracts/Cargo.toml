@@ -1,0 +1,12 @@
+[package]
+name = "document-persistence-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+document = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

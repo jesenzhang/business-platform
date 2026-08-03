@@ -342,3 +342,15 @@ The architecture fitness script must reject process configuration and `config`
 crate dependencies in `shared-kernel`, environment access in Document Domain
 or Application, and `AppState` fields containing `AppConfig`,
 `DatabaseConfig`, `SecretUrl`, or `PgPool`.
+
+## 23. Persistence and query adapter gates
+
+- Domain/Application cannot depend on SQLx, SQLite, PostgreSQL or an ORM.
+- `document-postgres` and `document-sqlite` depend inward on `document`; shared
+  contract support is dev-only.
+- Query DTOs cannot derive `sqlx::FromRow`; SQL is prohibited in Application.
+- Aggregate repositories cannot add dashboard/report/export query methods.
+- `AppState` cannot contain a concrete PostgreSQL or SQLite pool.
+- Production configuration rejects SQLite before infrastructure access.
+- PostgreSQL and SQLite run common semantic persistence contracts; their
+  database-specific concurrency and recovery contracts remain separate.

@@ -42,6 +42,7 @@
 | API 与事件 | [`standards/API_AND_EVENT_CONTRACT_STANDARD.md`](standards/API_AND_EVENT_CONTRACT_STANDARD.md) | Baseline | 命令、查询、事件、版本、幂等和兼容 |
 | 架构门禁 | [`standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`](standards/ARCHITECTURE_FITNESS_FUNCTIONS.md) | Baseline | CI 依赖检查、契约测试和发布证据 |
 | Rust 编码 | [`standards/RUST_CODING_STANDARD.md`](standards/RUST_CODING_STANDARD.md) | Baseline | Rust 代码、错误、异步、测试和安全规则 |
+| 查询与数据库适配 | [`standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`](standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md) | Baseline | Query Object、Read DTO、分页、SQL/ORM 与多数据库规则 |
 | 基础设施验证 | [`../企业AI业务平台基础设施开发验证与预生产方案_v1.md`](../企业AI业务平台基础设施开发验证与预生产方案_v1.md) | Baseline | 本地、测试、CI、预生产与恢复 |
 | 文档治理 | [`governance/DOCUMENT_MANAGEMENT.md`](governance/DOCUMENT_MANAGEMENT.md) | Baseline | 文档目录、生命周期、变更和归档 |
 
@@ -51,6 +52,8 @@
 - [`adr/ADR-0002-outbox-claim-retry.md`](adr/ADR-0002-outbox-claim-retry.md)：Outbox claim/lease/retry 设计。
 - [`adr/ADR-0003-domain-driven-layered-backend.md`](adr/ADR-0003-domain-driven-layered-backend.md)：服务端采用战略 DDD、模块化单体、领域/应用/适配器分层、数据所有权、质量属性与自动架构门禁。
 - [`adr/ADR-0004-rust-msrv-toolchain.md`](adr/ADR-0004-rust-msrv-toolchain.md)：Rust 1.94.1 为当前锁定依赖的最低验证工具链。
+- [`adr/ADR-0008-cqrs-query-model-and-read-projections.md`](adr/ADR-0008-cqrs-query-model-and-read-projections.md)：命令/查询分离与可重建 Read Projection。
+- [`adr/ADR-0009-multi-database-persistence-adapters.md`](adr/ADR-0009-multi-database-persistence-adapters.md)：PostgreSQL 生产权威与 SQLite 本地适配策略。
 
 ## 5. 文档目录
 
@@ -97,7 +100,7 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：无（Phase 2 preparation）
+- 当前计划：[`plans/current/PLAN-0003-persistence-query-architecture.md`](plans/current/PLAN-0003-persistence-query-architecture.md)
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
@@ -107,8 +110,8 @@ docs/
 Phase 1 Foundation Integrity 已完成。PLAN-0002 采用 local solo
 fast-forward 且不创建 PR，集成 SHA 为
 `ad47544505b66d577ccdcb8f300812c294d3d7bf`；main CI run 30784568762
-已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前进入 Phase 2
-preparation。
+已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前由 PLAN-0003
+执行 Phase 2 persistence/query preparation；该计划尚未集成。
 
 ## 9. 合并后的后续任务规则
 

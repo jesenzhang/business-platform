@@ -2,9 +2,18 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use business_api::auth::AuthMiddlewareConfig;
-use business_api::config::BusinessApiConfig;
+use business_api::config::{BusinessApiConfig, DatabaseBackend};
 use business_api::routes;
-use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
+use business_api::state::{
+    AppState, DocumentServices, PostgresReadinessProbe, ReadinessProbe, SqliteReadinessProbe,
+};
+
+type PersistenceAdapters = (
+    Arc<dyn document::ports::CreateDocumentUnitOfWork>,
+    Arc<dyn document::query::DocumentDetailQuery>,
+    Arc<dyn document::query::DocumentListQuery>,
+    Arc<dyn ReadinessProbe>,
+);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,35 +34,59 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!(service = %config.observability.service_name, "Starting business-api");
 
-    // Database pool
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(config.database.max_connections)
-        .min_connections(config.database.min_connections)
-        .acquire_timeout(std::time::Duration::from_secs(
-            config.database.acquire_timeout_secs,
-        ))
-        .connect(config.database.url.expose())
-        .await?;
+    let (unit_of_work, detail, list, readiness): PersistenceAdapters = match config.database.backend
+    {
+        DatabaseBackend::Postgres => {
+            let pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(config.database.max_connections)
+                .min_connections(config.database.min_connections)
+                .acquire_timeout(std::time::Duration::from_secs(
+                    config.database.acquire_timeout_secs,
+                ))
+                .connect(config.database.url.expose())
+                .await?;
+            (
+                Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
+                    pool.clone(),
+                )),
+                Arc::new(document_postgres::PostgresDocumentDetailQuery::new(
+                    pool.clone(),
+                )),
+                Arc::new(document_postgres::PostgresDocumentListQuery::new(
+                    pool.clone(),
+                )),
+                Arc::new(PostgresReadinessProbe::new(pool)),
+            )
+        }
+        DatabaseBackend::Sqlite => {
+            let pool = document_sqlite::connect(
+                config.database.url.expose(),
+                config.database.max_connections,
+            )
+            .await?;
+            (
+                Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(
+                    pool.clone(),
+                )),
+                Arc::new(document_sqlite::SqliteDocumentDetailQuery::new(
+                    pool.clone(),
+                )),
+                Arc::new(document_sqlite::SqliteDocumentListQuery::new(pool.clone())),
+                Arc::new(SqliteReadinessProbe::new(pool)),
+            )
+        }
+    };
 
-    tracing::info!("Database connection established");
-
-    let repository = Arc::new(document_postgres::PostgresDocumentQueryRepository::new(
-        pool.clone(),
-    ));
-    let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
-        pool.clone(),
-    ));
+    tracing::info!(backend = ?config.database.backend, "Database connection established");
     let state = Arc::new(AppState {
         documents: DocumentServices {
             create: Arc::new(document::application::CreateDocumentMetadata::new(
                 unit_of_work,
             )),
-            get: Arc::new(document::application::GetDocumentMetadata::new(
-                repository.clone(),
-            )),
-            list: Arc::new(document::application::ListDocumentMetadata::new(repository)),
+            detail,
+            list,
         },
-        readiness: Arc::new(PostgresReadinessProbe::new(pool)),
+        readiness,
     });
 
     let auth_config = AuthMiddlewareConfig {

@@ -25,15 +25,22 @@ impl MigrationConfig {
         Ok(config)
     }
 
-    pub fn validate(&self) -> Result<(), ConfigValidationError> {
-        if matches!(
-            self.database.url.expose().split(':').next(),
-            Some("postgres" | "postgresql")
-        ) {
+    pub fn validate_scheme(&self, schemes: &[&str]) -> Result<(), ConfigValidationError> {
+        if self
+            .database
+            .url
+            .expose()
+            .split(':')
+            .next()
+            .is_some_and(|scheme| schemes.contains(&scheme))
+        {
             Ok(())
         } else {
             Err(ConfigValidationError {
-                messages: vec!["database.url must use a PostgreSQL scheme".to_string()],
+                messages: vec![format!(
+                    "database.url must use one of these schemes: {}",
+                    schemes.join(", ")
+                )],
             })
         }
     }

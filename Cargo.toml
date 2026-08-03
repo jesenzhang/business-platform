@@ -19,6 +19,8 @@ members = [
     "crates/finance",
     "crates/document",
     "crates/document-postgres",
+    "crates/document-sqlite",
+    "crates/document-persistence-contracts",
     "crates/notification",
     "crates/audit",
     "crates/workflow",
@@ -67,7 +69,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "uuid", "chrono", "json", "migrate"] }
 
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
@@ -116,6 +118,7 @@ approval = { path = "crates/approval" }
 finance = { path = "crates/finance" }
 document = { path = "crates/document" }
 document-postgres = { path = "crates/document-postgres" }
+document-sqlite = { path = "crates/document-sqlite" }
 notification = { path = "crates/notification" }
 audit = { path = "crates/audit" }
 workflow = { path = "crates/workflow" }

@@ -39,9 +39,11 @@
 | 可观测性 | `OBSERVABILITY_ARCHITECTURE.md` | 日志、指标、追踪和审计 |
 | 遗留迁移 | `LEGACY_MIGRATION_ARCHITECTURE.md` | 从现有系统如何渐进迁移 |
 | 代码架构 | `CODE_ARCHITECTURE.md` | crate、分层与代码依赖规则 |
+| 持久化、查询与多数据库 | `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md` | Command/Query seam、Projection、跨 Context 读取与数据库适配策略 |
 | API 与事件 | `../standards/API_AND_EVENT_CONTRACT_STANDARD.md` | 对外协议和兼容性规则 |
 | 架构门禁 | `../standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` | 如何自动证明架构符合性 |
 | Rust 编码 | `../standards/RUST_CODING_STANDARD.md` | 具体编码和测试规范 |
+| 查询与数据库适配 | `../standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md` | Read DTO、分页、查询性能、SQL/ORM 与层级数据规则 |
 
 任何单份文档都不能脱离其余文档单独解释为完整架构。
 

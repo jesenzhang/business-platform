@@ -7,18 +7,23 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
-    AuthConfig, BusinessApiConfig, DatabaseConfig, ObservabilityConfig, ServerConfig,
+    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
+    ServerConfig,
 };
 use business_api::routes;
 use business_api::state::{
     AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
 };
-use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
+use document::application::CreateDocumentMetadata;
 use document::domain::{
     DocumentMetadata, DocumentPage, DocumentQueryRepository, ListDocumentsQuery, RepositoryError,
 };
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
+};
+use document::query::{
+    DocumentDetailQuery, DocumentDetailView, DocumentListCursor, DocumentListItem,
+    DocumentListPage, DocumentListQuery, DocumentListRequest, DocumentStatusView, QueryError,
 };
 use http_body_util::BodyExt;
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
@@ -97,6 +102,69 @@ impl CreateDocumentUnitOfWork for FakeStore {
     }
 }
 
+fn view_status(status: document::domain::DocumentStatus) -> DocumentStatusView {
+    match status {
+        document::domain::DocumentStatus::Active => DocumentStatusView::Active,
+        document::domain::DocumentStatus::Archived => DocumentStatusView::Archived,
+        document::domain::DocumentStatus::Deleted => DocumentStatusView::Deleted,
+    }
+}
+
+#[async_trait]
+impl DocumentDetailQuery for FakeStore {
+    async fn execute(
+        &self,
+        tenant_id: Uuid,
+        document_id: Uuid,
+    ) -> Result<Option<DocumentDetailView>, QueryError> {
+        Ok(self
+            .documents
+            .read()
+            .await
+            .iter()
+            .find(|item| item.tenant_id == tenant_id && item.id == document_id)
+            .map(|item| DocumentDetailView {
+                id: item.id,
+                tenant_id: item.tenant_id,
+                original_filename: item.original_filename.clone(),
+                content_type: item.content_type.clone(),
+                status: view_status(item.status),
+                version: item.version,
+                size_bytes: item.size_bytes,
+                created_by: item.created_by,
+                created_at: item.created_at,
+                updated_at: item.updated_at,
+            }))
+    }
+}
+
+#[async_trait]
+impl DocumentListQuery for FakeStore {
+    async fn execute(&self, request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
+        let mut items = self
+            .documents
+            .read()
+            .await
+            .iter()
+            .filter(|item| item.tenant_id == request.tenant_id)
+            .map(|item| DocumentListItem {
+                id: item.id,
+                original_filename: item.original_filename.clone(),
+                content_type: item.content_type.clone(),
+                status: view_status(item.status),
+                version: item.version,
+                size_bytes: item.size_bytes,
+                created_at: item.created_at,
+                updated_at: item.updated_at,
+            })
+            .collect::<Vec<_>>();
+        items.sort_by_key(|item| std::cmp::Reverse((item.created_at, item.id)));
+        items.truncate(request.limit as usize);
+        let next_cursor = None::<DocumentListCursor>;
+        Ok(DocumentListPage { items, next_cursor })
+    }
+}
+
 struct ReadyProbe;
 
 #[async_trait]
@@ -121,6 +189,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             body_limit_bytes: 1024 * 1024,
         },
         database: DatabaseConfig {
+            backend: DatabaseBackend::Postgres,
             url: SecretUrl::parse("postgres://localhost/test").expect("test URL should parse"),
             max_connections: 2,
             min_connections: 0,
@@ -138,12 +207,11 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             dev_auth_enabled: true,
         },
     };
-    let query = store.clone();
     let state = Arc::new(AppState {
         documents: DocumentServices {
-            create: Arc::new(CreateDocumentMetadata::new(store)),
-            get: Arc::new(GetDocumentMetadata::new(query.clone())),
-            list: Arc::new(ListDocumentMetadata::new(query)),
+            create: Arc::new(CreateDocumentMetadata::new(store.clone())),
+            detail: store.clone(),
+            list: store,
         },
         readiness: Arc::new(ReadyProbe),
     });

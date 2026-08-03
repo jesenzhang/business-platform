@@ -32,6 +32,8 @@ pub struct ServerConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {
+    #[serde(default)]
+    pub backend: DatabaseBackend,
     pub url: SecretUrl,
     #[serde(default = "default_max_connections")]
     pub max_connections: u32,
@@ -39,6 +41,14 @@ pub struct DatabaseConfig {
     pub min_connections: u32,
     #[serde(default = "default_acquire_timeout_secs")]
     pub acquire_timeout_secs: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabaseBackend {
+    #[default]
+    Postgres,
+    Sqlite,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -95,13 +105,23 @@ impl BusinessApiConfig {
         if self.database.acquire_timeout_secs == 0 {
             messages.push("database.acquire_timeout_secs must be > 0".to_string());
         }
-        if !matches!(
-            self.database.url.expose().split(':').next(),
-            Some("postgres" | "postgresql")
-        ) {
-            messages.push("database.url must use a PostgreSQL scheme".to_string());
+        let scheme = self.database.url.expose().split(':').next();
+        match self.database.backend {
+            DatabaseBackend::Postgres if !matches!(scheme, Some("postgres" | "postgresql")) => {
+                messages.push(
+                    "database.url must use a PostgreSQL scheme for postgres backend".to_string(),
+                );
+            }
+            DatabaseBackend::Sqlite if scheme != Some("sqlite") => {
+                messages
+                    .push("database.url must use a SQLite scheme for sqlite backend".to_string());
+            }
+            _ => {}
         }
         if self.env == RuntimeEnvironment::Production {
+            if self.database.backend == DatabaseBackend::Sqlite {
+                messages.push("database.backend must not be sqlite in production".to_string());
+            }
             if self.auth.dev_auth_enabled {
                 messages.push("auth.dev_auth_enabled must be false in production".to_string());
             }
@@ -176,6 +196,7 @@ mod tests {
                 body_limit_bytes: 1024,
             },
             database: DatabaseConfig {
+                backend: DatabaseBackend::Postgres,
                 url: SecretUrl::parse(&format!(
                     "postgres://user:{DATABASE_PASSWORD}@db.internal/platform"
                 ))
@@ -216,5 +237,19 @@ mod tests {
         assert!(rendered.contains("server.cors_origins"));
         assert!(!rendered.contains(DATABASE_PASSWORD));
         assert!(!rendered.contains("development-token"));
+    }
+
+    #[test]
+    fn production_rejects_sqlite_before_connecting() {
+        let mut config = valid_config();
+        config.env = RuntimeEnvironment::Production;
+        config.database.backend = DatabaseBackend::Sqlite;
+        config.database.url = SecretUrl::parse("sqlite://data/business-platform.db")
+            .unwrap_or_else(|_| unreachable!());
+        config.auth.issuer_url = "https://identity.example.test".to_string();
+        let Err(error) = config.validate() else {
+            unreachable!()
+        };
+        assert!(error.to_string().contains("database.backend"));
     }
 }

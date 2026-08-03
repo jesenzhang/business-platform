@@ -1,15 +1,58 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use document::application::{CreateDocumentMetadata, GetDocumentMetadata, ListDocumentMetadata};
+use document::application::CreateDocumentMetadata;
+use document::query::{DocumentDetailQuery, DocumentListQuery};
 use sqlx::PgPool;
 
 /// Application services injected by the composition root.
 #[derive(Clone)]
 pub struct DocumentServices {
     pub create: Arc<CreateDocumentMetadata>,
-    pub get: Arc<GetDocumentMetadata>,
-    pub list: Arc<ListDocumentMetadata>,
+    pub detail: Arc<dyn DocumentDetailQuery>,
+    pub list: Arc<dyn DocumentListQuery>,
+}
+
+pub struct SqliteReadinessProbe {
+    pool: sqlx::SqlitePool,
+}
+
+impl SqliteReadinessProbe {
+    #[must_use]
+    pub fn new(pool: sqlx::SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl ReadinessProbe for SqliteReadinessProbe {
+    async fn check(&self) -> ReadinessReport {
+        let database = sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map(|_| "available")
+            .unwrap_or("unavailable");
+        let applied =
+            sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(version), 0) FROM _sqlx_migrations")
+                .fetch_one(&self.pool)
+                .await;
+        let migrations = match applied {
+            Ok(version) if version == document_sqlite::latest_migration_version() => "equal",
+            Ok(0) => "empty",
+            Ok(version) if version < document_sqlite::latest_migration_version() => "behind",
+            Ok(_) => "ahead",
+            Err(_) => "unknown",
+        };
+        ReadinessReport {
+            status: if database == "available" && migrations == "equal" {
+                ReadinessStatus::Ready
+            } else {
+                ReadinessStatus::NotReady
+            },
+            database,
+            migrations,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -33,9 +33,11 @@
 - `docs/architecture/OBSERVABILITY_ARCHITECTURE.md`
 - `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`，涉及现有系统迁移时
 - `docs/architecture/CODE_ARCHITECTURE.md`
+- `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`，涉及持久化、查询或数据库适配时
 - `docs/standards/API_AND_EVENT_CONTRACT_STANDARD.md`
 - `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`
 - `docs/standards/RUST_CODING_STANDARD.md`
+- `docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`，涉及查询模型或数据库适配时
 
 ## 3. 架构预检
 

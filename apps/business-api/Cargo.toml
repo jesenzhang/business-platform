@@ -28,6 +28,7 @@ shared-kernel = { workspace = true }
 observability = { workspace = true }
 document = { workspace = true }
 document-postgres = { workspace = true }
+document-sqlite = { workspace = true }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
