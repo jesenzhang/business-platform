@@ -1,6 +1,16 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
+Push-Location $root
+try {
+    cargo run -p architecture-check -- check
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cargo metadata architecture fitness failed"
+    }
+} finally {
+    Pop-Location
+}
+
 function Assert-NotContains([string]$Path, [string[]]$Patterns, [string]$Message) {
     $target = Join-Path $root $Path
     if (-not (Test-Path $target)) {
@@ -36,6 +46,8 @@ Assert-NotContains "crates/document/Cargo.toml" @("axum", "sqlx", "aws-sdk", "ob
 Assert-NotContains "crates/document/src/domain" @("IntoResponse", "sqlx::", "FromRow") "document domain protocol/SQL violation"
 Assert-NotContains "crates/document/src/domain" @("std::env") "document domain environment access violation"
 Assert-NotContains "crates/document/src/application" @("std::env") "document application environment access violation"
+Assert-NotContains "apps/migration/src" @("sqlx::migrate!") "migration app must use the shared runtime migration catalog"
+Assert-NotContains "apps/business-api/src" @("expected_migration", "PostgresReadinessProbe::new(pool,") "readiness must derive compatibility from the shared migration catalog"
 $statePath = Join-Path $root "apps/business-api/src/state.rs"
 $stateContent = Get-Content -Raw $statePath
 $appStateMatch = [regex]::Match($stateContent, 'pub struct AppState\s*\{(?<body>[\s\S]*?)\n\}')
