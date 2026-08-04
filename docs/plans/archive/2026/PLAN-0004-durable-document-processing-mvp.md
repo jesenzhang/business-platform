@@ -1,7 +1,7 @@
 # PLAN-0004: Durable Document Processing MVP
 
-> Status: Accepted Candidate — Revision 1
-> Date: 2026-08-03
+> Status: Integrated — Archived
+> Date: 2026-08-04
 > Owner: Platform Foundation / Document Intelligence
 > Base: `97f6a41608aa136ac05176f37c6e7d3bda0e25a7`
 > Integration Mode: local solo fast-forward
@@ -201,6 +201,26 @@ Its Feature CI run is `30833527820` and is green across all six jobs.
   PostgreSQL-only. These are bounded MVP constraints, not deferred correctness
   work.
 
-Revision 1 is therefore an `Accepted Candidate`. The feature branch remains
-the delivery boundary; no PR, main merge, branch deletion, or PLAN-0005 work
-was performed.
+Revision 1 is therefore an `Accepted Candidate`. The feature branch was then
+integrated to `main` by local solo fast-forward; no PR, merge commit, or force
+push was used.
+
+## Integration closeout — 2026-08-04
+
+- Candidate SHA: `12454709a88fde16f7769af27a75e79c4bc0981a`.
+- Main integration SHA: `12454709a88fde16f7769af27a75e79c4bc0981a`.
+- Feature CI: `30833916455` — `PASS` across Format, Check, Clippy, Unit
+  tests, Architecture Fitness, and PostgreSQL + MinIO + E2E contracts.
+- Main CI: `30868701290` — `PASS` across the same six jobs after the
+  fast-forward integration.
+- Local SQLite process E2E: `PASS`, including killed running-step recovery.
+- GitHub Linux PostgreSQL/MinIO E2E: `PASS`.
+- Windows PostgreSQL/MinIO E2E: `NOT RUN`; the required runtime is not
+  installed locally and Linux CI is the environment-dependent evidence.
+- Accepted MVP boundaries remain unchanged: deterministic local extraction is
+  the only provider; PDF/image/Office/archive inputs are explicitly
+  unsupported; SQLite is local single-process only; Separate AI is
+  PostgreSQL-only. These are bounded MVP constraints, not correctness gaps.
+
+The plan is now `Integrated / Archived`. The PLAN-0004 delivery branch may be
+removed only after the post-integration Closeout CI is green.
