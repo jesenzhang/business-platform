@@ -133,11 +133,11 @@ PLAN-0006.
 
 ## Candidate evidence
 
-### Revision 1 closure audit (working tree, 2026-08-04)
+### Revision 1 closure audit (local commit `1a06393f9b8d1e8af5cae6f8160ce5a232fe197e`, 2026-08-04)
 
-The following implementation checks are complete in the current working tree;
-they are not an integration or Feature CI result until the branch is committed,
-pushed, and the required external contracts run.
+The following implementation checks are complete in the local commit; they are
+not an integration or Feature CI result until the branch is pushed and the
+required external contracts run.
 
 | Gate / requirement | Result | Evidence |
 |---|---|---|
@@ -149,7 +149,7 @@ pushed, and the required external contracts run.
 | Migration manifests | PASS | Root migration 014 and SQLite processing migration 005 are applied by runtime migration code and covered by both SHA256 manifests. |
 | Local fmt/check/clippy/test/architecture gates | PASS | `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --all-features`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo test --workspace --all-features` (105 passed, 31 ignored); `pwsh scripts/check-architecture.ps1`. |
 | External PostgreSQL/MinIO contracts | BLOCKED | `cargo test --workspace --all-features -- --include-ignored` reaches `apps/business-api/tests/documents_postgres.rs` and stops because `DATABASE_URL` is not set. No local PostgreSQL/MinIO service is available. |
-| Feature CI / integration | PENDING | Requires a successful push and CI run; no archive or PLAN-0006 start is authorized before this evidence exists. |
+| Feature CI / integration | PENDING | The local commit is not on GitHub because the non-force push was reset; no archive or PLAN-0006 start is authorized before this evidence exists. |
 
 - Revision 1 targeted SQLite Governance E2E: PASS after the recurrence/state
   matrix and shared-table migration guards (`cargo test -p governance-worker
@@ -163,11 +163,11 @@ pushed, and the required external contracts run.
 - Revision 1 management security tests: PASS — forged permission headers are
   rejected, server-side grants reach the governance boundary, and
   `repair.execute` cannot approve a repair.
-- Revision 1 Feature CI: PENDING; the push attempt for implementation commit
-  `f1e10a0942c18715f5591b56619d5c6dae21f06e` could not reach GitHub over
-  HTTPS (port 443), so no new Feature CI run exists. The previous candidate's
-  CI run is retained only as historical evidence and does not satisfy this
-  revision.
+- Revision 1 Feature CI: PENDING; the push attempt for local commit
+  `1a06393f9b8d1e8af5cae6f8160ce5a232fe197e` could not reach GitHub over
+  HTTPS (`Recv failure: Connection was reset`), so no new Feature CI run exists.
+  The previous candidate's CI run is retained only as historical evidence and
+  does not satisfy this revision.
 - Windows PostgreSQL/MinIO execution: NOT RUN; the local environment has no
   PostgreSQL service.
 
