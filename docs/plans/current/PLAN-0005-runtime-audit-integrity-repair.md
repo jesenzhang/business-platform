@@ -1,11 +1,13 @@
 # PLAN-0005: Runtime Audit, Data Integrity and Controlled Repair Foundation
 
-> Status: Accepted Candidate
+> Status: Active
+> Revision: 1
+> Revision Reason: Governance trust and correctness hardening
 > Date: 2026-08-04
 > Owner: Platform Foundation / Runtime Governance
 > Base SHA: `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`
-> Candidate SHA: `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
-> Feature CI: `30879843925` (all jobs green)
+> Previous Candidate SHA: `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
+> Previous Evidence HEAD: `ab01288cd3477107c567e342ff45b7f624ec5396`
 > Integration Mode: local solo fast-forward
 > Pull Request: not used
 > Stop Policy: blockers-only

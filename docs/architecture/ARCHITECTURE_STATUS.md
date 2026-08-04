@@ -41,6 +41,12 @@
 > metadata-only text-artifact verification and the separate owner/Governance
 > local transaction boundary are recorded accepted risks in the current plan;
 > SQLite also proves expired-lease reclaim and stale-fence rejection.
+>
+> 2026-08-04: PLAN-0005 was reopened as Revision 1, `Active`, for Governance
+> trust and correctness hardening. The previous implementation candidate is
+> `71a2a8495033aec7d8e40752fc80fd2ba30dc485` and the previous evidence HEAD is
+> `ab01288cd3477107c567e342ff45b7f624ec5396`. It is not an integration
+> candidate until the Revision 1 evidence and Feature CI are green.
 
 ## 1. 当前权威结论
 
@@ -192,7 +198,7 @@ PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
-PLAN-0005：Accepted Candidate（implementation `71a2a8495033aec7d8e40752fc80fd2ba30dc485`；Feature CI `30879843925` 全绿；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0005：Active，Revision 1（Governance trust and correctness hardening；previous candidate `71a2a8495033aec7d8e40752fc80fd2ba30dc485`；previous evidence HEAD `ab01288cd3477107c567e342ff45b7f624ec5396`）
 ```
 
 ## 8. PLAN-0002 采用动作
