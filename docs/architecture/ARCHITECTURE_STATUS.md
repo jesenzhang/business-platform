@@ -33,6 +33,13 @@
 > 2026-08-04: PLAN-0005 started from main `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`.
 > Runtime Governance owns Audit, integrity scan/finding, repair run and ledger
 > state; Document Intelligence remains the owner of processing state.
+>
+> 2026-08-04: PLAN-0005 reached Accepted Candidate at implementation
+> `21f8c603263bde0dab4c6944c7655c5c71394554`. Feature CI `30877000524` passed
+> format, check, clippy, workspace tests, Architecture Fitness, and the real
+> PostgreSQL/MinIO governance E2E. Windows PostgreSQL/MinIO remains NOT RUN;
+> metadata-only text-artifact verification and the separate owner/Governance
+> local transaction boundary are recorded accepted risks in the current plan.
 
 ## 1. 当前权威结论
 
@@ -184,7 +191,7 @@ PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
-PLAN-0005：Active（Runtime Audit, Data Integrity and Controlled Repair Foundation）
+PLAN-0005：Accepted Candidate（implementation `21f8c603263bde0dab4c6944c7655c5c71394554`；Feature CI `30877000524` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作

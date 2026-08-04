@@ -1,9 +1,11 @@
 # PLAN-0005: Runtime Audit, Data Integrity and Controlled Repair Foundation
 
-> Status: Active
+> Status: Accepted Candidate
 > Date: 2026-08-04
 > Owner: Platform Foundation / Runtime Governance
 > Base SHA: `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`
+> Candidate SHA: `21f8c603263bde0dab4c6944c7655c5c71394554`
+> Feature CI: `30877000524` (all jobs green)
 > Integration Mode: local solo fast-forward
 > Pull Request: not used
 > Stop Policy: blockers-only
@@ -34,10 +36,12 @@ only allow-listed owner operations through typed repair handlers.
   DryRunRepair, ApproveRepair, ExecuteRepair, CancelRepair, ResumeRepair;
   AuditQuery, FindingQuery, ScanRunQuery, RepairRunQuery, ProcessingJobQuery,
   CandidateQuery, and ProcessingStepQuery.
-- **Transactions:** owner business state, Audit, Outbox, Finding transition,
-  and Repair Ledger append commit in one local transaction where they share a
-  database. Cross-context reads are typed and read-only; repair handlers call
-  owner application ports and never write foreign tables.
+- **Transactions:** owner business state, Audit, and Outbox commit in the
+  Document Intelligence owner transaction; the Governance transaction commits
+  Finding, Repair Step/Run, and Repair Ledger transitions. Cross-context reads
+  are typed and read-only; repair handlers call owner application ports and
+  never write foreign tables. The boundary is explicit and recoverable through
+  fenced leases and idempotent repair commands.
 - **Security:** all records are tenant scoped; management permissions are
   required; medium/high risk repairs require creator/approver separation;
   details are redacted and never contain secrets, object locations, raw text,
@@ -99,10 +103,34 @@ and crash-recovery evidence, documentation, and a green feature CI run pass.
 This plan does not merge to main, archive itself, delete its branch, or start
 PLAN-0006.
 
+## Candidate evidence
+
+- Local `cargo fmt --all -- --check`, `cargo check --workspace
+  --all-targets --all-features`, `cargo clippy --workspace --all-targets
+  --all-features -- -D warnings`, and `cargo test --workspace
+  --all-features`: PASS.
+- Local `scripts/check-architecture.ps1` and
+  `scripts/test-local-governance-repair.ps1`: PASS, including SQLite scan,
+  repair, audit, outbox, ledger, and finding lifecycle assertions.
+- GitHub Feature CI `30877000524`: PASS for format, check, clippy, workspace
+  tests, architecture fitness, and PostgreSQL/MinIO contracts. The real
+  governance E2E `postgres_scan_and_requeue_repair_are_durable` passed with
+  migrations, unified audit, outbox, repaired Finding, and Repair Ledger
+  assertions.
+- Windows PostgreSQL/MinIO execution: NOT RUN; the local environment has no
+  PostgreSQL service.
+
 ## Accepted boundaries and risks
 
 No generic scheduler, DAG, arbitrary SQL, PDF/OCR/Office/real model provider,
 or automatic repair outside the explicit allow-list is introduced. Windows
 PostgreSQL/MinIO evidence may remain `NOT RUN` when GitHub Linux evidence is
 green. A full WORM archive is deferred; the database hash chain is tamper
-evidence, not an absolute immutability guarantee.
+evidence, not an absolute immutability guarantee. The PROC-INT-008 text
+artifact check is metadata/checkpoint based and deliberately reports Unknown
+when the durable artifact reference is not trustworthy; a bounded object-store
+probe with timeout/rate-limit policy is deferred. Owner business state and
+Governance ledger/finding state use separate local transactions across the
+bounded-context adapter boundary; leases, idempotency, and reconciliation keep
+the boundary recoverable, but a distributed transaction is intentionally not
+introduced.
