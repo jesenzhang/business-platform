@@ -126,8 +126,9 @@ PLAN-0004 均采用 local solo fast-forward 且不创建 PR；PLAN-0004 集成 S
 为 `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI run `30868701290`
 已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。Phase 4 Runtime
 Governance Foundation 的 PLAN-0005 已达到 Accepted Candidate：候选 SHA
-为 `21f8c603263bde0dab4c6944c7655c5c71394554`，Feature CI `30877000524`
-全绿并包含真实 PostgreSQL/MinIO 治理 E2E；本计划不启动 PLAN-0006。
+为 `71a2a8495033aec7d8e40752fc80fd2ba30dc485`，Feature CI `30879843925`
+全绿并包含真实 PostgreSQL/MinIO 治理 E2E 与 SQLite 租约恢复/陈旧 fence
+验证；本计划不启动 PLAN-0006。
 
 ## 9. 合并后的后续任务规则
 

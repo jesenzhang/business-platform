@@ -35,11 +35,12 @@
 > state; Document Intelligence remains the owner of processing state.
 >
 > 2026-08-04: PLAN-0005 reached Accepted Candidate at implementation
-> `21f8c603263bde0dab4c6944c7655c5c71394554`. Feature CI `30877000524` passed
+> `71a2a8495033aec7d8e40752fc80fd2ba30dc485`. Feature CI `30879843925` passed
 > format, check, clippy, workspace tests, Architecture Fitness, and the real
 > PostgreSQL/MinIO governance E2E. Windows PostgreSQL/MinIO remains NOT RUN;
 > metadata-only text-artifact verification and the separate owner/Governance
-> local transaction boundary are recorded accepted risks in the current plan.
+> local transaction boundary are recorded accepted risks in the current plan;
+> SQLite also proves expired-lease reclaim and stale-fence rejection.
 
 ## 1. 当前权威结论
 
@@ -191,7 +192,7 @@ PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
-PLAN-0005：Accepted Candidate（implementation `21f8c603263bde0dab4c6944c7655c5c71394554`；Feature CI `30877000524` 全绿；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0005：Accepted Candidate（implementation `71a2a8495033aec7d8e40752fc80fd2ba30dc485`；Feature CI `30879843925` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作

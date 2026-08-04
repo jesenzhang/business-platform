@@ -4,8 +4,8 @@
 > Date: 2026-08-04
 > Owner: Platform Foundation / Runtime Governance
 > Base SHA: `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`
-> Candidate SHA: `21f8c603263bde0dab4c6944c7655c5c71394554`
-> Feature CI: `30877000524` (all jobs green)
+> Candidate SHA: `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
+> Feature CI: `30879843925` (all jobs green)
 > Integration Mode: local solo fast-forward
 > Pull Request: not used
 > Stop Policy: blockers-only
@@ -111,12 +111,14 @@ PLAN-0006.
   --all-features`: PASS.
 - Local `scripts/check-architecture.ps1` and
   `scripts/test-local-governance-repair.ps1`: PASS, including SQLite scan,
-  repair, audit, outbox, ledger, and finding lifecycle assertions.
-- GitHub Feature CI `30877000524`: PASS for format, check, clippy, workspace
+  repair, audit, outbox, ledger, finding lifecycle, lease reclaim, and stale
+  fence assertions.
+- GitHub Feature CI `30879843925`: PASS for format, check, clippy, workspace
   tests, architecture fitness, and PostgreSQL/MinIO contracts. The real
   governance E2E `postgres_scan_and_requeue_repair_are_durable` passed with
   migrations, unified audit, outbox, repaired Finding, and Repair Ledger
-  assertions.
+  assertions; the SQLite governance E2E also covers expired-lease reclaim and
+  stale-fence rejection.
 - Windows PostgreSQL/MinIO execution: NOT RUN; the local environment has no
   PostgreSQL service.
 
