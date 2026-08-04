@@ -148,7 +148,7 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
     let outbox_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM outbox_events WHERE tenant_id=$1 AND event_type='document.processing.waiting-for-ai.v1'",
     )
-    .bind(tenant_id)
+    .bind(tenant_id.to_string())
     .fetch_one(&pool)
     .await
     .expect("read repair outbox");
