@@ -4,6 +4,7 @@ members = [
     "apps/business-api",
     "apps/business-worker",
     "apps/ai-worker",
+    "apps/governance-worker",
     "apps/agent-adapter",
     "apps/migration",
     "crates/runtime-migration",
@@ -27,6 +28,13 @@ members = [
     "crates/document-processing-sqlite",
     "crates/notification",
     "crates/audit",
+    "crates/audit-postgres",
+    "crates/audit-sqlite",
+    "crates/runtime-governance-postgres",
+    "crates/runtime-governance-sqlite",
+    "crates/runtime-governance",
+    "crates/data-integrity",
+    "crates/data-repair",
     "crates/workflow",
     "crates/ai-application",
     "crates/agent-integration",
@@ -125,8 +133,17 @@ finance = { path = "crates/finance" }
 document = { path = "crates/document" }
 document-postgres = { path = "crates/document-postgres" }
 document-sqlite = { path = "crates/document-sqlite" }
+document-processing-sqlite = { path = "crates/document-processing-sqlite" }
+document-processing-postgres = { path = "crates/document-processing-postgres" }
 notification = { path = "crates/notification" }
 audit = { path = "crates/audit" }
+audit-postgres = { path = "crates/audit-postgres" }
+audit-sqlite = { path = "crates/audit-sqlite" }
+runtime-governance-postgres = { path = "crates/runtime-governance-postgres" }
+runtime-governance-sqlite = { path = "crates/runtime-governance-sqlite" }
+runtime-governance = { path = "crates/runtime-governance" }
+data-integrity = { path = "crates/data-integrity" }
+data-repair = { path = "crates/data-repair" }
 workflow = { path = "crates/workflow" }
 ai-application = { path = "crates/ai-application" }
 agent-integration = { path = "crates/agent-integration" }

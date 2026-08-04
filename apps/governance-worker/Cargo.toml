@@ -1,0 +1,36 @@
+[package]
+name = "governance-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "governance-worker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+audit = { workspace = true }
+audit-postgres = { workspace = true }
+audit-sqlite = { workspace = true }
+chrono = { workspace = true }
+data-integrity = { workspace = true }
+data-repair = { workspace = true }
+document-processing-sqlite = { workspace = true }
+document-processing-postgres = { workspace = true }
+runtime-governance = { workspace = true }
+runtime-governance-postgres = { workspace = true }
+runtime-governance-sqlite = { workspace = true }
+runtime-migration = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+document-sqlite = { workspace = true }

@@ -1,0 +1,23 @@
+[package]
+name = "audit-sqlite"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+context = "audit"
+bounded_context = "audit"
+layer = "infrastructure-adapter"
+role = "infrastructure-adapter"
+data_owner = "audit"
+
+[dependencies]
+async-trait = { workspace = true }
+audit = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

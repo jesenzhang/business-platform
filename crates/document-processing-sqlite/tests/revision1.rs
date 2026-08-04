@@ -1,8 +1,7 @@
 use chrono::Utc;
 use document_processing::ports::{
-    AiTaskPort, CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand,
-    ProcessingExecutionUnitOfWork, ProcessingJobClaimPort, ProcessingJobCommandPort,
-    ProcessingJobQuery, TextArtifactReference,
+    CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, ProcessingExecutionUnitOfWork,
+    ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery, TextArtifactReference,
 };
 use document_processing::{
     CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionRequest,
@@ -112,10 +111,15 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         )
         .await
         .unwrap_or_else(|_| unreachable!());
-    let claimed_task = AiTaskPort::claim_next(&store, "ai-test", Utc::now(), 60)
-        .await
-        .unwrap_or_else(|_| unreachable!())
-        .unwrap_or_else(|| unreachable!());
+    let claimed_task = document_processing::ports::legacy::AiTaskPort::claim_next(
+        &store,
+        "ai-test",
+        Utc::now(),
+        60,
+    )
+    .await
+    .unwrap_or_else(|_| unreachable!())
+    .unwrap_or_else(|| unreachable!());
     let candidate = DeterministicLocalExtractor
         .extract(ExtractionRequest {
             tenant_id: tenant,

@@ -5,18 +5,26 @@
 //! idempotency read and all side effects.
 
 use async_trait::async_trait;
+use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
 use chrono::{DateTime, Duration, Utc};
+use data_repair::{
+    RepairCommand, RepairError, RepairExecutionContext, RepairOutcome, RepairResult,
+};
 use document_processing::domain::{
     CandidateReview, ExtractionCandidate, JobVersion, ProcessingJob, ProcessingJobStatus,
     ProcessingStepKind, ProcessingStepStatus,
 };
+use document_processing::ports::legacy;
+use document_processing::ports::legacy::{AiTaskPort, CandidateStore, ProcessingStepStore};
 use document_processing::ports::{
-    AiTask, AiTaskPort, CandidateStore, ClaimedProcessingJob, ClassifiedProcessingFailure,
+    AiTask, CandidateQuery, ClaimedProcessingJob, ClassifiedProcessingFailure,
     CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, FinalizeReviewResult,
     ProcessingExecutionUnitOfWork, ProcessingFailureDisposition, ProcessingJobClaimPort,
     ProcessingJobCommandPort, ProcessingJobDetail, ProcessingJobQuery, ProcessingRepositoryError,
-    ProcessingStepStore, StepCheckpoint, TextArtifactReference,
+    ProcessingStepQuery, StepCheckpoint, StoredStep, TextArtifactReference,
 };
+use runtime_governance::processing_repairs::ProcessingRepairPort;
+use serde_json::Value;
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::SqliteTransactionManager;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, TransactionManager};
@@ -103,6 +111,63 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .await?;
         transaction.commit().await?;
     }
+    let applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(version), 0) FROM document_processing_migrations",
+    )
+    .fetch_one(pool)
+    .await?;
+    if applied < 3 {
+        let mut transaction = pool.begin().await?;
+        sqlx::raw_sql(include_str!(
+            "../migrations/003_runtime_audit_integrity_repair.sql"
+        ))
+        .execute(&mut *transaction)
+        .await?;
+        ensure_audit_columns(&mut transaction).await?;
+        sqlx::query(
+            "INSERT INTO document_processing_migrations (version, checksum, applied_at) VALUES (?1, ?2, ?3)",
+        )
+        .bind(3_i64)
+        .bind(include_bytes!("../migrations/003_runtime_audit_integrity_repair.sql").as_slice())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+    }
+    Ok(())
+}
+
+async fn ensure_audit_columns(connection: &mut SqliteConnection) -> Result<(), sqlx::Error> {
+    let columns =
+        sqlx::query_scalar::<_, String>("SELECT name FROM pragma_table_info('audit_events')")
+            .fetch_all(&mut *connection)
+            .await?;
+    let additions = [
+        ("operation_id", "TEXT"),
+        ("actor_type", "TEXT NOT NULL DEFAULT 'user'"),
+        ("actor_id", "TEXT"),
+        ("correlation_id", "TEXT"),
+        ("causation_id", "TEXT"),
+        ("reason", "TEXT"),
+        ("result", "TEXT NOT NULL DEFAULT 'succeeded'"),
+        ("failure_code", "TEXT"),
+        ("before_hash", "TEXT"),
+        ("after_hash", "TEXT"),
+        ("changed_fields", "TEXT NOT NULL DEFAULT '[]'"),
+        ("schema_version", "TEXT NOT NULL DEFAULT 'audit.v1'"),
+        ("previous_hash", "TEXT"),
+        ("record_hash", "TEXT"),
+        ("occurred_at", "TEXT"),
+    ];
+    for (name, definition) in additions {
+        if !columns.iter().any(|column| column == name) {
+            let sql = format!("ALTER TABLE audit_events ADD COLUMN {name} {definition}");
+            sqlx::query(&sql).execute(&mut *connection).await?;
+        }
+    }
+    sqlx::query("UPDATE audit_events SET occurred_at = created_at WHERE occurred_at IS NULL")
+        .execute(&mut *connection)
+        .await?;
     Ok(())
 }
 
@@ -153,6 +218,15 @@ struct JobRow {
 #[derive(Debug, FromRow)]
 struct CandidateRow {
     payload: String,
+}
+
+#[derive(Debug, FromRow)]
+struct StepRow {
+    step_kind: String,
+    status: String,
+    attempt_number: i32,
+    checkpoint_json: Option<String>,
+    failure_code: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
@@ -855,6 +929,58 @@ impl CandidateStore for SqliteProcessingStore {
     }
 }
 
+#[async_trait]
+impl CandidateQuery for SqliteProcessingStore {
+    async fn get_candidate(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+    ) -> Result<Option<ExtractionCandidate>, ProcessingRepositoryError> {
+        CandidateStore::get_candidate(self, tenant_id, job_id).await
+    }
+}
+
+#[async_trait]
+impl ProcessingStepQuery for SqliteProcessingStore {
+    async fn list_steps(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+    ) -> Result<Vec<StoredStep>, ProcessingRepositoryError> {
+        let rows = sqlx::query_as::<_, StepRow>(
+            "SELECT step_kind, status, attempt_number, checkpoint_json, failure_code FROM document_processing_steps WHERE tenant_id = ?1 AND job_id = ?2 ORDER BY step_kind, attempt_number",
+        )
+        .bind(tenant_id.to_string())
+        .bind(job_id.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sql_error)?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(StoredStep {
+                    step_kind: ProcessingStepKind::try_from(row.step_kind.as_str())
+                        .map_err(|_| ProcessingRepositoryError::Failed)?,
+                    status: match row.status.as_str() {
+                        "pending" => ProcessingStepStatus::Pending,
+                        "running" => ProcessingStepStatus::Running,
+                        "succeeded" => ProcessingStepStatus::Succeeded,
+                        "failed" => ProcessingStepStatus::Failed,
+                        "skipped" => ProcessingStepStatus::Skipped,
+                        _ => return Err(ProcessingRepositoryError::Failed),
+                    },
+                    attempt_number: row.attempt_number,
+                    checkpoint_json: row
+                        .checkpoint_json
+                        .map(|value| serde_json::from_str(&value))
+                        .transpose()
+                        .map_err(|_| ProcessingRepositoryError::Failed)?,
+                    failure_code: row.failure_code,
+                })
+            })
+            .collect()
+    }
+}
+
 fn to_ai_task(row: AiTaskRow) -> Result<AiTask, ProcessingRepositoryError> {
     Ok(AiTask {
         id: parse_uuid(&row.id)?,
@@ -1193,6 +1319,93 @@ async fn insert_processing_audit(
         .execute(&mut *connection)
         .await
         .map_err(map_sql_error)?;
+    insert_unified_audit(connection, job, action, actor_id, details, occurred_at).await?;
+    Ok(())
+}
+
+async fn insert_unified_audit(
+    connection: &mut SqliteConnection,
+    job: &ProcessingJob,
+    action: &str,
+    actor_id: Option<Uuid>,
+    details: serde_json::Value,
+    occurred_at: DateTime<Utc>,
+) -> Result<(), ProcessingRepositoryError> {
+    let actor_id = actor_id.unwrap_or_else(|| job.created_by());
+    let result = if action.contains("failed") || action.contains("retry") {
+        AuditResult::Failed
+    } else if action.contains("cancel") {
+        AuditResult::Cancelled
+    } else {
+        AuditResult::Succeeded
+    };
+    let action = AuditAction::new(format!("document_processing.{action}"))
+        .map_err(|_| ProcessingRepositoryError::Failed)?;
+    let resource = AuditResource::new("processing_job", job.id().to_string())
+        .map_err(|_| ProcessingRepositoryError::Failed)?;
+    let event = AuditEvent::new(
+        Uuid::now_v7(),
+        job.tenant_id(),
+        AuditActor {
+            actor_type: if actor_id == job.created_by() {
+                AuditActorType::User
+            } else {
+                AuditActorType::Worker
+            },
+            actor_id,
+        },
+        action,
+        resource,
+        Uuid::now_v7(),
+        None,
+        None,
+        None,
+        None,
+        result,
+        None,
+        None,
+        None,
+        Vec::new(),
+        details,
+        "audit.v1",
+        occurred_at,
+    )
+    .map_err(|_| ProcessingRepositoryError::Failed)?;
+    let previous = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT record_hash FROM audit_events WHERE tenant_id=?1 ORDER BY occurred_at DESC,id DESC LIMIT 1",
+    )
+    .bind(job.tenant_id().to_string())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(map_sql_error)?
+    .flatten();
+    let event = event.with_chain(previous);
+    sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,details,trace_id,created_at,occurred_at,operation_id,actor_type,actor_id,correlation_id,causation_id,reason,result,failure_code,before_hash,after_hash,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)")
+        .bind(event.id.to_string())
+        .bind(event.tenant_id.to_string())
+        .bind(event.action.as_str())
+        .bind(&event.resource.resource_type)
+        .bind(&event.resource.resource_id)
+        .bind(event.details.to_string())
+        .bind(&event.trace_id)
+        .bind(event.occurred_at.to_rfc3339())
+        .bind(event.operation_id.to_string())
+        .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
+        .bind(event.actor.actor_id.to_string())
+        .bind(event.correlation_id.map(|value| value.to_string()))
+        .bind(event.causation_id.map(|value| value.to_string()))
+        .bind(&event.reason)
+        .bind(format!("{:?}", event.result).to_lowercase())
+        .bind(&event.failure_code)
+        .bind(&event.before_hash)
+        .bind(&event.after_hash)
+        .bind(serde_json::to_string(&event.changed_fields).map_err(|_| ProcessingRepositoryError::Failed)?)
+        .bind(&event.schema_version)
+        .bind(&event.previous_hash)
+        .bind(&event.record_hash)
+        .execute(&mut *connection)
+        .await
+        .map_err(map_sql_error)?;
     Ok(())
 }
 
@@ -1328,6 +1541,31 @@ async fn load_ai_task_for_update(
 #[async_trait]
 #[allow(clippy::too_many_lines)]
 impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
+    async fn create_job(
+        &self,
+        job: &ProcessingJob,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError> {
+        ProcessingJobCommandPort::create(self, job).await
+    }
+
+    async fn claim_next_job(
+        &self,
+        worker_id: &str,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<Option<ClaimedProcessingJob>, ProcessingRepositoryError> {
+        ProcessingJobClaimPort::claim_next(self, worker_id, now, lease_duration_secs).await
+    }
+
+    async fn claim_next_ai_task(
+        &self,
+        worker_id: &str,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<Option<AiTask>, ProcessingRepositoryError> {
+        legacy::AiTaskPort::claim_next(self, worker_id, now, lease_duration_secs).await
+    }
+
     async fn start_step(
         &self,
         tenant_id: Uuid,
@@ -2263,4 +2501,500 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
         commit_immediate(&mut connection).await?;
         Ok(reclaimed)
     }
+}
+
+#[async_trait]
+#[allow(clippy::too_many_lines)]
+impl ProcessingRepairPort for SqliteProcessingStore {
+    async fn reconcile_processing_job(
+        &self,
+        command: &RepairCommand,
+        context: &RepairExecutionContext,
+    ) -> Result<RepairResult, RepairError> {
+        let mut connection = begin_immediate(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Err(RepairError::Conflict);
+        };
+        let before = job.aggregate_version().value();
+        if command
+            .expected_resource_version
+            .is_some_and(|expected| expected != before)
+        {
+            return Err(RepairError::Conflict);
+        }
+        let decision = sqlx::query_scalar::<_, String>(
+            "SELECT r.decision FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=?1 AND c.job_id=?2 ORDER BY r.created_at DESC LIMIT 1",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .ok_or(RepairError::Conflict)?;
+        let status = if decision == "rejected" {
+            "rejected"
+        } else {
+            "succeeded"
+        };
+        let updated = sqlx::query("UPDATE document_processing_jobs SET status=?1,current_step='await_review',lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=?2 WHERE tenant_id=?3 AND id=?4 AND status='waiting_for_review' AND version=?5")
+            .bind(status)
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(before)
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        insert_processing_outbox(
+            &mut connection,
+            &job,
+            "processing.repair_review_reconciled",
+            serde_json::json!({ "job_id": job.id(), "decision": decision }),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        insert_processing_audit(
+            &mut connection,
+            &job,
+            "repair_review_reconciled",
+            Some(command.requested_by),
+            serde_json::json!({ "decision": decision }),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        commit_immediate(&mut connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        Ok(RepairResult {
+            command_id: Uuid::now_v7(),
+            resource_version_before: Some(before),
+            resource_version_after: Some(before.saturating_add(1)),
+            before_hash: format!("processing-job:{before}"),
+            after_hash: format!("processing-job:{}", before.saturating_add(1)),
+            rows_affected: 1,
+            outcome: RepairOutcome::Succeeded,
+        })
+    }
+
+    async fn requeue_missing_ai_task(
+        &self,
+        command: &RepairCommand,
+        context: &RepairExecutionContext,
+    ) -> Result<RepairResult, RepairError> {
+        let mut connection = begin_immediate(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Err(RepairError::Conflict);
+        };
+        let before = job.aggregate_version().value();
+        if command
+            .expected_resource_version
+            .is_some_and(|expected| expected != before)
+            || job.status() != ProcessingJobStatus::WaitingForAi
+            || job.current_step() != ProcessingStepKind::ExtractFields
+        {
+            return Err(RepairError::Conflict);
+        }
+        let active = sqlx::query_scalar::<_, String>(
+            "SELECT id FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND status IN ('queued','running','retry_scheduled') LIMIT 1",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        if active.is_some() {
+            commit_immediate(&mut connection)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+            return Ok(repair_result(before, before, 0, RepairOutcome::Noop));
+        }
+        let checkpoint = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT checkpoint_json FROM document_processing_steps WHERE tenant_id=?1 AND job_id=?2 AND step_kind='extract_text' AND status='succeeded' ORDER BY attempt_number DESC LIMIT 1",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .flatten()
+        .map(|value| serde_json::from_str(&value))
+        .transpose()
+        .map_err(|_| RepairError::Persistence)?;
+        let artifact =
+            artifact_from_checkpoint(checkpoint.as_ref(), job.document_content_revision())?;
+        let next_attempt = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT MAX(attempt_count) FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND step_kind='extract_fields'",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .unwrap_or(-1)
+        .saturating_add(1);
+        if next_attempt >= i64::from(job.max_attempts()) {
+            return Err(RepairError::Conflict);
+        }
+        let task_id = Uuid::now_v7();
+        let inserted = sqlx::query("INSERT INTO document_ai_tasks (id,tenant_id,job_id,step_kind,status,input_artifact_id,attempt_count,max_attempts,next_attempt_at,fence_version,created_at,updated_at) VALUES (?1,?2,?3,'extract_fields','queued',?4,?5,?6,?7,0,?7,?7) ON CONFLICT(tenant_id,job_id,step_kind,attempt_count) DO NOTHING")
+            .bind(task_id.to_string())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(&artifact.key)
+            .bind(next_attempt)
+            .bind(job.max_attempts())
+            .bind(context.now.to_rfc3339())
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if inserted.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        let updated = sqlx::query("UPDATE document_processing_jobs SET version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND status='waiting_for_ai' AND current_step='extract_fields' AND version=?4")
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(before)
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        insert_processing_outbox(
+            &mut connection,
+            &job,
+            "document.processing.waiting-for-ai.v1",
+            serde_json::json!({"task_id": task_id, "step": "extract_fields"}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        insert_processing_audit(
+            &mut connection,
+            &job,
+            "ai_task_requeued",
+            Some(command.requested_by),
+            serde_json::json!({"task_id": task_id}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        commit_immediate(&mut connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        Ok(repair_result(
+            before,
+            before.saturating_add(1),
+            1,
+            RepairOutcome::Succeeded,
+        ))
+    }
+
+    async fn clear_terminal_job_lease(
+        &self,
+        command: &RepairCommand,
+        context: &RepairExecutionContext,
+    ) -> Result<RepairResult, RepairError> {
+        let mut connection = begin_immediate(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let before = sqlx::query_scalar::<_, i64>(
+            "SELECT version FROM document_processing_jobs WHERE tenant_id=?1 AND id=?2 AND status IN ('succeeded','rejected','failed','cancelled') AND (lease_owner IS NOT NULL OR lease_token IS NOT NULL)",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .ok_or(RepairError::Conflict)?;
+        if command
+            .expected_resource_version
+            .is_some_and(|expected| expected != before)
+        {
+            return Err(RepairError::Conflict);
+        }
+        let updated = sqlx::query("UPDATE document_processing_jobs SET lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND version=?4")
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(before)
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        commit_immediate(&mut connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        Ok(RepairResult {
+            command_id: Uuid::now_v7(),
+            resource_version_before: Some(before),
+            resource_version_after: Some(before.saturating_add(1)),
+            before_hash: format!("processing-job:{before}"),
+            after_hash: format!("processing-job:{}", before.saturating_add(1)),
+            rows_affected: 1,
+            outcome: RepairOutcome::Succeeded,
+        })
+    }
+
+    async fn rebuild_processing_step_projection(
+        &self,
+        command: &RepairCommand,
+        context: &RepairExecutionContext,
+    ) -> Result<RepairResult, RepairError> {
+        let mut connection = begin_immediate(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Err(RepairError::Conflict);
+        };
+        let before = job.aggregate_version().value();
+        if command
+            .expected_resource_version
+            .is_some_and(|expected| expected != before)
+            || job.status() != ProcessingJobStatus::WaitingForReview
+            || job.current_step() != ProcessingStepKind::AwaitReview
+        {
+            return Err(RepairError::Conflict);
+        }
+        let checkpoint = serde_json::json!({
+            "repaired_from": "processing_job",
+            "status": "waiting_for_review"
+        })
+        .to_string();
+        let updated = sqlx::query("UPDATE document_processing_steps SET status='succeeded',finished_at=COALESCE(finished_at,?1),checkpoint_json=COALESCE(checkpoint_json,?2),updated_at=?1 WHERE tenant_id=?3 AND job_id=?4 AND step_kind='await_review' AND status <> 'succeeded'")
+            .bind(context.now.to_rfc3339())
+            .bind(&checkpoint)
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() == 0 {
+            let inserted = sqlx::query("INSERT INTO document_processing_steps (job_id,tenant_id,step_kind,status,attempt_number,finished_at,checkpoint_json,created_at,updated_at) VALUES (?1,?2,'await_review','succeeded',?3,?4,?5,?4,?4) ON CONFLICT(job_id,step_kind,attempt_number) DO NOTHING")
+                .bind(command.finding_id.to_string())
+                .bind(command.tenant_id.to_string())
+                .bind(job.attempt_count())
+                .bind(context.now.to_rfc3339())
+                .bind(&checkpoint)
+                .execute(&mut *connection)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+            if inserted.rows_affected() == 0 {
+                commit_immediate(&mut connection)
+                    .await
+                    .map_err(|_| RepairError::Persistence)?;
+                return Ok(repair_result(before, before, 0, RepairOutcome::Noop));
+            }
+        }
+        let updated_job = sqlx::query("UPDATE document_processing_jobs SET version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND version=?4")
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(before)
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated_job.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        insert_processing_outbox(
+            &mut connection,
+            &job,
+            "document.processing.step-projection-rebuilt.v1",
+            serde_json::json!({"step":"await_review"}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        insert_processing_audit(
+            &mut connection,
+            &job,
+            "processing_step_projection_rebuilt",
+            Some(command.requested_by),
+            serde_json::json!({"step":"await_review"}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        commit_immediate(&mut connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        Ok(repair_result(
+            before,
+            before.saturating_add(1),
+            1,
+            RepairOutcome::Succeeded,
+        ))
+    }
+
+    async fn reconcile_ai_completion(
+        &self,
+        command: &RepairCommand,
+        context: &RepairExecutionContext,
+    ) -> Result<RepairResult, RepairError> {
+        let mut connection = begin_immediate(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Err(RepairError::Conflict);
+        };
+        let before = job.aggregate_version().value();
+        if command
+            .expected_resource_version
+            .is_some_and(|expected| expected != before)
+            || job.status() != ProcessingJobStatus::WaitingForAi
+            || job.current_step() != ProcessingStepKind::ExtractFields
+        {
+            return Err(RepairError::Conflict);
+        }
+        let candidate = sqlx::query_scalar::<_, String>(
+            "SELECT c.payload FROM document_ai_tasks a JOIN document_extraction_candidates c ON c.id=a.output_candidate_id AND c.tenant_id=a.tenant_id WHERE a.tenant_id=?1 AND a.job_id=?2 AND a.status='succeeded' ORDER BY a.updated_at DESC LIMIT 1",
+        )
+        .bind(command.tenant_id.to_string())
+        .bind(command.finding_id.to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .ok_or(RepairError::Conflict)?;
+        let candidate: Value =
+            serde_json::from_str(&candidate).map_err(|_| RepairError::Conflict)?;
+        let candidate_revision = candidate
+            .get("content_revision")
+            .and_then(Value::as_i64)
+            .ok_or(RepairError::Conflict)?;
+        if candidate_revision != job.document_content_revision() {
+            return Err(RepairError::Conflict);
+        }
+        let updated = sqlx::query("UPDATE document_processing_jobs SET status='queued',current_step='validate_candidate',next_attempt_at=?1,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND status='waiting_for_ai' AND current_step='extract_fields' AND version=?4")
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .bind(before)
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            return Err(RepairError::Conflict);
+        }
+        sqlx::query("UPDATE document_processing_steps SET status='succeeded',finished_at=COALESCE(finished_at,?1),updated_at=?1 WHERE tenant_id=?2 AND job_id=?3 AND step_kind='extract_fields' AND status <> 'succeeded'")
+            .bind(context.now.to_rfc3339())
+            .bind(command.tenant_id.to_string())
+            .bind(command.finding_id.to_string())
+            .execute(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        insert_processing_outbox(
+            &mut connection,
+            &job,
+            "document.processing.ai-completion-reconciled.v1",
+            serde_json::json!({"step":"validate_candidate"}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        insert_processing_audit(
+            &mut connection,
+            &job,
+            "ai_completion_reconciled",
+            Some(command.requested_by),
+            serde_json::json!({"step":"validate_candidate"}),
+            context.now,
+        )
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        commit_immediate(&mut connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        Ok(repair_result(
+            before,
+            before.saturating_add(1),
+            1,
+            RepairOutcome::Succeeded,
+        ))
+    }
+}
+
+fn repair_result(
+    before: i64,
+    after: i64,
+    rows_affected: u32,
+    outcome: RepairOutcome,
+) -> RepairResult {
+    RepairResult {
+        command_id: Uuid::now_v7(),
+        resource_version_before: Some(before),
+        resource_version_after: Some(after),
+        before_hash: format!("processing-job:{before}"),
+        after_hash: format!("processing-job:{after}"),
+        rows_affected,
+        outcome,
+    }
+}
+
+fn artifact_from_checkpoint(
+    checkpoint: Option<&Value>,
+    expected_revision: i64,
+) -> Result<TextArtifactReference, RepairError> {
+    let object = checkpoint
+        .and_then(Value::as_object)
+        .ok_or(RepairError::Unavailable)?;
+    let key = object
+        .get("text_artifact_reference")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RepairError::Unavailable)?;
+    let content_revision = object
+        .get("content_revision")
+        .and_then(Value::as_i64)
+        .ok_or(RepairError::Unavailable)?;
+    let content_hash = object
+        .get("content_hash")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RepairError::Unavailable)?;
+    if content_revision != expected_revision {
+        return Err(RepairError::Conflict);
+    }
+    Ok(TextArtifactReference {
+        key: key.to_string(),
+        content_hash: content_hash.to_string(),
+        content_revision,
+        byte_count: object
+            .get("byte_count")
+            .and_then(Value::as_u64)
+            .ok_or(RepairError::Unavailable)?,
+        line_count: object
+            .get("line_count")
+            .and_then(Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or(RepairError::Unavailable)?,
+        character_count: object
+            .get("character_count")
+            .and_then(Value::as_u64)
+            .ok_or(RepairError::Unavailable)?,
+    })
 }

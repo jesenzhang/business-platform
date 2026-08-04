@@ -5,7 +5,8 @@ use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{BusinessApiConfig, DatabaseBackend};
 use business_api::routes;
 use business_api::state::{
-    AppState, DocumentServices, PostgresReadinessProbe, ReadinessProbe, SqliteReadinessProbe,
+    AppState, DocumentServices, GovernanceServices, PostgresReadinessProbe, ReadinessProbe,
+    SqliteReadinessProbe,
 };
 
 type PersistenceAdapters = (
@@ -13,11 +14,11 @@ type PersistenceAdapters = (
     Arc<dyn document::query::DocumentDetailQuery>,
     Arc<dyn document::query::DocumentListQuery>,
     Arc<dyn ReadinessProbe>,
-    Arc<dyn document_processing::ports::ProcessingJobCommandPort>,
-    Arc<dyn document_processing::ports::ProcessingJobClaimPort>,
     Arc<dyn document_processing::ports::ProcessingJobQuery>,
-    Arc<dyn document_processing::ports::CandidateStore>,
+    Arc<dyn document_processing::ports::CandidateQuery>,
+    Arc<dyn document_processing::ports::ProcessingStepQuery>,
     Arc<dyn document_processing::ports::ProcessingExecutionUnitOfWork>,
+    GovernanceServices,
 );
 
 #[tokio::main]
@@ -45,11 +46,11 @@ async fn main() -> anyhow::Result<()> {
         detail,
         list,
         readiness,
-        processing_commands,
-        processing_claims,
         processing_queries,
-        processing_candidates,
+        processing_candidate_queries,
+        processing_step_queries,
         processing_execution,
+        governance,
     ): PersistenceAdapters = match config.database.backend {
         DatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
@@ -62,6 +63,19 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             let processing_store = Arc::new(
                 document_processing_postgres::PostgresProcessingStore::new(pool.clone()),
+            );
+            let governance_store = Arc::new(
+                runtime_governance_postgres::PostgresGovernanceStore::new(pool.clone()),
+            );
+            let audit_store = Arc::new(audit_postgres::PostgresAuditStore::new(pool.clone()));
+            let scanner = Arc::new(runtime_governance::ExplicitIntegrityScanner::new(
+                governance_store.clone(),
+                governance_store.clone(),
+            ));
+            let repair_handlers = Arc::new(
+                runtime_governance::processing_repairs::ProcessingRepairRegistry::new(
+                    processing_store.clone(),
+                ),
             );
             (
                 Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
@@ -77,8 +91,15 @@ async fn main() -> anyhow::Result<()> {
                 processing_store.clone(),
                 processing_store.clone(),
                 processing_store.clone(),
-                processing_store.clone(),
                 processing_store,
+                GovernanceServices {
+                    scans: scanner,
+                    integrity_queries: governance_store.clone(),
+                    integrity_persistence: governance_store.clone(),
+                    repair_persistence: governance_store,
+                    repair_handlers,
+                    audit_queries: audit_store,
+                },
             )
         }
         DatabaseBackend::Sqlite => {
@@ -90,6 +111,19 @@ async fn main() -> anyhow::Result<()> {
             document_processing_sqlite::run_migrations(&pool).await?;
             let processing_store = Arc::new(
                 document_processing_sqlite::SqliteProcessingStore::new(pool.clone()),
+            );
+            let governance_store = Arc::new(runtime_governance_sqlite::SqliteGovernanceStore::new(
+                pool.clone(),
+            ));
+            let audit_store = Arc::new(audit_sqlite::SqliteAuditStore::new(pool.clone()));
+            let scanner = Arc::new(runtime_governance::ExplicitIntegrityScanner::new(
+                governance_store.clone(),
+                governance_store.clone(),
+            ));
+            let repair_handlers = Arc::new(
+                runtime_governance::processing_repairs::ProcessingRepairRegistry::new(
+                    processing_store.clone(),
+                ),
             );
             (
                 Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(
@@ -103,8 +137,15 @@ async fn main() -> anyhow::Result<()> {
                 processing_store.clone(),
                 processing_store.clone(),
                 processing_store.clone(),
-                processing_store.clone(),
                 processing_store,
+                GovernanceServices {
+                    scans: scanner,
+                    integrity_queries: governance_store.clone(),
+                    integrity_persistence: governance_store.clone(),
+                    repair_persistence: governance_store,
+                    repair_handlers,
+                    audit_queries: audit_store,
+                },
             )
         }
     };
@@ -119,12 +160,12 @@ async fn main() -> anyhow::Result<()> {
             list,
         },
         processing: Some(business_api::state::ProcessingServices {
-            commands: processing_commands,
-            claims: processing_claims,
             queries: processing_queries,
-            candidates: processing_candidates,
+            candidate_queries: processing_candidate_queries,
+            step_queries: processing_step_queries,
             execution: processing_execution,
         }),
+        governance: Some(governance),
         readiness,
     });
 

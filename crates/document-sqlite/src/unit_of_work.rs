@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
 use chrono::{DateTime, Utc};
 use document::domain::{
     AggregateVersion, ContentRevision, DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata,
@@ -234,11 +235,67 @@ async fn insert_audit(
     command: &PersistNewDocument,
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
-    let details = serde_json::json!({"original_filename": document.original_filename(), "content_type": document.content_type()});
-    sqlx::query("INSERT INTO audit_events (id, tenant_id, user_id, action, resource_type, resource_id, details, created_at) VALUES (?1, ?2, ?3, 'document.created', 'document', ?4, ?5, ?6)")
-        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id().to_string())
-        .bind(document.created_by().to_string()).bind(document.id().to_string())
-        .bind(details.to_string()).bind(Utc::now().to_rfc3339()).execute(&mut *tx).await.map_err(map_error)?;
+    let occurred_at = Utc::now();
+    let action = AuditAction::new("document.created").map_err(|_| ApplicationPortError::Failed)?;
+    let resource = AuditResource::new("document", document.id().to_string())
+        .map_err(|_| ApplicationPortError::Failed)?;
+    let event = AuditEvent::new(
+        Uuid::now_v7(),
+        document.tenant_id(),
+        AuditActor {
+            actor_type: AuditActorType::User,
+            actor_id: document.created_by(),
+        },
+        action,
+        resource,
+        Uuid::now_v7(),
+        None,
+        None,
+        None,
+        None,
+        AuditResult::Succeeded,
+        None,
+        None,
+        None,
+        vec!["content_type".to_string(), "original_filename".to_string()],
+        serde_json::json!({
+            "original_filename": document.original_filename(),
+            "content_type": document.content_type(),
+            "content_revision": document.content_revision().value(),
+        }),
+        "audit.v1",
+        occurred_at,
+    )
+    .map_err(|_| ApplicationPortError::Failed)?;
+    let previous = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT record_hash FROM audit_events WHERE tenant_id=?1 ORDER BY occurred_at DESC,id DESC LIMIT 1",
+    )
+    .bind(document.tenant_id().to_string())
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(map_error)?
+    .flatten();
+    let event = event.with_chain(previous);
+    sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16)")
+        .bind(event.id.to_string())
+        .bind(event.tenant_id.to_string())
+        .bind(document.created_by().to_string())
+        .bind(event.action.as_str())
+        .bind(&event.resource.resource_type)
+        .bind(&event.resource.resource_id)
+        .bind(event.details.to_string())
+        .bind(event.occurred_at.to_rfc3339())
+        .bind(event.operation_id.to_string())
+        .bind("user")
+        .bind(event.actor.actor_id.to_string())
+        .bind("succeeded")
+        .bind(serde_json::to_string(&event.changed_fields).map_err(|_| ApplicationPortError::Failed)?)
+        .bind(&event.schema_version)
+        .bind(&event.previous_hash)
+        .bind(&event.record_hash)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_error)?;
     Ok(())
 }
 

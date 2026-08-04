@@ -1,0 +1,23 @@
+[package]
+name = "data-integrity"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+context = "runtime-governance"
+bounded_context = "runtime-governance"
+layer = "domain"
+role = "core"
+data_owner = "runtime-governance"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

@@ -12,9 +12,12 @@ role = "sqlite-adapter"
 data_owner = "document-processing"
 
 [dependencies]
+audit = { workspace = true }
+data-repair = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 document-processing = { path = "../document-processing" }
+runtime-governance = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 uuid = { workspace = true }

@@ -215,8 +215,8 @@ pub async fn create_for_document(
         )
     })?;
     let stored = services
-        .commands
-        .create(&job)
+        .execution
+        .create_job(&job)
         .await
         .map_err(|error| trace(map_error(&error), &headers))?;
     let detail = services
@@ -282,7 +282,7 @@ pub async fn get_candidate(
     let (tenant_id, _) = context(&auth).map_err(|error| trace(error, &headers))?;
     let services = processing_services(&state)?;
     let candidate = services
-        .candidates
+        .candidate_queries
         .get_candidate(tenant_id, job_id)
         .await
         .map_err(|error| trace(map_error(&error), &headers))?

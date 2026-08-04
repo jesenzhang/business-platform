@@ -14,8 +14,7 @@ use config::{AiMode, BusinessWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
     ClassifiedProcessingFailure, ExecutionFence, ProcessingExecutionUnitOfWork,
-    ProcessingFailureDisposition, ProcessingJobClaimPort, ProcessingJobQuery, StepCheckpoint,
-    TextArtifactReference,
+    ProcessingFailureDisposition, ProcessingJobQuery, StepCheckpoint, TextArtifactReference,
 };
 use document_processing::{
     extract_text_artifact, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionError,
@@ -28,7 +27,6 @@ use tokio::time::{sleep, Instant};
 use uuid::Uuid;
 
 struct WorkerServices {
-    claims: Arc<dyn ProcessingJobClaimPort>,
     execution: Arc<dyn ProcessingExecutionUnitOfWork>,
     queries: Arc<dyn ProcessingJobQuery>,
 }
@@ -164,7 +162,7 @@ async fn main() -> anyhow::Result<()> {
     )?;
     let storage = build_storage(&config.storage).await?;
 
-    let (claims, execution, queries, documents) =
+    let (execution, queries, documents) =
         match config.database.backend {
             WorkerDatabaseBackend::Sqlite => {
                 let url =
@@ -179,7 +177,6 @@ async fn main() -> anyhow::Result<()> {
                 ));
                 let document = Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(pool));
                 (
-                    processing.clone() as Arc<dyn ProcessingJobClaimPort>,
                     processing.clone() as Arc<dyn ProcessingExecutionUnitOfWork>,
                     processing as Arc<dyn ProcessingJobQuery>,
                     document as Arc<dyn DocumentRepository>,
@@ -201,7 +198,6 @@ async fn main() -> anyhow::Result<()> {
                     pool,
                 ));
                 (
-                    processing.clone() as Arc<dyn ProcessingJobClaimPort>,
                     processing.clone() as Arc<dyn ProcessingExecutionUnitOfWork>,
                     processing as Arc<dyn ProcessingJobQuery>,
                     document as Arc<dyn DocumentRepository>,
@@ -209,11 +205,7 @@ async fn main() -> anyhow::Result<()> {
             }
         };
     let source = StorageSource { documents, storage };
-    let services = WorkerServices {
-        claims,
-        execution,
-        queries,
-    };
+    let services = WorkerServices { execution, queries };
 
     tracing::info!(worker_id = %config.worker_id, concurrency = config.concurrency, "business-worker ready");
     let mut shutdown = Box::pin(shutdown_signal());
@@ -232,7 +224,7 @@ async fn main() -> anyhow::Result<()> {
                 let now = Utc::now();
                 let _ = services.execution.reclaim_expired_jobs(now).await;
                 if let Ok(permit) = Arc::clone(&permits).try_acquire_owned() {
-                    if let Some(claimed) = services.claims.claim_next(&config.worker_id, now, config.lease_duration_secs).await? {
+                    if let Some(claimed) = services.execution.claim_next_job(&config.worker_id, now, config.lease_duration_secs).await? {
                         tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, "processing job claimed");
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);

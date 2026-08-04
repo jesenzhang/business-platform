@@ -222,6 +222,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             list: store,
         },
         processing: None,
+        governance: None,
         readiness: Arc::new(ReadyProbe),
     });
     routes::create_router(

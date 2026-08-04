@@ -81,6 +81,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             )),
         },
         processing: None,
+        governance: None,
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
     });
     routes::create_router(

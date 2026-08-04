@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{AiWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
-    AiTask, AiTaskPort, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
+    AiTask, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
     ProcessingExecutionUnitOfWork, ProcessingFailureDisposition, ProcessingJobQuery,
 };
 use document_processing::{
@@ -36,7 +36,6 @@ struct StorageSource {
 }
 
 struct AiWorkerServices {
-    tasks: Arc<dyn AiTaskPort>,
     execution: Arc<dyn ProcessingExecutionUnitOfWork>,
     queries: Arc<dyn ProcessingJobQuery>,
 }
@@ -163,7 +162,7 @@ async fn main() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("AI_WORKER__DATABASE__URL is required"))?;
     let storage = build_storage(&config.storage).await?;
 
-    let (tasks, execution, queries, documents) = match config.database.backend {
+    let (execution, queries, documents) = match config.database.backend {
         WorkerDatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
                 .max_connections((config.concurrency.max(1) * 4).max(8))
@@ -173,7 +172,6 @@ async fn main() -> anyhow::Result<()> {
                 pool.clone(),
             ));
             (
-                processing.clone() as Arc<dyn AiTaskPort>,
                 processing.clone() as Arc<dyn ProcessingExecutionUnitOfWork>,
                 processing as Arc<dyn ProcessingJobQuery>,
                 Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
@@ -186,11 +184,7 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     let source = StorageSource { documents, storage };
-    let services = Arc::new(AiWorkerServices {
-        tasks,
-        execution,
-        queries,
-    });
+    let services = Arc::new(AiWorkerServices { execution, queries });
     let source = Arc::new(source);
     let permits = Arc::new(tokio::sync::Semaphore::new(config.concurrency as usize));
     let mut task_set = JoinSet::new();
@@ -207,7 +201,7 @@ async fn main() -> anyhow::Result<()> {
                 let now = Utc::now();
                 let _ = services.execution.reclaim_expired_ai_tasks(now).await;
                 if let Ok(permit) = Arc::clone(&permits).try_acquire_owned() {
-                    if let Some(task) = services.tasks.claim_next(&config.worker_id, now, config.lease_duration_secs).await? {
+                    if let Some(task) = services.execution.claim_next_ai_task(&config.worker_id, now, config.lease_duration_secs).await? {
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
                         let config_for_task = config.clone();

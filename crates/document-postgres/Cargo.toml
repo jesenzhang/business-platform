@@ -10,6 +10,7 @@ layer = "infrastructure-adapter"
 migration_catalog = "runtime-migration"
 
 [dependencies]
+audit = { workspace = true }
 document = { workspace = true }
 sqlx = { workspace = true }
 async-trait = { workspace = true }

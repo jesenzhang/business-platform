@@ -1,8 +1,9 @@
 use chrono::{Duration, Utc};
+use document_processing::ports::legacy::ProcessingStepStore;
 use document_processing::ports::{
     CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, ProcessingExecutionUnitOfWork,
-    ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery, ProcessingStepStore,
-    StepCheckpoint, TextArtifactReference,
+    ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery, StepCheckpoint,
+    TextArtifactReference,
 };
 use document_processing::{
     CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionRequest,
@@ -345,11 +346,15 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
         .unwrap_or_else(|| unreachable!());
     assert_eq!(waiting.job.status(), ProcessingJobStatus::WaitingForAi);
 
-    let ai_claim =
-        document_processing::ports::AiTaskPort::claim_next(&store, "uow-ai", Utc::now(), 30)
-            .await
-            .unwrap_or_else(|_| unreachable!())
-            .unwrap_or_else(|| unreachable!());
+    let ai_claim = document_processing::ports::legacy::AiTaskPort::claim_next(
+        &store,
+        "uow-ai",
+        Utc::now(),
+        30,
+    )
+    .await
+    .unwrap_or_else(|_| unreachable!())
+    .unwrap_or_else(|| unreachable!());
     let ai_fence = ExecutionFence::new(
         "uow-ai",
         ai_claim.lease_token.clone().unwrap_or_default(),

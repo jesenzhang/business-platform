@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use audit::AuditQuery;
+use data_integrity::{IntegrityPersistencePort, IntegrityQueryPort};
+use data_repair::{RepairHandlerRegistry, RepairPersistencePort};
 use document::application::CreateDocumentMetadata;
 use document::query::{DocumentDetailQuery, DocumentListQuery};
 use document_processing::ports::{
-    CandidateStore, ProcessingExecutionUnitOfWork, ProcessingJobClaimPort,
-    ProcessingJobCommandPort, ProcessingJobQuery,
+    CandidateQuery, ProcessingExecutionUnitOfWork, ProcessingJobQuery, ProcessingStepQuery,
 };
+use runtime_governance::IntegrityScanPort;
 use sqlx::PgPool;
 
 /// Application services injected by the composition root.
@@ -19,11 +22,22 @@ pub struct DocumentServices {
 
 #[derive(Clone)]
 pub struct ProcessingServices {
-    pub commands: Arc<dyn ProcessingJobCommandPort>,
-    pub claims: Arc<dyn ProcessingJobClaimPort>,
     pub queries: Arc<dyn ProcessingJobQuery>,
-    pub candidates: Arc<dyn CandidateStore>,
+    pub candidate_queries: Arc<dyn CandidateQuery>,
+    pub step_queries: Arc<dyn ProcessingStepQuery>,
     pub execution: Arc<dyn ProcessingExecutionUnitOfWork>,
+}
+
+/// Management-only governance ports.  Handlers receive typed ports rather
+/// than database pools, SQL strings, or storage credentials.
+#[derive(Clone)]
+pub struct GovernanceServices {
+    pub scans: Arc<dyn IntegrityScanPort>,
+    pub integrity_queries: Arc<dyn IntegrityQueryPort>,
+    pub integrity_persistence: Arc<dyn IntegrityPersistencePort>,
+    pub repair_persistence: Arc<dyn RepairPersistencePort>,
+    pub repair_handlers: Arc<dyn RepairHandlerRegistry>,
+    pub audit_queries: Arc<dyn AuditQuery>,
 }
 
 pub struct SqliteReadinessProbe {
@@ -91,6 +105,7 @@ pub struct ReadinessReport {
 pub struct AppState {
     pub documents: DocumentServices,
     pub processing: Option<ProcessingServices>,
+    pub governance: Option<GovernanceServices>,
     pub readiness: Arc<dyn ReadinessProbe>,
 }
 

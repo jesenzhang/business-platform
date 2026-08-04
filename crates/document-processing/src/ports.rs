@@ -203,90 +203,121 @@ pub trait ProcessingJobQuery: Send + Sync {
     ) -> Result<Vec<ProcessingJobDetail>, ProcessingRepositoryError>;
 }
 
-#[allow(clippy::too_many_arguments)]
-#[async_trait]
-pub trait ProcessingStepStore: Send + Sync {
-    async fn start(
-        &self,
-        checkpoint: &StepCheckpoint,
-        expected_version: i64,
-    ) -> Result<(), ProcessingRepositoryError>;
-    async fn checkpoint(
-        &self,
-        checkpoint: &StepCheckpoint,
-        expected_version: i64,
-    ) -> Result<(), ProcessingRepositoryError>;
-    async fn complete(
-        &self,
-        job_id: Uuid,
-        tenant_id: Uuid,
-        step_kind: ProcessingStepKind,
-        attempt_number: i32,
-        expected_version: i64,
-        finished_at: DateTime<Utc>,
-    ) -> Result<(), ProcessingRepositoryError>;
-    async fn fail(
-        &self,
-        job_id: Uuid,
-        tenant_id: Uuid,
-        step_kind: ProcessingStepKind,
-        attempt_number: i32,
-        failure_code: &str,
-        expected_version: i64,
-        finished_at: DateTime<Utc>,
-    ) -> Result<(), ProcessingRepositoryError>;
+/// Adapter-only write ports retained for persistence contract tests.
+///
+/// Application and worker code must use `ProcessingExecutionUnitOfWork` so a
+/// caller cannot accidentally split a Job/Step/AI/Candidate/Review write
+/// across transactions.
+pub mod legacy {
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    #[allow(clippy::too_many_arguments)]
+    #[async_trait]
+    pub trait ProcessingStepStore: Send + Sync {
+        async fn start(
+            &self,
+            checkpoint: &StepCheckpoint,
+            expected_version: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn checkpoint(
+            &self,
+            checkpoint: &StepCheckpoint,
+            expected_version: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn complete(
+            &self,
+            job_id: Uuid,
+            tenant_id: Uuid,
+            step_kind: ProcessingStepKind,
+            attempt_number: i32,
+            expected_version: i64,
+            finished_at: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn fail(
+            &self,
+            job_id: Uuid,
+            tenant_id: Uuid,
+            step_kind: ProcessingStepKind,
+            attempt_number: i32,
+            failure_code: &str,
+            expected_version: i64,
+            finished_at: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
+
+    #[async_trait]
+    pub trait AiTaskPort: Send + Sync {
+        async fn enqueue(&self, task: &AiTask) -> Result<(), ProcessingRepositoryError>;
+        async fn claim_next(
+            &self,
+            worker_id: &str,
+            now: DateTime<Utc>,
+            lease_duration_secs: i64,
+        ) -> Result<Option<AiTask>, ProcessingRepositoryError>;
+        async fn heartbeat(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            now: DateTime<Utc>,
+            lease_duration_secs: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn complete(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            candidate_id: Uuid,
+            now: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn fail(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            failure_code: &str,
+            now: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
+
+    #[async_trait]
+    pub trait CandidateStore: Send + Sync {
+        async fn save_candidate(
+            &self,
+            candidate: &ExtractionCandidate,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn get_candidate(
+            &self,
+            tenant_id: Uuid,
+            job_id: Uuid,
+        ) -> Result<Option<ExtractionCandidate>, ProcessingRepositoryError>;
+        async fn save_review(
+            &self,
+            review: &CandidateReview,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
 }
 
 #[async_trait]
-pub trait AiTaskPort: Send + Sync {
-    async fn enqueue(&self, task: &AiTask) -> Result<(), ProcessingRepositoryError>;
-    async fn claim_next(
-        &self,
-        worker_id: &str,
-        now: DateTime<Utc>,
-        lease_duration_secs: i64,
-    ) -> Result<Option<AiTask>, ProcessingRepositoryError>;
-    async fn heartbeat(
-        &self,
-        task_id: Uuid,
-        worker_id: &str,
-        lease_token: &str,
-        fence_version: i64,
-        now: DateTime<Utc>,
-        lease_duration_secs: i64,
-    ) -> Result<(), ProcessingRepositoryError>;
-    async fn complete(
-        &self,
-        task_id: Uuid,
-        worker_id: &str,
-        lease_token: &str,
-        fence_version: i64,
-        candidate_id: Uuid,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProcessingRepositoryError>;
-    async fn fail(
-        &self,
-        task_id: Uuid,
-        worker_id: &str,
-        lease_token: &str,
-        fence_version: i64,
-        failure_code: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProcessingRepositoryError>;
-}
-
-#[async_trait]
-pub trait CandidateStore: Send + Sync {
-    async fn save_candidate(
-        &self,
-        candidate: &ExtractionCandidate,
-    ) -> Result<(), ProcessingRepositoryError>;
+pub trait CandidateQuery: Send + Sync {
     async fn get_candidate(
         &self,
         tenant_id: Uuid,
         job_id: Uuid,
     ) -> Result<Option<ExtractionCandidate>, ProcessingRepositoryError>;
-    async fn save_review(&self, review: &CandidateReview) -> Result<(), ProcessingRepositoryError>;
+}
+
+#[async_trait]
+pub trait ProcessingStepQuery: Send + Sync {
+    async fn list_steps(
+        &self,
+        tenant_id: Uuid,
+        job_id: Uuid,
+    ) -> Result<Vec<StoredStep>, ProcessingRepositoryError>;
 }
 
 /// Business-level transaction boundary for worker and review transitions.
@@ -296,6 +327,24 @@ pub trait CandidateStore: Send + Sync {
 /// windows between the Job, Step, Candidate, Review, Audit, and Outbox writes.
 #[async_trait]
 pub trait ProcessingExecutionUnitOfWork: Send + Sync {
+    async fn create_job(
+        &self,
+        job: &ProcessingJob,
+    ) -> Result<ProcessingJob, ProcessingRepositoryError>;
+
+    async fn claim_next_job(
+        &self,
+        worker_id: &str,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<Option<ClaimedProcessingJob>, ProcessingRepositoryError>;
+
+    async fn claim_next_ai_task(
+        &self,
+        worker_id: &str,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<Option<AiTask>, ProcessingRepositoryError>;
     async fn start_step(
         &self,
         tenant_id: Uuid,

@@ -64,6 +64,18 @@ Assert-NotContains "apps/ai-worker/src" @(
     "ProcessingStepStore",
     "FixedPipelineRunner"
 ) "ai-worker must use the execution unit of work for writes"
+Assert-NotContains "apps/business-api/src" @(
+    "ProcessingJobCommandPort",
+    "ProcessingStepStore",
+    "CandidateStore",
+    "AiTaskPort"
+) "business-api must not compose legacy processing write ports"
+Assert-NotContains "apps/governance-worker/src" @(
+    "execute_sql",
+    "repair_table",
+    "DELETE FROM audit_events",
+    "UPDATE audit_events"
+) "governance worker must use typed repair ports"
 $processingPorts = Get-Content -Raw (Join-Path $root "crates/document-processing/src/ports.rs")
 foreach ($requiredProcessingPort in @("ProcessingExecutionUnitOfWork", "ExecutionFence", "TextArtifactReference")) {
     if ($processingPorts -notmatch [regex]::Escape($requiredProcessingPort)) {
@@ -270,6 +282,16 @@ foreach ($required in @(
     "docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md",
     "docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md",
     "docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md"
+    "docs/architecture/RUNTIME_AUDIT_ARCHITECTURE.md"
+    "docs/architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md"
+    "docs/architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md"
+    "docs/standards/AUDIT_EVENT_STANDARD.md"
+    "docs/standards/DATA_INTEGRITY_RULE_STANDARD.md"
+    "docs/standards/CONTROLLED_REPAIR_STANDARD.md"
+    "docs/adr/ADR-0013-unified-runtime-audit-model.md"
+    "docs/adr/ADR-0014-data-integrity-finding-lifecycle.md"
+    "docs/adr/ADR-0015-controlled-repair-and-approval.md"
+    "docs/adr/ADR-0016-repair-ledger-and-verification.md"
 )) {
     if (-not (Test-Path (Join-Path $root $required))) {
         throw "Required architecture entry missing: $required"

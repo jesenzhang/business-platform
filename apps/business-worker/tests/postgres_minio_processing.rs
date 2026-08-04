@@ -1,7 +1,6 @@
 use chrono::{Duration, Utc};
-use document_processing::ports::{
-    CandidateStore, ProcessingJobClaimPort, ProcessingJobCommandPort,
-};
+use document_processing::ports::legacy::CandidateStore;
+use document_processing::ports::{ProcessingJobClaimPort, ProcessingJobCommandPort};
 use document_processing::{DeterministicLocalExtractor, FixedPipelineRunner, ProcessingJob};
 use document_processing_postgres::PostgresProcessingStore;
 use object_storage::{ObjectKey, ObjectStorageClient, S3Client};

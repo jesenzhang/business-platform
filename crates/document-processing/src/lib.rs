@@ -19,8 +19,8 @@ pub use domain::{
     TextArtifact, TextCheckpoint,
 };
 pub use ports::{
-    AiTaskPort, CandidateStore, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
+    CandidateQuery, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
     FinalizeReviewCommand, FinalizeReviewResult, ProcessingExecutionUnitOfWork,
     ProcessingFailureDisposition, ProcessingJobClaimPort, ProcessingJobCommandPort,
-    ProcessingJobQuery, ProcessingRepositoryError, ProcessingStepStore, TextArtifactReference,
+    ProcessingJobQuery, ProcessingRepositoryError, ProcessingStepQuery, TextArtifactReference,
 };

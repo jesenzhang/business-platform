@@ -122,6 +122,13 @@ jobs:
           cargo test -p document-persistence-contracts --all-features
           cargo test -p document-postgres --test query_contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p runtime-migration --all-features
+          cargo test -p audit --all-features
+          cargo test -p data-integrity --all-features
+          cargo test -p data-repair --all-features
+          cargo test -p runtime-governance --all-features
+          cargo test -p governance-worker --all-features --test repair_worker
+          cargo test -p governance-worker --all-features --test sqlite_governance
+          cargo test -p governance-worker --all-features --test postgres_governance -- --include-ignored --test-threads=1
           cargo test -p migration --test migration_test --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1
           cargo test -p messaging --test inbox_idempotency --all-features -- --include-ignored --test-threads=1

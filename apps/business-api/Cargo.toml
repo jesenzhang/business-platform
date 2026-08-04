@@ -34,6 +34,14 @@ document-processing = { path = "../../crates/document-processing" }
 document-processing-contracts = { path = "../../crates/document-processing-contracts" }
 document-processing-postgres = { path = "../../crates/document-processing-postgres" }
 document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }
+audit = { workspace = true }
+audit-postgres = { workspace = true }
+audit-sqlite = { workspace = true }
+data-integrity = { workspace = true }
+data-repair = { workspace = true }
+runtime-governance = { workspace = true }
+runtime-governance-postgres = { workspace = true }
+runtime-governance-sqlite = { workspace = true }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

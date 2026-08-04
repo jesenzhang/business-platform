@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod documents;
 pub mod health;
 pub mod processing;
@@ -52,6 +53,49 @@ pub fn create_router(
         .route(
             "/api/v1/processing-jobs/{job_id}/review",
             axum::routing::post(processing::review_candidate),
+        )
+        .route(
+            "/api/v1/admin/integrity/scans",
+            axum::routing::post(admin::create_scan).get(admin::list_scans),
+        )
+        .route("/api/v1/admin/integrity/scans/{id}", get(admin::get_scan))
+        .route(
+            "/api/v1/admin/integrity/findings",
+            get(admin::list_findings),
+        )
+        .route(
+            "/api/v1/admin/integrity/findings/{id}",
+            get(admin::get_finding),
+        )
+        .route(
+            "/api/v1/admin/repairs/dry-run",
+            axum::routing::post(admin::dry_run_repair),
+        )
+        .route(
+            "/api/v1/admin/repairs",
+            axum::routing::post(admin::create_repair),
+        )
+        .route("/api/v1/admin/repairs/{id}", get(admin::get_repair))
+        .route(
+            "/api/v1/admin/repairs/{id}/approve",
+            axum::routing::post(admin::approve_repair),
+        )
+        .route(
+            "/api/v1/admin/repairs/{id}/cancel",
+            axum::routing::post(admin::cancel_repair),
+        )
+        .route(
+            "/api/v1/admin/repairs/{id}/resume",
+            axum::routing::post(admin::resume_repair),
+        )
+        .route("/api/v1/admin/audit-events", get(admin::list_audit_events))
+        .route(
+            "/api/v1/admin/audit-events/{id}",
+            get(admin::get_audit_event),
+        )
+        .route(
+            "/api/v1/admin/audit/verify-chain",
+            axum::routing::post(admin::verify_audit_chain),
         )
         .layer(middleware::from_fn_with_state(auth_config, auth_middleware));
 

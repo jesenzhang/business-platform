@@ -207,7 +207,34 @@ dependencies = [
  "async-trait",
  "chrono",
  "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "shared-kernel",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
+name = "audit-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "chrono",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "audit-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "chrono",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 
@@ -762,9 +789,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "audit",
+ "audit-postgres",
+ "audit-sqlite",
  "axum 0.8.9",
  "base64 0.22.1",
  "chrono",
+ "data-integrity",
+ "data-repair",
  "document",
  "document-postgres",
  "document-processing",
@@ -775,6 +807,9 @@ dependencies = [
  "http-body-util",
  "observability",
  "runtime-config",
+ "runtime-governance",
+ "runtime-governance-postgres",
+ "runtime-governance-sqlite",
  "runtime-migration",
  "serde",
  "serde_json",
@@ -1127,6 +1162,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-integrity"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
+name = "data-repair"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "data-integrity",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1215,6 +1275,7 @@ name = "document-postgres"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "audit",
  "chrono",
  "document",
  "document-persistence-contracts",
@@ -1256,9 +1317,12 @@ name = "document-processing-postgres"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "audit",
  "chrono",
+ "data-repair",
  "document-processing",
  "document-processing-contracts",
+ "runtime-governance",
  "serde_json",
  "sqlx",
  "tokio",
@@ -1270,9 +1334,12 @@ name = "document-processing-sqlite"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "audit",
  "chrono",
+ "data-repair",
  "document-processing",
  "document-processing-contracts",
+ "runtime-governance",
  "serde_json",
  "sqlx",
  "tokio",
@@ -1284,6 +1351,7 @@ name = "document-sqlite"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "audit",
  "chrono",
  "document",
  "document-persistence-contracts",
@@ -1607,6 +1675,32 @@ name = "glob"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
+
+[[package]]
+name = "governance-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "audit",
+ "audit-postgres",
+ "audit-sqlite",
+ "chrono",
+ "data-integrity",
+ "data-repair",
+ "document-processing-postgres",
+ "document-processing-sqlite",
+ "document-sqlite",
+ "runtime-governance",
+ "runtime-governance-postgres",
+ "runtime-governance-sqlite",
+ "runtime-migration",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "group"
@@ -3140,6 +3234,45 @@ dependencies = [
  "serde",
  "thiserror 2.0.19",
  "url",
+]
+
+[[package]]
+name = "runtime-governance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "data-integrity",
+ "data-repair",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
+name = "runtime-governance-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "chrono",
+ "data-integrity",
+ "data-repair",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "runtime-governance-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "data-integrity",
+ "data-repair",
+ "serde_json",
+ "sqlx",
+ "uuid",
 ]
 
 [[package]]

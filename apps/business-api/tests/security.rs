@@ -120,6 +120,7 @@ fn test_router(dev_auth_enabled: bool) -> axum::Router {
             list: ports.clone(),
         },
         processing: None,
+        governance: None,
         readiness: ports,
     });
     let auth_config = AuthMiddlewareConfig {

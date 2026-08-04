@@ -1,0 +1,23 @@
+[package]
+name = "runtime-governance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+context = "runtime-governance"
+bounded_context = "runtime-governance"
+layer = "domain-and-application"
+role = "core"
+data_owner = "runtime-governance"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+data-integrity = { workspace = true }
+data-repair = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

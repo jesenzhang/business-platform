@@ -37,6 +37,8 @@ pub struct ArchitectureMetadata {
     pub migration_catalog: Option<String>,
     #[serde(default)]
     pub role: Option<String>,
+    #[serde(default)]
+    pub data_owner: Option<String>,
 }
 
 impl ArchitectureMetadata {
@@ -59,6 +61,7 @@ pub struct Dependency {
     pub path: Option<String>,
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
     let mut violations = Vec::new();
     let architecture_by_name = metadata
@@ -138,6 +141,15 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                     continue;
                 };
                 if path.replace('\\', "/").contains("/crates/")
+                    && !matches!(
+                        dependency.name.as_str(),
+                        "audit"
+                            | "audit-postgres"
+                            | "audit-sqlite"
+                            | "data-integrity"
+                            | "data-repair"
+                            | "runtime-governance"
+                    )
                     && !architecture_by_name
                         .get(dependency.name.as_str())
                         .is_some_and(|dependency_architecture| {
