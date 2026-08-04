@@ -2,7 +2,10 @@
 
 use chrono::Utc;
 use data_integrity::FindingStatus;
-use data_repair::{RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep};
+use data_repair::{
+    RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
+    RepairTarget,
+};
 use document_processing_sqlite::{
     run_migrations as run_processing_migrations, SqliteProcessingStore,
 };
@@ -80,19 +83,29 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         )
         .await
         .expect("integrity scan");
-    assert_eq!(report.findings.len(), 1);
-    assert_eq!(report.findings[0].rule_id, "PROC-INT-001");
-    let finding_id = report.findings[0].id;
+    assert!(report
+        .findings
+        .iter()
+        .any(|finding| finding.rule_id == "PROC-INT-001"));
+    let finding_id = report
+        .findings
+        .iter()
+        .find(|finding| finding.rule_id == "PROC-INT-001")
+        .map_or_else(|| unreachable!(), |finding| finding.id);
 
     let command = RepairCommand {
         idempotency_key: "sqlite-governance-requeue-1".to_string(),
         tenant_id,
-        finding_id,
+        integrity_finding_id: finding_id,
+        target: RepairTarget {
+            resource_type: "processing_job".to_string(),
+            resource_id: job_id.to_string(),
+            expected_resource_version: Some(1),
+        },
         repair_type: "requeue_missing_ai_task.v1".to_string(),
         repair_version: 1,
         requested_by: actor_id,
         reason: "restore the missing durable AI task".to_string(),
-        expected_resource_version: Some(1),
         batch_limit: 1,
     };
     let run = RepairRun {
@@ -108,12 +121,11 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         updated_at: Utc::now(),
         version: 0,
     };
-    governance.save_run(&run).await.expect("save repair run");
     let step = RepairStep {
         id: Uuid::new_v4(),
         run_id: run.id,
         finding_id,
-        status: RepairRunStatus::Queued,
+        status: RepairStepStatus::Queued,
         attempt_count: 0,
         checkpoint: None,
         lease_owner: None,
@@ -122,7 +134,10 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         lease_expires_at: None,
         next_attempt_at: Utc::now(),
     };
-    governance.save_step(&step).await.expect("save repair step");
+    governance
+        .create_repair_run(&run, &step)
+        .await
+        .expect("create repair run and step atomically");
 
     // Model a crashed worker: the first lease expires, a replacement claims a
     // higher fence, and the stale worker's completion is rejected.
@@ -133,12 +148,16 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         command: RepairCommand {
             idempotency_key: "sqlite-governance-crash-recovery".to_string(),
             tenant_id,
-            finding_id,
+            integrity_finding_id: finding_id,
+            target: RepairTarget {
+                resource_type: "processing_job".to_string(),
+                resource_id: job_id.to_string(),
+                expected_resource_version: Some(1),
+            },
             repair_type: "requeue_missing_ai_task.v1".to_string(),
             repair_version: 1,
             requested_by: actor_id,
             reason: "exercise lease recovery".to_string(),
-            expected_resource_version: Some(1),
             batch_limit: 1,
         },
         status: RepairRunStatus::Queued,
@@ -157,7 +176,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         id: Uuid::new_v4(),
         run_id: crash_run.id,
         finding_id,
-        status: RepairRunStatus::Queued,
+        status: RepairStepStatus::Queued,
         attempt_count: 0,
         checkpoint: None,
         lease_owner: None,
@@ -187,17 +206,26 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         .expect("expired step reclaimed");
     assert!(reclaimed.fence_version > stale.fence_version);
     let mut stale_completion = stale.clone();
-    stale_completion.status = RepairRunStatus::Succeeded;
+    stale_completion.status = RepairStepStatus::Succeeded;
     assert!(matches!(
         governance
             .save_step_fenced(&stale_completion, stale.fence_version)
             .await,
         Err(data_repair::RepairError::LeaseLost)
     ));
+    let mut wrong_token = reclaimed.clone();
+    wrong_token.status = RepairStepStatus::Succeeded;
+    wrong_token.lease_token = Some("wrong-token".to_string());
+    assert!(matches!(
+        governance
+            .save_step_fenced(&wrong_token, reclaimed.fence_version)
+            .await,
+        Err(data_repair::RepairError::LeaseLost)
+    ));
     // Remove the recovery fixture from the claim queue; the real repair run
     // below remains the only executable step.
     let mut recovered_cleanup = reclaimed;
-    recovered_cleanup.status = RepairRunStatus::Failed;
+    recovered_cleanup.status = RepairStepStatus::Failed;
     recovered_cleanup.lease_owner = None;
     recovered_cleanup.lease_token = None;
     governance
@@ -209,8 +237,10 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     let worker = RepairWorker {
         persistence: Arc::clone(&governance),
         handlers: Arc::new(ProcessingRepairRegistry::new(processing)),
+        rule_registry: None,
         worker_id: "sqlite-governance-worker".to_string(),
         lease_duration_secs: 60,
+        heartbeat_seconds: 5,
     };
     assert!(worker.execute_one().await.expect("execute repair"));
 

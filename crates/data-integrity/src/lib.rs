@@ -68,6 +68,20 @@ pub enum FindingStatus {
     NeedsManualReview,
 }
 
+#[must_use]
+pub fn finding_status_name(status: FindingStatus) -> &'static str {
+    match status {
+        FindingStatus::Open => "open",
+        FindingStatus::RepairPlanned => "repair_planned",
+        FindingStatus::Repairing => "repairing",
+        FindingStatus::Repaired => "repaired",
+        FindingStatus::Ignored => "ignored",
+        FindingStatus::FalsePositive => "false_positive",
+        FindingStatus::Stale => "stale",
+        FindingStatus::NeedsManualReview => "needs_manual_review",
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IntegrityFinding {
     pub id: Uuid,
@@ -88,6 +102,12 @@ pub struct IntegrityFinding {
     pub occurrence_count: u64,
     pub resolved_at: Option<DateTime<Utc>>,
     pub resolution_reason: Option<String>,
+    /// Timestamp of the latest explicit reopen after a resolved episode.
+    pub reopened_at: Option<DateTime<Utc>>,
+    /// Number of times a resolved finding has been observed again.
+    pub reopen_count: u64,
+    /// Resolution that was superseded by the latest reopen.
+    pub previous_resolution: Option<String>,
     pub version: i64,
 }
 
@@ -124,6 +144,9 @@ impl IntegrityFinding {
             occurrence_count: 1,
             resolved_at: None,
             resolution_reason: None,
+            reopened_at: None,
+            reopen_count: 0,
+            previous_resolution: None,
             version: 0,
         })
     }
@@ -133,7 +156,18 @@ impl IntegrityFinding {
             self.status,
             FindingStatus::Repaired | FindingStatus::FalsePositive
         ) {
-            return Err(IntegrityError::InvalidTransition);
+            // Recurrence is an explicit policy: the same rule version starts a
+            // new open episode and preserves the superseded resolution.  This
+            // prevents a scan from silently keeping a resolved finding closed.
+            self.previous_resolution = self
+                .resolution_reason
+                .clone()
+                .or_else(|| Some(format!("{:?}", self.status).to_lowercase()));
+            self.reopened_at = Some(now);
+            self.reopen_count = self.reopen_count.saturating_add(1);
+            self.status = FindingStatus::Open;
+            self.resolved_at = None;
+            self.resolution_reason = None;
         }
         self.last_detected_at = now;
         self.occurrence_count = self.occurrence_count.saturating_add(1);
@@ -246,6 +280,20 @@ impl IntegrityRuleRegistry {
     pub fn rules(&self) -> &[Box<dyn IntegrityRule>] {
         &self.rules
     }
+
+    /// Resolve the immutable rule identity stored on a Finding and verify the
+    /// current owner state. A missing rule/version is a fail-closed error; a
+    /// Repair Handler's self-reported success is never sufficient to close a
+    /// Finding.
+    pub async fn verify_finding(&self, finding: &IntegrityFinding) -> Result<bool, IntegrityError> {
+        let Some(rule) = self.rules.iter().find(|rule| {
+            let descriptor = rule.descriptor();
+            descriptor.id == finding.rule_id && descriptor.version == finding.rule_version
+        }) else {
+            return Err(IntegrityError::InvalidDescriptor);
+        };
+        rule.verify(finding).await
+    }
 }
 
 #[async_trait]
@@ -290,6 +338,10 @@ pub struct ProcessingIntegritySnapshot {
     pub tenant_id: Uuid,
     pub job_id: Uuid,
     pub job_status: String,
+    /// Owner attempt counter used by the state matrix to detect stale step
+    /// projections and impossible retry combinations.
+    #[serde(default)]
+    pub job_attempt_count: i64,
     pub current_step: String,
     pub content_revision: i64,
     pub candidate_content_revision: Option<i64>,
@@ -307,6 +359,9 @@ pub struct ProcessingIntegritySnapshot {
 pub struct ProcessingStepIntegritySnapshot {
     pub step_kind: String,
     pub status: String,
+    /// Attempt number is an owner fact, not a governance counter.
+    #[serde(default)]
+    pub attempt_number: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -348,6 +403,116 @@ impl ProcessingRule {
             automatic_repair_allowed: self.automatic_repair_allowed,
         }
     }
+}
+
+/// Explicit state-matrix checks for the processing owner.  Keeping the
+/// allowed combinations in one table-like function makes PROC-INT-006
+/// auditable and prevents it degrading into another single boolean check.
+#[must_use]
+pub fn processing_state_matrix_violations(
+    snapshot: &ProcessingIntegritySnapshot,
+) -> Vec<&'static str> {
+    const PIPELINE: [&str; 6] = [
+        "validate_source",
+        "detect_type",
+        "extract_text",
+        "extract_fields",
+        "validate_candidate",
+        "await_review",
+    ];
+    let mut violations = Vec::new();
+    let running_steps = snapshot
+        .steps
+        .iter()
+        .filter(|step| step.status == "running")
+        .count();
+    if running_steps > 1 {
+        violations.push("multiple_running_steps");
+    }
+
+    let current = snapshot
+        .steps
+        .iter()
+        .find(|step| step.step_kind == snapshot.current_step);
+    let current_projection_valid = match snapshot.job_status.as_str() {
+        "queued" => current.is_some_and(|step| step.status == "pending"),
+        "running" => current.is_some_and(|step| step.status == "running"),
+        "waiting_for_ai" => {
+            snapshot.current_step == "extract_fields"
+                && current.is_some_and(|step| matches!(step.status.as_str(), "queued" | "running"))
+        }
+        "waiting_for_review" => {
+            snapshot.current_step == "await_review"
+                && current.is_some_and(|step| matches!(step.status.as_str(), "pending" | "queued"))
+        }
+        "succeeded" | "rejected" => current.is_some_and(|step| step.status == "succeeded"),
+        _ => true,
+    };
+    if !current_projection_valid {
+        violations.push("current_step_projection_mismatch");
+    }
+
+    if snapshot.job_status == "waiting_for_ai" {
+        let extract_fields = snapshot
+            .steps
+            .iter()
+            .find(|step| step.step_kind == "extract_fields");
+        if extract_fields.is_none_or(|step| !matches!(step.status.as_str(), "queued" | "running")) {
+            violations.push("waiting_for_ai_extract_fields_invalid");
+        }
+    }
+
+    if snapshot.job_status == "waiting_for_review" {
+        let projection_valid = snapshot
+            .steps
+            .iter()
+            .any(|step| step.step_kind == "validate_candidate" && step.status == "succeeded")
+            && snapshot.steps.iter().any(|step| {
+                step.step_kind == "await_review"
+                    && matches!(step.status.as_str(), "pending" | "queued")
+            });
+        if !projection_valid {
+            violations.push("waiting_for_review_projection_invalid");
+        }
+    }
+
+    if matches!(
+        snapshot.job_status.as_str(),
+        "succeeded" | "failed" | "cancelled" | "rejected"
+    ) && snapshot.steps.iter().any(|step| step.status == "running")
+    {
+        violations.push("terminal_job_has_running_step");
+    }
+
+    // The fixed MVP pipeline is deliberately represented as an ordered list;
+    // a later succeeded step cannot precede an unfinished earlier step.
+    for (index, kind) in PIPELINE.iter().enumerate() {
+        let later_succeeded = snapshot.steps.iter().any(|step| {
+            PIPELINE
+                .iter()
+                .position(|candidate| candidate == &step.step_kind)
+                .is_some_and(|position| position > index)
+                && step.status == "succeeded"
+        });
+        if later_succeeded
+            && snapshot
+                .steps
+                .iter()
+                .find(|step| step.step_kind == *kind)
+                .is_some_and(|step| step.status != "succeeded")
+        {
+            violations.push("later_step_succeeded_before_predecessor");
+            break;
+        }
+    }
+
+    if snapshot.steps.iter().any(|step| {
+        step.attempt_number < 0
+            || step.attempt_number > snapshot.job_attempt_count.saturating_add(1)
+    }) {
+        violations.push("step_attempt_job_attempt_mismatch");
+    }
+    violations
 }
 
 macro_rules! processing_rule {
@@ -475,11 +640,7 @@ processing_rule!(
     IntegritySeverity::Error,
     false,
     |snapshot: &ProcessingIntegritySnapshot| {
-        snapshot.steps.iter().any(|step| {
-            step.step_kind == snapshot.current_step
-                && snapshot.job_status == "waiting_for_review"
-                && step.status != "succeeded"
-        })
+        !processing_state_matrix_violations(snapshot).is_empty()
     },
     "rebuild_processing_step_projection.v1"
 );
@@ -585,5 +746,101 @@ mod tests {
         assert!(finding
             .transition(FindingStatus::Repaired, None, Utc::now())
             .is_err());
+    }
+
+    #[test]
+    fn resolved_finding_reopens_as_a_new_episode_on_recurrence() {
+        let issue = DetectedIntegrityIssue {
+            tenant_id: Uuid::new_v4(),
+            resource_type: "job".to_string(),
+            resource_id: "job-1".to_string(),
+            fingerprint: "x".to_string(),
+            detected_state: Value::Null,
+            expected_state: Value::Null,
+            repairability: "none".to_string(),
+        };
+        let mut finding = IntegrityFinding::from_issue(&descriptor(), issue, Utc::now())
+            .unwrap_or_else(|_| unreachable!());
+        finding.status = FindingStatus::Repaired;
+        finding.resolution_reason = Some("repair_succeeded".to_string());
+        finding.resolved_at = Some(Utc::now());
+        finding
+            .mark_detected(Utc::now())
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(finding.status, FindingStatus::Open);
+        assert_eq!(finding.reopen_count, 1);
+        assert_eq!(
+            finding.previous_resolution.as_deref(),
+            Some("repair_succeeded")
+        );
+        assert!(finding.reopened_at.is_some());
+    }
+
+    #[test]
+    fn processing_state_matrix_reports_multiple_inconsistencies() {
+        let snapshot = ProcessingIntegritySnapshot {
+            tenant_id: Uuid::new_v4(),
+            job_id: Uuid::new_v4(),
+            job_status: "succeeded".to_string(),
+            job_attempt_count: 0,
+            current_step: "await_review".to_string(),
+            content_revision: 1,
+            candidate_content_revision: None,
+            has_candidate: false,
+            has_review: false,
+            review_decision: None,
+            has_active_ai_task: false,
+            has_succeeded_ai_without_candidate: false,
+            terminal_has_lease: true,
+            steps: vec![
+                ProcessingStepIntegritySnapshot {
+                    step_kind: "extract_text".to_string(),
+                    status: "running".to_string(),
+                    attempt_number: 2,
+                },
+                ProcessingStepIntegritySnapshot {
+                    step_kind: "await_review".to_string(),
+                    status: "succeeded".to_string(),
+                    attempt_number: 0,
+                },
+            ],
+            text_artifact_state: TextArtifactIntegrityState::Unknown,
+        };
+        let violations = processing_state_matrix_violations(&snapshot);
+        assert!(violations.contains(&"terminal_job_has_running_step"));
+        assert!(violations.contains(&"step_attempt_job_attempt_mismatch"));
+    }
+
+    #[test]
+    fn waiting_for_review_accepts_owner_pending_projection() {
+        let snapshot = ProcessingIntegritySnapshot {
+            tenant_id: Uuid::new_v4(),
+            job_id: Uuid::new_v4(),
+            job_status: "waiting_for_review".to_string(),
+            job_attempt_count: 0,
+            current_step: "await_review".to_string(),
+            content_revision: 1,
+            candidate_content_revision: Some(1),
+            has_candidate: true,
+            has_review: false,
+            review_decision: None,
+            has_active_ai_task: false,
+            has_succeeded_ai_without_candidate: false,
+            terminal_has_lease: false,
+            steps: vec![
+                ProcessingStepIntegritySnapshot {
+                    step_kind: "validate_candidate".to_string(),
+                    status: "succeeded".to_string(),
+                    attempt_number: 0,
+                },
+                ProcessingStepIntegritySnapshot {
+                    step_kind: "await_review".to_string(),
+                    status: "pending".to_string(),
+                    attempt_number: 0,
+                },
+            ],
+            text_artifact_state: TextArtifactIntegrityState::Present,
+        };
+        assert!(processing_state_matrix_violations(&snapshot).is_empty());
     }
 }

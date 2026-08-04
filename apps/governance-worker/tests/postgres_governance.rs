@@ -2,7 +2,10 @@
 
 use chrono::Utc;
 use data_integrity::FindingStatus;
-use data_repair::{RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep};
+use data_repair::{
+    RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
+    RepairTarget,
+};
 use document_processing_postgres::PostgresProcessingStore;
 use governance_worker::{GovernanceWorker, RepairWorker};
 use runtime_governance::processing_repairs::ProcessingRepairRegistry;
@@ -69,9 +72,15 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         )
         .await
         .expect("integrity scan");
-    assert_eq!(report.findings.len(), 1);
-    assert_eq!(report.findings[0].rule_id, "PROC-INT-001");
-    let finding_id = report.findings[0].id;
+    assert!(report
+        .findings
+        .iter()
+        .any(|finding| finding.rule_id == "PROC-INT-001"));
+    let finding_id = report
+        .findings
+        .iter()
+        .find(|finding| finding.rule_id == "PROC-INT-001")
+        .map_or_else(|| unreachable!(), |finding| finding.id);
 
     let run = RepairRun {
         id: Uuid::new_v4(),
@@ -80,12 +89,16 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         command: RepairCommand {
             idempotency_key: "postgres-governance-requeue-1".to_string(),
             tenant_id,
-            finding_id,
+            integrity_finding_id: finding_id,
+            target: RepairTarget {
+                resource_type: "processing_job".to_string(),
+                resource_id: job_id.to_string(),
+                expected_resource_version: Some(1),
+            },
             repair_type: "requeue_missing_ai_task.v1".to_string(),
             repair_version: 1,
             requested_by: actor_id,
             reason: "restore the missing durable AI task".to_string(),
-            expected_resource_version: Some(1),
             batch_limit: 1,
         },
         status: RepairRunStatus::Queued,
@@ -101,7 +114,7 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         id: Uuid::new_v4(),
         run_id: run.id,
         finding_id,
-        status: RepairRunStatus::Queued,
+        status: RepairStepStatus::Queued,
         attempt_count: 0,
         checkpoint: None,
         lease_owner: None,
@@ -116,8 +129,10 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
     let worker = RepairWorker {
         persistence: Arc::clone(&governance),
         handlers: Arc::new(ProcessingRepairRegistry::new(processing)),
+        rule_registry: None,
         worker_id: "postgres-governance-worker".to_string(),
         lease_duration_secs: 60,
+        heartbeat_seconds: 5,
     };
     assert!(worker.execute_one().await.expect("execute repair"));
 

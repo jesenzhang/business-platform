@@ -13,6 +13,8 @@ data_owner = "runtime-governance"
 
 [dependencies]
 async-trait = { workspace = true }
+audit = { workspace = true }
+audit-sqlite = { path = "../audit-sqlite" }
 chrono = { workspace = true }
 data-integrity = { workspace = true }
 data-repair = { workspace = true }

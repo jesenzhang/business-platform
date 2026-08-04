@@ -1,5 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -65,6 +66,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             audience: None,
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
+            dev_permissions: BTreeSet::new(),
         },
     };
     let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
@@ -89,6 +91,7 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
         AuthMiddlewareConfig {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
+            dev_permissions: BTreeSet::new(),
         },
         &config.server,
     )

@@ -3,6 +3,7 @@ use runtime_config::{
     SecretUrl,
 };
 use serde::Deserialize;
+use std::collections::BTreeSet;
 
 /// Process-local configuration for the HTTP business API composition root.
 #[derive(Debug, Clone, Deserialize)]
@@ -61,6 +62,9 @@ pub struct AuthConfig {
     pub dev_secret: Option<Secret<String>>,
     #[serde(default)]
     pub dev_auth_enabled: bool,
+    /// Server-side development grants; never sourced from request headers.
+    #[serde(default)]
+    pub dev_permissions: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -221,6 +225,7 @@ mod tests {
                 audience: None,
                 dev_secret: None,
                 dev_auth_enabled: false,
+                dev_permissions: BTreeSet::new(),
             },
             observability: ObservabilityConfig::default(),
         }

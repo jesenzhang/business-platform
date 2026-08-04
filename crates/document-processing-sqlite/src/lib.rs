@@ -8,7 +8,8 @@ use async_trait::async_trait;
 use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
 use chrono::{DateTime, Duration, Utc};
 use data_repair::{
-    RepairCommand, RepairError, RepairExecutionContext, RepairOutcome, RepairResult,
+    RepairCommand, RepairError, RepairExecutionContext, RepairOutcome, RepairPreview, RepairResult,
+    RepairVerification,
 };
 use document_processing::domain::{
     CandidateReview, ExtractionCandidate, JobVersion, ProcessingJob, ProcessingJobStatus,
@@ -25,6 +26,7 @@ use document_processing::ports::{
 };
 use runtime_governance::processing_repairs::ProcessingRepairPort;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::SqliteTransactionManager;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, TransactionManager};
@@ -38,6 +40,7 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 /// catalog. `SQLx`'s built-in migrator uses the global `_sqlx_migrations` table,
 /// while the two bounded contexts intentionally keep independent catalogs in
 /// the same local database.
+#[allow(clippy::too_many_lines)]
 pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS document_processing_migrations (version INTEGER PRIMARY KEY, checksum BLOB NOT NULL, applied_at TEXT NOT NULL)",
@@ -134,6 +137,62 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .await?;
         transaction.commit().await?;
     }
+    let applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(version), 0) FROM document_processing_migrations",
+    )
+    .fetch_one(pool)
+    .await?;
+    if applied < 4 {
+        let mut transaction = pool.begin().await?;
+        let columns =
+            sqlx::query_scalar::<_, String>("SELECT name FROM pragma_table_info('audit_events')")
+                .fetch_all(&mut *transaction)
+                .await?;
+        if !columns.iter().any(|column| column == "stream_sequence") {
+            sqlx::raw_sql(include_str!(
+                "../migrations/004_runtime_governance_revision1.sql"
+            ))
+            .execute(&mut *transaction)
+            .await?;
+        }
+        sqlx::query(
+            "INSERT INTO document_processing_migrations (version, checksum, applied_at) VALUES (?1, ?2, ?3)",
+        )
+        .bind(4_i64)
+        .bind(include_bytes!("../migrations/004_runtime_governance_revision1.sql").as_slice())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+    }
+    // Older Revision-1 development builds could have recorded migration 4
+    // after the shared audit columns already existed, which skipped the raw
+    // file. Reconcile the finding recurrence columns independently so a
+    // restart cannot leave an adapter/query schema half-upgraded.
+    ensure_revision1_finding_columns(pool).await?;
+    Ok(())
+}
+
+async fn ensure_revision1_finding_columns(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let columns = sqlx::query_scalar::<_, String>(
+        "SELECT name FROM pragma_table_info('data_integrity_findings')",
+    )
+    .fetch_all(pool)
+    .await?;
+    let additions = [
+        ("reopened_at", "TEXT"),
+        ("reopen_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("previous_resolution", "TEXT"),
+    ];
+    for (name, definition) in additions {
+        if !columns.iter().any(|column| column == name) {
+            sqlx::query(&format!(
+                "ALTER TABLE data_integrity_findings ADD COLUMN {name} {definition}"
+            ))
+            .execute(pool)
+            .await?;
+        }
+    }
     Ok(())
 }
 
@@ -176,6 +235,25 @@ pub struct SqliteProcessingStore {
     pool: SqlitePool,
 }
 
+fn state_hash(value: impl AsRef<str>) -> String {
+    let digest = Sha256::digest(value.as_ref().as_bytes());
+    format!("{digest:x}")
+}
+
+fn ensure_live_repair_context(context: &RepairExecutionContext) -> Result<(), RepairError> {
+    if context.run_id.is_nil()
+        || context.step_id.is_nil()
+        || context.worker_id.trim().is_empty()
+        || context.lease_token.trim().is_empty()
+        || context.fence_version < 0
+        || context.lease_expires_at <= Utc::now()
+    {
+        Err(RepairError::LeaseLost)
+    } else {
+        Ok(())
+    }
+}
+
 impl SqliteProcessingStore {
     #[must_use]
     pub fn new(pool: SqlitePool) -> Self {
@@ -185,6 +263,81 @@ impl SqliteProcessingStore {
     #[must_use]
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    async fn preview_processing_repair<F>(
+        &self,
+        command: &RepairCommand,
+        summary: &str,
+        predicate: F,
+    ) -> Result<RepairPreview, RepairError>
+    where
+        F: FnOnce(&ProcessingJob) -> bool,
+    {
+        command.validate()?;
+        let resource_id = command.target.uuid()?;
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| RepairError::Unavailable)?;
+        let Some(job) = load_job(&mut connection, command.tenant_id, resource_id)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Err(RepairError::Conflict);
+        };
+        let version = job.aggregate_version().value();
+        let version_ok = command
+            .target
+            .expected_resource_version
+            .is_none_or(|expected| expected == version);
+        let executable = version_ok && predicate(&job);
+        let conflict_reason = if !version_ok {
+            Some("resource version does not match the dry-run precondition".to_string())
+        } else if !executable {
+            Some("owner state does not satisfy this repair's preconditions".to_string())
+        } else {
+            None
+        };
+        let before_hash = state_hash(format!(
+            "processing-job:{}:{}:{}:{}",
+            job.id(),
+            version,
+            job.status().as_str(),
+            job.current_step().as_str()
+        ));
+        Ok(RepairPreview {
+            command_id: Uuid::now_v7(),
+            descriptor: data_repair::RepairDescriptor {
+                repair_type: command.repair_type.clone(),
+                version: command.repair_version,
+                bounded_context: "document-processing".to_string(),
+                risk_level: data_repair::RepairRiskLevel::Low,
+                requires_approval: false,
+                supports_automatic_execution: true,
+            },
+            finding_id: command.integrity_finding_id,
+            resource_type: command.target.resource_type.clone(),
+            resource_id: command.target.resource_id.clone(),
+            before_hash,
+            expected_after_hash: executable.then(|| {
+                state_hash(format!(
+                    "processing-job:{resource_id}:{version_plus}",
+                    version_plus = version.saturating_add(1)
+                ))
+            }),
+            affected_count: u32::from(executable),
+            resource_version_before: Some(version),
+            change_summary: summary.to_string(),
+            preconditions: vec![
+                "tenant and target identity match".to_string(),
+                "owner resource version matches expected version".to_string(),
+            ],
+            executable,
+            conflict_reason,
+            warnings: vec!["dry run reads owner state and performs no mutation".to_string()],
+        })
     }
 }
 
@@ -1372,15 +1525,22 @@ async fn insert_unified_audit(
     )
     .map_err(|_| ProcessingRepositoryError::Failed)?;
     let previous = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT record_hash FROM audit_events WHERE tenant_id=?1 ORDER BY occurred_at DESC,id DESC LIMIT 1",
+        "SELECT record_hash FROM audit_events WHERE tenant_id=?1 AND chain_version=1 ORDER BY stream_sequence DESC LIMIT 1",
     )
     .bind(job.tenant_id().to_string())
     .fetch_optional(&mut *connection)
     .await
     .map_err(map_sql_error)?
     .flatten();
-    let event = event.with_chain(previous);
-    sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,details,trace_id,created_at,occurred_at,operation_id,actor_type,actor_id,correlation_id,causation_id,reason,result,failure_code,before_hash,after_hash,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)")
+    let sequence = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(stream_sequence),0)+1 FROM audit_events WHERE tenant_id=?1",
+    )
+    .bind(job.tenant_id().to_string())
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(map_sql_error)?;
+    let event = event.with_chain_metadata(sequence, Utc::now(), 1, previous);
+    sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,details,trace_id,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,correlation_id,causation_id,reason,result,failure_code,before_hash,after_hash,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
         .bind(event.id.to_string())
         .bind(event.tenant_id.to_string())
         .bind(event.action.as_str())
@@ -1389,6 +1549,9 @@ async fn insert_unified_audit(
         .bind(event.details.to_string())
         .bind(&event.trace_id)
         .bind(event.occurred_at.to_rfc3339())
+        .bind(event.recorded_at.to_rfc3339())
+        .bind(event.stream_sequence)
+        .bind(event.chain_version)
         .bind(event.operation_id.to_string())
         .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
         .bind(event.actor.actor_id.to_string())
@@ -2506,22 +2669,157 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
 #[async_trait]
 #[allow(clippy::too_many_lines)]
 impl ProcessingRepairPort for SqliteProcessingStore {
+    async fn preview_reconcile_processing_job(
+        &self,
+        command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        self.preview_processing_repair(command, "reconcile processing review", |job| {
+            job.status() == ProcessingJobStatus::WaitingForReview
+                && job.current_step() == ProcessingStepKind::AwaitReview
+        })
+        .await
+    }
+
+    async fn preview_requeue_missing_ai_task(
+        &self,
+        command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        self.preview_processing_repair(command, "requeue missing extract-fields AI task", |job| {
+            job.status() == ProcessingJobStatus::WaitingForAi
+                && job.current_step() == ProcessingStepKind::ExtractFields
+        })
+        .await
+    }
+
+    async fn preview_clear_terminal_job_lease(
+        &self,
+        command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        self.preview_processing_repair(command, "clear terminal job lease", |job| {
+            matches!(
+                job.status(),
+                ProcessingJobStatus::Succeeded
+                    | ProcessingJobStatus::Rejected
+                    | ProcessingJobStatus::Failed
+                    | ProcessingJobStatus::Cancelled
+            ) && job.lease_snapshot().is_some()
+        })
+        .await
+    }
+
+    async fn preview_rebuild_processing_step_projection(
+        &self,
+        command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        self.preview_processing_repair(command, "rebuild await-review step projection", |job| {
+            job.status() == ProcessingJobStatus::WaitingForReview
+                && job.current_step() == ProcessingStepKind::AwaitReview
+        })
+        .await
+    }
+
+    async fn preview_reconcile_ai_completion(
+        &self,
+        command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        self.preview_processing_repair(command, "reconcile completed AI task", |job| {
+            job.status() == ProcessingJobStatus::WaitingForAi
+                && job.current_step() == ProcessingStepKind::ExtractFields
+        })
+        .await
+    }
+
+    async fn verify_repair(
+        &self,
+        command: &RepairCommand,
+        result: &RepairResult,
+    ) -> Result<RepairVerification, RepairError> {
+        if !matches!(
+            result.outcome,
+            RepairOutcome::Succeeded | RepairOutcome::Noop
+        ) {
+            return Ok(RepairVerification {
+                valid: false,
+                message: "owner reported a non-success outcome".to_string(),
+            });
+        }
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| RepairError::Unavailable)?;
+        let Some(job) = load_job(&mut connection, command.tenant_id, command.target.uuid()?)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+        else {
+            return Ok(RepairVerification {
+                valid: false,
+                message: "owner resource no longer exists".to_string(),
+            });
+        };
+        let valid = match command.repair_type.as_str() {
+            "requeue_missing_ai_task.v1" => {
+                let active: Option<String> = sqlx::query_scalar("SELECT id FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND status IN ('queued','running','retry_scheduled') LIMIT 1")
+                    .bind(command.tenant_id.to_string())
+                    .bind(job.id().to_string())
+                    .fetch_optional(&mut *connection)
+                    .await
+                    .map_err(|_| RepairError::Persistence)?;
+                active.is_some()
+            }
+            "clear_terminal_job_lease.v1" => job.lease_snapshot().is_none(),
+            "reconcile_processing_job.v1" => {
+                job.current_step() == ProcessingStepKind::AwaitReview
+                    && !matches!(job.status(), ProcessingJobStatus::WaitingForReview)
+            }
+            "rebuild_processing_step_projection.v1" => {
+                let validate_candidate: Option<i64> = sqlx::query_scalar(
+                    "SELECT (EXISTS (SELECT 1 FROM document_processing_steps WHERE tenant_id=?1 AND job_id=?2 AND step_kind='validate_candidate' AND status='succeeded')) AND (EXISTS (SELECT 1 FROM document_processing_steps WHERE tenant_id=?1 AND job_id=?2 AND step_kind='await_review' AND status='pending'))",
+                )
+                .bind(command.tenant_id.to_string())
+                .bind(job.id().to_string())
+                .fetch_one(&mut *connection)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+                matches!(job.status(), ProcessingJobStatus::WaitingForReview)
+                    && job.current_step() == ProcessingStepKind::AwaitReview
+                    && validate_candidate.unwrap_or(0) != 0
+            }
+            "reconcile_ai_completion.v1" => {
+                job.current_step() == ProcessingStepKind::ValidateCandidate
+                    && matches!(job.status(), ProcessingJobStatus::Queued)
+            }
+            _ => false,
+        };
+        Ok(RepairVerification {
+            valid,
+            message: if valid {
+                "processing integrity rule passed after re-read".to_string()
+            } else {
+                "processing integrity rule still reports the finding".to_string()
+            },
+        })
+    }
+
     async fn reconcile_processing_job(
         &self,
         command: &RepairCommand,
         context: &RepairExecutionContext,
     ) -> Result<RepairResult, RepairError> {
+        ensure_live_repair_context(context)?;
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
-            .await
-            .map_err(|_| RepairError::Persistence)?
+        let Some(job) =
+            load_job_for_update(&mut connection, command.tenant_id, command.target.uuid()?)
+                .await
+                .map_err(|_| RepairError::Persistence)?
         else {
             return Err(RepairError::Conflict);
         };
         let before = job.aggregate_version().value();
         if command
+            .target
             .expected_resource_version
             .is_some_and(|expected| expected != before)
         {
@@ -2531,7 +2829,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT r.decision FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=?1 AND c.job_id=?2 ORDER BY r.created_at DESC LIMIT 1",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?
@@ -2545,7 +2843,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             .bind(status)
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(before)
             .execute(&mut *connection)
             .await
@@ -2579,8 +2877,8 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             command_id: Uuid::now_v7(),
             resource_version_before: Some(before),
             resource_version_after: Some(before.saturating_add(1)),
-            before_hash: format!("processing-job:{before}"),
-            after_hash: format!("processing-job:{}", before.saturating_add(1)),
+            before_hash: state_hash(format!("processing-job:{before}")),
+            after_hash: state_hash(format!("processing-job:{}", before.saturating_add(1))),
             rows_affected: 1,
             outcome: RepairOutcome::Succeeded,
         })
@@ -2591,17 +2889,20 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         command: &RepairCommand,
         context: &RepairExecutionContext,
     ) -> Result<RepairResult, RepairError> {
+        ensure_live_repair_context(context)?;
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
-            .await
-            .map_err(|_| RepairError::Persistence)?
+        let Some(job) =
+            load_job_for_update(&mut connection, command.tenant_id, command.target.uuid()?)
+                .await
+                .map_err(|_| RepairError::Persistence)?
         else {
             return Err(RepairError::Conflict);
         };
         let before = job.aggregate_version().value();
         if command
+            .target
             .expected_resource_version
             .is_some_and(|expected| expected != before)
             || job.status() != ProcessingJobStatus::WaitingForAi
@@ -2613,7 +2914,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT id FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND status IN ('queued','running','retry_scheduled') LIMIT 1",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?;
@@ -2627,7 +2928,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT checkpoint_json FROM document_processing_steps WHERE tenant_id=?1 AND job_id=?2 AND step_kind='extract_text' AND status='succeeded' ORDER BY attempt_number DESC LIMIT 1",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?
@@ -2641,7 +2942,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT MAX(attempt_count) FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND step_kind='extract_fields'",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_one(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?
@@ -2654,7 +2955,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         let inserted = sqlx::query("INSERT INTO document_ai_tasks (id,tenant_id,job_id,step_kind,status,input_artifact_id,attempt_count,max_attempts,next_attempt_at,fence_version,created_at,updated_at) VALUES (?1,?2,?3,'extract_fields','queued',?4,?5,?6,?7,0,?7,?7) ON CONFLICT(tenant_id,job_id,step_kind,attempt_count) DO NOTHING")
             .bind(task_id.to_string())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(&artifact.key)
             .bind(next_attempt)
             .bind(job.max_attempts())
@@ -2668,7 +2969,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         let updated = sqlx::query("UPDATE document_processing_jobs SET version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND status='waiting_for_ai' AND current_step='extract_fields' AND version=?4")
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(before)
             .execute(&mut *connection)
             .await
@@ -2711,6 +3012,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         command: &RepairCommand,
         context: &RepairExecutionContext,
     ) -> Result<RepairResult, RepairError> {
+        ensure_live_repair_context(context)?;
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
@@ -2718,12 +3020,13 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT version FROM document_processing_jobs WHERE tenant_id=?1 AND id=?2 AND status IN ('succeeded','rejected','failed','cancelled') AND (lease_owner IS NOT NULL OR lease_token IS NOT NULL)",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?
         .ok_or(RepairError::Conflict)?;
         if command
+            .target
             .expected_resource_version
             .is_some_and(|expected| expected != before)
         {
@@ -2732,7 +3035,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         let updated = sqlx::query("UPDATE document_processing_jobs SET lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND version=?4")
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(before)
             .execute(&mut *connection)
             .await
@@ -2747,8 +3050,8 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             command_id: Uuid::now_v7(),
             resource_version_before: Some(before),
             resource_version_after: Some(before.saturating_add(1)),
-            before_hash: format!("processing-job:{before}"),
-            after_hash: format!("processing-job:{}", before.saturating_add(1)),
+            before_hash: state_hash(format!("processing-job:{before}")),
+            after_hash: state_hash(format!("processing-job:{}", before.saturating_add(1))),
             rows_affected: 1,
             outcome: RepairOutcome::Succeeded,
         })
@@ -2759,17 +3062,20 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         command: &RepairCommand,
         context: &RepairExecutionContext,
     ) -> Result<RepairResult, RepairError> {
+        ensure_live_repair_context(context)?;
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
-            .await
-            .map_err(|_| RepairError::Persistence)?
+        let Some(job) =
+            load_job_for_update(&mut connection, command.tenant_id, command.target.uuid()?)
+                .await
+                .map_err(|_| RepairError::Persistence)?
         else {
             return Err(RepairError::Conflict);
         };
         let before = job.aggregate_version().value();
         if command
+            .target
             .expected_resource_version
             .is_some_and(|expected| expected != before)
             || job.status() != ProcessingJobStatus::WaitingForReview
@@ -2782,21 +3088,21 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "status": "waiting_for_review"
         })
         .to_string();
-        let updated = sqlx::query("UPDATE document_processing_steps SET status='succeeded',finished_at=COALESCE(finished_at,?1),checkpoint_json=COALESCE(checkpoint_json,?2),updated_at=?1 WHERE tenant_id=?3 AND job_id=?4 AND step_kind='await_review' AND status <> 'succeeded'")
-            .bind(context.now.to_rfc3339())
+        let updated = sqlx::query("UPDATE document_processing_steps SET status='pending',finished_at=NULL,checkpoint_json=COALESCE(checkpoint_json,?1),updated_at=?2 WHERE tenant_id=?3 AND job_id=?4 AND step_kind='await_review' AND status <> 'pending'")
             .bind(&checkpoint)
+            .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .execute(&mut *connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
         if updated.rows_affected() == 0 {
-            let inserted = sqlx::query("INSERT INTO document_processing_steps (job_id,tenant_id,step_kind,status,attempt_number,finished_at,checkpoint_json,created_at,updated_at) VALUES (?1,?2,'await_review','succeeded',?3,?4,?5,?4,?4) ON CONFLICT(job_id,step_kind,attempt_number) DO NOTHING")
-                .bind(command.finding_id.to_string())
+            let inserted = sqlx::query("INSERT INTO document_processing_steps (job_id,tenant_id,step_kind,status,attempt_number,finished_at,checkpoint_json,created_at,updated_at) VALUES (?1,?2,'await_review','pending',?3,NULL,?4,?5,?5) ON CONFLICT(job_id,step_kind,attempt_number) DO NOTHING")
+                .bind(command.target.uuid()?.to_string())
                 .bind(command.tenant_id.to_string())
                 .bind(job.attempt_count())
-                .bind(context.now.to_rfc3339())
                 .bind(&checkpoint)
+                .bind(context.now.to_rfc3339())
                 .execute(&mut *connection)
                 .await
                 .map_err(|_| RepairError::Persistence)?;
@@ -2810,7 +3116,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         let updated_job = sqlx::query("UPDATE document_processing_jobs SET version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND version=?4")
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(before)
             .execute(&mut *connection)
             .await
@@ -2853,17 +3159,20 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         command: &RepairCommand,
         context: &RepairExecutionContext,
     ) -> Result<RepairResult, RepairError> {
+        ensure_live_repair_context(context)?;
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        let Some(job) = load_job_for_update(&mut connection, command.tenant_id, command.finding_id)
-            .await
-            .map_err(|_| RepairError::Persistence)?
+        let Some(job) =
+            load_job_for_update(&mut connection, command.tenant_id, command.target.uuid()?)
+                .await
+                .map_err(|_| RepairError::Persistence)?
         else {
             return Err(RepairError::Conflict);
         };
         let before = job.aggregate_version().value();
         if command
+            .target
             .expected_resource_version
             .is_some_and(|expected| expected != before)
             || job.status() != ProcessingJobStatus::WaitingForAi
@@ -2875,7 +3184,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
             "SELECT c.payload FROM document_ai_tasks a JOIN document_extraction_candidates c ON c.id=a.output_candidate_id AND c.tenant_id=a.tenant_id WHERE a.tenant_id=?1 AND a.job_id=?2 AND a.status='succeeded' ORDER BY a.updated_at DESC LIMIT 1",
         )
         .bind(command.tenant_id.to_string())
-        .bind(command.finding_id.to_string())
+        .bind(command.target.uuid()?.to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(|_| RepairError::Persistence)?
@@ -2892,7 +3201,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         let updated = sqlx::query("UPDATE document_processing_jobs SET status='queued',current_step='validate_candidate',next_attempt_at=?1,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,version=version+1,updated_at=?1 WHERE tenant_id=?2 AND id=?3 AND status='waiting_for_ai' AND current_step='extract_fields' AND version=?4")
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .bind(before)
             .execute(&mut *connection)
             .await
@@ -2903,7 +3212,7 @@ impl ProcessingRepairPort for SqliteProcessingStore {
         sqlx::query("UPDATE document_processing_steps SET status='succeeded',finished_at=COALESCE(finished_at,?1),updated_at=?1 WHERE tenant_id=?2 AND job_id=?3 AND step_kind='extract_fields' AND status <> 'succeeded'")
             .bind(context.now.to_rfc3339())
             .bind(command.tenant_id.to_string())
-            .bind(command.finding_id.to_string())
+            .bind(command.target.uuid()?.to_string())
             .execute(&mut *connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
@@ -2948,8 +3257,8 @@ fn repair_result(
         command_id: Uuid::now_v7(),
         resource_version_before: Some(before),
         resource_version_after: Some(after),
-        before_hash: format!("processing-job:{before}"),
-        after_hash: format!("processing-job:{after}"),
+        before_hash: state_hash(format!("processing-job:{before}")),
+        after_hash: state_hash(format!("processing-job:{after}")),
         rows_affected,
         outcome,
     }

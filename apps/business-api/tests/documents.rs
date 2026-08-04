@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -213,6 +213,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             audience: None,
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
+            dev_permissions: BTreeSet::new(),
         },
     };
     let state = Arc::new(AppState {
@@ -230,6 +231,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
         AuthMiddlewareConfig {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
+            dev_permissions: BTreeSet::new(),
         },
         &config.server,
     )

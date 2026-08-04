@@ -8,13 +8,15 @@ use std::sync::Arc;
 
 use audit::{AuditActorType, AuditChainScope, AuditQueryRequest, AuditResult};
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use data_integrity::{FindingStatus, IntegrityFinding, IntegrityScanScope};
-use data_repair::{RepairCommand, RepairRun, RepairRunStatus, RepairStep};
+use data_repair::{
+    RepairCommand, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus, RepairTarget,
+};
 use runtime_governance::dry_run_repair as execute_dry_run_repair;
 use serde::{Deserialize, Serialize};
 use shared_kernel::TenantContext;
@@ -22,6 +24,7 @@ use uuid::Uuid;
 
 use crate::api_error::ApiError;
 use crate::api_response::ApiResponse;
+use crate::auth::{AuthenticatedPrincipal, ManagementPermission};
 use crate::state::{AppState, GovernanceServices};
 
 #[derive(Debug, Deserialize)]
@@ -45,13 +48,21 @@ pub struct FindingListQuery {
 #[serde(deny_unknown_fields)]
 pub struct RepairRequest {
     pub finding_id: Uuid,
+    pub target: RepairTargetRequest,
     pub repair_type: String,
     pub repair_version: u32,
     pub idempotency_key: String,
     pub reason: String,
-    pub expected_resource_version: Option<i64>,
     #[serde(default = "default_batch_limit")]
     pub batch_limit: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepairTargetRequest {
+    pub resource_type: String,
+    pub resource_id: String,
+    pub expected_resource_version: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -106,17 +117,11 @@ fn context(context: &TenantContext) -> Result<(Uuid, Uuid), ApiError> {
     Ok((tenant_id, user_id))
 }
 
-fn require_permission(headers: &HeaderMap, permission: &str) -> Result<(), ApiError> {
-    let allowed = headers
-        .get("x-management-permissions")
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| {
-            value
-                .split(',')
-                .map(str::trim)
-                .any(|candidate| candidate == permission)
-        });
-    if allowed {
+fn require_permission(
+    principal: &AuthenticatedPrincipal,
+    permission: ManagementPermission,
+) -> Result<(), ApiError> {
+    if principal.has_permission(permission) {
         Ok(())
     } else {
         Err(ApiError::from(shared_kernel::error::AppError::Forbidden(
@@ -170,10 +175,10 @@ fn map_repair_error(error: data_repair::RepairError) -> ApiError {
 pub async fn create_scan(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(body): Json<ScanRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "integrity.scan")?;
+    require_permission(&principal, ManagementPermission::IntegrityScan)?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let report = services
@@ -194,9 +199,9 @@ pub async fn create_scan(
 pub async fn list_scans(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "integrity.read")?;
+    require_permission(&principal, ManagementPermission::IntegrityRead)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let runs = services
@@ -210,10 +215,10 @@ pub async fn list_scans(
 pub async fn get_scan(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "integrity.read")?;
+    require_permission(&principal, ManagementPermission::IntegrityRead)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -228,10 +233,10 @@ pub async fn get_scan(
 pub async fn list_findings(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Query(query): Query<FindingListQuery>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "integrity.read")?;
+    require_permission(&principal, ManagementPermission::IntegrityRead)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let findings = services
@@ -245,10 +250,10 @@ pub async fn list_findings(
 pub async fn get_finding(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "integrity.read")?;
+    require_permission(&principal, ManagementPermission::IntegrityRead)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let finding = services
@@ -265,57 +270,60 @@ fn command(body: RepairRequest, tenant_id: Uuid, user_id: Uuid) -> RepairCommand
     RepairCommand {
         idempotency_key: body.idempotency_key,
         tenant_id,
-        finding_id: body.finding_id,
+        integrity_finding_id: body.finding_id,
+        target: RepairTarget {
+            resource_type: body.target.resource_type,
+            resource_id: body.target.resource_id,
+            expected_resource_version: body.target.expected_resource_version,
+        },
         repair_type: body.repair_type,
         repair_version: body.repair_version,
         requested_by: user_id,
         reason: body.reason,
-        expected_resource_version: body.expected_resource_version,
         batch_limit: body.batch_limit,
     }
 }
 
-fn owner_command(
-    command: &RepairCommand,
-    finding: &IntegrityFinding,
-) -> Result<RepairCommand, ApiError> {
-    if finding.resource_type != "processing_job" {
-        return Err(ApiError::validation("unsupported repair resource"));
+fn validate_target(command: &RepairCommand, finding: &IntegrityFinding) -> Result<(), ApiError> {
+    if command.tenant_id != finding.tenant_id
+        || command.target.resource_type != finding.resource_type
+        || command.target.resource_id != finding.resource_id
+        || command.repair_type != finding.repairability
+    {
+        return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
+            "repair command does not match integrity finding".to_string(),
+        )));
     }
-    let resource_id = Uuid::parse_str(&finding.resource_id)
-        .map_err(|_| ApiError::validation("invalid repair resource"))?;
-    let mut owner_command = command.clone();
-    owner_command.finding_id = resource_id;
-    Ok(owner_command)
+    Ok(())
 }
 
 pub async fn dry_run_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(body): Json<RepairRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.dry-run")?;
+    require_permission(&principal, ManagementPermission::RepairDryRun)?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let command = command(body, tenant_id, user_id);
     let finding = services
         .integrity_persistence
-        .load_finding(command.finding_id)
+        .load_finding(command.integrity_finding_id)
         .await
         .map_err(map_integrity_error)?
         .filter(|finding| finding.tenant_id == tenant_id)
-        .ok_or_else(|| ApiError::not_found("integrity_finding", command.finding_id))?;
+        .ok_or_else(|| ApiError::not_found("integrity_finding", command.integrity_finding_id))?;
     if finding.rule_id.is_empty() {
         return Err(ApiError::validation("invalid integrity finding"));
     }
-    let owner_command = owner_command(&command, &finding)?;
+    validate_target(&command, &finding)?;
     let handler = services
         .repair_handlers
-        .get(&owner_command.repair_type, owner_command.repair_version)
+        .get(&command.repair_type, command.repair_version)
         .await
         .ok_or_else(|| ApiError::not_found("repair_handler", command.repair_type.clone()))?;
-    let mut preview = execute_dry_run_repair(handler.as_ref(), &owner_command)
+    let mut preview = execute_dry_run_repair(handler.as_ref(), &command)
         .await
         .map_err(|error| match error {
             runtime_governance::GovernanceError::Repair(error) => map_repair_error(error),
@@ -323,28 +331,31 @@ pub async fn dry_run_repair(
                 ApiError::validation("invalid repair")
             }
         })?;
-    preview.finding_id = command.finding_id;
-    preview.resource_id = finding.resource_id;
+    preview.finding_id = command.integrity_finding_id;
+    preview
+        .resource_type
+        .clone_from(&command.target.resource_type);
+    preview.resource_id.clone_from(&command.target.resource_id);
     Ok((StatusCode::OK, Json(ApiResponse::ok(preview))).into_response())
 }
 
 pub async fn create_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(body): Json<RepairRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.execute")?;
+    require_permission(&principal, ManagementPermission::RepairExecute)?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let command = command(body, tenant_id, user_id);
     let finding = services
         .integrity_persistence
-        .load_finding(command.finding_id)
+        .load_finding(command.integrity_finding_id)
         .await
         .map_err(map_integrity_error)?
         .filter(|finding| finding.tenant_id == tenant_id)
-        .ok_or_else(|| ApiError::not_found("integrity_finding", command.finding_id))?;
+        .ok_or_else(|| ApiError::not_found("integrity_finding", command.integrity_finding_id))?;
     if matches!(
         finding.status,
         FindingStatus::Repaired | FindingStatus::FalsePositive | FindingStatus::Stale
@@ -366,13 +377,13 @@ pub async fn create_repair(
             "idempotency key is already used for another repair".to_string(),
         )));
     }
-    let owner_command = owner_command(&command, &finding)?;
+    validate_target(&command, &finding)?;
     let handler = services
         .repair_handlers
-        .get(&owner_command.repair_type, owner_command.repair_version)
+        .get(&command.repair_type, command.repair_version)
         .await
         .ok_or_else(|| ApiError::not_found("repair_handler", command.repair_type.clone()))?;
-    let mut preview = execute_dry_run_repair(handler.as_ref(), &owner_command)
+    let mut preview = execute_dry_run_repair(handler.as_ref(), &command)
         .await
         .map_err(|error| match error {
             runtime_governance::GovernanceError::Repair(error) => map_repair_error(error),
@@ -380,8 +391,11 @@ pub async fn create_repair(
                 ApiError::validation("invalid repair")
             }
         })?;
-    preview.finding_id = command.finding_id;
-    preview.resource_id = finding.resource_id.clone();
+    preview.finding_id = command.integrity_finding_id;
+    preview
+        .resource_type
+        .clone_from(&command.target.resource_type);
+    preview.resource_id.clone_from(&finding.resource_id);
     let now = Utc::now();
     let descriptor = preview.descriptor;
     let status = if descriptor.requires_approval {
@@ -402,16 +416,15 @@ pub async fn create_repair(
         updated_at: now,
         version: 0,
     };
-    services
-        .repair_persistence
-        .save_run(&run)
-        .await
-        .map_err(map_repair_error)?;
     let step = RepairStep {
         id: Uuid::now_v7(),
         run_id: run.id,
         finding_id: run.finding_id,
-        status,
+        status: match status {
+            RepairRunStatus::AwaitingApproval => RepairStepStatus::AwaitingApproval,
+            RepairRunStatus::Queued => RepairStepStatus::Queued,
+            _ => RepairStepStatus::Draft,
+        },
         attempt_count: 0,
         checkpoint: None,
         lease_owner: None,
@@ -422,7 +435,7 @@ pub async fn create_repair(
     };
     services
         .repair_persistence
-        .save_step(&step)
+        .create_repair_run(&run, &step)
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::CREATED, Json(ApiResponse::ok(run))).into_response())
@@ -431,10 +444,10 @@ pub async fn create_repair(
 pub async fn get_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.execute")?;
+    require_permission(&principal, ManagementPermission::RepairExecute)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -450,24 +463,30 @@ pub async fn get_repair(
 pub async fn approve_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
     Json(body): Json<ApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.approve")?;
+    require_permission(&principal, ManagementPermission::RepairApprove)?;
     let (tenant_id, approver) = context(&auth)?;
     let services = governance(&state)?;
-    let mut run = services
+    let run = services
         .repair_persistence
         .load_run(id)
         .await
         .map_err(map_repair_error)?
         .filter(|run| run.tenant_id == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
-    run.approve(approver, body.note).map_err(map_repair_error)?;
-    services
+    let run = services
         .repair_persistence
-        .save_run(&run)
+        .approve_repair(
+            tenant_id,
+            run.id,
+            approver,
+            run.version,
+            run.status,
+            body.note,
+        )
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -476,33 +495,22 @@ pub async fn approve_repair(
 pub async fn cancel_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.cancel")?;
+    require_permission(&principal, ManagementPermission::RepairCancel)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
-    let mut run = services
+    let run = services
         .repair_persistence
         .load_run(id)
         .await
         .map_err(map_repair_error)?
         .filter(|run| run.tenant_id == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
-    if matches!(
-        run.status,
-        RepairRunStatus::Succeeded | RepairRunStatus::Cancelled
-    ) {
-        return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
-            "repair already completed".to_string(),
-        )));
-    }
-    run.status = RepairRunStatus::Cancelled;
-    run.version = run.version.saturating_add(1);
-    run.updated_at = Utc::now();
-    services
+    let run = services
         .repair_persistence
-        .save_run(&run)
+        .cancel_repair(tenant_id, run.id, run.version, run.status)
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -511,37 +519,22 @@ pub async fn cancel_repair(
 pub async fn resume_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "repair.execute")?;
+    require_permission(&principal, ManagementPermission::RepairExecute)?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
-    let mut run = services
+    let run = services
         .repair_persistence
         .load_run(id)
         .await
         .map_err(map_repair_error)?
         .filter(|run| run.tenant_id == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
-    if !matches!(
-        run.status,
-        RepairRunStatus::Cancelled | RepairRunStatus::Failed | RepairRunStatus::NeedsManualReview
-    ) {
-        return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
-            "repair is not resumable in its current state".to_string(),
-        )));
-    }
-    run.status = if run.approved_by.is_some() {
-        RepairRunStatus::Queued
-    } else {
-        RepairRunStatus::AwaitingApproval
-    };
-    run.version = run.version.saturating_add(1);
-    run.updated_at = Utc::now();
-    services
+    let run = services
         .repair_persistence
-        .save_run(&run)
+        .resume_repair(tenant_id, run.id, run.version, run.status)
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -573,10 +566,10 @@ fn encode_cursor(cursor: Option<audit::AuditCursor>) -> Result<Option<String>, A
 pub async fn list_audit_events(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Query(query): Query<AuditQueryParams>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "audit.read")?;
+    require_permission(&principal, ManagementPermission::AuditRead)?;
     let (tenant_id, _) = context(&auth)?;
     let actor = query.actor.as_deref().and_then(parse_actor_type);
     let result = query.result.as_deref().and_then(parse_result);
@@ -613,10 +606,10 @@ pub async fn list_audit_events(
 pub async fn get_audit_event(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "audit.read")?;
+    require_permission(&principal, ManagementPermission::AuditRead)?;
     let (tenant_id, _) = context(&auth)?;
     let event = governance(&state)?
         .audit_queries
@@ -634,10 +627,10 @@ pub async fn get_audit_event(
 pub async fn verify_audit_chain(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Json(body): Json<VerifyChainRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&headers, "audit.read")?;
+    require_permission(&principal, ManagementPermission::AuditRead)?;
     let (tenant_id, _) = context(&auth)?;
     let verification = governance(&state)?
         .audit_queries

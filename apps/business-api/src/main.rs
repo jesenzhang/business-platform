@@ -1,7 +1,8 @@
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use business_api::auth::AuthMiddlewareConfig;
+use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
 use business_api::config::{BusinessApiConfig, DatabaseBackend};
 use business_api::routes;
 use business_api::state::{
@@ -176,6 +177,15 @@ async fn main() -> anyhow::Result<()> {
             .dev_secret
             .as_ref()
             .map(|secret| secret.expose().clone()),
+        dev_permissions: config
+            .auth
+            .dev_permissions
+            .iter()
+            .map(|value| {
+                ManagementPermission::from_str(value)
+                    .map_err(|()| anyhow::anyhow!("invalid auth.dev_permissions value: {value}"))
+            })
+            .collect::<anyhow::Result<_>>()?,
     };
 
     let app = routes::create_router(state, auth_config, &config.server);

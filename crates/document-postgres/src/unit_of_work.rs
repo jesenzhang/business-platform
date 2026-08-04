@@ -277,16 +277,28 @@ async fn insert_audit(
         occurred_at,
     )
     .map_err(|_| ApplicationPortError::Failed)?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
+        .bind(document.tenant_id().to_string())
+        .execute(&mut **transaction)
+        .await
+        .map_err(map_sqlx_error)?;
     let previous = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT record_hash FROM audit_events WHERE tenant_id=$1 ORDER BY occurred_at DESC NULLS LAST,id DESC LIMIT 1",
+        "SELECT record_hash FROM audit_events WHERE tenant_id=$1 AND chain_version=1 ORDER BY stream_sequence DESC LIMIT 1",
     )
     .bind(document.tenant_id())
     .fetch_optional(&mut **transaction)
     .await
     .map_err(map_sqlx_error)?
     .flatten();
-    let event = event.with_chain(previous);
-    sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16)")
+    let sequence = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(stream_sequence),0)+1 FROM audit_events WHERE tenant_id=$1",
+    )
+    .bind(document.tenant_id())
+    .fetch_one(&mut **transaction)
+    .await
+    .map_err(map_sqlx_error)?;
+    let event = event.with_chain_metadata(sequence, chrono::Utc::now(), 1, previous);
+    sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)")
         .bind(event.id)
         .bind(event.tenant_id)
         .bind(document.created_by())
@@ -295,6 +307,9 @@ async fn insert_audit(
         .bind(&event.resource.resource_id)
         .bind(&event.details)
         .bind(event.occurred_at)
+        .bind(event.recorded_at)
+        .bind(event.stream_sequence)
+        .bind(event.chain_version)
         .bind(event.operation_id)
         .bind("user")
         .bind(event.actor.actor_id)

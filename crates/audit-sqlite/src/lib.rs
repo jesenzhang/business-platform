@@ -36,7 +36,7 @@ impl AuditQuery for SqliteAuditStore {
             ));
         }
         let limit = i64::from(query.limit.clamp(1, 200));
-        let mut builder = QueryBuilder::<Sqlite>::new("SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id = ");
+        let mut builder = QueryBuilder::<Sqlite>::new("SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id = ");
         builder.push_bind(query.tenant_id.to_string());
         if let Some(actor) = query.actor {
             builder
@@ -78,15 +78,21 @@ impl AuditQuery for SqliteAuditStore {
                 .push_bind(before.to_rfc3339());
         }
         if let Some(cursor) = query.cursor {
-            builder
-                .push(" AND (occurred_at, id) < (")
-                .push_bind(cursor.occurred_at.to_rfc3339())
-                .push(", ")
-                .push_bind(cursor.id.to_string())
-                .push(")");
+            if cursor.stream_sequence > 0 {
+                builder
+                    .push(" AND stream_sequence < ")
+                    .push_bind(cursor.stream_sequence);
+            } else {
+                builder
+                    .push(" AND (occurred_at, id) < (")
+                    .push_bind(cursor.occurred_at.to_rfc3339())
+                    .push(", ")
+                    .push_bind(cursor.id.to_string())
+                    .push(")");
+            }
         }
         builder
-            .push(" ORDER BY occurred_at DESC, id DESC LIMIT ")
+            .push(" ORDER BY stream_sequence DESC, id DESC LIMIT ")
             .push_bind(limit);
         let rows = builder
             .build_query_as::<AuditRow>()
@@ -98,6 +104,8 @@ impl AuditQuery for SqliteAuditStore {
             items.push(row.into_event()?);
         }
         let next_cursor = items.last().map(|item| audit::AuditCursor {
+            version: 1,
+            stream_sequence: item.stream_sequence,
             occurred_at: item.occurred_at,
             id: item.id,
         });
@@ -109,7 +117,7 @@ impl AuditQuery for SqliteAuditStore {
             return Err(AuditError::InvalidCursor);
         }
         let row = sqlx::query_as::<_, AuditRow>(
-            "SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id=?1 AND id=?2",
+            "SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id=?1 AND id=?2",
         )
         .bind(tenant_id.to_string())
         .bind(id.to_string())
@@ -124,20 +132,24 @@ impl AuditQuery for SqliteAuditStore {
         scope: AuditChainScope,
     ) -> Result<AuditChainVerification, AuditError> {
         let rows = sqlx::query_as::<_, AuditRow>(
-            "SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id = ?1 ORDER BY occurred_at ASC, id ASC",
+            "SELECT id, tenant_id, action, resource_type, resource_id, details, trace_id, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash FROM audit_events WHERE tenant_id = ?1 ORDER BY stream_sequence ASC, id ASC",
         )
         .bind(scope.tenant_id.to_string())
         .fetch_all(&self.pool)
         .await
         .map_err(|_| AuditError::Persistence)?;
         let mut previous = None;
+        let mut previous_sequence = None;
         let mut checked = 0_u64;
         for row in rows {
             let event = row.into_event()?;
-            if scope.to.is_some_and(|to| event.occurred_at > to) {
-                break;
+            if event.chain_version == 0 {
+                continue;
             }
-            if event.previous_hash != previous || event.record_hash != Some(hash_record(&event)) {
+            if previous_sequence.is_some_and(|sequence| event.stream_sequence != sequence + 1)
+                || event.previous_hash != previous
+                || event.record_hash != Some(hash_record(&event))
+            {
                 return Ok(AuditChainVerification {
                     checked,
                     valid: false,
@@ -145,7 +157,10 @@ impl AuditQuery for SqliteAuditStore {
                 });
             }
             previous.clone_from(&event.record_hash);
-            if scope.from.is_none_or(|from| event.occurred_at >= from) {
+            previous_sequence = Some(event.stream_sequence);
+            if scope.from.is_none_or(|from| event.occurred_at >= from)
+                && scope.to.is_none_or(|to| event.occurred_at <= to)
+            {
                 checked = checked.saturating_add(1);
             }
         }
@@ -182,15 +197,24 @@ pub async fn append_sqlite_in_transaction(
     event: &AuditEvent,
 ) -> Result<(), AuditError> {
     let previous = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT record_hash FROM audit_events WHERE tenant_id = ?1 ORDER BY occurred_at DESC, id DESC LIMIT 1",
+        "SELECT record_hash FROM audit_events WHERE tenant_id = ?1 AND chain_version = 1 ORDER BY stream_sequence DESC LIMIT 1",
     )
     .bind(event.tenant_id.to_string())
     .fetch_optional(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?
     .flatten();
-    let event = event.clone().with_chain(previous);
-    sqlx::query("INSERT INTO audit_events (id, tenant_id, action, resource_type, resource_id, details, trace_id, created_at, occurred_at, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)")
+    let sequence = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(stream_sequence), 0) + 1 FROM audit_events WHERE tenant_id = ?1",
+    )
+    .bind(event.tenant_id.to_string())
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(|_| AuditError::Persistence)?;
+    let event = event
+        .clone()
+        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous);
+    sqlx::query("INSERT INTO audit_events (id, tenant_id, action, resource_type, resource_id, details, trace_id, created_at, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
         .bind(event.id.to_string())
         .bind(event.tenant_id.to_string())
         .bind(event.action.as_str())
@@ -199,6 +223,9 @@ pub async fn append_sqlite_in_transaction(
         .bind(event.details.to_string())
         .bind(&event.trace_id)
         .bind(event.occurred_at.to_rfc3339())
+        .bind(event.recorded_at.to_rfc3339())
+        .bind(event.stream_sequence)
+        .bind(event.chain_version)
         .bind(event.operation_id.to_string())
         .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
         .bind(event.actor.actor_id.to_string())
@@ -229,6 +256,9 @@ struct AuditRow {
     details: Option<String>,
     trace_id: Option<String>,
     occurred_at: Option<String>,
+    recorded_at: Option<String>,
+    stream_sequence: Option<i64>,
+    chain_version: Option<i16>,
     operation_id: Option<String>,
     actor_type: String,
     actor_id: Option<String>,
@@ -308,6 +338,13 @@ impl AuditRow {
                 .map_or_else(chrono::Utc::now, |v| v.with_timezone(&chrono::Utc)),
         )
         .map_err(AuditError::Validation)?;
+        event.recorded_at = self
+            .recorded_at
+            .as_deref()
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .map_or(event.occurred_at, |value| value.with_timezone(&chrono::Utc));
+        event.stream_sequence = self.stream_sequence.unwrap_or(0);
+        event.chain_version = self.chain_version.unwrap_or(0);
         event.previous_hash = self.previous_hash;
         event.record_hash = self.record_hash;
         Ok(event)

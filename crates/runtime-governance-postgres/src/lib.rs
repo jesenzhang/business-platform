@@ -1,16 +1,17 @@
 //! `PostgreSQL` Runtime Governance query and persistence adapter.
 
 use async_trait::async_trait;
+use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
 use chrono::{DateTime, Utc};
 use data_integrity::{
-    DetectedIntegrityIssue, FindingStatus, IntegrityError, IntegrityFinding,
+    finding_status_name, DetectedIntegrityIssue, FindingStatus, IntegrityError, IntegrityFinding,
     IntegrityPersistencePort, IntegrityQueryPort, IntegrityRuleDescriptor, IntegrityScanRun,
     IntegrityScanScope, IntegritySeverity, ProcessingIntegrityQuery, ProcessingIntegritySnapshot,
     ProcessingStepIntegritySnapshot, ScanRunStatus, TextArtifactIntegrityState,
 };
 use data_repair::{
-    RepairCommand, RepairError, RepairLedgerEntry, RepairPersistencePort, RepairRun,
-    RepairRunStatus, RepairStep,
+    repair_run_status_name, RepairCommand, RepairError, RepairLedgerEntry, RepairPersistencePort,
+    RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -32,6 +33,40 @@ impl PostgresGovernanceStore {
     }
 }
 
+fn repair_created_audit(
+    tenant_id: Uuid,
+    requested_by: Uuid,
+    run_id: Uuid,
+    finding_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<AuditEvent, RepairError> {
+    AuditEvent::new(
+        Uuid::now_v7(),
+        tenant_id,
+        AuditActor {
+            actor_type: AuditActorType::User,
+            actor_id: requested_by,
+        },
+        AuditAction::new("repair.created").map_err(|_| RepairError::Persistence)?,
+        AuditResource::new("repair_run", run_id.to_string())
+            .map_err(|_| RepairError::Persistence)?,
+        run_id,
+        None,
+        None,
+        None,
+        Some("repair_run_created".to_string()),
+        AuditResult::Succeeded,
+        None,
+        None,
+        None,
+        Vec::new(),
+        serde_json::json!({ "finding_id": finding_id }),
+        "audit.v1",
+        now,
+    )
+    .map_err(|_| RepairError::Persistence)
+}
+
 fn parse_text_artifact_state(value: &str) -> TextArtifactIntegrityState {
     match value {
         "present" => TextArtifactIntegrityState::Present,
@@ -46,6 +81,7 @@ struct ProcessingJobRow {
     id: Uuid,
     tenant_id: Uuid,
     status: String,
+    job_attempt_count: i32,
     current_step: String,
     content_revision: i64,
     candidate_content_revision: Option<i64>,
@@ -65,7 +101,7 @@ impl ProcessingIntegrityQuery for PostgresGovernanceStore {
         scope: &IntegrityScanScope,
     ) -> Result<Vec<ProcessingIntegritySnapshot>, IntegrityError> {
         let rows = sqlx::query_as::<_, ProcessingJobRow>(
-            "SELECT j.id, j.tenant_id, j.status, j.current_step, j.content_revision, (SELECT CASE WHEN c.payload->>'content_revision' ~ '^[0-9]+$' THEN (c.payload->>'content_revision')::bigint ELSE NULL END FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id LIMIT 1) AS candidate_content_revision, EXISTS (SELECT 1 FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id) AS has_candidate, EXISTS (SELECT 1 FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=j.tenant_id AND c.job_id=j.id) AS has_review, (SELECT r.decision FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=j.tenant_id AND c.job_id=j.id LIMIT 1) AS review_decision, EXISTS (SELECT 1 FROM document_ai_tasks a WHERE a.tenant_id=j.tenant_id AND a.job_id=j.id AND a.status IN ('queued','running','retry_scheduled')) AS has_active_ai_task, EXISTS (SELECT 1 FROM document_ai_tasks a WHERE a.tenant_id=j.tenant_id AND a.job_id=j.id AND a.status='succeeded' AND NOT EXISTS (SELECT 1 FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id)) AS has_succeeded_ai_without_candidate, (j.lease_owner IS NOT NULL OR j.lease_token IS NOT NULL) AS terminal_has_lease, CASE WHEN EXISTS (SELECT 1 FROM document_processing_steps s WHERE s.tenant_id=j.tenant_id AND s.job_id=j.id AND s.step_kind='extract_text' AND s.status='succeeded') THEN CASE WHEN EXISTS (SELECT 1 FROM document_processing_steps s WHERE s.tenant_id=j.tenant_id AND s.job_id=j.id AND s.step_kind='extract_text' AND s.status='succeeded' AND s.checkpoint_json->>'text_artifact_reference' IS NOT NULL AND s.checkpoint_json->>'text_artifact_reference' <> '') THEN 'present' ELSE 'missing' END ELSE 'unknown' END AS text_artifact_state FROM document_processing_jobs j WHERE ($1::uuid IS NULL OR j.tenant_id=$1) AND ($2::uuid IS NULL OR j.id=$2)",
+            "SELECT j.id, j.tenant_id, j.status, j.attempt_count AS job_attempt_count, j.current_step, j.content_revision, (SELECT CASE WHEN c.payload->>'content_revision' ~ '^[0-9]+$' THEN (c.payload->>'content_revision')::bigint ELSE NULL END FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id LIMIT 1) AS candidate_content_revision, EXISTS (SELECT 1 FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id) AS has_candidate, EXISTS (SELECT 1 FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=j.tenant_id AND c.job_id=j.id) AS has_review, (SELECT r.decision FROM document_extraction_reviews r JOIN document_extraction_candidates c ON c.id=r.candidate_id AND c.tenant_id=r.tenant_id WHERE r.tenant_id=j.tenant_id AND c.job_id=j.id LIMIT 1) AS review_decision, EXISTS (SELECT 1 FROM document_ai_tasks a WHERE a.tenant_id=j.tenant_id AND a.job_id=j.id AND a.status IN ('queued','running','retry_scheduled')) AS has_active_ai_task, EXISTS (SELECT 1 FROM document_ai_tasks a WHERE a.tenant_id=j.tenant_id AND a.job_id=j.id AND a.status='succeeded' AND NOT EXISTS (SELECT 1 FROM document_extraction_candidates c WHERE c.tenant_id=j.tenant_id AND c.job_id=j.id)) AS has_succeeded_ai_without_candidate, (j.lease_owner IS NOT NULL OR j.lease_token IS NOT NULL) AS terminal_has_lease, CASE WHEN EXISTS (SELECT 1 FROM document_processing_steps s WHERE s.tenant_id=j.tenant_id AND s.job_id=j.id AND s.step_kind='extract_text' AND s.status='succeeded') THEN CASE WHEN EXISTS (SELECT 1 FROM document_processing_steps s WHERE s.tenant_id=j.tenant_id AND s.job_id=j.id AND s.step_kind='extract_text' AND s.status='succeeded' AND s.checkpoint_json->>'text_artifact_reference' IS NOT NULL AND s.checkpoint_json->>'text_artifact_reference' <> '') THEN 'present' ELSE 'missing' END ELSE 'unknown' END AS text_artifact_state FROM document_processing_jobs j WHERE ($1::uuid IS NULL OR j.tenant_id=$1) AND ($2::uuid IS NULL OR j.id=$2)",
         )
         .bind(scope.tenant_id)
         .bind(scope.resource_id.as_deref().and_then(|id| Uuid::parse_str(id).ok()))
@@ -74,8 +110,8 @@ impl ProcessingIntegrityQuery for PostgresGovernanceStore {
         .map_err(|_| IntegrityError::DependencyUnavailable)?;
         let mut snapshots = Vec::with_capacity(rows.len());
         for row in rows {
-            let steps = sqlx::query_as::<_, (String, String)>(
-                "SELECT step_kind, status FROM document_processing_steps WHERE tenant_id=$1 AND job_id=$2 ORDER BY step_kind, attempt_number",
+            let steps = sqlx::query_as::<_, (String, String, i32)>(
+                "SELECT step_kind, status, attempt_number FROM document_processing_steps WHERE tenant_id=$1 AND job_id=$2 ORDER BY step_kind, attempt_number",
             )
             .bind(row.tenant_id)
             .bind(row.id)
@@ -83,12 +119,17 @@ impl ProcessingIntegrityQuery for PostgresGovernanceStore {
             .await
             .map_err(|_| IntegrityError::DependencyUnavailable)?
             .into_iter()
-            .map(|(step_kind, status)| ProcessingStepIntegritySnapshot { step_kind, status })
+            .map(|(step_kind, status, attempt_number)| ProcessingStepIntegritySnapshot {
+                step_kind,
+                status,
+                attempt_number: i64::from(attempt_number),
+            })
             .collect();
             snapshots.push(ProcessingIntegritySnapshot {
                 tenant_id: row.tenant_id,
                 job_id: row.id,
                 job_status: row.status,
+                job_attempt_count: i64::from(row.job_attempt_count),
                 current_step: row.current_step,
                 content_revision: row.content_revision,
                 candidate_content_revision: row.candidate_content_revision,
@@ -143,7 +184,7 @@ impl IntegrityPersistencePort for PostgresGovernanceStore {
     }
 
     async fn upsert_finding(&self, finding: &IntegrityFinding) -> Result<(), IntegrityError> {
-        sqlx::query("INSERT INTO data_integrity_findings (id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT (tenant_id,rule_id,rule_version,resource_type,resource_id,fingerprint) DO UPDATE SET last_detected_at=EXCLUDED.last_detected_at, occurrence_count=data_integrity_findings.occurrence_count + 1, detected_state=EXCLUDED.detected_state, expected_state=EXCLUDED.expected_state, status=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN data_integrity_findings.status ELSE EXCLUDED.status END, version=data_integrity_findings.version + 1, updated_at=NOW()")
+        sqlx::query("INSERT INTO data_integrity_findings (id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,reopened_at,reopen_count,previous_resolution,version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) ON CONFLICT (tenant_id,rule_id,rule_version,resource_type,resource_id,fingerprint) DO UPDATE SET last_detected_at=EXCLUDED.last_detected_at, occurrence_count=data_integrity_findings.occurrence_count + 1, detected_state=EXCLUDED.detected_state, expected_state=EXCLUDED.expected_state, status=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN 'open' ELSE EXCLUDED.status END, resolved_at=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN NULL ELSE data_integrity_findings.resolved_at END, resolution_reason=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN NULL ELSE data_integrity_findings.resolution_reason END, reopened_at=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN EXCLUDED.last_detected_at ELSE data_integrity_findings.reopened_at END, reopen_count=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN data_integrity_findings.reopen_count + 1 ELSE data_integrity_findings.reopen_count END, previous_resolution=CASE WHEN data_integrity_findings.status IN ('repaired','false_positive') THEN COALESCE(data_integrity_findings.resolution_reason,data_integrity_findings.status) ELSE data_integrity_findings.previous_resolution END, version=data_integrity_findings.version + 1, updated_at=NOW()")
             .bind(finding.id)
             .bind(finding.tenant_id)
             .bind(&finding.rule_id)
@@ -155,13 +196,16 @@ impl IntegrityPersistencePort for PostgresGovernanceStore {
             .bind(&finding.fingerprint)
             .bind(&finding.detected_state)
             .bind(&finding.expected_state)
-            .bind(format!("{:?}", finding.status).to_lowercase())
+            .bind(finding_status_name(finding.status))
             .bind(&finding.repairability)
             .bind(finding.first_detected_at)
             .bind(finding.last_detected_at)
             .bind(i64::try_from(finding.occurrence_count).unwrap_or(i64::MAX))
             .bind(finding.resolved_at)
             .bind(&finding.resolution_reason)
+            .bind(finding.reopened_at)
+            .bind(i64::try_from(finding.reopen_count).unwrap_or(i64::MAX))
+            .bind(&finding.previous_resolution)
             .bind(finding.version)
             .execute(&self.pool)
             .await
@@ -171,7 +215,7 @@ impl IntegrityPersistencePort for PostgresGovernanceStore {
 
     async fn load_finding(&self, id: Uuid) -> Result<Option<IntegrityFinding>, IntegrityError> {
         let row = sqlx::query_as::<_, FindingRow>(
-            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,version FROM data_integrity_findings WHERE id=$1",
+            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,reopened_at,reopen_count,previous_resolution,version FROM data_integrity_findings WHERE id=$1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -201,6 +245,9 @@ struct FindingRow {
     occurrence_count: i64,
     resolved_at: Option<DateTime<Utc>>,
     resolution_reason: Option<String>,
+    reopened_at: Option<DateTime<Utc>>,
+    reopen_count: i64,
+    previous_resolution: Option<String>,
     version: i64,
 }
 
@@ -226,6 +273,9 @@ impl FindingRow {
             occurrence_count: u64::try_from(self.occurrence_count).unwrap_or(u64::MAX),
             resolved_at: self.resolved_at,
             resolution_reason: self.resolution_reason,
+            reopened_at: self.reopened_at,
+            reopen_count: u64::try_from(self.reopen_count).unwrap_or(u64::MAX),
+            previous_resolution: self.previous_resolution,
             version: self.version,
         })
     }
@@ -335,7 +385,7 @@ impl IntegrityQueryPort for PostgresGovernanceStore {
             return Err(IntegrityError::InvalidFinding);
         }
         let rows = sqlx::query_as::<_, FindingRow>(
-            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,version FROM data_integrity_findings WHERE tenant_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY last_detected_at DESC,id DESC LIMIT $3",
+            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,reopened_at,reopen_count,previous_resolution,version FROM data_integrity_findings WHERE tenant_id=$1 AND ($2::text IS NULL OR status=$2) ORDER BY last_detected_at DESC,id DESC LIMIT $3",
         )
         .bind(tenant_id)
         .bind(status.map(|value| format!("{value:?}").to_lowercase()))
@@ -349,10 +399,95 @@ impl IntegrityQueryPort for PostgresGovernanceStore {
 
 #[async_trait]
 impl RepairPersistencePort for PostgresGovernanceStore {
+    async fn create_repair_run(
+        &self,
+        run: &RepairRun,
+        step: &RepairStep,
+    ) -> Result<(), RepairError> {
+        run.command.validate()?;
+        if run.id != step.run_id
+            || run.finding_id != step.finding_id
+            || run.command.integrity_finding_id != run.finding_id
+            || run.command.tenant_id != run.tenant_id
+            || step.fence_version < 0
+        {
+            return Err(RepairError::Conflict);
+        }
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        sqlx::query("INSERT INTO data_repair_runs (id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,worker_id,lease_token,fence_version,lease_expires_at,attempt_count,checkpoint,next_attempt_at,idempotency_key,command,version,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,NULL,0,NULL,0,NULL,NOW(),$8,$9,$10,$11,$11)")
+            .bind(run.id)
+            .bind(run.tenant_id)
+            .bind(run.finding_id)
+            .bind(repair_run_status_name(run.status))
+            .bind(run.created_by)
+            .bind(run.approved_by)
+            .bind(&run.approval_note)
+            .bind(&run.command.idempotency_key)
+            .bind(serde_json::to_value(&run.command).map_err(|_| RepairError::Persistence)?)
+            .bind(run.version)
+            .bind(run.created_at)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        sqlx::query("INSERT INTO data_repair_steps (id,tenant_id,repair_run_id,finding_id,status,attempt_count,checkpoint,lease_owner,lease_token,fence_version,lease_expires_at,next_attempt_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)")
+            .bind(step.id)
+            .bind(run.tenant_id)
+            .bind(step.run_id)
+            .bind(step.finding_id)
+            .bind(data_repair::repair_step_status_name(step.status))
+            .bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
+            .bind(&step.checkpoint)
+            .bind(&step.lease_owner)
+            .bind(&step.lease_token)
+            .bind(step.fence_version)
+            .bind(step.lease_expires_at)
+            .bind(step.next_attempt_at)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='repair_planned',version=version+1,updated_at=NOW() WHERE id=$1 AND tenant_id=$2 AND status='open'")
+            .bind(run.finding_id)
+            .bind(run.tenant_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if finding_update.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        let audit_event = repair_created_audit(
+            run.tenant_id,
+            run.created_by,
+            run.id,
+            run.finding_id,
+            Utc::now(),
+        )?;
+        audit_postgres::append_postgres_in_transaction(&mut transaction, &audit_event)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        sqlx::query("INSERT INTO outbox_events (event_id,event_type,tenant_id,aggregate_id,aggregate_type,payload,schema_version,occurred_at) VALUES ($1,'runtime.governance.repair-created.v1',$2,$3,'repair_run',$4,'v1',$5)")
+            .bind(Uuid::now_v7())
+            .bind(run.tenant_id.to_string())
+            .bind(run.id.to_string())
+            .bind(serde_json::json!({ "repair_run_id": run.id, "finding_id": run.finding_id }))
+            .bind(Utc::now())
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| RepairError::Persistence)
+    }
+
     async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError> {
         sqlx::query("INSERT INTO data_repair_runs (id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,worker_id,lease_token,fence_version,lease_expires_at,attempt_count,checkpoint,next_attempt_at,idempotency_key,command,version,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,NULL,NOW(),$12,$13,$14,$15,NOW()) ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, approved_by=EXCLUDED.approved_by, approval_note=EXCLUDED.approval_note, command=EXCLUDED.command, updated_at=NOW(), version=EXCLUDED.version")
             .bind(run.id).bind(run.tenant_id).bind(run.finding_id)
-            .bind(format!("{:?}", run.status).to_lowercase()).bind(run.created_by)
+            .bind(repair_run_status_name(run.status)).bind(run.created_by)
             .bind(run.approved_by).bind(&run.approval_note).bind(Option::<String>::None).bind(Option::<String>::None)
             .bind(0_i64).bind(Option::<DateTime<Utc>>::None)
             .bind(&run.command.idempotency_key)
@@ -365,7 +500,7 @@ impl RepairPersistencePort for PostgresGovernanceStore {
     async fn save_step(&self, step: &RepairStep) -> Result<(), RepairError> {
         sqlx::query("INSERT INTO data_repair_steps (id,tenant_id,repair_run_id,finding_id,status,attempt_count,checkpoint,lease_owner,lease_token,fence_version,lease_expires_at,next_attempt_at) VALUES ($1,(SELECT tenant_id FROM data_repair_runs WHERE id=$2),$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, attempt_count=EXCLUDED.attempt_count, checkpoint=EXCLUDED.checkpoint, lease_owner=EXCLUDED.lease_owner, lease_token=EXCLUDED.lease_token, fence_version=EXCLUDED.fence_version, lease_expires_at=EXCLUDED.lease_expires_at, next_attempt_at=EXCLUDED.next_attempt_at, updated_at=NOW()")
             .bind(step.id).bind(step.run_id).bind(step.finding_id)
-            .bind(format!("{:?}", step.status).to_lowercase()).bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
+            .bind(data_repair::repair_step_status_name(step.status)).bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
             .bind(&step.checkpoint).bind(&step.lease_owner).bind(&step.lease_token)
             .bind(step.fence_version).bind(step.lease_expires_at).bind(step.next_attempt_at)
             .execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
@@ -377,8 +512,8 @@ impl RepairPersistencePort for PostgresGovernanceStore {
         step: &RepairStep,
         expected_fence_version: i64,
     ) -> Result<(), RepairError> {
-        let result = sqlx::query("UPDATE data_repair_steps SET status=$1,attempt_count=$2,checkpoint=$3,lease_owner=$4,lease_token=$5,fence_version=$6,lease_expires_at=$7,next_attempt_at=$8,updated_at=NOW() WHERE id=$9 AND fence_version=$10 AND lease_owner=$4 AND lease_token=$5")
-            .bind(format!("{:?}", step.status).to_lowercase())
+        let result = sqlx::query("UPDATE data_repair_steps SET status=$1,attempt_count=$2,checkpoint=$3,lease_owner=$4,lease_token=$5,fence_version=$6,lease_expires_at=$7,next_attempt_at=$8,updated_at=NOW() WHERE id=$9 AND fence_version=$10 AND lease_owner=$4 AND lease_token=$5 AND lease_expires_at > NOW()")
+            .bind(data_repair::repair_step_status_name(step.status))
             .bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
             .bind(&step.checkpoint)
             .bind(&step.lease_owner)
@@ -413,7 +548,7 @@ impl RepairPersistencePort for PostgresGovernanceStore {
 
     async fn load_finding(&self, id: Uuid) -> Result<Option<IntegrityFinding>, RepairError> {
         let row = sqlx::query_as::<_, FindingRow>(
-            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,version FROM data_integrity_findings WHERE id=$1",
+            "SELECT id,tenant_id,rule_id,rule_version,bounded_context,resource_type,resource_id,severity,fingerprint,detected_state,expected_state,status,repairability,first_detected_at,last_detected_at,occurrence_count,resolved_at,resolution_reason,reopened_at,reopen_count,previous_resolution,version FROM data_integrity_findings WHERE id=$1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -422,6 +557,151 @@ impl RepairPersistencePort for PostgresGovernanceStore {
         row.map(FindingRow::into_domain)
             .transpose()
             .map_err(|_| RepairError::Persistence)
+    }
+
+    async fn mark_finding_repaired(
+        &self,
+        finding_id: Uuid,
+        reason: &str,
+    ) -> Result<(), RepairError> {
+        let result = sqlx::query("UPDATE data_integrity_findings SET status='repaired',resolved_at=NOW(),resolution_reason=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND status IN ('open','repair_planned','repairing')")
+            .bind(reason)
+            .bind(finding_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if result.rows_affected() == 1 {
+            Ok(())
+        } else {
+            Err(RepairError::Conflict)
+        }
+    }
+
+    async fn mark_finding_needs_manual_review(
+        &self,
+        finding_id: Uuid,
+        reason: &str,
+    ) -> Result<(), RepairError> {
+        let result = sqlx::query("UPDATE data_integrity_findings SET status='needs_manual_review',resolution_reason=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND status IN ('open','repair_planned','repairing','needs_manual_review')")
+            .bind(reason).bind(finding_id).execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
+        if result.rows_affected() == 1 {
+            Ok(())
+        } else {
+            Err(RepairError::Conflict)
+        }
+    }
+
+    async fn approve_repair(
+        &self,
+        tenant_id: Uuid,
+        run_id: Uuid,
+        approver: Uuid,
+        expected_version: i64,
+        expected_status: RepairRunStatus,
+        note: String,
+    ) -> Result<RepairRun, RepairError> {
+        if tenant_id.is_nil() || run_id.is_nil() || approver.is_nil() || expected_version < 0 {
+            return Err(RepairError::Conflict);
+        }
+        if approver.is_nil() {
+            return Err(RepairError::ApprovalSeparation);
+        }
+        let expected = repair_run_status_name(expected_status);
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let updated = sqlx::query("UPDATE data_repair_runs SET status='approved',approved_by=$1,approval_note=$2,version=version+1,updated_at=NOW() WHERE id=$3 AND tenant_id=$4 AND version=$5 AND status=$6 AND requested_by<>$1")
+            .bind(approver).bind(&note).bind(run_id).bind(tenant_id).bind(expected_version).bind(expected)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        let step = sqlx::query("UPDATE data_repair_steps SET status='approved',updated_at=NOW() WHERE repair_run_id=$1 AND tenant_id=$2 AND status='awaiting_approval'")
+            .bind(run_id).bind(tenant_id).execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if step.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        self.load_run(run_id).await?.ok_or(RepairError::Persistence)
+    }
+
+    async fn cancel_repair(
+        &self,
+        tenant_id: Uuid,
+        run_id: Uuid,
+        expected_version: i64,
+        expected_status: RepairRunStatus,
+    ) -> Result<RepairRun, RepairError> {
+        if tenant_id.is_nil() || run_id.is_nil() || expected_version < 0 {
+            return Err(RepairError::Conflict);
+        }
+        let expected = repair_run_status_name(expected_status);
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let updated = sqlx::query("UPDATE data_repair_runs SET status='cancelled',version=version+1,updated_at=NOW() WHERE id=$1 AND tenant_id=$2 AND version=$3 AND status=$4 AND status NOT IN ('succeeded','cancelled')")
+            .bind(run_id).bind(tenant_id).bind(expected_version).bind(expected)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        let step = sqlx::query("UPDATE data_repair_steps SET status='cancelled',lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=NOW() WHERE repair_run_id=$1 AND tenant_id=$2 AND status NOT IN ('succeeded','cancelled')")
+            .bind(run_id).bind(tenant_id).execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if step.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        self.load_run(run_id).await?.ok_or(RepairError::Persistence)
+    }
+
+    async fn resume_repair(
+        &self,
+        tenant_id: Uuid,
+        run_id: Uuid,
+        expected_version: i64,
+        expected_status: RepairRunStatus,
+    ) -> Result<RepairRun, RepairError> {
+        if tenant_id.is_nil() || run_id.is_nil() || expected_version < 0 {
+            return Err(RepairError::Conflict);
+        }
+        let expected = repair_run_status_name(expected_status);
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        let updated = sqlx::query("UPDATE data_repair_runs SET status=CASE WHEN approved_by IS NULL THEN 'awaiting_approval' ELSE 'queued' END,version=version+1,updated_at=NOW() WHERE id=$1 AND tenant_id=$2 AND version=$3 AND status=$4 AND status IN ('cancelled','failed','needs_manual_review')")
+            .bind(run_id).bind(tenant_id).bind(expected_version).bind(expected)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if updated.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        let step = sqlx::query("UPDATE data_repair_steps SET status=CASE WHEN (SELECT approved_by FROM data_repair_runs WHERE id=$1) IS NULL THEN 'awaiting_approval' ELSE 'queued' END,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,next_attempt_at=NOW(),updated_at=NOW() WHERE repair_run_id=$1 AND tenant_id=$2 AND status IN ('cancelled','failed','needs_manual_review')")
+            .bind(run_id).bind(tenant_id).execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if step.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        self.load_run(run_id).await?.ok_or(RepairError::Persistence)
     }
 
     async fn commit_success(
@@ -445,9 +725,10 @@ impl RepairPersistencePort for PostgresGovernanceStore {
             .bind(&entry.failure_code).bind(&entry.trace_id).bind(entry.started_at).bind(entry.finished_at)
             .bind(&entry.previous_hash).bind(&entry.record_hash)
             .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
-        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='repaired',resolved_at=NOW(),resolution_reason=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND status IN ('open','repair_planned','repairing')")
+        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='repaired',resolved_at=NOW(),resolution_reason=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND tenant_id=$3 AND status IN ('open','repair_planned','repairing')")
             .bind("repair_succeeded")
             .bind(entry.finding_id)
+            .bind(run.tenant_id)
             .execute(&mut *transaction)
             .await
             .map_err(|_| RepairError::Persistence)?;
@@ -455,19 +736,71 @@ impl RepairPersistencePort for PostgresGovernanceStore {
             transaction.rollback().await.ok();
             return Err(RepairError::Conflict);
         }
-        let step_update = sqlx::query("UPDATE data_repair_steps SET status=$1,attempt_count=$2,checkpoint=$3,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,fence_version=$4,next_attempt_at=$5,updated_at=NOW() WHERE id=$6 AND fence_version=$7")
-            .bind(format!("{:?}", step.status).to_lowercase())
+        let step_update = sqlx::query("UPDATE data_repair_steps SET status=$1,attempt_count=$2,checkpoint=$3,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,fence_version=$4,next_attempt_at=$5,updated_at=NOW() WHERE id=$6 AND tenant_id=$7 AND fence_version=$8 AND status='running' AND lease_expires_at > NOW()")
+            .bind(data_repair::repair_step_status_name(step.status))
             .bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
             .bind(&step.checkpoint).bind(step.fence_version).bind(step.next_attempt_at)
-            .bind(step.id).bind(expected_fence_version)
+            .bind(step.id).bind(run.tenant_id).bind(expected_fence_version)
             .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
         if step_update.rows_affected() != 1 {
             transaction.rollback().await.ok();
             return Err(RepairError::LeaseLost);
         }
-        sqlx::query("UPDATE data_repair_runs SET status=$1,approved_by=$2,approval_note=$3,updated_at=NOW(),version=$4 WHERE id=$5")
-            .bind(format!("{:?}", run.status).to_lowercase())
-            .bind(run.approved_by).bind(&run.approval_note).bind(run.version).bind(run.id)
+        sqlx::query("UPDATE data_repair_runs SET status=$1,approved_by=$2,approval_note=$3,updated_at=NOW(),version=$4 WHERE id=$5 AND tenant_id=$6")
+            .bind(repair_run_status_name(run.status))
+            .bind(run.approved_by).bind(&run.approval_note).bind(run.version).bind(run.id).bind(run.tenant_id)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| RepairError::Persistence)
+    }
+
+    async fn commit_failure(
+        &self,
+        run: &RepairRun,
+        step: &RepairStep,
+        entry: &RepairLedgerEntry,
+        expected_fence_version: i64,
+    ) -> Result<(), RepairError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        sqlx::query("INSERT INTO data_repair_events (id,tenant_id,repair_run_id,repair_step_id,finding_id,rule_id,repair_type,repair_version,actor_type,actor_id,reason,resource_type,resource_id,before_hash,after_hash,before_snapshot,after_snapshot,rows_affected,result,failure_code,trace_id,started_at,finished_at,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)")
+            .bind(entry.id).bind(entry.tenant_id).bind(entry.repair_run_id).bind(entry.repair_step_id).bind(entry.finding_id)
+            .bind(&entry.rule_id).bind(&entry.repair_type).bind(i32::try_from(entry.repair_version).unwrap_or(i32::MAX))
+            .bind(&entry.actor_type).bind(entry.actor_id).bind(&entry.reason).bind(&entry.resource_type).bind(&entry.resource_id)
+            .bind(&entry.before_hash).bind(&entry.after_hash).bind(&entry.before_snapshot).bind(&entry.after_snapshot)
+            .bind(i32::try_from(entry.rows_affected).unwrap_or(i32::MAX)).bind(format!("{:?}", entry.result).to_lowercase())
+            .bind(&entry.failure_code).bind(&entry.trace_id).bind(entry.started_at).bind(entry.finished_at)
+            .bind(&entry.previous_hash).bind(&entry.record_hash)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='needs_manual_review',resolution_reason=$1,version=version+1,updated_at=NOW() WHERE id=$2 AND tenant_id=$3 AND status IN ('open','repair_planned','repairing','needs_manual_review')")
+            .bind(entry.failure_code.as_deref().unwrap_or("repair_failed"))
+            .bind(entry.finding_id)
+            .bind(run.tenant_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if finding_update.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
+        let step_update = sqlx::query("UPDATE data_repair_steps SET status=$1,attempt_count=$2,checkpoint=$3,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,fence_version=$4,next_attempt_at=$5,updated_at=NOW() WHERE id=$6 AND tenant_id=$7 AND fence_version=$8 AND status='running' AND lease_expires_at > NOW()")
+            .bind(data_repair::repair_step_status_name(step.status))
+            .bind(i32::try_from(step.attempt_count).unwrap_or(i32::MAX))
+            .bind(&step.checkpoint).bind(step.fence_version).bind(step.next_attempt_at)
+            .bind(step.id).bind(run.tenant_id).bind(expected_fence_version)
+            .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
+        if step_update.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::LeaseLost);
+        }
+        sqlx::query("UPDATE data_repair_runs SET status=$1,updated_at=NOW(),version=$2 WHERE id=$3 AND tenant_id=$4")
+            .bind(repair_run_status_name(run.status))
+            .bind(run.version).bind(run.id).bind(run.tenant_id)
             .execute(&mut *transaction).await.map_err(|_| RepairError::Persistence)?;
         transaction
             .commit()
@@ -557,6 +890,17 @@ impl RepairPersistencePort for PostgresGovernanceStore {
             transaction.rollback().await.ok();
             return Err(RepairError::Conflict);
         }
+        let run_update = sqlx::query(
+            "UPDATE data_repair_runs SET status='running',version=version+1,updated_at=NOW() WHERE id=$1 AND status IN ('approved','queued','running')",
+        )
+        .bind(row.repair_run_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        if run_update.rows_affected() != 1 {
+            transaction.rollback().await.ok();
+            return Err(RepairError::Conflict);
+        }
         transaction
             .commit()
             .await
@@ -565,7 +909,7 @@ impl RepairPersistencePort for PostgresGovernanceStore {
             id: row.id,
             run_id: row.repair_run_id,
             finding_id: row.finding_id,
-            status: RepairRunStatus::Running,
+            status: RepairStepStatus::Running,
             attempt_count: u32::try_from(row.attempt_count)
                 .unwrap_or(u32::MAX)
                 .saturating_add(1),
@@ -576,6 +920,74 @@ impl RepairPersistencePort for PostgresGovernanceStore {
             lease_expires_at: Some(expires),
             next_attempt_at: row.next_attempt_at,
         }))
+    }
+
+    async fn heartbeat_repair_step(
+        &self,
+        step_id: Uuid,
+        lease_owner: &str,
+        lease_token: &str,
+        fence_version: i64,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<RepairStep, RepairError> {
+        if step_id.is_nil()
+            || lease_owner.trim().is_empty()
+            || lease_token.trim().is_empty()
+            || fence_version < 0
+            || lease_duration_secs <= 0
+        {
+            return Err(RepairError::LeaseLost);
+        }
+        let expires = now + chrono::Duration::seconds(lease_duration_secs);
+        let row = sqlx::query_as::<_, RepairStepRow>(
+            "UPDATE data_repair_steps SET lease_expires_at=$1,updated_at=$2 WHERE id=$3 AND status='running' AND lease_owner=$4 AND lease_token=$5 AND fence_version=$6 AND lease_expires_at > $2 AND EXISTS (SELECT 1 FROM data_repair_runs r WHERE r.id=data_repair_steps.repair_run_id AND r.status NOT IN ('cancelled','succeeded')) RETURNING id,repair_run_id,finding_id,attempt_count,checkpoint,fence_version,next_attempt_at",
+        )
+        .bind(expires)
+        .bind(now)
+        .bind(step_id)
+        .bind(lease_owner)
+        .bind(lease_token)
+        .bind(fence_version)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .ok_or(RepairError::LeaseLost)?;
+        Ok(RepairStep {
+            id: row.id,
+            run_id: row.repair_run_id,
+            finding_id: row.finding_id,
+            status: RepairStepStatus::Running,
+            attempt_count: u32::try_from(row.attempt_count).unwrap_or(u32::MAX),
+            checkpoint: row.checkpoint,
+            lease_owner: Some(lease_owner.to_string()),
+            lease_token: Some(lease_token.to_string()),
+            fence_version: row.fence_version,
+            lease_expires_at: Some(expires),
+            next_attempt_at: row.next_attempt_at,
+        })
+    }
+
+    async fn validate_repair_fence(
+        &self,
+        step_id: Uuid,
+        lease_owner: &str,
+        lease_token: &str,
+        fence_version: i64,
+        now: DateTime<Utc>,
+    ) -> Result<(), RepairError> {
+        let owned = sqlx::query_scalar::<_, i64>(
+            "SELECT 1 FROM data_repair_steps s JOIN data_repair_runs r ON r.id=s.repair_run_id WHERE s.id=$1 AND s.status='running' AND s.lease_owner=$2 AND s.lease_token=$3 AND s.fence_version=$4 AND s.lease_expires_at > $5 AND r.status NOT IN ('cancelled','succeeded')",
+        )
+        .bind(step_id)
+        .bind(lease_owner)
+        .bind(lease_token)
+        .bind(fence_version)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        owned.map_or(Err(RepairError::LeaseLost), |_| Ok(()))
     }
 }
 
@@ -598,19 +1010,20 @@ impl RepairRunRow {
     fn into_domain(self) -> Result<RepairRun, RepairError> {
         let command: RepairCommand =
             serde_json::from_value(self.command).map_err(|_| RepairError::Persistence)?;
-        Ok(RepairRun {
-            id: self.id,
-            tenant_id: self.tenant_id,
-            finding_id: self.finding_id,
+        RepairRun::rehydrate(
+            self.id,
+            self.tenant_id,
+            self.finding_id,
             command,
-            status: parse_run_status(&self.status),
-            created_by: self.requested_by,
-            approved_by: self.approved_by,
-            approval_note: self.approval_note,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            version: self.version,
-        })
+            parse_run_status(&self.status),
+            self.requested_by,
+            self.approved_by,
+            self.approval_note,
+            self.created_at,
+            self.updated_at,
+            self.version,
+        )
+        .map_err(|_| RepairError::Persistence)
     }
 }
 

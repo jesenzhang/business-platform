@@ -9,6 +9,8 @@ use axum::middleware::Next;
 use axum::response::Response;
 use shared_kernel::error::AppError;
 use shared_kernel::tenant::TenantContext;
+use std::collections::BTreeSet;
+use std::str::FromStr;
 
 use crate::api_error::ApiError;
 
@@ -27,6 +29,65 @@ pub enum AuthError {
     MissingTenant,
 }
 
+/// Management permissions are issued by the trusted authentication boundary,
+/// never parsed from request-controlled headers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ManagementPermission {
+    AuditRead,
+    IntegrityRead,
+    IntegrityScan,
+    RepairDryRun,
+    RepairExecute,
+    RepairApprove,
+    RepairCancel,
+}
+
+impl ManagementPermission {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AuditRead => "audit.read",
+            Self::IntegrityRead => "integrity.read",
+            Self::IntegrityScan => "integrity.scan",
+            Self::RepairDryRun => "repair.dry-run",
+            Self::RepairExecute => "repair.execute",
+            Self::RepairApprove => "repair.approve",
+            Self::RepairCancel => "repair.cancel",
+        }
+    }
+}
+
+impl FromStr for ManagementPermission {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim() {
+            "audit.read" => Ok(Self::AuditRead),
+            "integrity.read" => Ok(Self::IntegrityRead),
+            "integrity.scan" => Ok(Self::IntegrityScan),
+            "repair.dry-run" => Ok(Self::RepairDryRun),
+            "repair.execute" => Ok(Self::RepairExecute),
+            "repair.approve" => Ok(Self::RepairApprove),
+            "repair.cancel" => Ok(Self::RepairCancel),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthenticatedPrincipal {
+    pub tenant_id: uuid::Uuid,
+    pub user_id: uuid::Uuid,
+    pub permissions: BTreeSet<ManagementPermission>,
+}
+
+impl AuthenticatedPrincipal {
+    #[must_use]
+    pub fn has_permission(&self, permission: ManagementPermission) -> bool {
+        self.permissions.contains(&permission)
+    }
+}
+
 /// Configuration for the authentication middleware.
 ///
 /// Derived from the API process configuration at startup.
@@ -36,6 +97,8 @@ pub struct AuthMiddlewareConfig {
     pub dev_auth_enabled: bool,
     /// The static development token. Must be `None` in production.
     pub dev_secret: Option<String>,
+    /// Server-side development grants. Client headers are ignored.
+    pub dev_permissions: BTreeSet<ManagementPermission>,
 }
 
 /// Middleware that extracts and validates authentication.
@@ -61,6 +124,11 @@ pub async fn auth_middleware(
 
     if config.dev_auth_enabled {
         authenticate_dev(&config, &token, &mut request)?;
+        // Do not let a request-controlled compatibility header cross the
+        // trusted authentication boundary. Management handlers use the
+        // principal extension populated above; downstream middleware must not
+        // have a second, ambiguous authorization source.
+        request.headers_mut().remove("x-management-permissions");
         Ok(next.run(request).await)
     } else {
         // Production OIDC/JWT validation is not implemented yet. Fail closed
@@ -122,8 +190,19 @@ fn authenticate_dev(
         ));
     };
 
-    let tenant_context = TenantContext::new(tenant_id, user_id);
+    let tenant_id: uuid::Uuid = tenant_id
+        .parse()
+        .map_err(|_| unauthorized(AuthError::MissingTenant, "invalid tenant context"))?;
+    let user_id: uuid::Uuid = user_id
+        .parse()
+        .map_err(|_| unauthorized(AuthError::MissingTenant, "invalid user context"))?;
+    let tenant_context = TenantContext::new(tenant_id.to_string(), user_id.to_string());
     request.extensions_mut().insert(tenant_context);
+    request.extensions_mut().insert(AuthenticatedPrincipal {
+        tenant_id,
+        user_id,
+        permissions: config.dev_permissions.clone(),
+    });
     Ok(())
 }
 
@@ -142,4 +221,40 @@ fn header_str(request: &Request, name: &str) -> Option<String> {
 fn unauthorized(kind: AuthError, public_message: &str) -> ApiError {
     tracing::debug!(?kind, "authentication rejected");
     ApiError::from(AppError::Unauthorized(public_message.to_owned()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+
+    #[test]
+    fn client_permission_header_cannot_grant_access() {
+        let mut permissions = BTreeSet::new();
+        permissions.insert(ManagementPermission::IntegrityRead);
+        let config = AuthMiddlewareConfig {
+            dev_auth_enabled: true,
+            dev_secret: Some("secret".to_string()),
+            dev_permissions: permissions,
+        };
+        let tenant = uuid::Uuid::new_v4();
+        let user = uuid::Uuid::new_v4();
+        let mut request = Request::builder()
+            .header("x-tenant-id", tenant.to_string())
+            .header("x-user-id", user.to_string())
+            .header("x-management-permissions", "repair.execute,repair.approve")
+            .body(Body::empty())
+            .unwrap_or_else(|_| unreachable!());
+        authenticate_dev(&config, "secret", &mut request).unwrap_or_else(|_| unreachable!());
+        let principal = request
+            .extensions()
+            .get::<AuthenticatedPrincipal>()
+            .unwrap_or_else(|| unreachable!());
+        assert_eq!(principal.tenant_id, tenant);
+        assert_eq!(principal.user_id, user);
+        assert!(principal.has_permission(ManagementPermission::IntegrityRead));
+        assert!(!principal.has_permission(ManagementPermission::RepairExecute));
+        assert!(!principal.has_permission(ManagementPermission::RepairApprove));
+    }
 }

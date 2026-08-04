@@ -3,12 +3,16 @@
 //! The process is deliberately idle until an explicit scan or approved repair
 //! command wakes it. It is not a generic scheduler.
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use anyhow::Context;
 use governance_worker::{GovernanceWorker, RepairWorker};
 use runtime_governance_postgres::PostgresGovernanceStore;
 use sqlx::postgres::PgPoolOptions;
+use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,22 +36,70 @@ async fn main() -> anyhow::Result<()> {
         pool.clone(),
     ));
     let store = Arc::new(PostgresGovernanceStore::new(pool));
-    let _worker = GovernanceWorker::new(Arc::clone(&store), Arc::clone(&store));
+    let governance = GovernanceWorker::new(Arc::clone(&store), Arc::clone(&store));
+    let rule_registry = Arc::new(governance.registry);
     let repair_handlers = Arc::new(
         runtime_governance::processing_repairs::ProcessingRepairRegistry::new(processing_store),
     );
+    let lease_duration_secs = std::env::var("GOVERNANCE_REPAIR_LEASE_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(30);
+    let poll_interval_ms = std::env::var("GOVERNANCE_REPAIR_POLL_INTERVAL_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(1_000);
+    let heartbeat_seconds = std::env::var("GOVERNANCE_REPAIR_HEARTBEAT_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or((lease_duration_secs / 3).max(1));
+    let batch_size = std::env::var("GOVERNANCE_REPAIR_BATCH_SIZE")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|value| (1..=1_000).contains(value))
+        .unwrap_or(1);
+    let once = std::env::var("GOVERNANCE_REPAIR_ONCE").as_deref() == Ok("true");
+    let stop = Arc::new(AtomicBool::new(false));
+    let signal_stop = Arc::clone(&stop);
     let repair_worker = RepairWorker {
         persistence: Arc::clone(&store),
         handlers: repair_handlers,
+        rule_registry: Some(rule_registry),
         worker_id: std::env::var("GOVERNANCE_WORKER_ID")
             .unwrap_or_else(|_| "governance-worker".to_string()),
-        lease_duration_secs: 30,
+        lease_duration_secs,
+        heartbeat_seconds,
     };
-    if std::env::var("GOVERNANCE_REPAIR_ONCE").as_deref() == Ok("true") {
-        repair_worker.execute_one().await?;
+    tracing::info!(
+        poll_interval_ms,
+        heartbeat_seconds,
+        batch_size,
+        once,
+        "governance repair consumer configured"
+    );
+    let signal_task = if once {
+        None
+    } else {
+        Some(tokio::spawn(async move {
+            shutdown_signal().await;
+            signal_stop.store(true, Ordering::Release);
+        }))
+    };
+    repair_worker
+        .run_loop(
+            Duration::from_millis(poll_interval_ms),
+            heartbeat_seconds,
+            batch_size,
+            once,
+            stop,
+        )
+        .await?;
+    if let Some(signal_task) = signal_task {
+        signal_task.abort();
     }
-    tracing::info!("governance-worker ready; waiting for explicit management commands");
-    shutdown_signal().await;
     tracing::info!("governance-worker stopped claiming new work");
     Ok(())
 }

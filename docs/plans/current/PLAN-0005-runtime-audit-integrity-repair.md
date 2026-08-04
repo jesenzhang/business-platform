@@ -88,6 +88,31 @@ lease expires; a new worker resumes the step, while stale writes fail closed.
 Each resource is repaired in its own transaction; a run records aggregate
 progress and may be cancelled or resumed.
 
+## Revision 1 correctness closure
+
+Revision 1 derives management permissions only from the authenticated
+principal and ignores client permission headers. `RepairCommand` keeps the
+Integrity Finding identity separate from its string-valued owner target.
+Owner-backed previews read the real Processing Job and return only hashes,
+versions, bounded summaries, preconditions, and conflict metadata. Typed
+handlers re-read owner state after mutation; a failed verification moves the
+Run/Step/Finding to manual review and never marks the Finding repaired.
+
+Audit migration `013_runtime_governance_revision1.sql` (SQLite processing
+migration `004_runtime_governance_revision1.sql`) adds
+`stream_sequence`/`recorded_at`/`chain_version`. Historical rows are assigned
+deterministic sequence values but remain `chain_version=0` legacy evidence;
+new version-1 appends start at the next sequence with an explicit genesis.
+The same migration records finding recurrence metadata and the adapters
+reopen resolved findings explicitly.
+
+`PROC-INT-006` is an explicit fixed-pipeline state matrix. `PROC-INT-008`
+remains **PARTIAL** because it checks metadata/checkpoints only; object-store
+existence probing is deferred. SQLite uses `BEGIN IMMEDIATE`; PostgreSQL uses
+tenant-local append locking and fenced multi-worker claims. Repair creation,
+approval, cancellation, and resume update Run and Step atomically and append
+Audit/Outbox evidence where the shared local schema is available.
+
 ## Fitness functions and documentation
 
 The plan requires the full workspace fmt/check/clippy/test gates,
@@ -107,20 +132,19 @@ PLAN-0006.
 
 ## Candidate evidence
 
-- Local `cargo fmt --all -- --check`, `cargo check --workspace
-  --all-targets --all-features`, `cargo clippy --workspace --all-targets
-  --all-features -- -D warnings`, and `cargo test --workspace
-  --all-features`: PASS.
-- Local `scripts/check-architecture.ps1` and
-  `scripts/test-local-governance-repair.ps1`: PASS, including SQLite scan,
-  repair, audit, outbox, ledger, finding lifecycle, lease reclaim, and stale
-  fence assertions.
-- GitHub Feature CI `30879843925`: PASS for format, check, clippy, workspace
-  tests, architecture fitness, and PostgreSQL/MinIO contracts. The real
-  governance E2E `postgres_scan_and_requeue_repair_are_durable` passed with
-  migrations, unified audit, outbox, repaired Finding, and Repair Ledger
-  assertions; the SQLite governance E2E also covers expired-lease reclaim and
-  stale-fence rejection.
+- Revision 1 targeted SQLite Governance E2E: PASS after the recurrence/state
+  matrix and shared-table migration guards (`cargo test -p governance-worker
+  --test sqlite_governance --all-features -- --nocapture`).
+- Revision 1 local gates: PASS — `cargo fmt --all -- --check`, workspace
+  `cargo check --workspace --all-targets --all-features`, workspace Clippy with
+  `-D warnings`, `cargo test --workspace --all-features`, and
+  `scripts/check-architecture.ps1`. The workspace test run intentionally leaves
+  infrastructure-dependent PostgreSQL/MinIO cases ignored locally.
+- Revision 1 management security tests: PASS — forged permission headers are
+  rejected, server-side grants reach the governance boundary, and
+  `repair.execute` cannot approve a repair.
+- Revision 1 Feature CI: PENDING; the previous candidate's CI run is retained
+  only as historical evidence and does not satisfy this revision.
 - Windows PostgreSQL/MinIO execution: NOT RUN; the local environment has no
   PostgreSQL service.
 

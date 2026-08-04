@@ -5,6 +5,7 @@
 //! accept arbitrary SQL, table names, or JSON patches.
 
 use async_trait::async_trait;
+use chrono::Utc;
 use data_repair::{
     RepairCommand, RepairDescriptor, RepairError, RepairExecutionContext, RepairHandler,
     RepairHandlerRegistry, RepairPreview, RepairResult, RepairRiskLevel, RepairVerification,
@@ -14,6 +15,47 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait ProcessingRepairPort: Send + Sync {
+    async fn preview_reconcile_processing_job(
+        &self,
+        _command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
+    async fn preview_requeue_missing_ai_task(
+        &self,
+        _command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
+    async fn preview_clear_terminal_job_lease(
+        &self,
+        _command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
+    async fn preview_rebuild_processing_step_projection(
+        &self,
+        _command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
+    async fn preview_reconcile_ai_completion(
+        &self,
+        _command: &RepairCommand,
+    ) -> Result<RepairPreview, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
+    async fn verify_repair(
+        &self,
+        _command: &RepairCommand,
+        result: &RepairResult,
+    ) -> Result<RepairVerification, RepairError>;
+
     async fn reconcile_processing_job(
         &self,
         command: &RepairCommand,
@@ -52,6 +94,14 @@ pub struct UnavailableProcessingRepairPort;
 
 #[async_trait]
 impl ProcessingRepairPort for UnavailableProcessingRepairPort {
+    async fn verify_repair(
+        &self,
+        _command: &RepairCommand,
+        _result: &RepairResult,
+    ) -> Result<RepairVerification, RepairError> {
+        Err(RepairError::Unavailable)
+    }
+
     async fn reconcile_processing_job(
         &self,
         _command: &RepairCommand,
@@ -93,28 +143,13 @@ impl ProcessingRepairPort for UnavailableProcessingRepairPort {
     }
 }
 
-fn preview(command: &RepairCommand, descriptor: RepairDescriptor) -> RepairPreview {
-    RepairPreview {
-        command_id: Uuid::now_v7(),
-        descriptor,
-        finding_id: command.finding_id,
-        resource_type: "processing_job".to_string(),
-        resource_id: command.finding_id.to_string(),
-        before_hash: format!("finding:{}", command.finding_id),
-        expected_after_hash: None,
-        affected_count: 1,
-        warnings: vec![
-            "preview is read-only; the finding is revalidated before execution".to_string(),
-        ],
-    }
-}
-
 fn verify_context(context: &RepairExecutionContext) -> Result<(), RepairError> {
     if context.run_id.is_nil()
         || context.step_id.is_nil()
         || context.worker_id.trim().is_empty()
         || context.lease_token.trim().is_empty()
         || context.fence_version < 0
+        || context.lease_expires_at <= Utc::now()
     {
         return Err(RepairError::LeaseLost);
     }
@@ -122,7 +157,7 @@ fn verify_context(context: &RepairExecutionContext) -> Result<(), RepairError> {
 }
 
 macro_rules! typed_handler {
-    ($name:ident, $method:ident, $repair_type:literal, $risk:expr, $approval:expr, $automatic:expr) => {
+    ($name:ident, $method:ident, $preview_method:ident, $repair_type:literal, $risk:expr, $approval:expr, $automatic:expr) => {
         pub struct $name<P> {
             port: Arc<P>,
         }
@@ -150,7 +185,13 @@ macro_rules! typed_handler {
                 command.validate()?;
                 let descriptor = self.descriptor();
                 descriptor.validate()?;
-                Ok(preview(command, descriptor))
+                let mut preview = self.port.$preview_method(command).await?;
+                preview.command_id = Uuid::now_v7();
+                preview.descriptor = descriptor;
+                preview.finding_id = command.integrity_finding_id;
+                preview.resource_type = command.target.resource_type.clone();
+                preview.resource_id = command.target.resource_id.clone();
+                Ok(preview)
             }
 
             async fn execute(
@@ -175,6 +216,14 @@ macro_rules! typed_handler {
                     message: "typed processing repair returned a fenced result".to_string(),
                 })
             }
+
+            async fn verify_after_repair(
+                &self,
+                command: &RepairCommand,
+                result: &RepairResult,
+            ) -> Result<RepairVerification, RepairError> {
+                self.port.verify_repair(command, result).await
+            }
         }
     };
 }
@@ -182,6 +231,7 @@ macro_rules! typed_handler {
 typed_handler!(
     ReconcileProcessingJobHandler,
     reconcile_processing_job,
+    preview_reconcile_processing_job,
     "reconcile_processing_job.v1",
     RepairRiskLevel::Medium,
     true,
@@ -190,6 +240,7 @@ typed_handler!(
 typed_handler!(
     RequeueMissingAiTaskHandler,
     requeue_missing_ai_task,
+    preview_requeue_missing_ai_task,
     "requeue_missing_ai_task.v1",
     RepairRiskLevel::Low,
     false,
@@ -198,6 +249,7 @@ typed_handler!(
 typed_handler!(
     ClearTerminalJobLeaseHandler,
     clear_terminal_job_lease,
+    preview_clear_terminal_job_lease,
     "clear_terminal_job_lease.v1",
     RepairRiskLevel::Low,
     false,
@@ -206,6 +258,7 @@ typed_handler!(
 typed_handler!(
     RebuildProcessingStepProjectionHandler,
     rebuild_processing_step_projection,
+    preview_rebuild_processing_step_projection,
     "rebuild_processing_step_projection.v1",
     RepairRiskLevel::Medium,
     true,
@@ -214,6 +267,7 @@ typed_handler!(
 typed_handler!(
     ReconcileAiCompletionHandler,
     reconcile_ai_completion,
+    preview_reconcile_ai_completion,
     "reconcile_ai_completion.v1",
     RepairRiskLevel::Medium,
     true,

@@ -131,6 +131,18 @@ pub struct AuditEvent {
     pub details: Value,
     pub schema_version: String,
     pub occurred_at: DateTime<Utc>,
+    /// Immutable tenant-local append order assigned by the persistence
+    /// adapter. Zero means the event has not yet been persisted.
+    #[serde(default)]
+    pub stream_sequence: i64,
+    /// Database recording time. This is deliberately distinct from the
+    /// business occurrence timestamp above.
+    #[serde(default = "Utc::now")]
+    pub recorded_at: DateTime<Utc>,
+    /// `0` is the explicit legacy/unverified history boundary; `1` is the
+    /// sequence-based chain written by Revision 1 adapters.
+    #[serde(default = "default_chain_version")]
+    pub chain_version: i16,
     pub previous_hash: Option<String>,
     pub record_hash: Option<String>,
 }
@@ -202,6 +214,9 @@ impl AuditEvent {
             details,
             schema_version,
             occurred_at,
+            stream_sequence: 0,
+            recorded_at: occurred_at,
+            chain_version: 1,
             previous_hash: None,
             record_hash: None,
         })
@@ -209,6 +224,22 @@ impl AuditEvent {
 
     #[must_use]
     pub fn with_chain(mut self, previous_hash: Option<String>) -> Self {
+        self.previous_hash = previous_hash;
+        self.record_hash = Some(hash_record(&self));
+        self
+    }
+
+    #[must_use]
+    pub fn with_chain_metadata(
+        mut self,
+        stream_sequence: i64,
+        recorded_at: DateTime<Utc>,
+        chain_version: i16,
+        previous_hash: Option<String>,
+    ) -> Self {
+        self.stream_sequence = stream_sequence;
+        self.recorded_at = recorded_at;
+        self.chain_version = chain_version;
         self.previous_hash = previous_hash;
         self.record_hash = Some(hash_record(&self));
         self
@@ -237,6 +268,9 @@ impl AuditEvent {
             "details": self.details,
             "schema_version": self.schema_version,
             "occurred_at": self.occurred_at,
+            "stream_sequence": self.stream_sequence,
+            "recorded_at": self.recorded_at,
+            "chain_version": self.chain_version,
             "previous_hash": self.previous_hash,
         })
     }
@@ -256,8 +290,20 @@ pub enum AuditError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditCursor {
+    #[serde(default = "default_cursor_version")]
+    pub version: u8,
+    #[serde(default)]
+    pub stream_sequence: i64,
     pub occurred_at: DateTime<Utc>,
     pub id: Uuid,
+}
+
+fn default_cursor_version() -> u8 {
+    1
+}
+
+fn default_chain_version() -> i16 {
+    1
 }
 
 #[derive(Debug, Clone, Default)]
@@ -470,6 +516,70 @@ mod tests {
         let mut changed = second.clone();
         changed.details = serde_json::json!({"n": 3});
         assert_ne!(changed.record_hash, Some(hash_record(&changed)));
+    }
+
+    #[test]
+    fn append_sequence_is_independent_of_business_time() {
+        let tenant = Uuid::new_v4();
+        let first_time = Utc::now();
+        let first = AuditEvent::new(
+            Uuid::new_v4(),
+            tenant,
+            AuditActor {
+                actor_type: AuditActorType::System,
+                actor_id: Uuid::new_v4(),
+            },
+            AuditAction::new("audit.first").unwrap_or_else(|_| unreachable!()),
+            AuditResource::new("job", "1").unwrap_or_else(|_| unreachable!()),
+            Uuid::new_v4(),
+            None,
+            None,
+            None,
+            None,
+            AuditResult::Succeeded,
+            None,
+            None,
+            None,
+            Vec::new(),
+            serde_json::json!({}),
+            "audit.v1",
+            first_time,
+        )
+        .unwrap_or_else(|_| unreachable!())
+        .with_chain_metadata(1, first_time, 1, None);
+        let second = AuditEvent::new(
+            Uuid::new_v4(),
+            tenant,
+            AuditActor {
+                actor_type: AuditActorType::System,
+                actor_id: Uuid::new_v4(),
+            },
+            AuditAction::new("audit.second").unwrap_or_else(|_| unreachable!()),
+            AuditResource::new("job", "1").unwrap_or_else(|_| unreachable!()),
+            Uuid::new_v4(),
+            None,
+            None,
+            None,
+            None,
+            AuditResult::Succeeded,
+            None,
+            None,
+            None,
+            Vec::new(),
+            serde_json::json!({}),
+            "audit.v1",
+            first_time - chrono::Duration::hours(1),
+        )
+        .unwrap_or_else(|_| unreachable!())
+        .with_chain_metadata(
+            2,
+            first_time + chrono::Duration::seconds(1),
+            1,
+            first.record_hash.clone(),
+        );
+        assert_eq!(second.stream_sequence, first.stream_sequence + 1);
+        assert_eq!(second.previous_hash, first.record_hash);
+        assert_eq!(second.record_hash, Some(hash_record(&second)));
     }
 
     #[test]

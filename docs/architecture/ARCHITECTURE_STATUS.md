@@ -48,6 +48,18 @@
 > `ab01288cd3477107c567e342ff45b7f624ec5396`. It is not an integration
 > candidate until the Revision 1 evidence and Feature CI are green.
 
+> 2026-08-04: Revision 1 local evidence is green for formatting, workspace
+> check, Clippy, workspace tests, the SQLite Governance E2E, management
+> security tests, and Architecture Fitness. Feature CI remains PENDING for
+> this revision; PostgreSQL/MinIO integration cases remain NOT RUN locally.
+
+Revision 1 records the Audit history boundary explicitly: migration 013
+backfills deterministic tenant-local sequence values but marks pre-existing
+rows `chain_version=0`; only new sequence-based rows are chain-protected.
+The processing state matrix is now the owner rule for PROC-INT-006, while
+PROC-INT-008 remains PARTIAL (metadata/checkpoint only; object-store probing
+is deferred). Resolved findings reopen as explicit recurrence episodes.
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 是可选入口；

@@ -6,12 +6,13 @@
 
 #![allow(clippy::expect_used)]
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use business_api::auth::AuthMiddlewareConfig;
+use axum::http::{HeaderValue, Method, Request, StatusCode};
+use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
 use business_api::config::{
     AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
     ServerConfig,
@@ -104,11 +105,15 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             audience: None,
             dev_secret: Some(Secret::new(DEV_SECRET.to_string())),
             dev_auth_enabled,
+            dev_permissions: BTreeSet::new(),
         },
     }
 }
 
-fn test_router(dev_auth_enabled: bool) -> axum::Router {
+fn test_router_with_permissions(
+    dev_auth_enabled: bool,
+    dev_permissions: BTreeSet<ManagementPermission>,
+) -> axum::Router {
     let config = test_config(dev_auth_enabled, vec!["*".to_string()]);
     let ports = Arc::new(EmptyPorts);
     let state = Arc::new(AppState {
@@ -126,8 +131,13 @@ fn test_router(dev_auth_enabled: bool) -> axum::Router {
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled,
         dev_secret: Some(DEV_SECRET.to_string()),
+        dev_permissions,
     };
     create_router(state, auth_config, &config.server)
+}
+
+fn test_router(dev_auth_enabled: bool) -> axum::Router {
+    test_router_with_permissions(dev_auth_enabled, BTreeSet::new())
 }
 
 async fn status_of(router: axum::Router, request: Request<Body>) -> StatusCode {
@@ -148,8 +158,8 @@ fn authorized_get(uri: &str, token: &str, tenant: bool) -> Request<Body> {
         .header("authorization", format!("Bearer {token}"));
     if tenant {
         builder = builder
-            .header("x-tenant-id", "tenant-1")
-            .header("x-user-id", "user-1");
+            .header("x-tenant-id", "00000000-0000-0000-0000-000000000001")
+            .header("x-user-id", "00000000-0000-0000-0000-000000000002");
     }
     builder.body(Body::empty()).expect("request must build")
 }
@@ -215,4 +225,50 @@ async fn production_mode_is_fail_closed() {
     let router = test_router(false);
     let status = status_of(router, authorized_get("/api/v1/anything", DEV_SECRET, true)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn forged_permission_header_cannot_read_integrity_findings() {
+    let router = test_router(true);
+    let mut request = authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true);
+    request.headers_mut().insert(
+        "x-management-permissions",
+        HeaderValue::from_static("integrity.read"),
+    );
+    let status = status_of(router, request).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn server_granted_integrity_read_reaches_governance_boundary() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::IntegrityRead);
+    let router = test_router_with_permissions(true, permissions);
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    // The test state intentionally has no GovernanceServices.  A non-403
+    // response proves the trusted server grant, rather than the request
+    // header, authorized the handler.
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+}
+
+#[tokio::test]
+async fn execute_permission_cannot_approve_repair() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::RepairExecute);
+    let router = test_router_with_permissions(true, permissions);
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/admin/repairs/00000000-0000-0000-0000-000000000003/approve")
+        .header("authorization", format!("Bearer {DEV_SECRET}"))
+        .header("x-tenant-id", "00000000-0000-0000-0000-000000000001")
+        .header("x-user-id", "00000000-0000-0000-0000-000000000002")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"note":"approve"}"#))
+        .expect("request must build");
+    let status = status_of(router, request).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }

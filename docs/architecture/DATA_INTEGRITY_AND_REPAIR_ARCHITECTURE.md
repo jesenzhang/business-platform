@@ -14,7 +14,11 @@ generic repository.
 Rules have stable IDs, explicit versions, bounded-context ownership, severity,
 and an allow-list flag. A finding is keyed by tenant, rule/version, resource,
 and fingerprint. Repeated scans update detection time and occurrence count;
-they do not create duplicates. Lifecycle transitions are `open`,
+they do not create duplicates. A recurrence after `repaired` or
+`false_positive` explicitly reopens the same rule-version identity as a new
+episode and records `reopened_at`, `reopen_count`, and
+`previous_resolution`; a rule-version change remains a distinct identity.
+Lifecycle transitions are `open`,
 `repair_planned`, `repairing`, `repaired`, `ignored`, `false_positive`,
 `stale`, and `needs_manual_review`, each with an optimistic version.
 Transient dependency failures produce an unknown/failed scan result, not a
@@ -34,7 +38,14 @@ resume, and stale-worker rejection.
 
 PROC-INT-001..008 cover missing active AI task, missing candidate, invalid
 review/job terminal state, succeeded AI without candidate, terminal lease,
-current-step mismatch, candidate revision mismatch, and missing text artifact.
+the explicit processing state matrix (current-step projection, waiting-state
+projections using the owner's pending/queued AwaitReview projection,
+terminal/running exclusivity, pipeline ordering, and attempt coherence),
+candidate revision mismatch, and missing text artifact.
 The only handlers are `reconcile_processing_job.v1`,
 `requeue_missing_ai_task.v1`, `clear_terminal_job_lease.v1`,
 `rebuild_processing_step_projection.v1`, and `reconcile_ai_completion.v1`.
+
+PROC-INT-008 remains **PARTIAL**: it validates only metadata/checkpoint
+references. A bounded object-store existence probe with timeout and
+rate-limiting is deferred and must not be represented as complete validation.
