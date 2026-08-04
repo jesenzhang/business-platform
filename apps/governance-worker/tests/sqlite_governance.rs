@@ -124,6 +124,87 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     };
     governance.save_step(&step).await.expect("save repair step");
 
+    // Model a crashed worker: the first lease expires, a replacement claims a
+    // higher fence, and the stale worker's completion is rejected.
+    let crash_run = RepairRun {
+        id: Uuid::new_v4(),
+        tenant_id,
+        finding_id,
+        command: RepairCommand {
+            idempotency_key: "sqlite-governance-crash-recovery".to_string(),
+            tenant_id,
+            finding_id,
+            repair_type: "requeue_missing_ai_task.v1".to_string(),
+            repair_version: 1,
+            requested_by: actor_id,
+            reason: "exercise lease recovery".to_string(),
+            expected_resource_version: Some(1),
+            batch_limit: 1,
+        },
+        status: RepairRunStatus::Queued,
+        created_by: actor_id,
+        approved_by: None,
+        approval_note: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        version: 0,
+    };
+    governance
+        .save_run(&crash_run)
+        .await
+        .expect("save crash-recovery run");
+    let crash_step = RepairStep {
+        id: Uuid::new_v4(),
+        run_id: crash_run.id,
+        finding_id,
+        status: RepairRunStatus::Queued,
+        attempt_count: 0,
+        checkpoint: None,
+        lease_owner: None,
+        lease_token: None,
+        fence_version: 0,
+        lease_expires_at: None,
+        next_attempt_at: Utc::now() - chrono::Duration::seconds(1),
+    };
+    governance
+        .save_step(&crash_step)
+        .await
+        .expect("save crash-recovery step");
+    let crashed_at = Utc::now();
+    let stale = governance
+        .claim_step("crashed-worker", crashed_at, 1)
+        .await
+        .expect("claim crashed step")
+        .expect("crashed step claimed");
+    let reclaimed = governance
+        .claim_step(
+            "replacement-worker",
+            crashed_at + chrono::Duration::seconds(2),
+            60,
+        )
+        .await
+        .expect("reclaim crashed step")
+        .expect("expired step reclaimed");
+    assert!(reclaimed.fence_version > stale.fence_version);
+    let mut stale_completion = stale.clone();
+    stale_completion.status = RepairRunStatus::Succeeded;
+    assert!(matches!(
+        governance
+            .save_step_fenced(&stale_completion, stale.fence_version)
+            .await,
+        Err(data_repair::RepairError::LeaseLost)
+    ));
+    // Remove the recovery fixture from the claim queue; the real repair run
+    // below remains the only executable step.
+    let mut recovered_cleanup = reclaimed;
+    recovered_cleanup.status = RepairRunStatus::Failed;
+    recovered_cleanup.lease_owner = None;
+    recovered_cleanup.lease_token = None;
+    governance
+        .save_step(&recovered_cleanup)
+        .await
+        .expect("cleanup recovery fixture");
+
     let processing = Arc::new(SqliteProcessingStore::new(pool.clone()));
     let worker = RepairWorker {
         persistence: Arc::clone(&governance),
