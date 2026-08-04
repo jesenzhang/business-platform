@@ -84,31 +84,31 @@ pub fn finding_status_name(status: FindingStatus) -> &'static str {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IntegrityFinding {
-    pub id: Uuid,
-    pub tenant_id: Uuid,
-    pub rule_id: String,
-    pub rule_version: u32,
-    pub bounded_context: String,
-    pub resource_type: String,
-    pub resource_id: String,
-    pub severity: IntegritySeverity,
-    pub fingerprint: String,
-    pub detected_state: Value,
-    pub expected_state: Value,
-    pub status: FindingStatus,
-    pub repairability: String,
-    pub first_detected_at: DateTime<Utc>,
-    pub last_detected_at: DateTime<Utc>,
-    pub occurrence_count: u64,
-    pub resolved_at: Option<DateTime<Utc>>,
-    pub resolution_reason: Option<String>,
+    id: Uuid,
+    tenant_id: Uuid,
+    rule_id: String,
+    rule_version: u32,
+    bounded_context: String,
+    resource_type: String,
+    resource_id: String,
+    severity: IntegritySeverity,
+    fingerprint: String,
+    detected_state: Value,
+    expected_state: Value,
+    status: FindingStatus,
+    repairability: String,
+    first_detected_at: DateTime<Utc>,
+    last_detected_at: DateTime<Utc>,
+    occurrence_count: u64,
+    resolved_at: Option<DateTime<Utc>>,
+    resolution_reason: Option<String>,
     /// Timestamp of the latest explicit reopen after a resolved episode.
-    pub reopened_at: Option<DateTime<Utc>>,
+    reopened_at: Option<DateTime<Utc>>,
     /// Number of times a resolved finding has been observed again.
-    pub reopen_count: u64,
+    reopen_count: u64,
     /// Resolution that was superseded by the latest reopen.
-    pub previous_resolution: Option<String>,
-    pub version: i64,
+    previous_resolution: Option<String>,
+    version: i64,
 }
 
 impl IntegrityFinding {
@@ -125,30 +125,185 @@ impl IntegrityFinding {
         {
             return Err(IntegrityError::InvalidFinding);
         }
+        Self::rehydrate(
+            Uuid::new_v4(),
+            issue.tenant_id,
+            descriptor.id.clone(),
+            descriptor.version,
+            descriptor.bounded_context.clone(),
+            issue.resource_type,
+            issue.resource_id,
+            descriptor.severity,
+            issue.fingerprint,
+            issue.detected_state,
+            issue.expected_state,
+            FindingStatus::Open,
+            issue.repairability,
+            now,
+            now,
+            1,
+            None,
+            None,
+            None,
+            0,
+            None,
+            0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn rehydrate(
+        id: Uuid,
+        tenant_id: Uuid,
+        rule_id: String,
+        rule_version: u32,
+        bounded_context: String,
+        resource_type: String,
+        resource_id: String,
+        severity: IntegritySeverity,
+        fingerprint: String,
+        detected_state: Value,
+        expected_state: Value,
+        status: FindingStatus,
+        repairability: String,
+        first_detected_at: DateTime<Utc>,
+        last_detected_at: DateTime<Utc>,
+        occurrence_count: u64,
+        resolved_at: Option<DateTime<Utc>>,
+        resolution_reason: Option<String>,
+        reopened_at: Option<DateTime<Utc>>,
+        reopen_count: u64,
+        previous_resolution: Option<String>,
+        version: i64,
+    ) -> Result<Self, IntegrityError> {
+        if id.is_nil()
+            || tenant_id.is_nil()
+            || rule_id.trim().is_empty()
+            || rule_version == 0
+            || bounded_context.trim().is_empty()
+            || resource_type.trim().is_empty()
+            || resource_id.trim().is_empty()
+            || fingerprint.trim().is_empty()
+            || repairability.trim().is_empty()
+            || occurrence_count == 0
+            || version < 0
+            || last_detected_at < first_detected_at
+        {
+            return Err(IntegrityError::InvalidFinding);
+        }
         Ok(Self {
-            id: Uuid::new_v4(),
-            tenant_id: issue.tenant_id,
-            rule_id: descriptor.id.clone(),
-            rule_version: descriptor.version,
-            bounded_context: descriptor.bounded_context.clone(),
-            resource_type: issue.resource_type,
-            resource_id: issue.resource_id,
-            severity: descriptor.severity,
-            fingerprint: issue.fingerprint,
-            detected_state: issue.detected_state,
-            expected_state: issue.expected_state,
-            status: FindingStatus::Open,
-            repairability: issue.repairability,
-            first_detected_at: now,
-            last_detected_at: now,
-            occurrence_count: 1,
-            resolved_at: None,
-            resolution_reason: None,
-            reopened_at: None,
-            reopen_count: 0,
-            previous_resolution: None,
-            version: 0,
+            id,
+            tenant_id,
+            rule_id,
+            rule_version,
+            bounded_context,
+            resource_type,
+            resource_id,
+            severity,
+            fingerprint,
+            detected_state,
+            expected_state,
+            status,
+            repairability,
+            first_detected_at,
+            last_detected_at,
+            occurrence_count,
+            resolved_at,
+            resolution_reason,
+            reopened_at,
+            reopen_count,
+            previous_resolution,
+            version,
         })
+    }
+
+    #[must_use]
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+    #[must_use]
+    pub fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
+    #[must_use]
+    pub fn rule_id(&self) -> &str {
+        &self.rule_id
+    }
+    #[must_use]
+    pub fn rule_version(&self) -> u32 {
+        self.rule_version
+    }
+    #[must_use]
+    pub fn bounded_context(&self) -> &str {
+        &self.bounded_context
+    }
+    #[must_use]
+    pub fn resource_type(&self) -> &str {
+        &self.resource_type
+    }
+    #[must_use]
+    pub fn resource_id(&self) -> &str {
+        &self.resource_id
+    }
+    #[must_use]
+    pub fn severity(&self) -> IntegritySeverity {
+        self.severity
+    }
+    #[must_use]
+    pub fn fingerprint(&self) -> &str {
+        &self.fingerprint
+    }
+    #[must_use]
+    pub fn detected_state(&self) -> &Value {
+        &self.detected_state
+    }
+    #[must_use]
+    pub fn expected_state(&self) -> &Value {
+        &self.expected_state
+    }
+    #[must_use]
+    pub fn status(&self) -> FindingStatus {
+        self.status
+    }
+    #[must_use]
+    pub fn repairability(&self) -> &str {
+        &self.repairability
+    }
+    #[must_use]
+    pub fn first_detected_at(&self) -> DateTime<Utc> {
+        self.first_detected_at
+    }
+    #[must_use]
+    pub fn last_detected_at(&self) -> DateTime<Utc> {
+        self.last_detected_at
+    }
+    #[must_use]
+    pub fn occurrence_count(&self) -> u64 {
+        self.occurrence_count
+    }
+    #[must_use]
+    pub fn resolved_at(&self) -> Option<DateTime<Utc>> {
+        self.resolved_at
+    }
+    #[must_use]
+    pub fn resolution_reason(&self) -> Option<&str> {
+        self.resolution_reason.as_deref()
+    }
+    #[must_use]
+    pub fn reopened_at(&self) -> Option<DateTime<Utc>> {
+        self.reopened_at
+    }
+    #[must_use]
+    pub fn reopen_count(&self) -> u64 {
+        self.reopen_count
+    }
+    #[must_use]
+    pub fn previous_resolution(&self) -> Option<&str> {
+        self.previous_resolution.as_deref()
+    }
+    #[must_use]
+    pub fn version(&self) -> i64 {
+        self.version
     }
 
     pub fn mark_detected(&mut self, now: DateTime<Utc>) -> Result<(), IntegrityError> {
@@ -164,14 +319,23 @@ impl IntegrityFinding {
                 .clone()
                 .or_else(|| Some(format!("{:?}", self.status).to_lowercase()));
             self.reopened_at = Some(now);
-            self.reopen_count = self.reopen_count.saturating_add(1);
+            self.reopen_count = self
+                .reopen_count
+                .checked_add(1)
+                .ok_or(IntegrityError::Persistence)?;
             self.status = FindingStatus::Open;
             self.resolved_at = None;
             self.resolution_reason = None;
         }
         self.last_detected_at = now;
-        self.occurrence_count = self.occurrence_count.saturating_add(1);
-        self.version = self.version.saturating_add(1);
+        self.occurrence_count = self
+            .occurrence_count
+            .checked_add(1)
+            .ok_or(IntegrityError::Persistence)?;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(IntegrityError::Persistence)?;
         Ok(())
     }
 
@@ -204,7 +368,10 @@ impl IntegrityFinding {
         self.resolution_reason = reason;
         self.resolved_at =
             matches!(status, FindingStatus::Repaired | FindingStatus::Stale).then_some(now);
-        self.version = self.version.saturating_add(1);
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(IntegrityError::Persistence)?;
         Ok(())
     }
 }
@@ -288,7 +455,7 @@ impl IntegrityRuleRegistry {
     pub async fn verify_finding(&self, finding: &IntegrityFinding) -> Result<bool, IntegrityError> {
         let Some(rule) = self.rules.iter().find(|rule| {
             let descriptor = rule.descriptor();
-            descriptor.id == finding.rule_id && descriptor.version == finding.rule_version
+            descriptor.id == finding.rule_id() && descriptor.version == finding.rule_version()
         }) else {
             return Err(IntegrityError::InvalidDescriptor);
         };
@@ -567,9 +734,9 @@ macro_rules! processing_rule {
                 &self,
                 finding: &IntegrityFinding,
             ) -> Result<bool, IntegrityError> {
-                let job_id = Uuid::parse_str(&finding.resource_id)
+                let job_id = Uuid::parse_str(finding.resource_id())
                     .map_err(|_| IntegrityError::InvalidFinding)?;
-                let Some(snapshot) = self.query.snapshot(finding.tenant_id, job_id).await? else {
+            let Some(snapshot) = self.query.snapshot(finding.tenant_id(), job_id).await? else {
                     return Ok(false);
                 };
                 Ok(!($predicate)(&snapshot))

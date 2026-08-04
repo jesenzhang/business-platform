@@ -133,12 +133,31 @@ PLAN-0006.
 
 ## Candidate evidence
 
+### Revision 1 closure audit (working tree, 2026-08-04)
+
+The following implementation checks are complete in the current working tree;
+they are not an integration or Feature CI result until the branch is committed,
+pushed, and the required external contracts run.
+
+| Gate / requirement | Result | Evidence |
+|---|---|---|
+| R1-07 transaction boundary | PASS | Processing raw write Ports are adapter-private; public callers use `ProcessingExecutionUnitOfWork`. Audit, Integrity, and Repair persistence use owner-context local transactions. No generic cross-context transaction API was added. |
+| R1-09 domain encapsulation | PASS | `AuditEvent`, `IntegrityFinding`, `RepairRun`, `RepairStep`, and `RepairLedgerEntry` have private state, validated constructors/`rehydrate`, getters, and domain transitions; external struct literals are absent. |
+| Review idempotency | PASS | PostgreSQL/SQLite schema keys and fingerprints; same-key/same-fingerprint replay returns the original result with `replayed=true`; same-key/different-fingerprint conflict; concurrent SQLite finalization asserts one review, one `review_finalized` Audit row, and one succeeded Outbox event. |
+| Worker runtime safety | PASS | Business/AI JoinSets continuously reap completions, log join errors, stop claiming on shutdown, drain tasks, and fail closed when lease state is unproven. Dedicated worker tests cover completed-task and panic-task reaping. Reclaim/claim/persistence errors are observable. Governance post-claim failures use fenced manual-review abort handling. |
+| Controlled repair execution | PASS | `repair.execute` is a separate API permission/command. Approval moves Run/Step to `approved`; explicit ExecuteRepair moves them to `queued`; claim SQL excludes approved states. |
+| Migration manifests | PASS | Root migration 014 and SQLite processing migration 005 are applied by runtime migration code and covered by both SHA256 manifests. |
+| Local fmt/check/clippy/test/architecture gates | PASS | `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --all-features`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo test --workspace --all-features` (105 passed, 31 ignored); `pwsh scripts/check-architecture.ps1`. |
+| External PostgreSQL/MinIO contracts | BLOCKED | `cargo test --workspace --all-features -- --include-ignored` reaches `apps/business-api/tests/documents_postgres.rs` and stops because `DATABASE_URL` is not set. No local PostgreSQL/MinIO service is available. |
+| Feature CI / integration | PENDING | Requires a successful push and CI run; no archive or PLAN-0006 start is authorized before this evidence exists. |
+
 - Revision 1 targeted SQLite Governance E2E: PASS after the recurrence/state
   matrix and shared-table migration guards (`cargo test -p governance-worker
   --test sqlite_governance --all-features -- --nocapture`).
 - Revision 1 local gates: PASS — `cargo fmt --all -- --check`, workspace
   `cargo check --workspace --all-targets --all-features`, workspace Clippy with
-  `-D warnings`, `cargo test --workspace --all-features`, and
+  `-D warnings`, `cargo test --workspace --all-features` (105 passed, 31
+  ignored), and
   `scripts/check-architecture.ps1`. The workspace test run intentionally leaves
   infrastructure-dependent PostgreSQL/MinIO cases ignored locally.
 - Revision 1 management security tests: PASS — forged permission headers are

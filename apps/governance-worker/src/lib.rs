@@ -6,7 +6,7 @@ use data_integrity::{
 };
 use data_repair::{
     RepairError, RepairHandlerRegistry, RepairLedgerEntry, RepairPersistencePort, RepairResult,
-    RepairRunStatus, RepairStepStatus,
+    RepairRunStatus,
 };
 use runtime_governance::{run_integrity_scan, GovernanceError, ScanReport};
 use serde_json::json;
@@ -42,8 +42,8 @@ fn failure_result() -> data_repair::RepairResult {
         command_id: Uuid::now_v7(),
         resource_version_before: None,
         resource_version_after: None,
-        before_hash: String::new(),
-        after_hash: String::new(),
+        before_hash: "unavailable".to_string(),
+        after_hash: "unavailable".to_string(),
         rows_affected: 0,
         outcome: data_repair::RepairOutcome::Failed,
     }
@@ -56,34 +56,34 @@ fn ledger_entry(
     result: &data_repair::RepairResult,
     failure_code: Option<String>,
     started_at: chrono::DateTime<Utc>,
-) -> RepairLedgerEntry {
-    RepairLedgerEntry {
-        id: Uuid::now_v7(),
-        tenant_id: run.tenant_id,
-        repair_run_id: run.id,
-        repair_step_id: step.id,
-        finding_id: run.finding_id,
-        rule_id: finding.rule_id.clone(),
-        repair_type: run.command.repair_type.clone(),
-        repair_version: run.command.repair_version,
-        actor_type: "repair_job".to_string(),
-        actor_id: run.created_by,
-        reason: run.command.reason.clone(),
-        resource_type: finding.resource_type.clone(),
-        resource_id: finding.resource_id.clone(),
-        before_hash: result.before_hash.clone(),
-        after_hash: result.after_hash.clone(),
-        before_snapshot: json!({ "hash": result.before_hash }),
-        after_snapshot: json!({ "hash": result.after_hash }),
-        rows_affected: result.rows_affected,
-        result: result.outcome,
+) -> Result<RepairLedgerEntry, RepairError> {
+    RepairLedgerEntry::new(
+        Uuid::now_v7(),
+        run.tenant_id(),
+        run.id(),
+        step.id(),
+        run.finding_id(),
+        finding.rule_id().to_string(),
+        run.command().repair_type.clone(),
+        run.command().repair_version,
+        "repair_job".to_string(),
+        run.created_by(),
+        run.command().reason.clone(),
+        finding.resource_type().to_string(),
+        finding.resource_id().to_string(),
+        result.before_hash.clone(),
+        result.after_hash.clone(),
+        json!({ "hash": result.before_hash }),
+        json!({ "hash": result.after_hash }),
+        result.rows_affected,
+        result.outcome,
         failure_code,
-        trace_id: None,
+        None,
         started_at,
-        finished_at: Utc::now(),
-        previous_hash: None,
-        record_hash: None,
-    }
+        Utc::now(),
+        None,
+        None,
+    )
 }
 
 impl<P, H> RepairWorker<P, H>
@@ -94,53 +94,105 @@ where
     #[allow(clippy::too_many_lines)]
     pub async fn execute_one(&self) -> Result<bool, RepairError> {
         let now = Utc::now();
-        let Some(mut step) = self
+        let Some(step) = self
             .persistence
             .claim_step(&self.worker_id, now, self.lease_duration_secs)
             .await?
         else {
             return Ok(false);
         };
-        let lease_token = step.lease_token.clone().ok_or(RepairError::LeaseLost)?;
+        let claim_snapshot = step.clone();
+        match self.execute_claimed(step).await {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                let reason = match &error {
+                    RepairError::Conflict => "post_claim_conflict",
+                    RepairError::InvalidDescriptor => "post_claim_invalid_descriptor",
+                    RepairError::InvalidTransition => "post_claim_invalid_transition",
+                    RepairError::ApprovalRequired => "post_claim_approval_required",
+                    RepairError::ApprovalSeparation => "post_claim_approval_separation",
+                    RepairError::LeaseLost => "post_claim_lease_lost",
+                    RepairError::Unavailable => "post_claim_dependency_unavailable",
+                    RepairError::Persistence | RepairError::InvalidCommand => {
+                        "post_claim_persistence_failure"
+                    }
+                };
+                if let Err(abort_error) = self
+                    .persistence
+                    .abort_claimed_repair(&claim_snapshot, &self.worker_id, reason)
+                    .await
+                {
+                    tracing::error!(
+                        worker_id = %self.worker_id,
+                        step_id = %claim_snapshot.id(),
+                        run_id = %claim_snapshot.run_id(),
+                        error = %abort_error,
+                        original_error = %error,
+                        "failed to durably abort claimed repair"
+                    );
+                } else {
+                    tracing::error!(
+                        worker_id = %self.worker_id,
+                        step_id = %claim_snapshot.id(),
+                        run_id = %claim_snapshot.run_id(),
+                        error = %error,
+                        "claimed repair moved to manual review after execution failure"
+                    );
+                }
+                Err(error)
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    async fn execute_claimed(
+        &self,
+        mut step: data_repair::RepairStep,
+    ) -> Result<bool, RepairError> {
+        let now = Utc::now();
+        let lease_token = step
+            .lease_token()
+            .ok_or(RepairError::LeaseLost)?
+            .to_string();
         self.persistence
             .validate_repair_fence(
-                step.id,
+                step.id(),
                 &self.worker_id,
                 &lease_token,
-                step.fence_version,
+                step.fence_version(),
                 now,
             )
             .await?;
         step = self
             .persistence
             .heartbeat_repair_step(
-                step.id,
+                step.id(),
                 &self.worker_id,
                 &lease_token,
-                step.fence_version,
+                step.fence_version(),
                 now,
                 self.lease_duration_secs,
             )
             .await?;
-        let Some(mut run) = self.persistence.load_run(step.run_id).await? else {
+        let Some(mut run) = self.persistence.load_run(step.run_id()).await? else {
             return Err(RepairError::Persistence);
         };
-        if run.command.integrity_finding_id != run.finding_id
-            || run.command.tenant_id != run.tenant_id
+        if run.command().integrity_finding_id != run.finding_id()
+            || run.command().tenant_id != run.tenant_id()
         {
             return Err(RepairError::Conflict);
         }
         let finding = self
             .persistence
-            .load_finding(run.finding_id)
+            .load_finding(run.finding_id())
             .await?
             .ok_or(RepairError::Conflict)?;
-        if finding.tenant_id != run.tenant_id
-            || finding.resource_type != run.command.target.resource_type
-            || finding.resource_id != run.command.target.resource_id
-            || finding.repairability != run.command.repair_type
+        if finding.tenant_id() != run.tenant_id()
+            || finding.resource_type() != run.command().target.resource_type
+            || finding.resource_id() != run.command().target.resource_id
+            || finding.repairability() != run.command().repair_type
             || matches!(
-                finding.status,
+                finding.status(),
                 data_integrity::FindingStatus::Repaired
                     | data_integrity::FindingStatus::FalsePositive
                     | data_integrity::FindingStatus::Stale
@@ -149,38 +201,41 @@ where
             return Err(RepairError::Conflict);
         }
         if !matches!(
-            run.status,
-            RepairRunStatus::Approved | RepairRunStatus::Queued | RepairRunStatus::Running
+            run.status(),
+            RepairRunStatus::Queued | RepairRunStatus::Running
         ) {
             return Err(RepairError::InvalidTransition);
         }
         let Some(handler) = self
             .handlers
-            .get(&run.command.repair_type, run.command.repair_version)
+            .get(&run.command().repair_type, run.command().repair_version)
             .await
         else {
             return Err(RepairError::InvalidDescriptor);
         };
         let descriptor = handler.descriptor();
         descriptor.validate()?;
-        if descriptor.requires_approval && run.approved_by.is_none() {
+        if descriptor.requires_approval && run.approved_by().is_none() {
             return Err(RepairError::ApprovalRequired);
         }
-        if descriptor.requires_approval && run.approved_by == Some(run.created_by) {
+        if descriptor.requires_approval && run.approved_by() == Some(run.created_by()) {
             return Err(RepairError::ApprovalSeparation);
         }
         let context = data_repair::RepairExecutionContext {
-            run_id: run.id,
-            step_id: step.id,
+            run_id: run.id(),
+            step_id: step.id(),
             worker_id: self.worker_id.clone(),
-            fence_version: step.fence_version,
-            lease_token: step.lease_token.clone().ok_or(RepairError::LeaseLost)?,
+            fence_version: step.fence_version(),
+            lease_token: step
+                .lease_token()
+                .ok_or(RepairError::LeaseLost)?
+                .to_string(),
             now,
-            lease_expires_at: step.lease_expires_at.ok_or(RepairError::LeaseLost)?,
+            lease_expires_at: step.lease_expires_at().ok_or(RepairError::LeaseLost)?,
         };
         self.persistence
             .validate_repair_fence(
-                step.id,
+                step.id(),
                 &self.worker_id,
                 &context.lease_token,
                 context.fence_version,
@@ -193,13 +248,14 @@ where
                 .min(self.lease_duration_secs.saturating_sub(1).max(1))
                 .cast_unsigned(),
         );
-        let mut execution = std::pin::pin!(handler.execute(&run.command, &context));
+        let command_for_execution = run.command().clone();
+        let mut execution = std::pin::pin!(handler.execute(&command_for_execution, &context));
         let execution_result = loop {
             tokio::select! {
                 result = &mut execution => break result,
                 () = sleep(heartbeat_interval) => {
                     step = self.persistence.heartbeat_repair_step(
-                        step.id,
+                        step.id(),
                         &self.worker_id,
                         &context.lease_token,
                         context.fence_version,
@@ -212,15 +268,11 @@ where
         let result = match execution_result {
             Ok(result) => result,
             Err(error) => {
+                let expected_run_version = run.version();
                 let mut failed_run = run.clone();
-                failed_run.status = RepairRunStatus::Failed;
-                failed_run.updated_at = Utc::now();
-                failed_run.version = failed_run.version.saturating_add(1);
+                failed_run.mark_failed(Utc::now())?;
                 let mut failed_step = step.clone();
-                failed_step.status = RepairStepStatus::Failed;
-                failed_step.lease_expires_at = None;
-                failed_step.lease_owner = None;
-                failed_step.lease_token = None;
+                failed_step.fail()?;
                 let failure = failure_result();
                 let entry = ledger_entry(
                     &failed_run,
@@ -229,9 +281,17 @@ where
                     &failure,
                     Some("owner_mutation_failed".to_string()),
                     now,
-                );
+                )?;
                 self.persistence
-                    .commit_failure(&failed_run, &failed_step, &entry, context.fence_version)
+                    .commit_failure(
+                        &failed_run,
+                        &failed_step,
+                        &entry,
+                        expected_run_version,
+                        context.fence_version,
+                        &context.worker_id,
+                        &context.lease_token,
+                    )
                     .await?;
                 return Err(error);
             }
@@ -240,15 +300,11 @@ where
             result.outcome,
             data_repair::RepairOutcome::Conflict | data_repair::RepairOutcome::Failed
         ) {
+            let expected_run_version = run.version();
             let mut failed_run = run.clone();
-            failed_run.status = RepairRunStatus::Failed;
-            failed_run.updated_at = Utc::now();
-            failed_run.version = failed_run.version.saturating_add(1);
+            failed_run.mark_failed(Utc::now())?;
             let mut failed_step = step.clone();
-            failed_step.status = RepairStepStatus::Failed;
-            failed_step.lease_expires_at = None;
-            failed_step.lease_owner = None;
-            failed_step.lease_token = None;
+            failed_step.fail()?;
             let entry = ledger_entry(
                 &failed_run,
                 &failed_step,
@@ -263,9 +319,17 @@ where
                     .to_string(),
                 ),
                 now,
-            );
+            )?;
             self.persistence
-                .commit_failure(&failed_run, &failed_step, &entry, context.fence_version)
+                .commit_failure(
+                    &failed_run,
+                    &failed_step,
+                    &entry,
+                    expected_run_version,
+                    context.fence_version,
+                    &context.worker_id,
+                    &context.lease_token,
+                )
                 .await?;
             return Err(if result.outcome == data_repair::RepairOutcome::Conflict {
                 RepairError::Conflict
@@ -273,7 +337,10 @@ where
                 RepairError::Persistence
             });
         }
-        let verification = handler.verify_after_repair(&run.command, &result).await?;
+        let command_for_verification = run.command().clone();
+        let verification = handler
+            .verify_after_repair(&command_for_verification, &result)
+            .await?;
         let rule_verified = match self.rule_registry.as_ref() {
             Some(registry) => registry
                 .verify_finding(&finding)
@@ -282,14 +349,10 @@ where
             None => verification.valid,
         };
         if !verification.valid || !rule_verified {
-            run.status = RepairRunStatus::NeedsManualReview;
-            run.updated_at = Utc::now();
-            run.version = run.version.saturating_add(1);
+            let expected_run_version = run.version();
+            run.mark_needs_manual_review(Utc::now())?;
             let mut review_step = step.clone();
-            review_step.status = RepairStepStatus::NeedsManualReview;
-            review_step.lease_expires_at = None;
-            review_step.lease_owner = None;
-            review_step.lease_token = None;
+            review_step.require_manual_review()?;
             let entry = ledger_entry(
                 &run,
                 &review_step,
@@ -300,24 +363,28 @@ where
                 },
                 Some("verification_failed".to_string()),
                 now,
-            );
+            )?;
             self.persistence
-                .commit_failure(&run, &review_step, &entry, context.fence_version)
+                .commit_failure(
+                    &run,
+                    &review_step,
+                    &entry,
+                    expected_run_version,
+                    context.fence_version,
+                    &context.worker_id,
+                    &context.lease_token,
+                )
                 .await?;
             return Err(RepairError::Conflict);
         }
+        let expected_run_version = run.version();
         let mut completed = step;
-        completed.status = RepairStepStatus::Succeeded;
-        completed.lease_expires_at = None;
-        completed.lease_owner = None;
-        completed.lease_token = None;
-        run.status = RepairRunStatus::Succeeded;
-        run.updated_at = Utc::now();
-        run.version = run.version.saturating_add(1);
-        let entry = ledger_entry(&run, &completed, &finding, &result, None, now);
+        completed.succeed()?;
+        run.mark_succeeded(Utc::now())?;
+        let entry = ledger_entry(&run, &completed, &finding, &result, None, now)?;
         self.persistence
             .validate_repair_fence(
-                completed.id,
+                completed.id(),
                 &self.worker_id,
                 &context.lease_token,
                 context.fence_version,
@@ -325,7 +392,15 @@ where
             )
             .await?;
         self.persistence
-            .commit_success(&run, &completed, &entry, context.fence_version)
+            .commit_success(
+                &run,
+                &completed,
+                &entry,
+                expected_run_version,
+                context.fence_version,
+                &context.worker_id,
+                &context.lease_token,
+            )
             .await?;
         Ok(true)
     }
@@ -380,20 +455,21 @@ where
     Q: ProcessingIntegrityQuery + 'static,
     P: IntegrityPersistencePort + 'static,
 {
-    pub fn new(query: std::sync::Arc<Q>, persistence: std::sync::Arc<P>) -> Self {
+    pub fn new(
+        query: std::sync::Arc<Q>,
+        persistence: std::sync::Arc<P>,
+    ) -> Result<Self, data_integrity::IntegrityError> {
         let mut registry = IntegrityRuleRegistry::default();
         for rule in data_integrity::processing_rules(std::sync::Arc::clone(&query)) {
             // Registration is deterministic and descriptors are validated at
             // composition time; an invalid built-in rule is a startup error.
-            if registry.register(rule).is_err() {
-                tracing::error!("built-in processing integrity rule registration failed");
-            }
+            registry.register(rule)?;
         }
-        Self {
+        Ok(Self {
             query,
             persistence,
             registry,
-        }
+        })
     }
 
     pub async fn run_explicit_scan(

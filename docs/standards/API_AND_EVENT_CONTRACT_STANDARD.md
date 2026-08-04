@@ -367,8 +367,17 @@ envelope from section 16. Payloads contain references and bounded counters,
 never document bytes or storage credentials. Consumers must tolerate duplicate
 and out-of-order execution events.
 
-Revision 1 keeps the public contract unchanged while moving cancellation and
-review finalization behind the atomic processing execution unit of work.
-Repeated review commands with the same candidate/version/decision replay the
-stored result; a different decision conflicts. Internal artifact references,
-checkpoints, lease identity, and task retry state remain private.
+Revision 1 keeps existing processing response fields while adding the explicit
+`replayed` flag to the review response, and moves cancellation and review
+finalization behind the atomic processing execution unit of work. The review endpoint requires `Idempotency-Key`; its durable
+fingerprint includes the tenant, job, candidate, reviewer, candidate version,
+decision, patch, and comment, but not generated IDs or timestamps. A retry with
+the same key and fingerprint replays the stored review. The same key with a
+different fingerprint conflicts, and concurrent attempts commit at most one
+review, Audit fact, and Outbox fact. Internal artifact references, checkpoints,
+lease identity, and task retry state remain private.
+
+Controlled repair management exposes a separate `POST
+/api/v1/admin/repairs/{id}/execute` command guarded by `repair.execute`.
+Approval changes a run to `approved`; only the explicit execute command moves
+it to the claimable queue. `approved` runs and steps are never claimable.

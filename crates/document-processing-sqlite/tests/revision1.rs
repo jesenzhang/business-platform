@@ -18,7 +18,9 @@ async fn setup() -> (sqlx::SqlitePool, Uuid, Uuid, Uuid) {
         .connect("sqlite::memory:")
         .await
         .unwrap_or_else(|_| unreachable!());
-    pool.execute("PRAGMA foreign_keys = ON").await.ok();
+    pool.execute("PRAGMA foreign_keys = ON")
+        .await
+        .unwrap_or_else(|_| unreachable!());
     pool.execute("CREATE TABLE documents (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, original_filename TEXT NOT NULL, content_type TEXT NOT NULL, object_key TEXT NOT NULL, status TEXT NOT NULL, version INTEGER NOT NULL, content_revision INTEGER NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
         .await
         .unwrap_or_else(|_| unreachable!());
@@ -111,15 +113,11 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         )
         .await
         .unwrap_or_else(|_| unreachable!());
-    let claimed_task = document_processing::ports::legacy::AiTaskPort::claim_next(
-        &store,
-        "ai-test",
-        Utc::now(),
-        60,
-    )
-    .await
-    .unwrap_or_else(|_| unreachable!())
-    .unwrap_or_else(|| unreachable!());
+    let claimed_task = store
+        .claim_next_ai_task("ai-test", Utc::now(), 60)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
     let candidate = DeterministicLocalExtractor
         .extract(ExtractionRequest {
             tenant_id: tenant,
@@ -203,6 +201,8 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
+                idempotency_key: "review-sqlite-rollback".to_string(),
+                request_fingerprint: "b".repeat(64),
                 review: rollback_review,
             },
             Utc::now(),
@@ -230,34 +230,79 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
     pool.execute("DROP TRIGGER test_processing_review_failure_trigger")
         .await
         .unwrap_or_else(|_| unreachable!());
-    let finalized = store
-        .finalize_review(
+    let (first, second) = tokio::join!(
+        store.finalize_review(
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
+                idempotency_key: "review-sqlite-1".to_string(),
+                request_fingerprint: "a".repeat(64),
+                review: review.clone(),
+            },
+            Utc::now(),
+        ),
+        store.finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                idempotency_key: "review-sqlite-1".to_string(),
+                request_fingerprint: "a".repeat(64),
                 review: review.clone(),
             },
             Utc::now(),
         )
-        .await
-        .unwrap_or_else(|_| unreachable!());
-    assert!(!finalized.replayed);
+    );
+    let first = first.unwrap_or_else(|_| unreachable!());
+    let second = second.unwrap_or_else(|_| unreachable!());
+    assert_ne!(first.replayed, second.replayed);
+    let created = if first.replayed { second } else { first };
     assert_eq!(
-        finalized.job.status(),
+        created.job.status(),
         document_processing::ProcessingJobStatus::Succeeded
     );
-    let replay = store
+    let review_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM document_extraction_reviews WHERE tenant_id = ?1 AND candidate_id = ?2",
+    )
+    .bind(tenant.to_string())
+    .bind(candidate.id().to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM document_processing_audit_events WHERE tenant_id = ?1 AND job_id = ?2 AND action = 'review_finalized'",
+    )
+    .bind(tenant.to_string())
+    .bind(job.id().to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    let outbox_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM outbox_events WHERE tenant_id = ?1 AND aggregate_id = ?2 AND event_type = 'document.processing.succeeded.v1'",
+    )
+    .bind(tenant.to_string())
+    .bind(job.id().to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert_eq!(review_count, 1);
+    assert_eq!(audit_count, 1);
+    assert_eq!(outbox_count, 1);
+    let conflict = store
         .finalize_review(
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
+                idempotency_key: "review-sqlite-1".to_string(),
+                request_fingerprint: "c".repeat(64),
                 review,
             },
             Utc::now(),
         )
-        .await
-        .unwrap_or_else(|_| unreachable!());
-    assert!(replay.replayed);
+        .await;
+    assert!(matches!(
+        conflict,
+        Err(document_processing::ProcessingRepositoryError::IdempotencyConflict)
+    ));
 
     let cancel_job = ProcessingJob::queue(
         tenant,

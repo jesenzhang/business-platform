@@ -91,6 +91,8 @@ struct LeaseHeartbeatGuard {
     stop: Option<oneshot::Sender<()>>,
     task: JoinHandle<()>,
     lost: Arc<AtomicBool>,
+    tenant_id: Uuid,
+    task_id: Uuid,
 }
 
 impl LeaseHeartbeatGuard {
@@ -112,8 +114,9 @@ impl LeaseHeartbeatGuard {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        if execution.heartbeat_ai_task(tenant_id, task_id, &fence, Utc::now(), lease_duration_secs).await.is_err() {
+                        if let Err(error) = execution.heartbeat_ai_task(tenant_id, task_id, &fence, Utc::now(), lease_duration_secs).await {
                             lost_for_task.store(true, Ordering::Release);
+                            tracing::error!(tenant_id = %tenant_id, task_id = %task_id, error = %error, "AI lease heartbeat failed; stopping work");
                             break;
                         }
                     }
@@ -125,6 +128,8 @@ impl LeaseHeartbeatGuard {
             stop: Some(stop),
             task: handle,
             lost,
+            tenant_id,
+            task_id,
         }
     }
 
@@ -136,15 +141,24 @@ impl LeaseHeartbeatGuard {
         }
     }
 
-    async fn stop(mut self) {
+    async fn stop(mut self) -> bool {
+        let mut stopped = true;
         if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
+            if stop.send(()).is_err() {
+                stopped = false;
+                tracing::warn!(tenant_id = %self.tenant_id, task_id = %self.task_id, "AI lease heartbeat task was already stopped");
+            }
         }
-        let _ = self.task.await;
+        if let Err(error) = self.task.await {
+            stopped = false;
+            tracing::error!(tenant_id = %self.tenant_id, task_id = %self.task_id, error = %error, "AI lease heartbeat task join failed");
+        }
+        stopped
     }
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     let config = AiWorkerConfig::load()?;
     config
@@ -193,15 +207,38 @@ async fn main() -> anyhow::Result<()> {
     let mut shutdown = Box::pin(shutdown_signal());
     loop {
         tokio::select! {
-            () = &mut shutdown => {
+            shutdown_result = &mut shutdown => {
+                shutdown_result?;
                 tracing::info!(worker_id = %config.worker_id, "ai-worker graceful shutdown");
                 break;
             }
+            joined = task_set.join_next(), if !task_set.is_empty() => {
+                match joined {
+                    Some(Ok(())) | None => {}
+                    Some(Err(error)) => tracing::error!(worker_id = %config.worker_id, error = %error, "AI task join failed"),
+                }
+                let reap = reap_completed_tasks(&mut task_set, &config.worker_id);
+                if reap.joined > 0 {
+                    tracing::debug!(worker_id = %config.worker_id, completed = reap.completed, join_errors = reap.join_errors, "reaped completed AI tasks");
+                }
+            }
             () = sleep(Duration::from_millis(config.poll_interval_millis)) => {
                 let now = Utc::now();
-                let _ = services.execution.reclaim_expired_ai_tasks(now).await;
+                match services.execution.reclaim_expired_ai_tasks(now).await {
+                    Ok(reclaimed) if reclaimed > 0 => tracing::info!(worker_id = %config.worker_id, reclaimed, "expired AI leases reclaimed"),
+                    Ok(_) => {}
+                    Err(error) => tracing::error!(worker_id = %config.worker_id, error = %error, "failed to reclaim expired AI leases"),
+                }
                 if let Ok(permit) = Arc::clone(&permits).try_acquire_owned() {
-                    if let Some(task) = services.execution.claim_next_ai_task(&config.worker_id, now, config.lease_duration_secs).await? {
+                    let task = match services.execution.claim_next_ai_task(&config.worker_id, now, config.lease_duration_secs).await {
+                        Ok(task) => task,
+                        Err(error) => {
+                            tracing::error!(worker_id = %config.worker_id, error = %error, "failed to claim AI task");
+                            drop(permit);
+                            continue;
+                        }
+                    };
+                    if let Some(task) = task {
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
                         let config_for_task = config.clone();
@@ -216,7 +253,11 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-    while task_set.join_next().await.is_some() {}
+    while let Some(joined) = task_set.join_next().await {
+        if let Err(error) = joined {
+            tracing::error!(worker_id = %config.worker_id, error = %error, "AI task join failed during graceful drain");
+        }
+    }
     Ok(())
 }
 
@@ -261,6 +302,7 @@ async fn build_storage(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn process_task(
     services: &AiWorkerServices,
     source: &StorageSource,
@@ -268,6 +310,7 @@ async fn process_task(
     config: &AiWorkerConfig,
 ) {
     let Some(token) = task.lease_token.clone() else {
+        tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "claimed AI task has no lease token; refusing work");
         return;
     };
     let fence = ExecutionFence::new(config.worker_id.clone(), token, task.fence_version);
@@ -321,8 +364,11 @@ async fn process_task(
         Ok::<_, ExtractionError>(candidate)
     }
     .await;
+    let heartbeat_lost_flag = Arc::clone(&heartbeat.lost);
+    let heartbeat_stopped = heartbeat.stop().await;
+    let heartbeat_lost = heartbeat_lost_flag.load(Ordering::Acquire);
     match result {
-        Ok(candidate) => {
+        Ok(candidate) if heartbeat_stopped && !heartbeat_lost => {
             let completion = CompleteAiTaskCommand {
                 tenant_id: task.tenant_id,
                 job_id: task.job_id,
@@ -338,9 +384,12 @@ async fn process_task(
                 tracing::warn!(task_id = %task.id, error = %error, "AI task completion was fenced");
             }
         }
-        Err(error) => {
+        Ok(_) => {
+            tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "AI task result discarded because lease state was not proven");
+        }
+        Err(error) if heartbeat_stopped && !heartbeat_lost => {
             tracing::warn!(task_id = %task.id, failure_code = error.code(), "AI task failed");
-            let _ = services
+            if let Err(persistence_error) = services
                 .execution
                 .fail_ai_task(
                     task.tenant_id,
@@ -350,10 +399,15 @@ async fn process_task(
                     &fence,
                     Utc::now(),
                 )
-                .await;
+                .await
+            {
+                tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, error = %persistence_error, "failed to persist AI task failure");
+            }
+        }
+        Err(error) => {
+            tracing::warn!(tenant_id = %task.tenant_id, task_id = %task.id, failure_code = error.code(), "AI task failed without a provable lease; state transition skipped");
         }
     }
-    heartbeat.stop().await;
 }
 
 fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedProcessingFailure {
@@ -379,6 +433,59 @@ fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedPr
     }
 }
 
-async fn shutdown_signal() {
-    tokio::signal::ctrl_c().await.ok();
+async fn shutdown_signal() -> anyhow::Result<()> {
+    tokio::signal::ctrl_c().await.map_err(Into::into)
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct JoinSetReapSummary {
+    joined: usize,
+    completed: usize,
+    join_errors: usize,
+}
+
+fn reap_completed_tasks(tasks: &mut JoinSet<()>, worker_id: &str) -> JoinSetReapSummary {
+    let mut summary = JoinSetReapSummary::default();
+    while let Some(joined) = tasks.try_join_next() {
+        summary.joined += 1;
+        match joined {
+            Ok(()) => summary.completed += 1,
+            Err(error) => {
+                summary.join_errors += 1;
+                tracing::error!(worker_id, error = %error, "AI task join failed while reaping");
+            }
+        }
+    }
+    summary
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{reap_completed_tasks, JoinSet, JoinSetReapSummary};
+
+    #[tokio::test]
+    #[allow(clippy::panic)]
+    async fn reaps_completed_and_panicked_tasks_without_accumulation() {
+        let mut tasks = JoinSet::new();
+        tasks.spawn(async {});
+        tasks.spawn(async {
+            panic!("regression panic");
+        });
+        tasks.spawn(async {});
+
+        let mut total = JoinSetReapSummary::default();
+        while !tasks.is_empty() {
+            let current = reap_completed_tasks(&mut tasks, "test-ai-worker");
+            total.joined += current.joined;
+            total.completed += current.completed;
+            total.join_errors += current.join_errors;
+            if !tasks.is_empty() {
+                tokio::task::yield_now().await;
+            }
+        }
+
+        assert_eq!(total.joined, 3);
+        assert_eq!(total.completed, 2);
+        assert_eq!(total.join_errors, 1);
+    }
 }

@@ -261,7 +261,7 @@ pub async fn get_finding(
         .load_finding(id)
         .await
         .map_err(map_integrity_error)?
-        .filter(|finding| finding.tenant_id == tenant_id)
+        .filter(|finding| finding.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("integrity_finding", id))?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(finding))).into_response())
 }
@@ -285,10 +285,10 @@ fn command(body: RepairRequest, tenant_id: Uuid, user_id: Uuid) -> RepairCommand
 }
 
 fn validate_target(command: &RepairCommand, finding: &IntegrityFinding) -> Result<(), ApiError> {
-    if command.tenant_id != finding.tenant_id
-        || command.target.resource_type != finding.resource_type
-        || command.target.resource_id != finding.resource_id
-        || command.repair_type != finding.repairability
+    if command.tenant_id != finding.tenant_id()
+        || command.target.resource_type != finding.resource_type()
+        || command.target.resource_id != finding.resource_id()
+        || command.repair_type != finding.repairability()
     {
         return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
             "repair command does not match integrity finding".to_string(),
@@ -312,9 +312,9 @@ pub async fn dry_run_repair(
         .load_finding(command.integrity_finding_id)
         .await
         .map_err(map_integrity_error)?
-        .filter(|finding| finding.tenant_id == tenant_id)
+        .filter(|finding| finding.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("integrity_finding", command.integrity_finding_id))?;
-    if finding.rule_id.is_empty() {
+    if finding.rule_id().is_empty() {
         return Err(ApiError::validation("invalid integrity finding"));
     }
     validate_target(&command, &finding)?;
@@ -354,10 +354,10 @@ pub async fn create_repair(
         .load_finding(command.integrity_finding_id)
         .await
         .map_err(map_integrity_error)?
-        .filter(|finding| finding.tenant_id == tenant_id)
+        .filter(|finding| finding.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("integrity_finding", command.integrity_finding_id))?;
     if matches!(
-        finding.status,
+        finding.status(),
         FindingStatus::Repaired | FindingStatus::FalsePositive | FindingStatus::Stale
     ) {
         return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
@@ -370,7 +370,7 @@ pub async fn create_repair(
         .await
         .map_err(map_repair_error)?
     {
-        if existing.command == command {
+        if existing.command() == &command {
             return Ok((StatusCode::OK, Json(ApiResponse::ok(existing))).into_response());
         }
         return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
@@ -395,7 +395,9 @@ pub async fn create_repair(
     preview
         .resource_type
         .clone_from(&command.target.resource_type);
-    preview.resource_id.clone_from(&finding.resource_id);
+    preview
+        .resource_id
+        .clone_from(&finding.resource_id().to_string());
     let now = Utc::now();
     let descriptor = preview.descriptor;
     let status = if descriptor.requires_approval {
@@ -403,36 +405,23 @@ pub async fn create_repair(
     } else {
         RepairRunStatus::Queued
     };
-    let run = RepairRun {
-        id: Uuid::now_v7(),
+    let run = RepairRun::new(
+        Uuid::now_v7(),
         tenant_id,
-        finding_id: finding.id,
+        finding.id(),
         command,
         status,
-        created_by: user_id,
-        approved_by: None,
-        approval_note: None,
-        created_at: now,
-        updated_at: now,
-        version: 0,
+        user_id,
+        now,
+    )
+    .map_err(map_repair_error)?;
+    let step_status = match status {
+        RepairRunStatus::AwaitingApproval => RepairStepStatus::AwaitingApproval,
+        RepairRunStatus::Queued => RepairStepStatus::Queued,
+        _ => RepairStepStatus::Draft,
     };
-    let step = RepairStep {
-        id: Uuid::now_v7(),
-        run_id: run.id,
-        finding_id: run.finding_id,
-        status: match status {
-            RepairRunStatus::AwaitingApproval => RepairStepStatus::AwaitingApproval,
-            RepairRunStatus::Queued => RepairStepStatus::Queued,
-            _ => RepairStepStatus::Draft,
-        },
-        attempt_count: 0,
-        checkpoint: None,
-        lease_owner: None,
-        lease_token: None,
-        fence_version: 0,
-        lease_expires_at: None,
-        next_attempt_at: now,
-    };
+    let step = RepairStep::new(Uuid::now_v7(), run.id(), run.finding_id(), step_status, now)
+        .map_err(map_repair_error)?;
     services
         .repair_persistence
         .create_repair_run(&run, &step)
@@ -455,7 +444,7 @@ pub async fn get_repair(
         .load_run(id)
         .await
         .map_err(map_repair_error)?
-        .filter(|run| run.tenant_id == tenant_id)
+        .filter(|run| run.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
 }
@@ -475,18 +464,42 @@ pub async fn approve_repair(
         .load_run(id)
         .await
         .map_err(map_repair_error)?
-        .filter(|run| run.tenant_id == tenant_id)
+        .filter(|run| run.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
         .approve_repair(
             tenant_id,
-            run.id,
+            run.id(),
             approver,
-            run.version,
-            run.status,
+            run.version(),
+            run.status(),
             body.note,
         )
+        .await
+        .map_err(map_repair_error)?;
+    Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
+}
+
+pub async fn execute_repair(
+    axum::Extension(auth): axum::Extension<TenantContext>,
+    State(state): State<Arc<AppState>>,
+    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    require_permission(&principal, ManagementPermission::RepairExecute)?;
+    let (tenant_id, _) = context(&auth)?;
+    let services = governance(&state)?;
+    let run = services
+        .repair_persistence
+        .load_run(id)
+        .await
+        .map_err(map_repair_error)?
+        .filter(|run| run.tenant_id() == tenant_id)
+        .ok_or_else(|| ApiError::not_found("repair_run", id))?;
+    let run = services
+        .repair_persistence
+        .execute_repair(tenant_id, run.id(), run.version(), run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -506,11 +519,11 @@ pub async fn cancel_repair(
         .load_run(id)
         .await
         .map_err(map_repair_error)?
-        .filter(|run| run.tenant_id == tenant_id)
+        .filter(|run| run.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
-        .cancel_repair(tenant_id, run.id, run.version, run.status)
+        .cancel_repair(tenant_id, run.id(), run.version(), run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -530,11 +543,11 @@ pub async fn resume_repair(
         .load_run(id)
         .await
         .map_err(map_repair_error)?
-        .filter(|run| run.tenant_id == tenant_id)
+        .filter(|run| run.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
-        .resume_repair(tenant_id, run.id, run.version, run.status)
+        .resume_repair(tenant_id, run.id(), run.version(), run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())

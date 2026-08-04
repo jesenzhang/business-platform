@@ -71,7 +71,8 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         .expect("text checkpoint fixture");
 
     let governance = Arc::new(SqliteGovernanceStore::new(pool.clone()));
-    let scanner = GovernanceWorker::new(Arc::clone(&governance), Arc::clone(&governance));
+    let scanner = GovernanceWorker::new(Arc::clone(&governance), Arc::clone(&governance))
+        .expect("register integrity rules");
     let report = scanner
         .run_explicit_scan(
             data_integrity::IntegrityScanScope {
@@ -86,12 +87,13 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     assert!(report
         .findings
         .iter()
-        .any(|finding| finding.rule_id == "PROC-INT-001"));
-    let finding_id = report
+        .any(|finding| finding.rule_id() == "PROC-INT-001"));
+    let finding = report
         .findings
         .iter()
-        .find(|finding| finding.rule_id == "PROC-INT-001")
-        .map_or_else(|| unreachable!(), |finding| finding.id);
+        .find(|finding| finding.rule_id() == "PROC-INT-001")
+        .unwrap_or_else(|| unreachable!());
+    let finding_id = finding.id();
 
     let command = RepairCommand {
         idempotency_key: "sqlite-governance-requeue-1".to_string(),
@@ -108,32 +110,25 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         reason: "restore the missing durable AI task".to_string(),
         batch_limit: 1,
     };
-    let run = RepairRun {
-        id: Uuid::new_v4(),
+    let now = Utc::now();
+    let run = RepairRun::new(
+        Uuid::new_v4(),
         tenant_id,
         finding_id,
         command,
-        status: RepairRunStatus::Queued,
-        created_by: actor_id,
-        approved_by: None,
-        approval_note: None,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        version: 0,
-    };
-    let step = RepairStep {
-        id: Uuid::new_v4(),
-        run_id: run.id,
+        RepairRunStatus::Queued,
+        actor_id,
+        now,
+    )
+    .expect("valid repair run");
+    let step = RepairStep::new(
+        Uuid::new_v4(),
+        run.id(),
         finding_id,
-        status: RepairStepStatus::Queued,
-        attempt_count: 0,
-        checkpoint: None,
-        lease_owner: None,
-        lease_token: None,
-        fence_version: 0,
-        lease_expires_at: None,
-        next_attempt_at: Utc::now(),
-    };
+        RepairStepStatus::Queued,
+        now,
+    )
+    .expect("valid repair step");
     governance
         .create_repair_run(&run, &step)
         .await
@@ -141,11 +136,11 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
 
     // Model a crashed worker: the first lease expires, a replacement claims a
     // higher fence, and the stale worker's completion is rejected.
-    let crash_run = RepairRun {
-        id: Uuid::new_v4(),
+    let crash_run = RepairRun::new(
+        Uuid::new_v4(),
         tenant_id,
         finding_id,
-        command: RepairCommand {
+        RepairCommand {
             idempotency_key: "sqlite-governance-crash-recovery".to_string(),
             tenant_id,
             integrity_finding_id: finding_id,
@@ -160,31 +155,23 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
             reason: "exercise lease recovery".to_string(),
             batch_limit: 1,
         },
-        status: RepairRunStatus::Queued,
-        created_by: actor_id,
-        approved_by: None,
-        approval_note: None,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        version: 0,
-    };
+        RepairRunStatus::Queued,
+        actor_id,
+        Utc::now(),
+    )
+    .expect("valid crash-recovery run");
     governance
         .save_run(&crash_run)
         .await
         .expect("save crash-recovery run");
-    let crash_step = RepairStep {
-        id: Uuid::new_v4(),
-        run_id: crash_run.id,
+    let crash_step = RepairStep::new(
+        Uuid::new_v4(),
+        crash_run.id(),
         finding_id,
-        status: RepairStepStatus::Queued,
-        attempt_count: 0,
-        checkpoint: None,
-        lease_owner: None,
-        lease_token: None,
-        fence_version: 0,
-        lease_expires_at: None,
-        next_attempt_at: Utc::now() - chrono::Duration::seconds(1),
-    };
+        RepairStepStatus::Queued,
+        Utc::now() - chrono::Duration::seconds(1),
+    )
+    .expect("valid crash-recovery step");
     governance
         .save_step(&crash_step)
         .await
@@ -204,30 +191,39 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         .await
         .expect("reclaim crashed step")
         .expect("expired step reclaimed");
-    assert!(reclaimed.fence_version > stale.fence_version);
+    assert!(reclaimed.fence_version() > stale.fence_version());
     let mut stale_completion = stale.clone();
-    stale_completion.status = RepairStepStatus::Succeeded;
+    stale_completion.succeed().expect("valid stale completion");
     assert!(matches!(
         governance
-            .save_step_fenced(&stale_completion, stale.fence_version)
+            .save_step_fenced(&stale_completion, stale.fence_version())
             .await,
         Err(data_repair::RepairError::LeaseLost)
     ));
-    let mut wrong_token = reclaimed.clone();
-    wrong_token.status = RepairStepStatus::Succeeded;
-    wrong_token.lease_token = Some("wrong-token".to_string());
+    let wrong_token = RepairStep::rehydrate(
+        reclaimed.id(),
+        reclaimed.run_id(),
+        reclaimed.finding_id(),
+        reclaimed.status(),
+        reclaimed.attempt_count(),
+        reclaimed.checkpoint().cloned(),
+        reclaimed.lease_owner().map(ToString::to_string),
+        Some("wrong-token".to_string()),
+        reclaimed.fence_version(),
+        reclaimed.lease_expires_at(),
+        reclaimed.next_attempt_at(),
+    )
+    .expect("valid wrong-token fixture");
     assert!(matches!(
         governance
-            .save_step_fenced(&wrong_token, reclaimed.fence_version)
+            .save_step_fenced(&wrong_token, reclaimed.fence_version())
             .await,
         Err(data_repair::RepairError::LeaseLost)
     ));
     // Remove the recovery fixture from the claim queue; the real repair run
     // below remains the only executable step.
     let mut recovered_cleanup = reclaimed;
-    recovered_cleanup.status = RepairStepStatus::Failed;
-    recovered_cleanup.lease_owner = None;
-    recovered_cleanup.lease_token = None;
+    recovered_cleanup.fail().expect("valid recovery cleanup");
     governance
         .save_step(&recovered_cleanup)
         .await
@@ -249,7 +245,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         .await
         .expect("read repaired finding")
         .expect("repaired finding exists");
-    assert_eq!(finding.status, FindingStatus::Repaired);
+    assert_eq!(finding.status(), FindingStatus::Repaired);
 
     let task_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM document_ai_tasks WHERE tenant_id=?1 AND job_id=?2 AND status='queued'",
@@ -277,14 +273,14 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     .expect("read repair outbox");
     assert_eq!(outbox_count, 1);
     let run_status: String = sqlx::query_scalar("SELECT status FROM data_repair_runs WHERE id=?1")
-        .bind(run.id.to_string())
+        .bind(run.id().to_string())
         .fetch_one(&pool)
         .await
         .expect("read repair run");
     assert_eq!(run_status, "succeeded");
     let ledger_count: i64 =
         sqlx::query("SELECT COUNT(*) AS count FROM data_repair_events WHERE repair_run_id=?1")
-            .bind(run.id.to_string())
+            .bind(run.id().to_string())
             .fetch_one(&pool)
             .await
             .expect("read ledger")

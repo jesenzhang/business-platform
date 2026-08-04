@@ -564,7 +564,10 @@ impl ProcessingJob {
         expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
     ) -> Result<i64, ProcessingDomainError> {
-        if self.status != ProcessingJobStatus::Queued || self.next_attempt_at > now {
+        if self.status != ProcessingJobStatus::Queued
+            || self.cancel_requested_at.is_some()
+            || self.next_attempt_at > now
+        {
             return Err(ProcessingDomainError::InvalidTransition {
                 from: self.status.to_string(),
                 action: "claim".to_string(),
@@ -616,7 +619,9 @@ impl ProcessingJob {
     ) -> Result<(), ProcessingDomainError> {
         self.require_lease(owner, token, fence_version, now)?;
         self.lease = None;
-        if self.status == ProcessingJobStatus::Running {
+        if self.cancel_requested_at.is_some() {
+            self.status = ProcessingJobStatus::Cancelled;
+        } else if self.status == ProcessingJobStatus::Running {
             self.status = ProcessingJobStatus::Queued;
             self.next_attempt_at = now;
         }
@@ -632,7 +637,9 @@ impl ProcessingJob {
             return Ok(false);
         }
         self.lease = None;
-        if matches!(
+        if self.cancel_requested_at.is_some() {
+            self.status = ProcessingJobStatus::Cancelled;
+        } else if matches!(
             self.status,
             ProcessingJobStatus::Running | ProcessingJobStatus::WaitingForAi
         ) {
@@ -652,6 +659,7 @@ impl ProcessingJob {
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingDomainError> {
         self.require_lease(owner, token, fence_version, now)?;
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::Running || self.current_step != step {
             return Err(ProcessingDomainError::InvalidStep);
         }
@@ -667,6 +675,7 @@ impl ProcessingJob {
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingDomainError> {
         self.require_lease(owner, token, fence_version, now)?;
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::Running || self.current_step != step {
             return Err(ProcessingDomainError::InvalidStep);
         }
@@ -689,6 +698,7 @@ impl ProcessingJob {
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingDomainError> {
         self.require_lease(owner, token, fence_version, now)?;
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::Running
             || self.current_step != ProcessingStepKind::ExtractFields
         {
@@ -706,6 +716,7 @@ impl ProcessingJob {
         expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
     ) -> Result<i64, ProcessingDomainError> {
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::WaitingForAi
             || self.current_step != ProcessingStepKind::ExtractFields
         {
@@ -725,6 +736,7 @@ impl ProcessingJob {
     /// claim is intentionally separate so the AI transaction never borrows a
     /// Job lease for the following step.
     pub fn resume_after_ai(&mut self, now: DateTime<Utc>) -> Result<(), ProcessingDomainError> {
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::WaitingForAi
             || self.current_step != ProcessingStepKind::ExtractFields
         {
@@ -747,6 +759,7 @@ impl ProcessingJob {
         now: DateTime<Utc>,
     ) -> Result<(), ProcessingDomainError> {
         self.require_lease(owner, token, fence_version, now)?;
+        self.ensure_not_cancel_requested()?;
         if self.status != ProcessingJobStatus::Running
             || self.current_step != ProcessingStepKind::ValidateCandidate
         {
@@ -849,7 +862,20 @@ impl ProcessingJob {
         self.failure_code = Some(failure_code);
         self.failure_message = failure_message;
         self.lease = None;
+        if self.cancel_requested_at.is_some() {
+            self.status = ProcessingJobStatus::Cancelled;
+        }
         self.touch(now)
+    }
+
+    fn ensure_not_cancel_requested(&self) -> Result<(), ProcessingDomainError> {
+        if self.cancel_requested_at.is_some() {
+            return Err(ProcessingDomainError::InvalidTransition {
+                from: self.status.to_string(),
+                action: "cancel_requested".to_string(),
+            });
+        }
+        Ok(())
     }
 
     pub fn confirm_review(&mut self, now: DateTime<Utc>) -> Result<(), ProcessingDomainError> {
@@ -1019,5 +1045,31 @@ mod tests {
             ProcessingFailureKind::Cancelled
         );
         assert_eq!(job.status(), ProcessingJobStatus::Cancelled);
+    }
+
+    #[test]
+    fn cancellation_wins_release_and_expiry_reclaim() {
+        let now = Utc::now();
+        let mut released = job();
+        let fence = claim(&mut released, now);
+        released
+            .request_cancel(now + Duration::seconds(1))
+            .unwrap_or_else(|_| unreachable!());
+        released
+            .release("worker-a", "lease-a", fence, now + Duration::seconds(1))
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(released.status(), ProcessingJobStatus::Cancelled);
+        assert!(released.lease_snapshot().is_none());
+
+        let mut reclaimed = job();
+        claim(&mut reclaimed, now);
+        reclaimed
+            .request_cancel(now + Duration::seconds(1))
+            .unwrap_or_else(|_| unreachable!());
+        reclaimed
+            .reclaim_expired(now + Duration::seconds(31))
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(reclaimed.status(), ProcessingJobStatus::Cancelled);
+        assert!(reclaimed.lease_snapshot().is_none());
     }
 }

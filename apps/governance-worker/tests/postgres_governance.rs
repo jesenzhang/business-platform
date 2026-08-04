@@ -60,7 +60,8 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         .expect("text checkpoint fixture");
 
     let governance = Arc::new(PostgresGovernanceStore::new(pool.clone()));
-    let scanner = GovernanceWorker::new(Arc::clone(&governance), Arc::clone(&governance));
+    let scanner = GovernanceWorker::new(Arc::clone(&governance), Arc::clone(&governance))
+        .expect("register integrity rules");
     let report = scanner
         .run_explicit_scan(
             data_integrity::IntegrityScanScope {
@@ -75,18 +76,19 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
     assert!(report
         .findings
         .iter()
-        .any(|finding| finding.rule_id == "PROC-INT-001"));
-    let finding_id = report
+        .any(|finding| finding.rule_id() == "PROC-INT-001"));
+    let finding = report
         .findings
         .iter()
-        .find(|finding| finding.rule_id == "PROC-INT-001")
-        .map_or_else(|| unreachable!(), |finding| finding.id);
+        .find(|finding| finding.rule_id() == "PROC-INT-001")
+        .unwrap_or_else(|| unreachable!());
+    let finding_id = finding.id();
 
-    let run = RepairRun {
-        id: Uuid::new_v4(),
+    let run = RepairRun::new(
+        Uuid::new_v4(),
         tenant_id,
         finding_id,
-        command: RepairCommand {
+        RepairCommand {
             idempotency_key: "postgres-governance-requeue-1".to_string(),
             tenant_id,
             integrity_finding_id: finding_id,
@@ -101,28 +103,20 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
             reason: "restore the missing durable AI task".to_string(),
             batch_limit: 1,
         },
-        status: RepairRunStatus::Queued,
-        created_by: actor_id,
-        approved_by: None,
-        approval_note: None,
-        created_at: now,
-        updated_at: now,
-        version: 0,
-    };
+        RepairRunStatus::Queued,
+        actor_id,
+        now,
+    )
+    .expect("valid repair run");
     governance.save_run(&run).await.expect("save repair run");
-    let step = RepairStep {
-        id: Uuid::new_v4(),
-        run_id: run.id,
+    let step = RepairStep::new(
+        Uuid::new_v4(),
+        run.id(),
         finding_id,
-        status: RepairStepStatus::Queued,
-        attempt_count: 0,
-        checkpoint: None,
-        lease_owner: None,
-        lease_token: None,
-        fence_version: 0,
-        lease_expires_at: None,
-        next_attempt_at: now,
-    };
+        RepairStepStatus::Queued,
+        now,
+    )
+    .expect("valid repair step");
     governance.save_step(&step).await.expect("save repair step");
 
     let processing = Arc::new(PostgresProcessingStore::new(pool.clone()));
@@ -141,7 +135,7 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         .await
         .expect("read repaired finding")
         .expect("repaired finding exists");
-    assert_eq!(finding.status, FindingStatus::Repaired);
+    assert_eq!(finding.status(), FindingStatus::Repaired);
 
     let task_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM document_ai_tasks WHERE tenant_id=$1 AND job_id=$2 AND status='queued'",
@@ -170,7 +164,7 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
     assert_eq!(outbox_count, 1);
     let ledger_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM data_repair_events WHERE repair_run_id=$1")
-            .bind(run.id)
+            .bind(run.id())
             .fetch_one(&pool)
             .await
             .expect("read repair ledger");

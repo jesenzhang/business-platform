@@ -4,9 +4,7 @@
 //! is fenced by the lease token and monotonically increasing fence version.
 
 use async_trait::async_trait;
-use audit::{
-    hash_record, AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult,
-};
+use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
 use chrono::{DateTime, Duration, Utc};
 use data_repair::{
     RepairCommand, RepairError, RepairExecutionContext, RepairOutcome, RepairPreview, RepairResult,
@@ -16,8 +14,6 @@ use document_processing::domain::{
     CandidateReview, ExtractionCandidate, JobVersion, ProcessingJob, ProcessingJobStatus,
     ProcessingStepKind, ProcessingStepStatus,
 };
-use document_processing::ports::legacy;
-use document_processing::ports::legacy::{AiTaskPort, CandidateStore, ProcessingStepStore};
 use document_processing::ports::{
     AiTask, CandidateQuery, ClaimedProcessingJob, ClassifiedProcessingFailure,
     CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, FinalizeReviewResult,
@@ -30,6 +26,105 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgConnection, PgPool};
 use uuid::Uuid;
+
+#[allow(dead_code, clippy::too_many_arguments)]
+mod legacy {
+    use async_trait::async_trait;
+    use chrono::{DateTime, Utc};
+    use document_processing::domain::{CandidateReview, ExtractionCandidate, ProcessingStepKind};
+    use document_processing::ports::{AiTask, ProcessingRepositoryError, StepCheckpoint};
+    use uuid::Uuid;
+
+    #[async_trait]
+    pub trait ProcessingStepStore: Send + Sync {
+        async fn start(
+            &self,
+            checkpoint: &StepCheckpoint,
+            expected_version: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn checkpoint(
+            &self,
+            checkpoint: &StepCheckpoint,
+            expected_version: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn complete(
+            &self,
+            job_id: Uuid,
+            tenant_id: Uuid,
+            step_kind: ProcessingStepKind,
+            attempt_number: i32,
+            expected_version: i64,
+            finished_at: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn fail(
+            &self,
+            job_id: Uuid,
+            tenant_id: Uuid,
+            step_kind: ProcessingStepKind,
+            attempt_number: i32,
+            failure_code: &str,
+            expected_version: i64,
+            finished_at: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
+
+    #[async_trait]
+    pub trait AiTaskPort: Send + Sync {
+        async fn enqueue(&self, task: &AiTask) -> Result<(), ProcessingRepositoryError>;
+        async fn claim_next(
+            &self,
+            worker_id: &str,
+            now: DateTime<Utc>,
+            lease_duration_secs: i64,
+        ) -> Result<Option<AiTask>, ProcessingRepositoryError>;
+        async fn heartbeat(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            now: DateTime<Utc>,
+            lease_duration_secs: i64,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn complete(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            candidate_id: Uuid,
+            now: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn fail(
+            &self,
+            task_id: Uuid,
+            worker_id: &str,
+            lease_token: &str,
+            fence_version: i64,
+            failure_code: &str,
+            now: DateTime<Utc>,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
+
+    #[async_trait]
+    pub trait CandidateStore: Send + Sync {
+        async fn save_candidate(
+            &self,
+            candidate: &ExtractionCandidate,
+        ) -> Result<(), ProcessingRepositoryError>;
+        async fn get_candidate(
+            &self,
+            tenant_id: Uuid,
+            job_id: Uuid,
+        ) -> Result<Option<ExtractionCandidate>, ProcessingRepositoryError>;
+        async fn save_review(
+            &self,
+            review: &CandidateReview,
+        ) -> Result<(), ProcessingRepositoryError>;
+    }
+}
+
+use self::legacy::{AiTaskPort, CandidateStore, ProcessingStepStore};
 
 #[derive(Clone)]
 pub struct PostgresProcessingStore {
@@ -194,6 +289,7 @@ struct ReviewRow {
     comment: Option<String>,
     candidate_version: i64,
     created_at: DateTime<Utc>,
+    request_fingerprint: String,
 }
 
 #[derive(Debug, FromRow)]
@@ -444,7 +540,7 @@ impl ProcessingJobClaimPort for PostgresProcessingStore {
             return Err(ProcessingRepositoryError::Failed);
         }
         let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
-        let row = sqlx::query_as::<_, JobRow>("SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE status = 'queued' AND next_attempt_at <= $1 AND (lease_expires_at IS NULL OR lease_expires_at <= $1) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1")
+        let row = sqlx::query_as::<_, JobRow>("SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE status = 'queued' AND cancel_requested_at IS NULL AND next_attempt_at <= $1 AND (lease_expires_at IS NULL OR lease_expires_at <= $1) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1")
             .bind(now)
             .fetch_optional(&mut *transaction)
             .await
@@ -553,7 +649,7 @@ impl ProcessingJobQuery for PostgresProcessingStore {
             .map(|row| serde_json::from_value(row.payload).map_err(|_| ProcessingRepositoryError::Failed))
             .transpose()?;
         let review = if let Some(candidate) = candidate.as_ref() {
-            sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2")
+            sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at, idempotency_key, request_fingerprint FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2")
                 .bind(tenant_id)
                 .bind(candidate.id())
                 .fetch_optional(&mut *connection)
@@ -751,7 +847,9 @@ impl CandidateStore for PostgresProcessingStore {
     }
 
     async fn save_review(&self, review: &CandidateReview) -> Result<(), ProcessingRepositoryError> {
-        let result = sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (tenant_id, candidate_id) DO NOTHING")
+        let idempotency_key = format!("legacy-review-{}", review.id);
+        let request_fingerprint = state_hash(review.id.to_string());
+        let result = sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at, idempotency_key, request_fingerprint) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (tenant_id, candidate_id) DO NOTHING")
             .bind(review.id)
             .bind(review.tenant_id)
             .bind(review.candidate_id)
@@ -761,6 +859,8 @@ impl CandidateStore for PostgresProcessingStore {
             .bind(&review.comment)
             .bind(review.candidate_version)
             .bind(review.created_at)
+            .bind(idempotency_key)
+            .bind(request_fingerprint)
             .execute(&self.pool)
             .await
             .map_err(map_sql_error)?;
@@ -1162,33 +1262,35 @@ async fn insert_unified_audit(
     .fetch_one(&mut *connection)
     .await
     .map_err(map_sql_error)?;
-    event = event.with_chain_metadata(sequence, Utc::now(), 1, previous);
+    event = event
+        .with_chain_metadata(sequence, Utc::now(), 1, previous)
+        .map_err(|_| ProcessingRepositoryError::Failed)?;
     sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,details,trace_id,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,correlation_id,causation_id,reason,result,failure_code,before_hash,after_hash,changed_fields,schema_version,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)")
-        .bind(event.id)
-        .bind(event.tenant_id)
-        .bind(event.action.as_str())
-        .bind(&event.resource.resource_type)
-        .bind(&event.resource.resource_id)
-        .bind(&event.details)
-        .bind(&event.trace_id)
-        .bind(event.occurred_at)
-        .bind(event.recorded_at)
-        .bind(event.stream_sequence)
-        .bind(event.chain_version)
-        .bind(event.operation_id)
-        .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
-        .bind(event.actor.actor_id)
-        .bind(event.correlation_id)
-        .bind(event.causation_id)
-        .bind(&event.reason)
-        .bind(format!("{:?}", event.result).to_lowercase())
-        .bind(&event.failure_code)
-        .bind(&event.before_hash)
-        .bind(&event.after_hash)
-    .bind(serde_json::to_value(&event.changed_fields).map_err(|_| ProcessingRepositoryError::Failed)?)
-    .bind(&event.schema_version)
-    .bind(&event.previous_hash)
-        .bind(event.record_hash.clone().unwrap_or_else(|| hash_record(&event)))
+        .bind(event.id())
+        .bind(event.tenant_id())
+        .bind(event.action().as_str())
+        .bind(&event.resource().resource_type)
+        .bind(&event.resource().resource_id)
+        .bind(event.details())
+        .bind(event.trace_id())
+        .bind(event.occurred_at())
+        .bind(event.recorded_at())
+        .bind(event.stream_sequence())
+        .bind(event.chain_version())
+        .bind(event.operation_id())
+        .bind(format!("{:?}", event.actor().actor_type).to_lowercase())
+        .bind(event.actor().actor_id)
+        .bind(event.correlation_id())
+        .bind(event.causation_id())
+        .bind(event.reason())
+        .bind(format!("{:?}", event.result()).to_lowercase())
+        .bind(event.failure_code())
+        .bind(event.before_hash())
+        .bind(event.after_hash())
+        .bind(serde_json::to_value(event.changed_fields()).map_err(|_| ProcessingRepositoryError::Failed)?)
+        .bind(event.schema_version())
+        .bind(event.previous_hash())
+        .bind(event.record_hash().ok_or(ProcessingRepositoryError::Failed)?)
         .execute(&mut *connection)
         .await
         .map_err(map_sql_error)?;
@@ -1199,7 +1301,7 @@ async fn write_step_started(
     connection: &mut PgConnection,
     checkpoint: &StepCheckpoint,
 ) -> Result<(), ProcessingRepositoryError> {
-    let result = sqlx::query("INSERT INTO document_processing_steps (job_id, tenant_id, step_kind, status, attempt_number, started_at, checkpoint_json, created_at, updated_at) VALUES ($1, $2, $3, 'running', $4, $5, $6, $5, $5) ON CONFLICT (job_id, step_kind, attempt_number) DO UPDATE SET status = 'running', started_at = EXCLUDED.started_at, checkpoint_json = EXCLUDED.checkpoint_json, updated_at = EXCLUDED.updated_at")
+    sqlx::query("INSERT INTO document_processing_steps (job_id, tenant_id, step_kind, status, attempt_number, started_at, checkpoint_json, created_at, updated_at) VALUES ($1, $2, $3, 'running', $4, $5, $6, $5, $5) ON CONFLICT (job_id, step_kind, attempt_number) DO UPDATE SET status = 'running', started_at = EXCLUDED.started_at, checkpoint_json = EXCLUDED.checkpoint_json, updated_at = EXCLUDED.updated_at")
         .bind(checkpoint.job_id)
         .bind(checkpoint.tenant_id)
         .bind(checkpoint.step_kind.as_str())
@@ -1209,7 +1311,6 @@ async fn write_step_started(
         .execute(&mut *connection)
         .await
         .map_err(map_sql_error)?;
-    let _ = result;
     Ok(())
 }
 
@@ -1702,6 +1803,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
             || task.lease_owner.as_deref() != Some(&completion.fence.worker_id)
             || task.lease_token.as_deref() != Some(&completion.fence.lease_token)
             || task.fence_version != completion.fence.fence_version
+            || task.cancel_requested_at.is_some()
             || task.lease_expires_at.is_none_or(|expires| expires <= now)
         {
             return Err(ProcessingRepositoryError::LeaseLost);
@@ -1793,6 +1895,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
             || task.lease_owner.as_deref() != Some(&fence.worker_id)
             || task.lease_token.as_deref() != Some(&fence.lease_token)
             || task.fence_version != fence.fence_version
+            || task.cancel_requested_at.is_some()
             || task.lease_expires_at.is_none_or(|expires| expires <= now)
         {
             return Err(ProcessingRepositoryError::LeaseLost);
@@ -1956,6 +2059,34 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         else {
             return Err(ProcessingRepositoryError::NotFound);
         };
+        if command.idempotency_key.trim().is_empty()
+            || command.idempotency_key.len() > 255
+            || command.request_fingerprint.len() != 64
+            || !command
+                .request_fingerprint
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(ProcessingRepositoryError::IdempotencyConflict);
+        }
+        if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at, idempotency_key, request_fingerprint FROM document_extraction_reviews WHERE tenant_id = $1 AND idempotency_key = $2 FOR UPDATE")
+            .bind(command.tenant_id)
+            .bind(&command.idempotency_key)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?
+        {
+            if existing.request_fingerprint != command.request_fingerprint {
+                return Err(ProcessingRepositoryError::IdempotencyConflict);
+            }
+            let existing = to_review(existing)?;
+            transaction.commit().await.map_err(map_sql_error)?;
+            return Ok(FinalizeReviewResult {
+                job,
+                review: existing,
+                replayed: true,
+            });
+        }
         let candidate = sqlx::query_as::<_, CandidateRow>("SELECT payload FROM document_extraction_candidates WHERE tenant_id = $1 AND id = $2 FOR UPDATE")
             .bind(command.tenant_id)
             .bind(command.review.candidate_id)
@@ -1968,7 +2099,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         if candidate.job_id() != command.job_id || command.review.tenant_id != command.tenant_id {
             return Err(ProcessingRepositoryError::Conflict);
         }
-        if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2 FOR UPDATE")
+        if let Some(existing) = sqlx::query_as::<_, ReviewRow>("SELECT id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at, idempotency_key, request_fingerprint FROM document_extraction_reviews WHERE tenant_id = $1 AND candidate_id = $2 FOR UPDATE")
             .bind(command.tenant_id)
             .bind(command.review.candidate_id)
             .fetch_optional(&mut *transaction)
@@ -2009,7 +2140,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
                 .map_err(|_| ProcessingRepositoryError::Conflict)?,
         }
         save_job_without_fence(&mut transaction, &job, expected).await?;
-        sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+        sqlx::query("INSERT INTO document_extraction_reviews (id, tenant_id, candidate_id, reviewer_id, decision, patch, comment, candidate_version, created_at, idempotency_key, request_fingerprint) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)")
             .bind(command.review.id)
             .bind(command.review.tenant_id)
             .bind(command.review.candidate_id)
@@ -2019,6 +2150,8 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
             .bind(&command.review.comment)
             .bind(command.review.candidate_version)
             .bind(command.review.created_at)
+            .bind(&command.idempotency_key)
+            .bind(&command.request_fingerprint)
             .execute(&mut *transaction)
             .await
             .map_err(map_sql_error)?;
@@ -2155,15 +2288,30 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         )
         .map_err(|_| ProcessingRepositoryError::LeaseLost)?;
         save_job_fenced(&mut transaction, &job, expected, fence, now).await?;
+        let cancelled = job.status() == ProcessingJobStatus::Cancelled;
         insert_processing_audit(
             &mut transaction,
             &job,
-            "job_released",
+            if cancelled {
+                "processing_cancelled"
+            } else {
+                "job_released"
+            },
             None,
             serde_json::json!({}),
             now,
         )
         .await?;
+        if cancelled {
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                "document.processing.cancelled.v1",
+                serde_json::json!({}),
+                now,
+            )
+            .await?;
+        }
         transaction.commit().await.map_err(map_sql_error)?;
         Ok(())
     }
@@ -2184,7 +2332,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         lease_duration_secs: i64,
     ) -> Result<DateTime<Utc>, ProcessingRepositoryError> {
         let expires_at = now + Duration::seconds(lease_duration_secs);
-        let result = sqlx::query("UPDATE document_ai_tasks SET lease_expires_at = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4 AND status = 'running' AND lease_owner = $5 AND lease_token = $6 AND fence_version = $7 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2")
+        let result = sqlx::query("UPDATE document_ai_tasks SET lease_expires_at = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4 AND status = 'running' AND lease_owner = $5 AND lease_token = $6 AND fence_version = $7 AND lease_expires_at > CURRENT_TIMESTAMP AND lease_expires_at > $2 AND EXISTS (SELECT 1 FROM document_processing_jobs j WHERE j.id = document_ai_tasks.job_id AND j.tenant_id = document_ai_tasks.tenant_id AND j.status = 'waiting_for_ai' AND j.cancel_requested_at IS NULL)")
             .bind(expires_at)
             .bind(now)
             .bind(tenant_id)
@@ -2215,7 +2363,34 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         let mut reclaimed = 0_u64;
         for row in rows {
             let task = to_ai_task(row)?;
-            if task.attempt_count < task.max_attempts {
+            let (job_status, job_cancelled) = sqlx::query_as::<_, (String, i64)>(
+                "SELECT status, CASE WHEN status = 'cancelled' OR cancel_requested_at IS NOT NULL THEN 1 ELSE 0 END FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2",
+            )
+            .bind(task.tenant_id)
+            .bind(task.job_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?
+            .ok_or(ProcessingRepositoryError::NotFound)?;
+            let cancelled = task.cancel_requested_at.is_some() || job_cancelled != 0;
+            if cancelled {
+                let updated = sqlx::query("UPDATE document_ai_tasks SET status = 'cancelled', cancel_requested_at = COALESCE(cancel_requested_at, $1), lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, next_attempt_at = $1, updated_at = $1 WHERE tenant_id = $2 AND id = $3 AND status = 'running' AND fence_version = $4")
+                    .bind(now)
+                    .bind(task.tenant_id)
+                    .bind(task.id)
+                    .bind(task.fence_version)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(map_sql_error)?;
+                if updated.rows_affected() != 1 {
+                    return Err(ProcessingRepositoryError::LeaseLost);
+                }
+                // The cancellation command owns the Job + AI Task atomic
+                // transition. Reclaim only fences the stale task here so it
+                // cannot acquire the Job row in the opposite lock order.
+            } else if job_status != "waiting_for_ai" {
+                return Err(ProcessingRepositoryError::Conflict);
+            } else if task.attempt_count < task.max_attempts {
                 sqlx::query("UPDATE document_ai_tasks SET status = 'queued', lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL, next_attempt_at = $1, updated_at = $1 WHERE tenant_id = $2 AND id = $3 AND status = 'running' AND fence_version = $4")
                     .bind(now)
                     .bind(task.tenant_id)
@@ -2233,7 +2408,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
                     .execute(&mut *transaction)
                     .await
                     .map_err(map_sql_error)?;
-                sqlx::query("UPDATE document_processing_jobs SET status = 'failed', failure_code = 'ai_provider_unavailable', version = version + 1, updated_at = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL WHERE tenant_id = $2 AND id = $3 AND status = 'waiting_for_ai'")
+                sqlx::query("UPDATE document_processing_jobs SET status = 'failed', failure_code = 'ai_provider_unavailable', version = version + 1, updated_at = $1, lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL WHERE tenant_id = $2 AND id = $3 AND status = 'waiting_for_ai' AND cancel_requested_at IS NULL")
                     .bind(now)
                     .bind(task.tenant_id)
                     .bind(task.job_id)
@@ -2241,7 +2416,9 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
                     .await
                     .map_err(map_sql_error)?;
             }
-            reclaimed = reclaimed.saturating_add(1);
+            reclaimed = reclaimed
+                .checked_add(1)
+                .ok_or(ProcessingRepositoryError::Failed)?;
         }
         transaction.commit().await.map_err(map_sql_error)?;
         Ok(reclaimed)

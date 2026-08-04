@@ -111,6 +111,8 @@ pub struct CompleteAiTaskCommand {
 pub struct FinalizeReviewCommand {
     pub tenant_id: Uuid,
     pub job_id: Uuid,
+    pub idempotency_key: String,
+    pub request_fingerprint: String,
     pub review: CandidateReview,
 }
 
@@ -208,7 +210,8 @@ pub trait ProcessingJobQuery: Send + Sync {
 /// Application and worker code must use `ProcessingExecutionUnitOfWork` so a
 /// caller cannot accidentally split a Job/Step/AI/Candidate/Review write
 /// across transactions.
-pub mod legacy {
+#[allow(dead_code)]
+pub(crate) mod legacy {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 

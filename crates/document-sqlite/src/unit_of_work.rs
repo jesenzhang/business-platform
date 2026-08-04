@@ -64,7 +64,7 @@ impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
                 Ok(result)
             }
             Err(error) => {
-                let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
+                rollback(&mut connection).await?;
                 Err(error)
             }
         }
@@ -275,24 +275,26 @@ async fn insert_audit(
     .await
     .map_err(map_error)?
     .flatten();
-    let event = event.with_chain(previous);
+    let event = event
+        .with_chain(previous)
+        .map_err(|_| ApplicationPortError::Failed)?;
     sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16)")
-        .bind(event.id.to_string())
-        .bind(event.tenant_id.to_string())
+        .bind(event.id().to_string())
+        .bind(event.tenant_id().to_string())
         .bind(document.created_by().to_string())
-        .bind(event.action.as_str())
-        .bind(&event.resource.resource_type)
-        .bind(&event.resource.resource_id)
-        .bind(event.details.to_string())
-        .bind(event.occurred_at.to_rfc3339())
-        .bind(event.operation_id.to_string())
+        .bind(event.action().as_str())
+        .bind(&event.resource().resource_type)
+        .bind(&event.resource().resource_id)
+        .bind(event.details().to_string())
+        .bind(event.occurred_at().to_rfc3339())
+        .bind(event.operation_id().to_string())
         .bind("user")
-        .bind(event.actor.actor_id.to_string())
+        .bind(event.actor().actor_id.to_string())
         .bind("succeeded")
-        .bind(serde_json::to_string(&event.changed_fields).map_err(|_| ApplicationPortError::Failed)?)
-        .bind(&event.schema_version)
-        .bind(&event.previous_hash)
-        .bind(&event.record_hash)
+        .bind(serde_json::to_string(event.changed_fields()).map_err(|_| ApplicationPortError::Failed)?)
+        .bind(event.schema_version())
+        .bind(event.previous_hash())
+        .bind(event.record_hash())
         .execute(&mut *tx)
         .await
         .map_err(map_error)?;
@@ -320,6 +322,16 @@ fn map_error(error: sqlx::Error) -> ApplicationPortError {
         }
         _ => ApplicationPortError::Failed,
     }
+}
+
+async fn rollback(
+    connection: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
+) -> Result<(), ApplicationPortError> {
+    sqlx::query("ROLLBACK")
+        .execute(&mut **connection)
+        .await
+        .map(|_| ())
+        .map_err(map_error)
 }
 
 fn parse_timestamp(value: &str) -> Result<DateTime<Utc>, ApplicationPortError> {

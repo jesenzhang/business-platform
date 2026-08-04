@@ -1,7 +1,12 @@
 use chrono::{Duration, Utc};
-use document_processing::ports::legacy::CandidateStore;
+use document_processing::ports::{
+    CompleteAiTaskCommand, ExecutionFence, ProcessingExecutionUnitOfWork, ProcessingJobQuery,
+    TextArtifactReference,
+};
 use document_processing::ports::{ProcessingJobClaimPort, ProcessingJobCommandPort};
-use document_processing::{DeterministicLocalExtractor, FixedPipelineRunner, ProcessingJob};
+use document_processing::{
+    DeterministicLocalExtractor, FixedPipelineRunner, ProcessingJob, ProcessingStepKind,
+};
 use document_processing_postgres::PostgresProcessingStore;
 use object_storage::{ObjectKey, ObjectStorageClient, S3Client};
 use sqlx::PgPool;
@@ -86,14 +91,108 @@ async fn postgres_minio_processing_adapter_round_trip() {
         )
         .await
         .unwrap_or_else(|_| unreachable!());
+    let business_fence = ExecutionFence::new(
+        "minio-worker",
+        claimed.lease_token.clone(),
+        claimed.fence_version,
+    );
+    for step in [
+        ProcessingStepKind::ValidateSource,
+        ProcessingStepKind::DetectType,
+    ] {
+        store
+            .start_step(tenant, job.id(), step, &business_fence, Utc::now())
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        store
+            .complete_step(tenant, job.id(), step, None, &business_fence, Utc::now())
+            .await
+            .unwrap_or_else(|_| unreachable!());
+    }
     store
-        .save_candidate(&run.candidate)
+        .start_step(
+            tenant,
+            job.id(),
+            ProcessingStepKind::ExtractText,
+            &business_fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let task = store
+        .enqueue_ai_and_wait(
+            tenant,
+            job.id(),
+            TextArtifactReference {
+                key: format!("processing/{}/text", job.id()),
+                content_hash: run.checkpoint.content_hash.clone(),
+                content_revision: 1,
+                byte_count: run.checkpoint.byte_count,
+                line_count: run.checkpoint.line_count,
+                character_count: run.checkpoint.character_count,
+            },
+            &business_fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let ai_claim = store
+        .claim_next_ai_task("minio-ai-worker", Utc::now(), 30)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    store
+        .complete_ai_and_resume(
+            CompleteAiTaskCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                task_id: task.id,
+                fence: ExecutionFence::new(
+                    "minio-ai-worker",
+                    ai_claim.lease_token.clone().unwrap_or_default(),
+                    ai_claim.fence_version,
+                ),
+                candidate: run.candidate.clone(),
+            },
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let candidate_claim = store
+        .claim_next("minio-worker-2", Utc::now(), 30)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
+    let candidate_fence = ExecutionFence::new(
+        "minio-worker-2",
+        candidate_claim.lease_token,
+        candidate_claim.fence_version,
+    );
+    store
+        .start_step(
+            tenant,
+            job.id(),
+            ProcessingStepKind::ValidateCandidate,
+            &candidate_fence,
+            Utc::now(),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    store
+        .save_candidate_and_wait_for_review(
+            tenant,
+            job.id(),
+            &run.candidate,
+            &candidate_fence,
+            Utc::now(),
+        )
         .await
         .unwrap_or_else(|_| unreachable!());
     assert!(store
-        .get_candidate(tenant, job.id())
+        .detail(tenant, job.id())
         .await
         .unwrap_or_else(|_| unreachable!())
+        .and_then(|detail| detail.candidate)
         .is_some());
     storage
         .delete(&object_key)

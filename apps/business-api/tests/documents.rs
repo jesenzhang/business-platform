@@ -342,14 +342,14 @@ async fn document_http_responses_never_expose_storage_locations() {
         .await
         .expect("router must respond");
     assert_eq!(get.status(), StatusCode::OK);
-    let _ = response_json(get).await;
+    response_json(get).await;
 
     let list = router
         .oneshot(request("GET", "/api/v1/documents", TENANT_A, None))
         .await
         .expect("router must respond");
     assert_eq!(list.status(), StatusCode::OK);
-    let _ = response_json(list).await;
+    response_json(list).await;
 }
 
 #[tokio::test]

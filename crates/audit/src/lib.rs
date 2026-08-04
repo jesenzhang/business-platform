@@ -109,42 +109,43 @@ pub enum AuditValidationError {
     InvalidFailureCode,
     #[error("details contain a forbidden sensitive field")]
     SensitiveDetails,
+    #[error("audit chain metadata is invalid")]
+    InvalidChainMetadata,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AuditEvent {
-    pub id: Uuid,
-    pub tenant_id: Uuid,
-    pub actor: AuditActor,
-    pub action: AuditAction,
-    pub resource: AuditResource,
-    pub operation_id: Uuid,
-    pub correlation_id: Option<Uuid>,
-    pub causation_id: Option<Uuid>,
-    pub trace_id: Option<String>,
-    pub reason: Option<String>,
-    pub result: AuditResult,
-    pub failure_code: Option<String>,
-    pub before_hash: Option<String>,
-    pub after_hash: Option<String>,
-    pub changed_fields: Vec<String>,
-    pub details: Value,
-    pub schema_version: String,
-    pub occurred_at: DateTime<Utc>,
+    id: Uuid,
+    tenant_id: Uuid,
+    actor: AuditActor,
+    action: AuditAction,
+    resource: AuditResource,
+    operation_id: Uuid,
+    correlation_id: Option<Uuid>,
+    causation_id: Option<Uuid>,
+    trace_id: Option<String>,
+    reason: Option<String>,
+    result: AuditResult,
+    failure_code: Option<String>,
+    before_hash: Option<String>,
+    after_hash: Option<String>,
+    changed_fields: Vec<String>,
+    details: Value,
+    schema_version: String,
+    occurred_at: DateTime<Utc>,
     /// Immutable tenant-local append order assigned by the persistence
     /// adapter. Zero means the event has not yet been persisted.
     #[serde(default)]
-    pub stream_sequence: i64,
+    stream_sequence: i64,
     /// Database recording time. This is deliberately distinct from the
     /// business occurrence timestamp above.
     #[serde(default = "Utc::now")]
-    pub recorded_at: DateTime<Utc>,
+    recorded_at: DateTime<Utc>,
     /// `0` is the explicit legacy/unverified history boundary; `1` is the
     /// sequence-based chain written by Revision 1 adapters.
-    #[serde(default = "default_chain_version")]
-    pub chain_version: i16,
-    pub previous_hash: Option<String>,
-    pub record_hash: Option<String>,
+    chain_version: i16,
+    previous_hash: Option<String>,
+    record_hash: Option<String>,
 }
 
 impl AuditEvent {
@@ -222,27 +223,182 @@ impl AuditEvent {
         })
     }
 
-    #[must_use]
-    pub fn with_chain(mut self, previous_hash: Option<String>) -> Self {
-        self.previous_hash = previous_hash;
-        self.record_hash = Some(hash_record(&self));
-        self
+    #[allow(clippy::too_many_arguments)]
+    pub fn rehydrate(
+        id: Uuid,
+        tenant_id: Uuid,
+        actor: AuditActor,
+        action: AuditAction,
+        resource: AuditResource,
+        operation_id: Uuid,
+        correlation_id: Option<Uuid>,
+        causation_id: Option<Uuid>,
+        trace_id: Option<String>,
+        reason: Option<String>,
+        result: AuditResult,
+        failure_code: Option<String>,
+        before_hash: Option<String>,
+        after_hash: Option<String>,
+        changed_fields: Vec<String>,
+        details: Value,
+        schema_version: String,
+        occurred_at: DateTime<Utc>,
+        recorded_at: DateTime<Utc>,
+        stream_sequence: i64,
+        chain_version: i16,
+        previous_hash: Option<String>,
+        record_hash: Option<String>,
+    ) -> Result<Self, AuditError> {
+        if stream_sequence < 0
+            || !matches!(chain_version, 0 | 1)
+            || (chain_version == 1 && stream_sequence == 0)
+            || (chain_version == 0 && (previous_hash.is_some() || record_hash.is_some()))
+        {
+            return Err(AuditValidationError::InvalidChainMetadata.into());
+        }
+        let mut event = Self::new(
+            id,
+            tenant_id,
+            actor,
+            action,
+            resource,
+            operation_id,
+            correlation_id,
+            causation_id,
+            trace_id,
+            reason,
+            result,
+            failure_code,
+            before_hash,
+            after_hash,
+            changed_fields,
+            details,
+            schema_version,
+            occurred_at,
+        )?;
+        event.recorded_at = recorded_at;
+        event.stream_sequence = stream_sequence;
+        event.chain_version = chain_version;
+        event.previous_hash = previous_hash;
+        event.record_hash = record_hash;
+        Ok(event)
     }
 
-    #[must_use]
+    pub fn with_chain(mut self, previous_hash: Option<String>) -> Result<Self, AuditError> {
+        self.previous_hash = previous_hash;
+        self.record_hash = Some(hash_record(&self)?);
+        Ok(self)
+    }
+
     pub fn with_chain_metadata(
         mut self,
         stream_sequence: i64,
         recorded_at: DateTime<Utc>,
         chain_version: i16,
         previous_hash: Option<String>,
-    ) -> Self {
+    ) -> Result<Self, AuditError> {
+        if stream_sequence <= 0 || chain_version != 1 {
+            return Err(AuditValidationError::InvalidChainMetadata.into());
+        }
         self.stream_sequence = stream_sequence;
         self.recorded_at = recorded_at;
         self.chain_version = chain_version;
         self.previous_hash = previous_hash;
-        self.record_hash = Some(hash_record(&self));
-        self
+        self.record_hash = Some(hash_record(&self)?);
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+    #[must_use]
+    pub fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
+    #[must_use]
+    pub fn actor(&self) -> &AuditActor {
+        &self.actor
+    }
+    #[must_use]
+    pub fn action(&self) -> &AuditAction {
+        &self.action
+    }
+    #[must_use]
+    pub fn resource(&self) -> &AuditResource {
+        &self.resource
+    }
+    #[must_use]
+    pub fn operation_id(&self) -> Uuid {
+        self.operation_id
+    }
+    #[must_use]
+    pub fn correlation_id(&self) -> Option<Uuid> {
+        self.correlation_id
+    }
+    #[must_use]
+    pub fn causation_id(&self) -> Option<Uuid> {
+        self.causation_id
+    }
+    #[must_use]
+    pub fn trace_id(&self) -> Option<&str> {
+        self.trace_id.as_deref()
+    }
+    #[must_use]
+    pub fn reason(&self) -> Option<&str> {
+        self.reason.as_deref()
+    }
+    #[must_use]
+    pub fn result(&self) -> AuditResult {
+        self.result
+    }
+    #[must_use]
+    pub fn failure_code(&self) -> Option<&str> {
+        self.failure_code.as_deref()
+    }
+    #[must_use]
+    pub fn before_hash(&self) -> Option<&str> {
+        self.before_hash.as_deref()
+    }
+    #[must_use]
+    pub fn after_hash(&self) -> Option<&str> {
+        self.after_hash.as_deref()
+    }
+    #[must_use]
+    pub fn changed_fields(&self) -> &[String] {
+        &self.changed_fields
+    }
+    #[must_use]
+    pub fn details(&self) -> &Value {
+        &self.details
+    }
+    #[must_use]
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+    #[must_use]
+    pub fn occurred_at(&self) -> DateTime<Utc> {
+        self.occurred_at
+    }
+    #[must_use]
+    pub fn stream_sequence(&self) -> i64 {
+        self.stream_sequence
+    }
+    #[must_use]
+    pub fn recorded_at(&self) -> DateTime<Utc> {
+        self.recorded_at
+    }
+    #[must_use]
+    pub fn chain_version(&self) -> i16 {
+        self.chain_version
+    }
+    #[must_use]
+    pub fn previous_hash(&self) -> Option<&str> {
+        self.previous_hash.as_deref()
+    }
+    #[must_use]
+    pub fn record_hash(&self) -> Option<&str> {
+        self.record_hash.as_deref()
     }
 
     #[must_use]
@@ -302,10 +458,6 @@ fn default_cursor_version() -> u8 {
     1
 }
 
-fn default_chain_version() -> i16 {
-    1
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct AuditQueryRequest {
     pub tenant_id: Uuid,
@@ -357,9 +509,8 @@ pub trait AuditAppendPort: Send + Sync {
 #[async_trait]
 pub trait AuditQuery: Send + Sync {
     async fn list(&self, query: AuditQueryRequest) -> Result<AuditPage, AuditError>;
-    async fn get(&self, tenant_id: Uuid, id: Uuid) -> Result<Option<AuditEvent>, AuditError> {
-        let _ = (tenant_id, id);
-        Ok(None)
+    async fn get(&self, _tenant_id: Uuid, _id: Uuid) -> Result<Option<AuditEvent>, AuditError> {
+        Err(AuditError::Persistence)
     }
     async fn verify_chain(
         &self,
@@ -367,11 +518,11 @@ pub trait AuditQuery: Send + Sync {
     ) -> Result<AuditChainVerification, AuditError>;
 }
 
-#[must_use]
-pub fn hash_record(event: &AuditEvent) -> String {
-    let payload = serde_json::to_vec(&event.canonical_payload()).unwrap_or_default();
+pub fn hash_record(event: &AuditEvent) -> Result<String, AuditError> {
+    let payload =
+        serde_json::to_vec(&event.canonical_payload()).map_err(|_| AuditError::Persistence)?;
     let digest = Sha256::digest(payload);
-    hex_encode(&digest)
+    Ok(hex_encode(&digest))
 }
 
 fn redact_details(value: Value) -> Result<Value, AuditValidationError> {
@@ -508,14 +659,22 @@ mod tests {
     fn hash_chain_detects_payload_change() {
         let first = event(AuditResult::Succeeded, serde_json::json!({"n": 1}))
             .unwrap_or_else(|_| unreachable!())
-            .with_chain(None);
+            .with_chain(None)
+            .unwrap_or_else(|_| unreachable!());
         let second = event(AuditResult::Succeeded, serde_json::json!({"n": 2}))
             .unwrap_or_else(|_| unreachable!())
-            .with_chain(first.record_hash.clone());
-        assert_eq!(second.record_hash, Some(hash_record(&second)));
+            .with_chain(first.record_hash.clone())
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(
+            second.record_hash,
+            Some(hash_record(&second).unwrap_or_else(|_| unreachable!()))
+        );
         let mut changed = second.clone();
         changed.details = serde_json::json!({"n": 3});
-        assert_ne!(changed.record_hash, Some(hash_record(&changed)));
+        assert_ne!(
+            changed.record_hash,
+            Some(hash_record(&changed).unwrap_or_else(|_| unreachable!()))
+        );
     }
 
     #[test]
@@ -546,7 +705,8 @@ mod tests {
             first_time,
         )
         .unwrap_or_else(|_| unreachable!())
-        .with_chain_metadata(1, first_time, 1, None);
+        .with_chain_metadata(1, first_time, 1, None)
+        .unwrap_or_else(|_| unreachable!());
         let second = AuditEvent::new(
             Uuid::new_v4(),
             tenant,
@@ -576,10 +736,14 @@ mod tests {
             first_time + chrono::Duration::seconds(1),
             1,
             first.record_hash.clone(),
-        );
+        )
+        .unwrap_or_else(|_| unreachable!());
         assert_eq!(second.stream_sequence, first.stream_sequence + 1);
         assert_eq!(second.previous_hash, first.record_hash);
-        assert_eq!(second.record_hash, Some(hash_record(&second)));
+        assert_eq!(
+            second.record_hash,
+            Some(hash_record(&second).unwrap_or_else(|_| unreachable!()))
+        );
     }
 
     #[test]

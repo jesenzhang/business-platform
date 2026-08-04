@@ -50,10 +50,10 @@ impl RepairPersistencePort for FakePersistence {
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if state.step.fence_version != expected_fence_version
-            || state.step.lease_owner.is_none()
-            || state.step.lease_token.is_none()
-            || step.fence_version != expected_fence_version
+        if state.step.fence_version() != expected_fence_version
+            || state.step.lease_owner().is_none()
+            || state.step.lease_token().is_none()
+            || step.fence_version() != expected_fence_version
         {
             return Err(RepairError::LeaseLost);
         }
@@ -76,30 +76,33 @@ impl RepairPersistencePort for FakePersistence {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let run = &state.run;
-        Ok(Some(IntegrityFinding {
-            id: run.finding_id,
-            tenant_id: run.tenant_id,
-            rule_id: "TEST-RULE".to_string(),
-            rule_version: 1,
-            bounded_context: "document-processing".to_string(),
-            resource_type: run.command.target.resource_type.clone(),
-            resource_id: run.command.target.resource_id.clone(),
-            severity: data_integrity::IntegritySeverity::Warning,
-            fingerprint: "test-fingerprint".to_string(),
-            detected_state: serde_json::json!({}),
-            expected_state: serde_json::json!({}),
-            status: data_integrity::FindingStatus::Open,
-            repairability: run.command.repair_type.clone(),
-            first_detected_at: run.created_at,
-            last_detected_at: run.updated_at,
-            occurrence_count: 1,
-            resolved_at: None,
-            resolution_reason: None,
-            reopened_at: None,
-            reopen_count: 0,
-            previous_resolution: None,
-            version: 0,
-        }))
+        Ok(Some(
+            IntegrityFinding::rehydrate(
+                run.finding_id(),
+                run.tenant_id(),
+                "TEST-RULE".to_string(),
+                1,
+                "document-processing".to_string(),
+                run.command().target.resource_type.clone(),
+                run.command().target.resource_id.clone(),
+                data_integrity::IntegritySeverity::Warning,
+                "test-fingerprint".to_string(),
+                serde_json::json!({}),
+                serde_json::json!({}),
+                data_integrity::FindingStatus::Open,
+                run.command().repair_type.clone(),
+                run.created_at(),
+                run.updated_at(),
+                1,
+                None,
+                None,
+                None,
+                0,
+                None,
+                0,
+            )
+            .map_err(|_| RepairError::Persistence)?,
+        ))
     }
 
     async fn mark_finding_repaired(
@@ -123,7 +126,10 @@ impl RepairPersistencePort for FakePersistence {
         run: &RepairRun,
         step: &RepairStep,
         entry: &RepairLedgerEntry,
+        _expected_run_version: i64,
         expected_fence_version: i64,
+        _lease_owner: &str,
+        _lease_token: &str,
     ) -> Result<(), RepairError> {
         self.save_step_fenced(step, expected_fence_version).await?;
         self.append_ledger(entry).await?;
@@ -135,7 +141,10 @@ impl RepairPersistencePort for FakePersistence {
         run: &RepairRun,
         step: &RepairStep,
         entry: &RepairLedgerEntry,
+        _expected_run_version: i64,
         expected_fence_version: i64,
+        _lease_owner: &str,
+        _lease_token: &str,
     ) -> Result<(), RepairError> {
         self.save_step_fenced(step, expected_fence_version).await?;
         self.append_ledger(entry).await?;
@@ -174,7 +183,7 @@ impl RepairPersistencePort for FakePersistence {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         state.run.approve(approver, note)?;
-        state.step.status = RepairStepStatus::Approved;
+        state.step.approve()?;
         Ok(state.run.clone())
     }
 
@@ -189,9 +198,8 @@ impl RepairPersistencePort for FakePersistence {
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        state.run.status = RepairRunStatus::Cancelled;
-        state.run.version = state.run.version.saturating_add(1);
-        state.step.status = RepairStepStatus::Cancelled;
+        state.run.cancel(Utc::now())?;
+        state.step.request_cancel()?;
         Ok(state.run.clone())
     }
 
@@ -206,24 +214,15 @@ impl RepairPersistencePort for FakePersistence {
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        state.run.status = if state.run.approved_by.is_some() {
-            RepairRunStatus::Queued
-        } else {
-            RepairRunStatus::AwaitingApproval
-        };
-        state.run.version = state.run.version.saturating_add(1);
-        state.step.status = if state.run.approved_by.is_some() {
-            RepairStepStatus::Queued
-        } else {
-            RepairStepStatus::AwaitingApproval
-        };
+        state.run.resume(Utc::now())?;
+        state.step.resume(Utc::now())?;
         Ok(state.run.clone())
     }
 
     async fn claim_step(
         &self,
         worker_id: &str,
-        _now: chrono::DateTime<Utc>,
+        now: chrono::DateTime<Utc>,
         _lease_duration_secs: i64,
     ) -> Result<Option<RepairStep>, RepairError> {
         let mut state = self
@@ -235,12 +234,27 @@ impl RepairPersistencePort for FakePersistence {
         }
         state.claimed = true;
         let mut step = state.step.clone();
-        step.status = RepairStepStatus::Running;
-        step.lease_owner = Some(worker_id.to_string());
-        step.lease_token = Some("fenced-token".to_string());
-        step.fence_version = 1;
-        step.lease_expires_at = Some(Utc::now() + chrono::Duration::seconds(30));
+        step.claim(
+            worker_id.to_string(),
+            "fenced-token".to_string(),
+            step.fence_version().saturating_add(1),
+            Utc::now() + chrono::Duration::seconds(30),
+        )?;
         state.step = step.clone();
+        let run = state.run.clone();
+        state.run = RepairRun::rehydrate(
+            run.id(),
+            run.tenant_id(),
+            run.finding_id(),
+            run.command().clone(),
+            RepairRunStatus::Running,
+            run.created_by(),
+            run.approved_by(),
+            run.approval_note().map(ToString::to_string),
+            run.created_at(),
+            now,
+            run.version().saturating_add(1),
+        )?;
         Ok(Some(step))
     }
 
@@ -258,14 +272,14 @@ impl RepairPersistencePort for FakePersistence {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut step = state.step.clone();
-        if step.id != step_id
-            || step.lease_owner.as_deref() != Some(lease_owner)
-            || step.lease_token.as_deref() != Some(lease_token)
-            || step.fence_version != fence_version
+        if step.id() != step_id
+            || step.lease_owner() != Some(lease_owner)
+            || step.lease_token() != Some(lease_token)
+            || step.fence_version() != fence_version
         {
             return Err(RepairError::LeaseLost);
         }
-        step.lease_expires_at = Some(now + chrono::Duration::seconds(lease_duration_secs));
+        step.heartbeat(now, now + chrono::Duration::seconds(lease_duration_secs))?;
         Ok(step)
     }
 
@@ -282,11 +296,11 @@ impl RepairPersistencePort for FakePersistence {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let step = &state.step;
-        if step.id == step_id
-            && step.lease_owner.as_deref() == Some(lease_owner)
-            && step.lease_token.as_deref() == Some(lease_token)
-            && step.fence_version == fence_version
-            && step.lease_expires_at.is_none_or(|expires| expires > now)
+        if step.id() == step_id
+            && step.lease_owner() == Some(lease_owner)
+            && step.lease_token() == Some(lease_token)
+            && step.fence_version() == fence_version
+            && step.lease_expires_at().is_none_or(|expires| expires > now)
         {
             Ok(())
         } else {
@@ -382,34 +396,25 @@ fn fixture() -> (RepairRun, RepairStep) {
         batch_limit: 1,
     };
     let now = Utc::now();
-    (
-        RepairRun {
-            id: run_id,
-            tenant_id,
-            finding_id,
-            command,
-            status: RepairRunStatus::Queued,
-            created_by: Uuid::new_v4(),
-            approved_by: None,
-            approval_note: None,
-            created_at: now,
-            updated_at: now,
-            version: 0,
-        },
-        RepairStep {
-            id: Uuid::new_v4(),
-            run_id,
-            finding_id,
-            status: RepairStepStatus::Queued,
-            attempt_count: 0,
-            checkpoint: None,
-            lease_owner: None,
-            lease_token: None,
-            fence_version: 0,
-            lease_expires_at: None,
-            next_attempt_at: now,
-        },
+    let run = RepairRun::new(
+        run_id,
+        tenant_id,
+        finding_id,
+        command,
+        RepairRunStatus::Queued,
+        Uuid::new_v4(),
+        now,
     )
+    .unwrap_or_else(|_| unreachable!());
+    let step = RepairStep::new(
+        Uuid::new_v4(),
+        run_id,
+        finding_id,
+        RepairStepStatus::Queued,
+        now,
+    )
+    .unwrap_or_else(|_| unreachable!());
+    (run, step)
 }
 
 #[tokio::test]
@@ -431,10 +436,9 @@ async fn repair_worker_executes_once_and_records_ledger() {
         lease_duration_secs: 30,
         heartbeat_seconds: 5,
     };
-    assert!(worker
-        .execute_one()
-        .await
-        .unwrap_or_else(|_| unreachable!()));
+    let first = worker.execute_one().await;
+    assert!(first.is_ok(), "first repair execution failed: {first:?}");
+    assert!(first.unwrap_or_else(|_| unreachable!()));
     assert!(!worker
         .execute_one()
         .await
@@ -442,7 +446,7 @@ async fn repair_worker_executes_once_and_records_ledger() {
     let state = state
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(state.run.status, RepairRunStatus::Succeeded);
-    assert_eq!(state.step.status, RepairStepStatus::Succeeded);
+    assert_eq!(state.run.status(), RepairRunStatus::Succeeded);
+    assert_eq!(state.step.status(), RepairStepStatus::Succeeded);
     assert_eq!(state.ledger.len(), 1);
 }

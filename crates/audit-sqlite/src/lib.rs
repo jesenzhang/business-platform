@@ -105,9 +105,9 @@ impl AuditQuery for SqliteAuditStore {
         }
         let next_cursor = items.last().map(|item| audit::AuditCursor {
             version: 1,
-            stream_sequence: item.stream_sequence,
-            occurred_at: item.occurred_at,
-            id: item.id,
+            stream_sequence: item.stream_sequence(),
+            occurred_at: item.occurred_at(),
+            id: item.id(),
         });
         Ok(AuditPage { items, next_cursor })
     }
@@ -143,23 +143,32 @@ impl AuditQuery for SqliteAuditStore {
         let mut checked = 0_u64;
         for row in rows {
             let event = row.into_event()?;
-            if event.chain_version == 0 {
+            if event.chain_version() == 0 {
+                if previous_sequence.is_some() {
+                    return Ok(AuditChainVerification {
+                        checked,
+                        valid: false,
+                        first_broken_id: Some(event.id()),
+                    });
+                }
                 continue;
             }
-            if previous_sequence.is_some_and(|sequence| event.stream_sequence != sequence + 1)
-                || event.previous_hash != previous
-                || event.record_hash != Some(hash_record(&event))
+            let hash = hash_record(&event)?;
+            if previous_sequence.is_none() && event.previous_hash().is_some()
+                || previous_sequence.is_some_and(|sequence| event.stream_sequence() != sequence + 1)
+                || event.previous_hash() != previous.as_deref()
+                || event.record_hash() != Some(hash.as_str())
             {
                 return Ok(AuditChainVerification {
                     checked,
                     valid: false,
-                    first_broken_id: Some(event.id),
+                    first_broken_id: Some(event.id()),
                 });
             }
-            previous.clone_from(&event.record_hash);
-            previous_sequence = Some(event.stream_sequence);
-            if scope.from.is_none_or(|from| event.occurred_at >= from)
-                && scope.to.is_none_or(|to| event.occurred_at <= to)
+            previous = event.record_hash().map(str::to_string);
+            previous_sequence = Some(event.stream_sequence());
+            if scope.from.is_none_or(|from| event.occurred_at() >= from)
+                && scope.to.is_none_or(|to| event.occurred_at() <= to)
             {
                 checked = checked.saturating_add(1);
             }
@@ -185,7 +194,10 @@ pub async fn append_sqlite(pool: &SqlitePool, event: &AuditEvent) -> Result<(), 
             .map(|_| ())
             .map_err(|_| AuditError::Persistence),
         Err(error) => {
-            let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
+            sqlx::query("ROLLBACK")
+                .execute(&mut *connection)
+                .await
+                .map_err(|_| AuditError::Persistence)?;
             Err(error)
         }
     }
@@ -199,7 +211,7 @@ pub async fn append_sqlite_in_transaction(
     let previous = sqlx::query_scalar::<_, Option<String>>(
         "SELECT record_hash FROM audit_events WHERE tenant_id = ?1 AND chain_version = 1 ORDER BY stream_sequence DESC LIMIT 1",
     )
-    .bind(event.tenant_id.to_string())
+    .bind(event.tenant_id().to_string())
     .fetch_optional(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?
@@ -207,39 +219,39 @@ pub async fn append_sqlite_in_transaction(
     let sequence = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(stream_sequence), 0) + 1 FROM audit_events WHERE tenant_id = ?1",
     )
-    .bind(event.tenant_id.to_string())
+    .bind(event.tenant_id().to_string())
     .fetch_one(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?;
     let event = event
         .clone()
-        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous);
+        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous)?;
     sqlx::query("INSERT INTO audit_events (id, tenant_id, action, resource_type, resource_id, details, trace_id, created_at, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
-        .bind(event.id.to_string())
-        .bind(event.tenant_id.to_string())
-        .bind(event.action.as_str())
-        .bind(&event.resource.resource_type)
-        .bind(&event.resource.resource_id)
-        .bind(event.details.to_string())
-        .bind(&event.trace_id)
-        .bind(event.occurred_at.to_rfc3339())
-        .bind(event.recorded_at.to_rfc3339())
-        .bind(event.stream_sequence)
-        .bind(event.chain_version)
-        .bind(event.operation_id.to_string())
-        .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
-        .bind(event.actor.actor_id.to_string())
-        .bind(event.correlation_id.map(|id| id.to_string()))
-        .bind(event.causation_id.map(|id| id.to_string()))
-        .bind(&event.reason)
-        .bind(format!("{:?}", event.result).to_lowercase())
-        .bind(&event.failure_code)
-        .bind(&event.before_hash)
-        .bind(&event.after_hash)
-        .bind(serde_json::to_string(&event.changed_fields).map_err(|_| AuditError::Persistence)?)
-        .bind(&event.schema_version)
-        .bind(&event.previous_hash)
-        .bind(&event.record_hash)
+        .bind(event.id().to_string())
+        .bind(event.tenant_id().to_string())
+        .bind(event.action().as_str())
+        .bind(&event.resource().resource_type)
+        .bind(&event.resource().resource_id)
+        .bind(event.details().to_string())
+        .bind(event.trace_id())
+        .bind(event.occurred_at().to_rfc3339())
+        .bind(event.recorded_at().to_rfc3339())
+        .bind(event.stream_sequence())
+        .bind(event.chain_version())
+        .bind(event.operation_id().to_string())
+        .bind(format!("{:?}", event.actor().actor_type).to_lowercase())
+        .bind(event.actor().actor_id.to_string())
+        .bind(event.correlation_id().map(|id| id.to_string()))
+        .bind(event.causation_id().map(|id| id.to_string()))
+        .bind(event.reason())
+        .bind(format!("{:?}", event.result()).to_lowercase())
+        .bind(event.failure_code())
+        .bind(event.before_hash())
+        .bind(event.after_hash())
+        .bind(serde_json::to_string(event.changed_fields()).map_err(|_| AuditError::Persistence)?)
+        .bind(event.schema_version())
+        .bind(event.previous_hash())
+        .bind(event.record_hash())
         .execute(&mut *connection)
         .await
         .map_err(|_| AuditError::Persistence)?;
@@ -279,29 +291,52 @@ impl AuditRow {
     fn into_event(self) -> Result<AuditEvent, AuditError> {
         let id = Uuid::parse_str(&self.id).map_err(|_| AuditError::Persistence)?;
         let tenant_id = Uuid::parse_str(&self.tenant_id).map_err(|_| AuditError::Persistence)?;
-        let actor_id = self
-            .actor_id
-            .as_deref()
-            .and_then(|value| Uuid::parse_str(value).ok())
-            .unwrap_or(id);
-        let operation_id = self
-            .operation_id
-            .as_deref()
-            .and_then(|value| Uuid::parse_str(value).ok())
-            .unwrap_or(id);
+        let chain_version = self.chain_version.ok_or(AuditError::Persistence)?;
+        let actor_id = match self.actor_id.as_deref() {
+            Some(value) => Uuid::parse_str(value).map_err(|_| AuditError::Persistence)?,
+            None if chain_version == 0 => id,
+            None => return Err(AuditError::Persistence),
+        };
+        let operation_id = match self.operation_id.as_deref() {
+            Some(value) => Uuid::parse_str(value).map_err(|_| AuditError::Persistence)?,
+            None if chain_version == 0 => id,
+            None => return Err(AuditError::Persistence),
+        };
         let action = audit::AuditAction::new(self.action).map_err(AuditError::Validation)?;
         let resource = audit::AuditResource::new(
             self.resource_type,
-            self.resource_id.unwrap_or_else(|| "unknown".to_string()),
+            self.resource_id.ok_or(AuditError::Persistence)?,
         )
         .map_err(AuditError::Validation)?;
         let result = match self.result.as_str() {
             "failed" => audit::AuditResult::Failed,
             "denied" => audit::AuditResult::Denied,
             "cancelled" => audit::AuditResult::Cancelled,
-            _ => audit::AuditResult::Succeeded,
+            "succeeded" => audit::AuditResult::Succeeded,
+            _ => return Err(AuditError::Persistence),
         };
-        let mut event = AuditEvent::new(
+        let occurred_at = self
+            .occurred_at
+            .as_deref()
+            .ok_or(AuditError::Persistence)
+            .and_then(|value| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .map(|value| value.with_timezone(&chrono::Utc))
+                    .map_err(|_| AuditError::Persistence)
+            })?;
+        let recorded_at = match self.recorded_at.as_deref() {
+            Some(value) => chrono::DateTime::parse_from_rfc3339(value)
+                .map(|value| value.with_timezone(&chrono::Utc))
+                .map_err(|_| AuditError::Persistence)?,
+            None if chain_version == 0 => occurred_at,
+            None => return Err(AuditError::Persistence),
+        };
+        let details = match self.details.as_deref() {
+            Some(value) => serde_json::from_str(value).map_err(|_| AuditError::Persistence)?,
+            None if chain_version == 0 => serde_json::Value::Null,
+            None => return Err(AuditError::Persistence),
+        };
+        let event = AuditEvent::rehydrate(
             id,
             tenant_id,
             audit::AuditActor {
@@ -310,43 +345,39 @@ impl AuditRow {
                     "service" => audit::AuditActorType::Service,
                     "worker" => audit::AuditActorType::Worker,
                     "repairjob" | "repair_job" => audit::AuditActorType::RepairJob,
-                    _ => audit::AuditActorType::System,
+                    _ => return Err(AuditError::Persistence),
                 },
                 actor_id,
             },
             action,
             resource,
             operation_id,
-            self.correlation_id.and_then(|v| Uuid::parse_str(&v).ok()),
-            self.causation_id.and_then(|v| Uuid::parse_str(&v).ok()),
+            self.correlation_id
+                .as_deref()
+                .map(Uuid::parse_str)
+                .transpose()
+                .map_err(|_| AuditError::Persistence)?,
+            self.causation_id
+                .as_deref()
+                .map(Uuid::parse_str)
+                .transpose()
+                .map_err(|_| AuditError::Persistence)?,
             self.trace_id,
             self.reason,
             result,
             self.failure_code,
             self.before_hash,
             self.after_hash,
-            serde_json::from_str(&self.changed_fields).unwrap_or_default(),
-            audit::sanitize_details_for_read(
-                self.details
-                    .and_then(|v| serde_json::from_str(&v).ok())
-                    .unwrap_or(serde_json::Value::Null),
-            ),
+            serde_json::from_str(&self.changed_fields).map_err(|_| AuditError::Persistence)?,
+            audit::sanitize_details_for_read(details),
             self.schema_version,
-            self.occurred_at
-                .as_deref()
-                .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
-                .map_or_else(chrono::Utc::now, |v| v.with_timezone(&chrono::Utc)),
-        )
-        .map_err(AuditError::Validation)?;
-        event.recorded_at = self
-            .recorded_at
-            .as_deref()
-            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
-            .map_or(event.occurred_at, |value| value.with_timezone(&chrono::Utc));
-        event.stream_sequence = self.stream_sequence.unwrap_or(0);
-        event.chain_version = self.chain_version.unwrap_or(0);
-        event.previous_hash = self.previous_hash;
-        event.record_hash = self.record_hash;
+            occurred_at,
+            recorded_at,
+            self.stream_sequence.ok_or(AuditError::Persistence)?,
+            chain_version,
+            self.previous_hash,
+            self.record_hash,
+        )?;
         Ok(event)
     }
 }

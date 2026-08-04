@@ -204,14 +204,18 @@ async fn main() -> anyhow::Result<()> {
 /// Resolve the process shutdown signal (Ctrl-C or SIGTERM).
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c().await.ok();
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            tracing::error!(%error, "failed to receive Ctrl-C shutdown signal");
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
         match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
             Ok(mut signal) => {
-                let _ = signal.recv().await;
+                if signal.recv().await.is_none() {
+                    tracing::error!("SIGTERM signal stream closed before shutdown");
+                }
             }
             Err(error) => {
                 tracing::error!(%error, "failed to install SIGTERM handler");

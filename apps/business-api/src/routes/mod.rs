@@ -81,6 +81,10 @@ pub fn create_router(
             axum::routing::post(admin::approve_repair),
         )
         .route(
+            "/api/v1/admin/repairs/{id}/execute",
+            axum::routing::post(admin::execute_repair),
+        )
+        .route(
             "/api/v1/admin/repairs/{id}/cancel",
             axum::routing::post(admin::cancel_repair),
         )

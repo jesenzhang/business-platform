@@ -257,22 +257,36 @@ pub fn repair_step_status_name(status: RepairStepStatus) -> &'static str {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RepairRun {
-    pub id: Uuid,
-    pub tenant_id: Uuid,
-    pub finding_id: Uuid,
-    pub command: RepairCommand,
-    pub status: RepairRunStatus,
-    pub created_by: Uuid,
-    pub approved_by: Option<Uuid>,
-    pub approval_note: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
+    id: Uuid,
+    tenant_id: Uuid,
+    finding_id: Uuid,
+    command: RepairCommand,
+    status: RepairRunStatus,
+    created_by: Uuid,
+    approved_by: Option<Uuid>,
+    approval_note: Option<String>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    version: i64,
 }
 
 impl RepairRun {
+    pub fn new(
+        id: Uuid,
+        tenant_id: Uuid,
+        finding_id: Uuid,
+        command: RepairCommand,
+        status: RepairRunStatus,
+        created_by: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<Self, RepairError> {
+        Self::rehydrate(
+            id, tenant_id, finding_id, command, status, created_by, None, None, now, now, 0,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn rehydrate(
         id: Uuid,
@@ -295,6 +309,10 @@ impl RepairRun {
             || version < 0
             || command.tenant_id != tenant_id
             || command.integrity_finding_id != finding_id
+            || approved_by.is_some_and(|approver| approver == created_by)
+            || approval_note
+                .as_deref()
+                .is_some_and(|note| note.trim().is_empty())
         {
             return Err(RepairError::InvalidCommand);
         }
@@ -313,8 +331,53 @@ impl RepairRun {
         })
     }
 
+    #[must_use]
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+    #[must_use]
+    pub fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
+    #[must_use]
+    pub fn finding_id(&self) -> Uuid {
+        self.finding_id
+    }
+    #[must_use]
+    pub fn command(&self) -> &RepairCommand {
+        &self.command
+    }
+    #[must_use]
+    pub fn status(&self) -> RepairRunStatus {
+        self.status
+    }
+    #[must_use]
+    pub fn created_by(&self) -> Uuid {
+        self.created_by
+    }
+    #[must_use]
+    pub fn approved_by(&self) -> Option<Uuid> {
+        self.approved_by
+    }
+    #[must_use]
+    pub fn approval_note(&self) -> Option<&str> {
+        self.approval_note.as_deref()
+    }
+    #[must_use]
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+    #[must_use]
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+    #[must_use]
+    pub fn version(&self) -> i64 {
+        self.version
+    }
+
     pub fn approve(&mut self, approver: Uuid, note: String) -> Result<(), RepairError> {
-        if approver.is_nil() || approver == self.created_by {
+        if approver.is_nil() || approver == self.created_by || note.trim().is_empty() {
             return Err(RepairError::ApprovalSeparation);
         }
         if self.status != RepairRunStatus::AwaitingApproval {
@@ -323,7 +386,71 @@ impl RepairRun {
         self.approved_by = Some(approver);
         self.approval_note = Some(note);
         self.status = RepairRunStatus::Approved;
-        self.version = self.version.saturating_add(1);
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn queue_for_execution(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if self.status != RepairRunStatus::Approved {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Queued;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn mark_failed(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairRunStatus::Running | RepairRunStatus::Verifying
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Failed;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn mark_needs_manual_review(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairRunStatus::Running | RepairRunStatus::Verifying
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::NeedsManualReview;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn mark_succeeded(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairRunStatus::Running | RepairRunStatus::Verifying
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Succeeded;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
         Ok(())
     }
 
@@ -336,7 +463,10 @@ impl RepairRun {
         }
         self.status = RepairRunStatus::Cancelled;
         self.updated_at = now;
-        self.version = self.version.saturating_add(1);
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
         Ok(())
     }
 
@@ -355,27 +485,52 @@ impl RepairRun {
             RepairRunStatus::AwaitingApproval
         };
         self.updated_at = now;
-        self.version = self.version.saturating_add(1);
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RepairStep {
-    pub id: Uuid,
-    pub run_id: Uuid,
-    pub finding_id: Uuid,
-    pub status: RepairStepStatus,
-    pub attempt_count: u32,
-    pub checkpoint: Option<Value>,
-    pub lease_owner: Option<String>,
-    pub lease_token: Option<String>,
-    pub fence_version: i64,
-    pub lease_expires_at: Option<DateTime<Utc>>,
-    pub next_attempt_at: DateTime<Utc>,
+    id: Uuid,
+    run_id: Uuid,
+    finding_id: Uuid,
+    status: RepairStepStatus,
+    attempt_count: u32,
+    checkpoint: Option<Value>,
+    lease_owner: Option<String>,
+    lease_token: Option<String>,
+    fence_version: i64,
+    lease_expires_at: Option<DateTime<Utc>>,
+    next_attempt_at: DateTime<Utc>,
 }
 
 impl RepairStep {
+    pub fn new(
+        id: Uuid,
+        run_id: Uuid,
+        finding_id: Uuid,
+        status: RepairStepStatus,
+        next_attempt_at: DateTime<Utc>,
+    ) -> Result<Self, RepairError> {
+        Self::rehydrate(
+            id,
+            run_id,
+            finding_id,
+            status,
+            0,
+            None,
+            None,
+            None,
+            0,
+            None,
+            next_attempt_at,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn rehydrate(
         id: Uuid,
@@ -413,6 +568,51 @@ impl RepairStep {
         })
     }
 
+    #[must_use]
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+    #[must_use]
+    pub fn run_id(&self) -> Uuid {
+        self.run_id
+    }
+    #[must_use]
+    pub fn finding_id(&self) -> Uuid {
+        self.finding_id
+    }
+    #[must_use]
+    pub fn status(&self) -> RepairStepStatus {
+        self.status
+    }
+    #[must_use]
+    pub fn attempt_count(&self) -> u32 {
+        self.attempt_count
+    }
+    #[must_use]
+    pub fn checkpoint(&self) -> Option<&Value> {
+        self.checkpoint.as_ref()
+    }
+    #[must_use]
+    pub fn lease_owner(&self) -> Option<&str> {
+        self.lease_owner.as_deref()
+    }
+    #[must_use]
+    pub fn lease_token(&self) -> Option<&str> {
+        self.lease_token.as_deref()
+    }
+    #[must_use]
+    pub fn fence_version(&self) -> i64 {
+        self.fence_version
+    }
+    #[must_use]
+    pub fn lease_expires_at(&self) -> Option<DateTime<Utc>> {
+        self.lease_expires_at
+    }
+    #[must_use]
+    pub fn next_attempt_at(&self) -> DateTime<Utc> {
+        self.next_attempt_at
+    }
+
     pub fn claim(
         &mut self,
         worker_id: String,
@@ -420,6 +620,12 @@ impl RepairStep {
         fence_version: i64,
         expires_at: DateTime<Utc>,
     ) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairStepStatus::Queued | RepairStepStatus::Running
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
         if worker_id.trim().is_empty()
             || lease_token.trim().is_empty()
             || fence_version <= self.fence_version
@@ -427,7 +633,10 @@ impl RepairStep {
             return Err(RepairError::LeaseLost);
         }
         self.status = RepairStepStatus::Running;
-        self.attempt_count = self.attempt_count.saturating_add(1);
+        self.attempt_count = self
+            .attempt_count
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
         self.lease_owner = Some(worker_id);
         self.lease_token = Some(lease_token);
         self.fence_version = fence_version;
@@ -463,6 +672,22 @@ impl RepairStep {
         self.lease_owner = None;
         self.lease_token = None;
         self.lease_expires_at = None;
+        Ok(())
+    }
+
+    pub fn approve(&mut self) -> Result<(), RepairError> {
+        if self.status != RepairStepStatus::AwaitingApproval {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairStepStatus::Approved;
+        Ok(())
+    }
+
+    pub fn queue_for_execution(&mut self) -> Result<(), RepairError> {
+        if self.status != RepairStepStatus::Approved {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairStepStatus::Queued;
         Ok(())
     }
 
@@ -520,33 +745,269 @@ impl RepairStep {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RepairLedgerEntry {
-    pub id: Uuid,
-    pub tenant_id: Uuid,
-    pub repair_run_id: Uuid,
-    pub repair_step_id: Uuid,
-    pub finding_id: Uuid,
-    pub rule_id: String,
-    pub repair_type: String,
-    pub repair_version: u32,
-    pub actor_type: String,
-    pub actor_id: Uuid,
-    pub reason: String,
-    pub resource_type: String,
-    pub resource_id: String,
-    pub before_hash: String,
-    pub after_hash: String,
-    pub before_snapshot: Value,
-    pub after_snapshot: Value,
-    pub rows_affected: u32,
-    pub result: RepairOutcome,
-    pub failure_code: Option<String>,
-    pub trace_id: Option<String>,
-    pub started_at: DateTime<Utc>,
-    pub finished_at: DateTime<Utc>,
-    pub previous_hash: Option<String>,
-    pub record_hash: Option<String>,
+    id: Uuid,
+    tenant_id: Uuid,
+    repair_run_id: Uuid,
+    repair_step_id: Uuid,
+    finding_id: Uuid,
+    rule_id: String,
+    repair_type: String,
+    repair_version: u32,
+    actor_type: String,
+    actor_id: Uuid,
+    reason: String,
+    resource_type: String,
+    resource_id: String,
+    before_hash: String,
+    after_hash: String,
+    before_snapshot: Value,
+    after_snapshot: Value,
+    rows_affected: u32,
+    result: RepairOutcome,
+    failure_code: Option<String>,
+    trace_id: Option<String>,
+    started_at: DateTime<Utc>,
+    finished_at: DateTime<Utc>,
+    previous_hash: Option<String>,
+    record_hash: Option<String>,
+}
+
+impl RepairLedgerEntry {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: Uuid,
+        tenant_id: Uuid,
+        repair_run_id: Uuid,
+        repair_step_id: Uuid,
+        finding_id: Uuid,
+        rule_id: String,
+        repair_type: String,
+        repair_version: u32,
+        actor_type: String,
+        actor_id: Uuid,
+        reason: String,
+        resource_type: String,
+        resource_id: String,
+        before_hash: String,
+        after_hash: String,
+        before_snapshot: Value,
+        after_snapshot: Value,
+        rows_affected: u32,
+        result: RepairOutcome,
+        failure_code: Option<String>,
+        trace_id: Option<String>,
+        started_at: DateTime<Utc>,
+        finished_at: DateTime<Utc>,
+        previous_hash: Option<String>,
+        record_hash: Option<String>,
+    ) -> Result<Self, RepairError> {
+        Self::rehydrate(
+            id,
+            tenant_id,
+            repair_run_id,
+            repair_step_id,
+            finding_id,
+            rule_id,
+            repair_type,
+            repair_version,
+            actor_type,
+            actor_id,
+            reason,
+            resource_type,
+            resource_id,
+            before_hash,
+            after_hash,
+            before_snapshot,
+            after_snapshot,
+            rows_affected,
+            result,
+            failure_code,
+            trace_id,
+            started_at,
+            finished_at,
+            previous_hash,
+            record_hash,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn rehydrate(
+        id: Uuid,
+        tenant_id: Uuid,
+        repair_run_id: Uuid,
+        repair_step_id: Uuid,
+        finding_id: Uuid,
+        rule_id: String,
+        repair_type: String,
+        repair_version: u32,
+        actor_type: String,
+        actor_id: Uuid,
+        reason: String,
+        resource_type: String,
+        resource_id: String,
+        before_hash: String,
+        after_hash: String,
+        before_snapshot: Value,
+        after_snapshot: Value,
+        rows_affected: u32,
+        result: RepairOutcome,
+        failure_code: Option<String>,
+        trace_id: Option<String>,
+        started_at: DateTime<Utc>,
+        finished_at: DateTime<Utc>,
+        previous_hash: Option<String>,
+        record_hash: Option<String>,
+    ) -> Result<Self, RepairError> {
+        if id.is_nil()
+            || tenant_id.is_nil()
+            || repair_run_id.is_nil()
+            || repair_step_id.is_nil()
+            || finding_id.is_nil()
+            || rule_id.trim().is_empty()
+            || repair_type.trim().is_empty()
+            || repair_version == 0
+            || actor_type.trim().is_empty()
+            || actor_id.is_nil()
+            || reason.trim().is_empty()
+            || resource_type.trim().is_empty()
+            || resource_id.trim().is_empty()
+            || before_hash.trim().is_empty()
+            || after_hash.trim().is_empty()
+            || finished_at < started_at
+        {
+            return Err(RepairError::Persistence);
+        }
+        Ok(Self {
+            id,
+            tenant_id,
+            repair_run_id,
+            repair_step_id,
+            finding_id,
+            rule_id,
+            repair_type,
+            repair_version,
+            actor_type,
+            actor_id,
+            reason,
+            resource_type,
+            resource_id,
+            before_hash,
+            after_hash,
+            before_snapshot,
+            after_snapshot,
+            rows_affected,
+            result,
+            failure_code,
+            trace_id,
+            started_at,
+            finished_at,
+            previous_hash,
+            record_hash,
+        })
+    }
+
+    #[must_use]
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+    #[must_use]
+    pub fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
+    #[must_use]
+    pub fn repair_run_id(&self) -> Uuid {
+        self.repair_run_id
+    }
+    #[must_use]
+    pub fn repair_step_id(&self) -> Uuid {
+        self.repair_step_id
+    }
+    #[must_use]
+    pub fn finding_id(&self) -> Uuid {
+        self.finding_id
+    }
+    #[must_use]
+    pub fn rule_id(&self) -> &str {
+        &self.rule_id
+    }
+    #[must_use]
+    pub fn repair_type(&self) -> &str {
+        &self.repair_type
+    }
+    #[must_use]
+    pub fn repair_version(&self) -> u32 {
+        self.repair_version
+    }
+    #[must_use]
+    pub fn actor_type(&self) -> &str {
+        &self.actor_type
+    }
+    #[must_use]
+    pub fn actor_id(&self) -> Uuid {
+        self.actor_id
+    }
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+    #[must_use]
+    pub fn resource_type(&self) -> &str {
+        &self.resource_type
+    }
+    #[must_use]
+    pub fn resource_id(&self) -> &str {
+        &self.resource_id
+    }
+    #[must_use]
+    pub fn before_hash(&self) -> &str {
+        &self.before_hash
+    }
+    #[must_use]
+    pub fn after_hash(&self) -> &str {
+        &self.after_hash
+    }
+    #[must_use]
+    pub fn before_snapshot(&self) -> &Value {
+        &self.before_snapshot
+    }
+    #[must_use]
+    pub fn after_snapshot(&self) -> &Value {
+        &self.after_snapshot
+    }
+    #[must_use]
+    pub fn rows_affected(&self) -> u32 {
+        self.rows_affected
+    }
+    #[must_use]
+    pub fn result(&self) -> RepairOutcome {
+        self.result
+    }
+    #[must_use]
+    pub fn failure_code(&self) -> Option<&str> {
+        self.failure_code.as_deref()
+    }
+    #[must_use]
+    pub fn trace_id(&self) -> Option<&str> {
+        self.trace_id.as_deref()
+    }
+    #[must_use]
+    pub fn started_at(&self) -> DateTime<Utc> {
+        self.started_at
+    }
+    #[must_use]
+    pub fn finished_at(&self) -> DateTime<Utc> {
+        self.finished_at
+    }
+    #[must_use]
+    pub fn previous_hash(&self) -> Option<&str> {
+        self.previous_hash.as_deref()
+    }
+    #[must_use]
+    pub fn record_hash(&self) -> Option<&str> {
+        self.record_hash.as_deref()
+    }
 }
 
 #[derive(Debug, Error)]
@@ -606,26 +1067,48 @@ pub trait RepairPersistencePort: Send + Sync {
     async fn load_finding(&self, id: Uuid) -> Result<Option<IntegrityFinding>, RepairError>;
 
     /// Commit a successful step, immutable ledger entry, and run transition
-    /// through one adapter-owned transaction when supported.
+    /// through one adapter-owned transaction when supported. The lease
+    /// identity and expected run version are part of the same CAS boundary;
+    /// callers must not rely on a preceding read as the only fence.
+    #[allow(clippy::too_many_arguments)]
     async fn commit_success(
         &self,
         run: &RepairRun,
         step: &RepairStep,
         entry: &RepairLedgerEntry,
+        expected_run_version: i64,
         expected_fence_version: i64,
+        lease_owner: &str,
+        lease_token: &str,
     ) -> Result<(), RepairError>;
 
     /// Atomically record a failed/conflicted execution, release the fenced
     /// step, and move the run/finding to a recoverable non-success state.
     /// Adapters must implement this with the same transaction boundary as
     /// [`Self::commit_success`].
+    #[allow(clippy::too_many_arguments)]
     async fn commit_failure(
         &self,
         run: &RepairRun,
         step: &RepairStep,
         entry: &RepairLedgerEntry,
+        expected_run_version: i64,
         expected_fence_version: i64,
+        lease_owner: &str,
+        lease_token: &str,
     ) -> Result<(), RepairError>;
+
+    /// Atomically stop a claimed step when post-claim validation or provider
+    /// setup fails before a complete run/finding aggregate is available.
+    /// Implementations must fence the transition by owner, token, and fence.
+    async fn abort_claimed_repair(
+        &self,
+        _step: &RepairStep,
+        _worker_id: &str,
+        _reason: &str,
+    ) -> Result<(), RepairError> {
+        Err(RepairError::Persistence)
+    }
 
     async fn mark_finding_repaired(
         &self,
@@ -655,6 +1138,18 @@ pub trait RepairPersistencePort: Send + Sync {
         expected_status: RepairRunStatus,
         note: String,
     ) -> Result<RepairRun, RepairError>;
+
+    /// Explicitly move an approved run into the executable queue. Approval
+    /// alone must never make a step claimable.
+    async fn execute_repair(
+        &self,
+        _tenant_id: Uuid,
+        _run_id: Uuid,
+        _expected_version: i64,
+        _expected_status: RepairRunStatus,
+    ) -> Result<RepairRun, RepairError> {
+        Err(RepairError::Persistence)
+    }
 
     async fn cancel_repair(
         &self,
@@ -732,14 +1227,16 @@ mod tests {
     #[test]
     fn medium_risk_approval_is_separated() {
         let creator = Uuid::new_v4();
-        let mut run = RepairRun {
-            id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            finding_id: Uuid::new_v4(),
-            command: RepairCommand {
+        let tenant_id = Uuid::new_v4();
+        let finding_id = Uuid::new_v4();
+        let mut run = RepairRun::new(
+            Uuid::new_v4(),
+            tenant_id,
+            finding_id,
+            RepairCommand {
                 idempotency_key: "repair-1".to_string(),
-                tenant_id: Uuid::new_v4(),
-                integrity_finding_id: Uuid::new_v4(),
+                tenant_id,
+                integrity_finding_id: finding_id,
                 target: RepairTarget {
                     resource_type: "processing_job".to_string(),
                     resource_id: Uuid::new_v4().to_string(),
@@ -751,14 +1248,11 @@ mod tests {
                 reason: "fix".to_string(),
                 batch_limit: 1,
             },
-            status: RepairRunStatus::AwaitingApproval,
-            created_by: creator,
-            approved_by: None,
-            approval_note: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            version: 0,
-        };
+            RepairRunStatus::AwaitingApproval,
+            creator,
+            Utc::now(),
+        )
+        .unwrap_or_else(|_| unreachable!());
         assert!(run.approve(creator, "self".to_string()).is_err());
         assert!(run.approve(Uuid::new_v4(), "approved".to_string()).is_ok());
     }

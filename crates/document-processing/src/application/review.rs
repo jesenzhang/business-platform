@@ -1,4 +1,5 @@
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::domain::{CandidateReview, ProcessingJob};
@@ -33,5 +34,23 @@ impl ReviewCandidateCommand {
             candidate_version: self.candidate_version,
             created_at: Utc::now(),
         }
+    }
+
+    /// Build the stable request fingerprint used by the durable review
+    /// idempotency boundary. The generated review id and timestamp are
+    /// deliberately excluded so a retry represents the same request.
+    pub fn request_fingerprint(&self, candidate_id: Uuid) -> Result<String, serde_json::Error> {
+        let canonical = serde_json::to_vec(&(
+            "document-processing.review.v1",
+            self.tenant_id,
+            self.job_id,
+            candidate_id,
+            self.reviewer_id,
+            self.decision,
+            self.candidate_version,
+            &self.patch,
+            &self.comment,
+        ))?;
+        Ok(format!("{:x}", Sha256::digest(canonical)))
     }
 }

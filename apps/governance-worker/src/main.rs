@@ -36,7 +36,8 @@ async fn main() -> anyhow::Result<()> {
         pool.clone(),
     ));
     let store = Arc::new(PostgresGovernanceStore::new(pool));
-    let governance = GovernanceWorker::new(Arc::clone(&store), Arc::clone(&store));
+    let governance = GovernanceWorker::new(Arc::clone(&store), Arc::clone(&store))
+        .context("register governance integrity rules")?;
     let rule_registry = Arc::new(governance.registry);
     let repair_handlers = Arc::new(
         runtime_governance::processing_repairs::ProcessingRepairRegistry::new(processing_store),
@@ -84,7 +85,9 @@ async fn main() -> anyhow::Result<()> {
         None
     } else {
         Some(tokio::spawn(async move {
-            shutdown_signal().await;
+            if let Err(error) = shutdown_signal().await {
+                tracing::error!(error = %error, "governance shutdown signal listener failed");
+            }
             signal_stop.store(true, Ordering::Release);
         }))
     };
@@ -99,27 +102,31 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     if let Some(signal_task) = signal_task {
         signal_task.abort();
+        if let Err(error) = signal_task.await {
+            if !error.is_cancelled() {
+                tracing::error!(error = %error, "governance shutdown signal task join failed");
+            }
+        }
     }
     tracing::info!("governance-worker stopped claiming new work");
     Ok(())
 }
 
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c().await.ok();
-    };
+async fn shutdown_signal() -> anyhow::Result<()> {
+    let ctrl_c = async { tokio::signal::ctrl_c().await.map_err(anyhow::Error::from) };
     #[cfg(unix)]
     let terminate = async {
-        if let Ok(mut signal) =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-        {
-            let _ = signal.recv().await;
-        }
+        let mut signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .map_err(anyhow::Error::from)?;
+        signal
+            .recv()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("termination signal stream ended"))
     };
     #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
+    let terminate = std::future::pending::<anyhow::Result<()>>();
     tokio::select! {
-        () = ctrl_c => {},
-        () = terminate => {},
+        result = ctrl_c => result,
+        result = terminate => result,
     }
 }

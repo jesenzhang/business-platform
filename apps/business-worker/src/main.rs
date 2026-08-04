@@ -96,6 +96,8 @@ struct LeaseHeartbeatGuard {
     stop: Option<oneshot::Sender<()>>,
     task: JoinHandle<()>,
     lost: Arc<AtomicBool>,
+    tenant_id: Uuid,
+    job_id: Uuid,
 }
 
 impl LeaseHeartbeatGuard {
@@ -117,8 +119,9 @@ impl LeaseHeartbeatGuard {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        if execution.heartbeat_job(tenant_id, job_id, &fence, Utc::now(), lease_duration_secs).await.is_err() {
+                        if let Err(error) = execution.heartbeat_job(tenant_id, job_id, &fence, Utc::now(), lease_duration_secs).await {
                             lost_for_task.store(true, Ordering::Release);
+                            tracing::error!(tenant_id = %tenant_id, job_id = %job_id, error = %error, "processing lease heartbeat failed; stopping work");
                             break;
                         }
                     }
@@ -130,6 +133,8 @@ impl LeaseHeartbeatGuard {
             stop: Some(stop),
             task,
             lost,
+            tenant_id,
+            job_id,
         }
     }
 
@@ -141,15 +146,24 @@ impl LeaseHeartbeatGuard {
         }
     }
 
-    async fn stop(mut self) {
+    async fn stop(mut self) -> bool {
+        let mut stopped = true;
         if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
+            if stop.send(()).is_err() {
+                stopped = false;
+                tracing::warn!(tenant_id = %self.tenant_id, job_id = %self.job_id, "processing lease heartbeat task was already stopped");
+            }
         }
-        let _ = self.task.await;
+        if let Err(error) = self.task.await {
+            stopped = false;
+            tracing::error!(tenant_id = %self.tenant_id, job_id = %self.job_id, error = %error, "processing lease heartbeat task join failed");
+        }
+        stopped
     }
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     let config = BusinessWorkerConfig::load()?;
     config
@@ -216,15 +230,39 @@ async fn main() -> anyhow::Result<()> {
     let mut tasks = JoinSet::new();
     loop {
         tokio::select! {
-            () = &mut shutdown => {
+            shutdown_result = &mut shutdown => {
+                shutdown_result?;
                 tracing::info!(worker_id = %config.worker_id, "business-worker graceful shutdown");
                 break;
             }
+            joined = tasks.join_next(), if !tasks.is_empty() => {
+                match joined {
+                    Some(Ok(())) | None => {}
+                    Some(Err(error)) => tracing::error!(worker_id = %config.worker_id, error = %error, "processing task join failed"),
+                }
+                let reap = reap_completed_tasks(&mut tasks, &config.worker_id);
+                if reap.joined > 0 {
+                    tracing::debug!(worker_id = %config.worker_id, completed = reap.completed, join_errors = reap.join_errors, "reaped completed processing tasks");
+                }
+            }
             () = sleep(next_poll.saturating_duration_since(Instant::now())) => {
                 let now = Utc::now();
-                let _ = services.execution.reclaim_expired_jobs(now).await;
+                match services.execution.reclaim_expired_jobs(now).await {
+                    Ok(reclaimed) if reclaimed > 0 => tracing::info!(worker_id = %config.worker_id, reclaimed, "expired processing leases reclaimed"),
+                    Ok(_) => {}
+                    Err(error) => tracing::error!(worker_id = %config.worker_id, error = %error, "failed to reclaim expired processing leases"),
+                }
                 if let Ok(permit) = Arc::clone(&permits).try_acquire_owned() {
-                    if let Some(claimed) = services.execution.claim_next_job(&config.worker_id, now, config.lease_duration_secs).await? {
+                    let claimed = match services.execution.claim_next_job(&config.worker_id, now, config.lease_duration_secs).await {
+                        Ok(claimed) => claimed,
+                        Err(error) => {
+                            tracing::error!(worker_id = %config.worker_id, error = %error, "failed to claim processing job");
+                            drop(permit);
+                            next_poll = Instant::now() + Duration::from_millis(config.poll_interval_millis);
+                            continue;
+                        }
+                    };
+                    if let Some(claimed) = claimed {
                         tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, "processing job claimed");
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
@@ -241,7 +279,11 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-    while tasks.join_next().await.is_some() {}
+    while let Some(joined) = tasks.join_next().await {
+        if let Err(error) = joined {
+            tracing::error!(worker_id = %config.worker_id, error = %error, "processing task join failed during graceful drain");
+        }
+    }
     Ok(())
 }
 
@@ -313,22 +355,36 @@ async fn process_claimed(
     }
     let step = job.current_step();
     let result = process_step(services, source, &job, &fence, config, &heartbeat).await;
-    let heartbeat_lost = heartbeat.lost.load(Ordering::Acquire);
-    heartbeat.stop().await;
+    let heartbeat_lost_flag = Arc::clone(&heartbeat.lost);
+    let heartbeat_stopped = heartbeat.stop().await;
+    let heartbeat_lost = heartbeat_lost_flag.load(Ordering::Acquire);
     if let Err(error) = result {
-        if !matches!(error, ExtractionError::LeaseLost) && !heartbeat_lost {
+        if !matches!(error, ExtractionError::LeaseLost) && !heartbeat_lost && heartbeat_stopped {
             let failure = classify_failure(&error, job.attempt_count());
-            let _ = services
+            if let Err(persistence_error) = services
                 .execution
                 .retry_or_fail_step(job.tenant_id(), job.id(), step, failure, &fence, Utc::now())
-                .await;
+                .await
+            {
+                tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, error = %persistence_error, "failed to persist processing step failure");
+            }
+        } else if !heartbeat_stopped || heartbeat_lost {
+            tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, "processing step result discarded because lease state was not proven");
         }
         tracing::warn!(job_id = %job.id(), step = %step, failure_code = error.code(), "processing job step failed");
-    } else if !heartbeat_lost && job.status() == document_processing::ProcessingJobStatus::Running {
-        let _ = services
+    } else if !heartbeat_lost
+        && heartbeat_stopped
+        && job.status() == document_processing::ProcessingJobStatus::Running
+    {
+        if let Err(error) = services
             .execution
             .release_job(job.tenant_id(), job.id(), &fence, Utc::now())
-            .await;
+            .await
+        {
+            tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, error = %error, "failed to release processing job lease");
+        }
+    } else if !heartbeat_stopped || heartbeat_lost {
+        tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, "processing job lease was not released because lease state was not proven");
     }
 }
 
@@ -619,6 +675,59 @@ fn map_repository_error(error: document_processing::ProcessingRepositoryError) -
     }
 }
 
-async fn shutdown_signal() {
-    tokio::signal::ctrl_c().await.ok();
+async fn shutdown_signal() -> anyhow::Result<()> {
+    tokio::signal::ctrl_c().await.map_err(Into::into)
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct JoinSetReapSummary {
+    joined: usize,
+    completed: usize,
+    join_errors: usize,
+}
+
+fn reap_completed_tasks(tasks: &mut JoinSet<()>, worker_id: &str) -> JoinSetReapSummary {
+    let mut summary = JoinSetReapSummary::default();
+    while let Some(joined) = tasks.try_join_next() {
+        summary.joined += 1;
+        match joined {
+            Ok(()) => summary.completed += 1,
+            Err(error) => {
+                summary.join_errors += 1;
+                tracing::error!(worker_id, error = %error, "processing task join failed while reaping");
+            }
+        }
+    }
+    summary
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{reap_completed_tasks, JoinSet, JoinSetReapSummary};
+
+    #[tokio::test]
+    #[allow(clippy::panic)]
+    async fn reaps_completed_and_panicked_tasks_without_accumulation() {
+        let mut tasks = JoinSet::new();
+        tasks.spawn(async {});
+        tasks.spawn(async {
+            panic!("regression panic");
+        });
+        tasks.spawn(async {});
+
+        let mut total = JoinSetReapSummary::default();
+        while !tasks.is_empty() {
+            let current = reap_completed_tasks(&mut tasks, "test-business-worker");
+            total.joined += current.joined;
+            total.completed += current.completed;
+            total.join_errors += current.join_errors;
+            if !tasks.is_empty() {
+                tokio::task::yield_now().await;
+            }
+        }
+
+        assert_eq!(total.joined, 3);
+        assert_eq!(total.completed, 2);
+        assert_eq!(total.join_errors, 1);
+    }
 }

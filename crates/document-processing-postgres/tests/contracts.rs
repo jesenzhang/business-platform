@@ -1,9 +1,8 @@
 use chrono::{Duration, Utc};
-use document_processing::ports::legacy::ProcessingStepStore;
 use document_processing::ports::{
     CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, ProcessingExecutionUnitOfWork,
-    ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery, StepCheckpoint,
-    TextArtifactReference,
+    ProcessingJobClaimPort, ProcessingJobCommandPort, ProcessingJobQuery,
+    ProcessingRepositoryError, TextArtifactReference,
 };
 use document_processing::{
     CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionRequest,
@@ -83,12 +82,11 @@ async fn postgres_processing_contract_claims_and_restarts() {
         .await
         .is_ok());
     assert!(store.request_cancel(tenant, claimed.job.id()).await.is_ok());
-    assert!(store
+    let detail = store
         .detail(tenant, job.id())
         .await
-        .ok()
-        .flatten()
-        .is_some());
+        .unwrap_or_else(|_| unreachable!("processing job detail failed"));
+    assert!(detail.is_some());
 
     let claim_job = ProcessingJob::queue(
         tenant,
@@ -141,56 +139,28 @@ async fn postgres_processing_contract_claims_and_restarts() {
         .await
         .unwrap_or_else(|_| unreachable!())
         .unwrap_or_else(|| unreachable!());
-    let mut checkpointed = first.job.clone();
-    let expected = checkpointed.aggregate_version().value();
-    checkpointed
+    let fence = ExecutionFence::new(
+        "crashed-worker",
+        first.lease_token.clone(),
+        first.fence_version,
+    );
+    store
         .start_step(
-            "crashed-worker",
-            &first.lease_token,
-            first.fence_version,
-            ProcessingStepKind::ValidateSource,
-            now,
-        )
-        .unwrap_or_else(|_| unreachable!());
-    store
-        .save(&checkpointed, expected)
-        .await
-        .unwrap_or_else(|_| unreachable!());
-    store
-        .start(
-            &StepCheckpoint {
-                job_id: checkpointed.id(),
-                tenant_id: tenant,
-                step_kind: ProcessingStepKind::ValidateSource,
-                attempt_number: checkpointed.attempt_count(),
-                checkpoint_json: serde_json::json!({"content_hash":"test"}),
-                updated_at: now,
-            },
-            checkpointed.aggregate_version().value(),
-        )
-        .await
-        .unwrap_or_else(|_| unreachable!());
-    let expected = checkpointed.aggregate_version().value();
-    checkpointed
-        .complete_step(
-            "crashed-worker",
-            &first.lease_token,
-            first.fence_version,
-            ProcessingStepKind::ValidateSource,
-            now,
-        )
-        .unwrap_or_else(|_| unreachable!());
-    store
-        .save(&checkpointed, expected)
-        .await
-        .unwrap_or_else(|_| unreachable!());
-    store
-        .complete(
-            checkpointed.id(),
             tenant,
+            first.job.id(),
             ProcessingStepKind::ValidateSource,
-            checkpointed.attempt_count(),
-            checkpointed.aggregate_version().value(),
+            &fence,
+            now,
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    store
+        .complete_step(
+            tenant,
+            first.job.id(),
+            ProcessingStepKind::ValidateSource,
+            None,
+            &fence,
             now,
         )
         .await
@@ -346,15 +316,11 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
         .unwrap_or_else(|| unreachable!());
     assert_eq!(waiting.job.status(), ProcessingJobStatus::WaitingForAi);
 
-    let ai_claim = document_processing::ports::legacy::AiTaskPort::claim_next(
-        &store,
-        "uow-ai",
-        Utc::now(),
-        30,
-    )
-    .await
-    .unwrap_or_else(|_| unreachable!())
-    .unwrap_or_else(|| unreachable!());
+    let ai_claim = store
+        .claim_next_ai_task("uow-ai", Utc::now(), 30)
+        .await
+        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|| unreachable!());
     let ai_fence = ExecutionFence::new(
         "uow-ai",
         ai_claim.lease_token.clone().unwrap_or_default(),
@@ -453,6 +419,8 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
+                idempotency_key: "review-contract-rollback".to_string(),
+                request_fingerprint: "b".repeat(64),
                 review: rollback_review,
             },
             Utc::now(),
@@ -492,6 +460,8 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
+                idempotency_key: "review-contract-1".to_string(),
+                request_fingerprint: "a".repeat(64),
                 review: review.clone(),
             },
             Utc::now(),
@@ -505,13 +475,31 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
             FinalizeReviewCommand {
                 tenant_id: tenant,
                 job_id: job.id(),
-                review,
+                idempotency_key: "review-contract-1".to_string(),
+                request_fingerprint: "a".repeat(64),
+                review: review.clone(),
             },
             Utc::now(),
         )
         .await
         .unwrap_or_else(|_| unreachable!());
     assert!(replayed.replayed);
+    let conflict = store
+        .finalize_review(
+            FinalizeReviewCommand {
+                tenant_id: tenant,
+                job_id: job.id(),
+                idempotency_key: "review-contract-1".to_string(),
+                request_fingerprint: "c".repeat(64),
+                review,
+            },
+            Utc::now(),
+        )
+        .await;
+    assert!(matches!(
+        conflict,
+        Err(ProcessingRepositoryError::IdempotencyConflict)
+    ));
 
     let stale = store
         .complete_step(

@@ -104,9 +104,9 @@ impl AuditQuery for PostgresAuditStore {
         }
         let next_cursor = items.last().map(|item| audit::AuditCursor {
             version: 1,
-            stream_sequence: item.stream_sequence,
-            occurred_at: item.occurred_at,
-            id: item.id,
+            stream_sequence: item.stream_sequence(),
+            occurred_at: item.occurred_at(),
+            id: item.id(),
         });
         Ok(AuditPage { items, next_cursor })
     }
@@ -142,23 +142,32 @@ impl AuditQuery for PostgresAuditStore {
         let mut checked = 0_u64;
         for row in rows {
             let event = row.into_event()?;
-            if event.chain_version == 0 {
+            if event.chain_version() == 0 {
+                if previous_sequence.is_some() {
+                    return Ok(AuditChainVerification {
+                        checked,
+                        valid: false,
+                        first_broken_id: Some(event.id()),
+                    });
+                }
                 continue;
             }
-            if previous_sequence.is_some_and(|sequence| event.stream_sequence != sequence + 1)
-                || event.previous_hash != previous
-                || event.record_hash != Some(hash_record(&event))
+            let hash = hash_record(&event)?;
+            if previous_sequence.is_none() && event.previous_hash().is_some()
+                || previous_sequence.is_some_and(|sequence| event.stream_sequence() != sequence + 1)
+                || event.previous_hash() != previous.as_deref()
+                || event.record_hash() != Some(hash.as_str())
             {
                 return Ok(AuditChainVerification {
                     checked,
                     valid: false,
-                    first_broken_id: Some(event.id),
+                    first_broken_id: Some(event.id()),
                 });
             }
-            previous.clone_from(&event.record_hash);
-            previous_sequence = Some(event.stream_sequence);
-            if scope.from.is_none_or(|from| event.occurred_at >= from)
-                && scope.to.is_none_or(|to| event.occurred_at <= to)
+            previous = event.record_hash().map(str::to_string);
+            previous_sequence = Some(event.stream_sequence());
+            if scope.from.is_none_or(|from| event.occurred_at() >= from)
+                && scope.to.is_none_or(|to| event.occurred_at() <= to)
             {
                 checked = checked.saturating_add(1);
             }
@@ -191,14 +200,14 @@ pub async fn append_postgres_in_transaction(
     // Serialize only this tenant's append stream; unrelated tenants remain
     // concurrent and no global application lock is introduced.
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
-        .bind(event.tenant_id.to_string())
+        .bind(event.tenant_id().to_string())
         .execute(&mut *connection)
         .await
         .map_err(|_| AuditError::Persistence)?;
     let previous = sqlx::query_scalar::<_, Option<String>>(
         "SELECT record_hash FROM audit_events WHERE tenant_id = $1 AND chain_version = 1 ORDER BY stream_sequence DESC LIMIT 1",
     )
-    .bind(event.tenant_id)
+    .bind(event.tenant_id())
     .fetch_optional(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?
@@ -206,39 +215,39 @@ pub async fn append_postgres_in_transaction(
     let sequence = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(stream_sequence), 0) + 1 FROM audit_events WHERE tenant_id = $1",
     )
-    .bind(event.tenant_id)
+    .bind(event.tenant_id())
     .fetch_one(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?;
     let event = event
         .clone()
-        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous);
+        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous)?;
     sqlx::query("INSERT INTO audit_events (id, tenant_id, action, resource_type, resource_id, details, trace_id, created_at, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)")
-        .bind(event.id)
-        .bind(event.tenant_id)
-        .bind(event.action.as_str())
-        .bind(&event.resource.resource_type)
-        .bind(&event.resource.resource_id)
-        .bind(&event.details)
-        .bind(&event.trace_id)
-        .bind(event.occurred_at)
-        .bind(event.recorded_at)
-        .bind(event.stream_sequence)
-        .bind(event.chain_version)
-        .bind(event.operation_id)
-        .bind(format!("{:?}", event.actor.actor_type).to_lowercase())
-        .bind(event.actor.actor_id)
-        .bind(event.correlation_id)
-        .bind(event.causation_id)
-        .bind(&event.reason)
-        .bind(format!("{:?}", event.result).to_lowercase())
-        .bind(&event.failure_code)
-        .bind(&event.before_hash)
-        .bind(&event.after_hash)
-        .bind(serde_json::to_value(&event.changed_fields).map_err(|_| AuditError::Persistence)?)
-        .bind(&event.schema_version)
-        .bind(&event.previous_hash)
-        .bind(&event.record_hash)
+        .bind(event.id())
+        .bind(event.tenant_id())
+        .bind(event.action().as_str())
+        .bind(&event.resource().resource_type)
+        .bind(&event.resource().resource_id)
+        .bind(event.details())
+        .bind(event.trace_id())
+        .bind(event.occurred_at())
+        .bind(event.recorded_at())
+        .bind(event.stream_sequence())
+        .bind(event.chain_version())
+        .bind(event.operation_id())
+        .bind(format!("{:?}", event.actor().actor_type).to_lowercase())
+        .bind(event.actor().actor_id)
+        .bind(event.correlation_id())
+        .bind(event.causation_id())
+        .bind(event.reason())
+        .bind(format!("{:?}", event.result()).to_lowercase())
+        .bind(event.failure_code())
+        .bind(event.before_hash())
+        .bind(event.after_hash())
+        .bind(serde_json::to_value(event.changed_fields()).map_err(|_| AuditError::Persistence)?)
+        .bind(event.schema_version())
+        .bind(event.previous_hash())
+        .bind(event.record_hash())
         .execute(&mut *connection)
         .await
         .map_err(|_| AuditError::Persistence)?;
@@ -277,29 +286,48 @@ type ChainRow = AuditRow;
 
 impl AuditRow {
     fn into_event(self) -> Result<AuditEvent, AuditError> {
+        let chain_version = self.chain_version.ok_or(AuditError::Persistence)?;
         let actor_type = match self.actor_type.as_str() {
             "user" => audit::AuditActorType::User,
             "service" => audit::AuditActorType::Service,
             "worker" => audit::AuditActorType::Worker,
             "repairjob" | "repair_job" => audit::AuditActorType::RepairJob,
-            _ => audit::AuditActorType::System,
+            _ => return Err(AuditError::Persistence),
         };
         // Rows written before the unified actor columns existed are mapped to
         // their immutable event id rather than fabricating a nil actor.
-        let actor_id = self.actor_id.unwrap_or(self.id);
+        let actor_id = match self.actor_id {
+            Some(actor_id) => actor_id,
+            None if chain_version == 0 => self.id,
+            None => return Err(AuditError::Persistence),
+        };
         let action = audit::AuditAction::new(self.action).map_err(AuditError::Validation)?;
         let resource = audit::AuditResource::new(
             self.resource_type,
-            self.resource_id.unwrap_or_else(|| "unknown".to_string()),
+            self.resource_id.ok_or(AuditError::Persistence)?,
         )
         .map_err(AuditError::Validation)?;
         let result = match self.result.as_str() {
             "failed" => audit::AuditResult::Failed,
             "denied" => audit::AuditResult::Denied,
             "cancelled" => audit::AuditResult::Cancelled,
-            _ => audit::AuditResult::Succeeded,
+            "succeeded" => audit::AuditResult::Succeeded,
+            _ => return Err(AuditError::Persistence),
         };
-        let mut event = AuditEvent::new(
+        let occurred_at = self.occurred_at.ok_or(AuditError::Persistence)?;
+        let recorded_at = match self.recorded_at {
+            Some(recorded_at) => recorded_at,
+            None if chain_version == 0 => occurred_at,
+            None => return Err(AuditError::Persistence),
+        };
+        let changed_fields =
+            serde_json::from_value(self.changed_fields).map_err(|_| AuditError::Persistence)?;
+        let details = match self.details {
+            Some(details) => details,
+            None if chain_version == 0 => serde_json::Value::Null,
+            None => return Err(AuditError::Persistence),
+        };
+        let event = AuditEvent::rehydrate(
             self.id,
             self.tenant_id,
             audit::AuditActor {
@@ -308,7 +336,11 @@ impl AuditRow {
             },
             action,
             resource,
-            self.operation_id.unwrap_or(self.id),
+            match self.operation_id {
+                Some(operation_id) => operation_id,
+                None if chain_version == 0 => self.id,
+                None => return Err(AuditError::Persistence),
+            },
             self.correlation_id,
             self.causation_id,
             self.trace_id,
@@ -317,17 +349,16 @@ impl AuditRow {
             self.failure_code,
             self.before_hash,
             self.after_hash,
-            serde_json::from_value(self.changed_fields).unwrap_or_default(),
-            audit::sanitize_details_for_read(self.details.unwrap_or(serde_json::Value::Null)),
+            changed_fields,
+            audit::sanitize_details_for_read(details),
             self.schema_version,
-            self.occurred_at.unwrap_or_else(chrono::Utc::now),
-        )
-        .map_err(AuditError::Validation)?;
-        event.recorded_at = self.recorded_at.unwrap_or(event.occurred_at);
-        event.stream_sequence = self.stream_sequence.unwrap_or(0);
-        event.chain_version = self.chain_version.unwrap_or(0);
-        event.previous_hash = self.previous_hash;
-        event.record_hash = self.record_hash;
+            occurred_at,
+            recorded_at,
+            self.stream_sequence.ok_or(AuditError::Persistence)?,
+            chain_version,
+            self.previous_hash,
+            self.record_hash,
+        )?;
         Ok(event)
     }
 }

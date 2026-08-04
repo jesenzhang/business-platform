@@ -8,7 +8,9 @@ pub mod application;
 pub mod domain;
 pub mod ports;
 
-pub use application::{FixedPipelineRunner, PipelineRunResult, ProcessingSource};
+pub use application::{
+    FixedPipelineRunner, PipelineRunResult, ProcessingSource, ReviewCandidateCommand,
+};
 
 pub use domain::{
     extract_text_artifact, CandidateEvidence, CandidateEvidenceSource, CandidatePayload,

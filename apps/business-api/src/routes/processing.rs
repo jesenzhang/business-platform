@@ -7,7 +7,8 @@ use axum::Json;
 use chrono::Utc;
 use document_processing::ports::FinalizeReviewCommand;
 use document_processing::{
-    CandidateReview, ProcessingJob, ProcessingJobStatus, ProcessingRepositoryError, ReviewDecision,
+    ProcessingJob, ProcessingJobStatus, ProcessingRepositoryError, ReviewCandidateCommand,
+    ReviewDecision,
 };
 use document_processing_contracts::safe_failure_code;
 use serde::{Deserialize, Serialize};
@@ -64,6 +65,13 @@ pub struct CandidateResponse {
     pub prompt_version: String,
     pub version: i64,
     pub created_at: chrono::DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReviewResponse {
+    #[serde(flatten)]
+    pub review: document_processing::CandidateReview,
+    pub replayed: bool,
 }
 
 impl From<document_processing::ExtractionCandidate> for CandidateResponse {
@@ -302,15 +310,20 @@ pub async fn review_candidate(
     Json(body): Json<ReviewRequest>,
 ) -> Result<Response, ApiError> {
     let (tenant_id, reviewer_id) = context(&auth).map_err(|error| trace(error, &headers))?;
-    if headers
+    let idempotency_key = headers
         .get("idempotency-key")
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .is_none()
-    {
+        .ok_or_else(|| {
+            trace(
+                ApiError::validation("Idempotency-Key is required"),
+                &headers,
+            )
+        })?;
+    if idempotency_key.len() > 255 {
         return Err(trace(
-            ApiError::validation("Idempotency-Key is required"),
+            ApiError::validation("Idempotency-Key is too long"),
             &headers,
         ));
     }
@@ -333,17 +346,19 @@ pub async fn review_candidate(
             &headers,
         ));
     }
-    let review = CandidateReview {
-        id: Uuid::now_v7(),
+    let review_command = ReviewCandidateCommand {
         tenant_id,
-        candidate_id: candidate.id(),
+        job_id,
         reviewer_id,
         decision: body.decision,
         patch: body.patch,
         comment: body.comment,
         candidate_version: body.candidate_version,
-        created_at: Utc::now(),
     };
+    let request_fingerprint = review_command
+        .request_fingerprint(candidate.id())
+        .map_err(|_| trace(ApiError::validation("invalid review request"), &headers))?;
+    let review = review_command.build_review(candidate.id());
     review
         .validate(candidate)
         .map_err(|_| trace(ApiError::validation("invalid review"), &headers))?;
@@ -353,11 +368,20 @@ pub async fn review_candidate(
             FinalizeReviewCommand {
                 tenant_id,
                 job_id,
+                idempotency_key: idempotency_key.to_string(),
+                request_fingerprint,
                 review,
             },
             Utc::now(),
         )
         .await
         .map_err(|error| trace(map_error(&error), &headers))?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(finalized.review))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(ApiResponse::ok(ReviewResponse {
+            review: finalized.review,
+            replayed: finalized.replayed,
+        })),
+    )
+        .into_response())
 }
