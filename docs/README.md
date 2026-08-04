@@ -29,6 +29,9 @@
 | 安全架构 | [`architecture/SECURITY_ARCHITECTURE.md`](architecture/SECURITY_ARCHITECTURE.md) | Baseline | 身份、租户、授权、文件、AI 和 Agent 安全 |
 | 部署架构 | [`architecture/DEPLOYMENT_ARCHITECTURE.md`](architecture/DEPLOYMENT_ARCHITECTURE.md) | Baseline | 进程、网络、环境、发布和扩缩容 |
 | 可观测性 | [`architecture/OBSERVABILITY_ARCHITECTURE.md`](architecture/OBSERVABILITY_ARCHITECTURE.md) | Baseline | 日志、指标、追踪、审计和告警 |
+| Runtime Audit | [`architecture/RUNTIME_AUDIT_ARCHITECTURE.md`](architecture/RUNTIME_AUDIT_ARCHITECTURE.md) | Baseline profile | 统一审计模型、原子写入和查询 |
+| Integrity and Repair | [`architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md`](architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md) | Baseline profile | Finding、受控修复和恢复边界 |
+| Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -58,6 +61,10 @@
 - [`adr/ADR-0010-durable-processing-job-and-fixed-pipeline.md`](adr/ADR-0010-durable-processing-job-and-fixed-pipeline.md)：持久化 Job 与固定处理 Pipeline。
 - [`adr/ADR-0011-worker-leases-fencing-and-crash-recovery.md`](adr/ADR-0011-worker-leases-fencing-and-crash-recovery.md)：Worker Lease、Fencing 与崩溃恢复。
 - [`adr/ADR-0012-document-candidate-and-human-review.md`](adr/ADR-0012-document-candidate-and-human-review.md)：候选结果与人工复核边界。
+- [`adr/ADR-0013-unified-runtime-audit-model.md`](adr/ADR-0013-unified-runtime-audit-model.md)：统一 Runtime Audit 模型。
+- [`adr/ADR-0014-data-integrity-finding-lifecycle.md`](adr/ADR-0014-data-integrity-finding-lifecycle.md)：完整性 Finding 生命周期。
+- [`adr/ADR-0015-controlled-repair-and-approval.md`](adr/ADR-0015-controlled-repair-and-approval.md)：受控修复与审批。
+- [`adr/ADR-0016-repair-ledger-and-verification.md`](adr/ADR-0016-repair-ledger-and-verification.md)：Repair Ledger 与验证。
 
 ## 5. 文档目录
 
@@ -104,7 +111,7 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：无（PLAN-0004 已集成归档，下一计划启动前保持空档）
+- 当前计划：[`plans/current/PLAN-0005-runtime-audit-integrity-repair.md`](plans/current/PLAN-0005-runtime-audit-integrity-repair.md)
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
@@ -118,7 +125,8 @@ Phase 3 First Durable Business Flow 均已完成。PLAN-0002、PLAN-0003 与
 PLAN-0004 均采用 local solo fast-forward 且不创建 PR；PLAN-0004 集成 SHA
 为 `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI run `30868701290`
 已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。当前进入 Phase 4
-Runtime Governance Foundation；下一项计划将在其自身启动记录中声明。
+Runtime Governance Foundation，由 PLAN-0005 负责统一 Audit、Integrity
+Finding 和受控 Repair；本计划不启动 PLAN-0006。
 
 ## 9. 合并后的后续任务规则
 

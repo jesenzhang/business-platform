@@ -3,7 +3,7 @@
 > 文档类型：Living Document
 > 最后更新：2026-08-04
 > 当前阶段：Phase 4 Runtime Governance Foundation
-> 当前计划：无（PLAN-0004 已集成归档）
+> 当前计划：`PLAN-0005-runtime-audit-integrity-repair`
 > 集成方式：local solo fast-forward，无 PR
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -29,6 +29,10 @@
 > `30833916455` and Main CI `30868701290` passed all six jobs, including the
 > GitHub Linux PostgreSQL/MinIO E2E and Architecture Fitness. Local SQLite
 > process E2E passed; Windows PostgreSQL/MinIO remains NOT RUN.
+>
+> 2026-08-04: PLAN-0005 started from main `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`.
+> Runtime Governance owns Audit, integrity scan/finding, repair run and ledger
+> state; Document Intelligence remains the owner of processing state.
 
 ## 1. 当前权威结论
 
@@ -100,7 +104,7 @@ Hardening 与 Phase 3 First Durable Business Flow；PLAN-0001 至 PLAN-0004
   Document Processing 执行边界已落在独立 processing adapters 中；
 - Worker 与 Migration 已具备该固定切片的运行实现，其他 Agent Adapter 能力
   仍处于骨架阶段；Runtime Governance 的统一 Audit、Integrity 与 Repair
-  能力将在下一项计划中收敛；
+  能力由 PLAN-0005 收敛；
 - API/Event 契约尚未全部形成可生成 Schema；
 - 质量属性尚未形成性能和恢复证据；
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
@@ -180,6 +184,7 @@ PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0005：Active（Runtime Audit, Data Integrity and Controlled Repair Foundation）
 ```
 
 ## 8. PLAN-0002 采用动作
