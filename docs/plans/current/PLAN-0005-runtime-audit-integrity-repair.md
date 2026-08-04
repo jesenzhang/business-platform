@@ -8,6 +8,7 @@
 > Base SHA: `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`
 > Previous Candidate SHA: `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
 > Previous Evidence HEAD: `ab01288cd3477107c567e342ff45b7f624ec5396`
+> Revision 1 Implementation SHA: `f1e10a0942c18715f5591b56619d5c6dae21f06e`
 > Integration Mode: local solo fast-forward
 > Pull Request: not used
 > Stop Policy: blockers-only
@@ -143,8 +144,11 @@ PLAN-0006.
 - Revision 1 management security tests: PASS — forged permission headers are
   rejected, server-side grants reach the governance boundary, and
   `repair.execute` cannot approve a repair.
-- Revision 1 Feature CI: PENDING; the previous candidate's CI run is retained
-  only as historical evidence and does not satisfy this revision.
+- Revision 1 Feature CI: PENDING; the push attempt for implementation commit
+  `f1e10a0942c18715f5591b56619d5c6dae21f06e` could not reach GitHub over
+  HTTPS (port 443), so no new Feature CI run exists. The previous candidate's
+  CI run is retained only as historical evidence and does not satisfy this
+  revision.
 - Windows PostgreSQL/MinIO execution: NOT RUN; the local environment has no
   PostgreSQL service.
 

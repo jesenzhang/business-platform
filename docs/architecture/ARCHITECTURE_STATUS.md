@@ -52,6 +52,9 @@
 > check, Clippy, workspace tests, the SQLite Governance E2E, management
 > security tests, and Architecture Fitness. Feature CI remains PENDING for
 > this revision; PostgreSQL/MinIO integration cases remain NOT RUN locally.
+> Implementation evidence is committed at `f1e10a0942c18715f5591b56619d5c6dae21f06e`;
+> the push attempt could not reach GitHub HTTPS/443, so no new Feature CI run
+> was created.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
