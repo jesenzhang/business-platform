@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use data_integrity::IntegrityFinding;
 use data_repair::{
-    RepairCommand, RepairDescriptor, RepairError, RepairExecutionContext, RepairHandler,
-    RepairHandlerRegistry, RepairLedgerEntry, RepairOutcome, RepairPersistencePort, RepairPreview,
-    RepairResult, RepairRiskLevel, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
-    RepairTarget, RepairVerification,
+    CreateRepairExecution, CreateRepairResult, RepairCommand, RepairDescriptor, RepairError,
+    RepairExecutionContext, RepairHandler, RepairHandlerRegistry, RepairLedgerEntry, RepairOutcome,
+    RepairPersistencePort, RepairPreview, RepairResult, RepairRiskLevel, RepairRun,
+    RepairRunStatus, RepairStep, RepairStepStatus, RepairTarget, RepairVerification,
 };
 use governance_worker::RepairWorker;
 use std::sync::{Arc, Mutex};
@@ -25,6 +25,13 @@ struct FakeState {
 
 #[async_trait]
 impl RepairPersistencePort for FakePersistence {
+    async fn create_repair_execution(
+        &self,
+        _command: CreateRepairExecution,
+    ) -> Result<CreateRepairResult, RepairError> {
+        Err(RepairError::Persistence)
+    }
+
     async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError> {
         self.state
             .lock()
@@ -435,6 +442,7 @@ async fn repair_worker_executes_once_and_records_ledger() {
         worker_id: "worker-a".to_string(),
         lease_duration_secs: 30,
         heartbeat_seconds: 5,
+        max_attempts: 3,
     };
     let first = worker.execute_one().await;
     assert!(first.is_ok(), "first repair execution failed: {first:?}");

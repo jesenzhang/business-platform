@@ -127,6 +127,7 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         worker_id: "postgres-governance-worker".to_string(),
         lease_duration_secs: 60,
         heartbeat_seconds: 5,
+        max_attempts: 3,
     };
     assert!(worker.execute_one().await.expect("execute repair"));
 

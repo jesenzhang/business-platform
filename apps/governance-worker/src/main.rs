@@ -42,26 +42,22 @@ async fn main() -> anyhow::Result<()> {
     let repair_handlers = Arc::new(
         runtime_governance::processing_repairs::ProcessingRepairRegistry::new(processing_store),
     );
-    let lease_duration_secs = std::env::var("GOVERNANCE_REPAIR_LEASE_SECONDS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(30);
-    let poll_interval_ms = std::env::var("GOVERNANCE_REPAIR_POLL_INTERVAL_MS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(1_000);
-    let heartbeat_seconds = std::env::var("GOVERNANCE_REPAIR_HEARTBEAT_SECONDS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or((lease_duration_secs / 3).max(1));
-    let batch_size = std::env::var("GOVERNANCE_REPAIR_BATCH_SIZE")
-        .ok()
-        .and_then(|value| value.parse::<u32>().ok())
-        .filter(|value| (1..=1_000).contains(value))
-        .unwrap_or(1);
+    let lease_duration_secs = positive_i64("GOVERNANCE_LEASE_DURATION_SECS", 30)?;
+    let poll_interval_ms = positive_u64("GOVERNANCE_POLL_INTERVAL_MILLIS", 1_000)?;
+    let heartbeat_seconds = positive_i64("GOVERNANCE_HEARTBEAT_INTERVAL_SECS", 10)?;
+    let concurrency = positive_u32("GOVERNANCE_CONCURRENCY", 1)?;
+    let max_attempts = positive_u32("GOVERNANCE_MAX_ATTEMPTS", 3)?;
+    if heartbeat_seconds >= lease_duration_secs {
+        anyhow::bail!("GOVERNANCE_LEASE_DURATION_SECS must be greater than GOVERNANCE_HEARTBEAT_INTERVAL_SECS");
+    }
+    if concurrency != 1 {
+        anyhow::bail!("GOVERNANCE_CONCURRENCY currently supports only 1");
+    }
+    let worker_id =
+        std::env::var("GOVERNANCE_WORKER_ID").unwrap_or_else(|_| "governance-worker".to_string());
+    if worker_id.trim().is_empty() {
+        anyhow::bail!("GOVERNANCE_WORKER_ID must not be empty");
+    }
     let once = std::env::var("GOVERNANCE_REPAIR_ONCE").as_deref() == Ok("true");
     let stop = Arc::new(AtomicBool::new(false));
     let signal_stop = Arc::clone(&stop);
@@ -69,15 +65,16 @@ async fn main() -> anyhow::Result<()> {
         persistence: Arc::clone(&store),
         handlers: repair_handlers,
         rule_registry: Some(rule_registry),
-        worker_id: std::env::var("GOVERNANCE_WORKER_ID")
-            .unwrap_or_else(|_| "governance-worker".to_string()),
+        worker_id,
         lease_duration_secs,
         heartbeat_seconds,
+        max_attempts,
     };
     tracing::info!(
         poll_interval_ms,
         heartbeat_seconds,
-        batch_size,
+        concurrency,
+        max_attempts,
         once,
         "governance repair consumer configured"
     );
@@ -95,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
         .run_loop(
             Duration::from_millis(poll_interval_ms),
             heartbeat_seconds,
-            batch_size,
+            concurrency,
             once,
             stop,
         )
@@ -110,6 +107,42 @@ async fn main() -> anyhow::Result<()> {
     }
     tracing::info!("governance-worker stopped claiming new work");
     Ok(())
+}
+
+fn positive_i64(name: &str, default: i64) -> anyhow::Result<i64> {
+    match std::env::var(name) {
+        Ok(value) => value
+            .parse::<i64>()
+            .ok()
+            .filter(|value| *value > 0)
+            .ok_or_else(|| anyhow::anyhow!("{name} must be > 0")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(anyhow::anyhow!("{name} is invalid: {error}")),
+    }
+}
+
+fn positive_u64(name: &str, default: u64) -> anyhow::Result<u64> {
+    match std::env::var(name) {
+        Ok(value) => value
+            .parse::<u64>()
+            .ok()
+            .filter(|value| *value > 0)
+            .ok_or_else(|| anyhow::anyhow!("{name} must be > 0")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(anyhow::anyhow!("{name} is invalid: {error}")),
+    }
+}
+
+fn positive_u32(name: &str, default: u32) -> anyhow::Result<u32> {
+    match std::env::var(name) {
+        Ok(value) => value
+            .parse::<u32>()
+            .ok()
+            .filter(|value| *value > 0)
+            .ok_or_else(|| anyhow::anyhow!("{name} must be > 0")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(anyhow::anyhow!("{name} is invalid: {error}")),
+    }
 }
 
 async fn shutdown_signal() -> anyhow::Result<()> {

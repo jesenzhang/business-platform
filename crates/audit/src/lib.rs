@@ -253,6 +253,13 @@ impl AuditEvent {
             || !matches!(chain_version, 0 | 1)
             || (chain_version == 1 && stream_sequence == 0)
             || (chain_version == 0 && (previous_hash.is_some() || record_hash.is_some()))
+            || (chain_version == 1
+                && (previous_hash
+                    .as_deref()
+                    .is_none_or(|value| value.trim().is_empty())
+                    || record_hash
+                        .as_deref()
+                        .is_none_or(|value| value.trim().is_empty())))
         {
             return Err(AuditValidationError::InvalidChainMetadata.into());
         }
@@ -297,7 +304,12 @@ impl AuditEvent {
         chain_version: i16,
         previous_hash: Option<String>,
     ) -> Result<Self, AuditError> {
-        if stream_sequence <= 0 || chain_version != 1 {
+        if stream_sequence <= 0
+            || chain_version != 1
+            || previous_hash
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+        {
             return Err(AuditValidationError::InvalidChainMetadata.into());
         }
         self.stream_sequence = stream_sequence;
@@ -438,6 +450,8 @@ pub enum AuditError {
     Validation(#[from] AuditValidationError),
     #[error("audit persistence failed")]
     Persistence,
+    #[error("audit persistence contains an unsupported enum value")]
+    InvalidStoredEnum,
     #[error("audit chain verification failed")]
     ChainBroken,
     #[error("audit query cursor is invalid")]
@@ -490,8 +504,11 @@ pub struct AuditChainScope {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditChainVerification {
     pub checked: u64,
+    pub legacy_count: u64,
+    pub verified_count: u64,
     pub valid: bool,
     pub first_broken_id: Option<Uuid>,
+    pub chain_version: i16,
 }
 
 #[async_trait]
@@ -523,6 +540,11 @@ pub fn hash_record(event: &AuditEvent) -> Result<String, AuditError> {
         serde_json::to_vec(&event.canonical_payload()).map_err(|_| AuditError::Persistence)?;
     let digest = Sha256::digest(payload);
     Ok(hex_encode(&digest))
+}
+
+#[must_use]
+pub fn audit_chain_genesis(tenant_id: Uuid) -> String {
+    format!("GENESIS:audit:v1:{tenant_id}")
 }
 
 fn redact_details(value: Value) -> Result<Value, AuditValidationError> {
@@ -705,7 +727,7 @@ mod tests {
             first_time,
         )
         .unwrap_or_else(|_| unreachable!())
-        .with_chain_metadata(1, first_time, 1, None)
+        .with_chain_metadata(1, first_time, 1, Some(audit_chain_genesis(tenant)))
         .unwrap_or_else(|_| unreachable!());
         let second = AuditEvent::new(
             Uuid::new_v4(),

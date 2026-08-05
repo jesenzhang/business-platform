@@ -5,8 +5,8 @@ use data_integrity::{
     IntegrityPersistencePort, IntegrityRuleRegistry, IntegrityScanScope, ProcessingIntegrityQuery,
 };
 use data_repair::{
-    RepairError, RepairHandlerRegistry, RepairLedgerEntry, RepairPersistencePort, RepairResult,
-    RepairRunStatus,
+    RepairError, RepairFailureDisposition, RepairHandlerRegistry, RepairLedgerEntry,
+    RepairPersistencePort, RepairResult, RepairRun, RepairRunStatus, RepairStep,
 };
 use runtime_governance::{run_integrity_scan, GovernanceError, ScanReport};
 use serde_json::json;
@@ -35,6 +35,34 @@ pub struct RepairWorker<P, H> {
     pub worker_id: String,
     pub lease_duration_secs: i64,
     pub heartbeat_seconds: i64,
+    pub max_attempts: u32,
+}
+
+fn failure_disposition(error: &RepairError) -> RepairFailureDisposition {
+    match error {
+        RepairError::Unavailable | RepairError::Persistence => RepairFailureDisposition::Retry {
+            backoff: chrono::Duration::seconds(5),
+        },
+        RepairError::Conflict => RepairFailureDisposition::NeedsManualReview,
+        RepairError::LeaseLost => RepairFailureDisposition::LeaseLost,
+        RepairError::InvalidDescriptor
+        | RepairError::InvalidCommand
+        | RepairError::InvalidStoredEnum
+        | RepairError::InvalidTransition
+        | RepairError::ApprovalRequired
+        | RepairError::ApprovalSeparation
+        | RepairError::IdempotencyConflict => RepairFailureDisposition::Permanent,
+    }
+}
+
+fn failure_code(_error: &RepairError, disposition: &RepairFailureDisposition) -> &'static str {
+    match disposition {
+        RepairFailureDisposition::Retry { .. } => "dependency_unavailable",
+        RepairFailureDisposition::Permanent => "permanent_execution_failure",
+        RepairFailureDisposition::NeedsManualReview => "execution_conflict",
+        RepairFailureDisposition::LeaseLost => "lease_lost",
+        RepairFailureDisposition::Cancelled => "cancelled",
+    }
 }
 
 fn failure_result() -> data_repair::RepairResult {
@@ -91,6 +119,72 @@ where
     P: RepairPersistencePort + 'static,
     H: RepairHandlerRegistry + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
+    async fn persist_failure(
+        &self,
+        mut run: RepairRun,
+        mut step: RepairStep,
+        finding: &data_integrity::IntegrityFinding,
+        result: RepairResult,
+        error: &RepairError,
+        started_at: chrono::DateTime<Utc>,
+        lease_token: &str,
+    ) -> Result<bool, RepairError> {
+        let disposition = failure_disposition(error);
+        if disposition == RepairFailureDisposition::LeaseLost {
+            tracing::warn!(
+                worker_id = %self.worker_id,
+                step_id = %step.id(),
+                run_id = %run.id(),
+                "repair lease was lost; worker will not commit a result"
+            );
+            return Ok(true);
+        }
+
+        let expected_run_version = run.version();
+        let now = Utc::now();
+        let mut code = failure_code(error, &disposition).to_string();
+        match disposition {
+            RepairFailureDisposition::Retry { backoff }
+                if step.attempt_count() < self.max_attempts =>
+            {
+                run.schedule_retry(now)?;
+                step.schedule_retry(now + backoff)?;
+            }
+            RepairFailureDisposition::Retry { .. } => {
+                run.mark_failed(now)?;
+                step.fail()?;
+                code = "retry_exhausted".to_string();
+            }
+            RepairFailureDisposition::Permanent => {
+                run.mark_failed(now)?;
+                step.fail()?;
+            }
+            RepairFailureDisposition::NeedsManualReview => {
+                run.mark_needs_manual_review(now)?;
+                step.require_manual_review()?;
+            }
+            RepairFailureDisposition::Cancelled => {
+                run.cancel(now)?;
+                step.cancel()?;
+            }
+            RepairFailureDisposition::LeaseLost => unreachable!(),
+        }
+        let entry = ledger_entry(&run, &step, finding, &result, Some(code), started_at)?;
+        self.persistence
+            .commit_failure(
+                &run,
+                &step,
+                &entry,
+                expected_run_version,
+                step.fence_version(),
+                &self.worker_id,
+                lease_token,
+            )
+            .await?;
+        Ok(true)
+    }
+
     #[allow(clippy::too_many_lines)]
     pub async fn execute_one(&self) -> Result<bool, RepairError> {
         let now = Utc::now();
@@ -105,17 +199,28 @@ where
         match self.execute_claimed(step).await {
             Ok(result) => Ok(result),
             Err(error) => {
+                if matches!(error, RepairError::LeaseLost) {
+                    tracing::warn!(
+                        worker_id = %self.worker_id,
+                        step_id = %claim_snapshot.id(),
+                        run_id = %claim_snapshot.run_id(),
+                        "repair lease was lost before a durable result could be committed"
+                    );
+                    return Ok(true);
+                }
                 let reason = match &error {
-                    RepairError::Conflict => "post_claim_conflict",
+                    RepairError::Conflict | RepairError::IdempotencyConflict => {
+                        "post_claim_conflict"
+                    }
                     RepairError::InvalidDescriptor => "post_claim_invalid_descriptor",
                     RepairError::InvalidTransition => "post_claim_invalid_transition",
                     RepairError::ApprovalRequired => "post_claim_approval_required",
                     RepairError::ApprovalSeparation => "post_claim_approval_separation",
                     RepairError::LeaseLost => "post_claim_lease_lost",
                     RepairError::Unavailable => "post_claim_dependency_unavailable",
-                    RepairError::Persistence | RepairError::InvalidCommand => {
-                        "post_claim_persistence_failure"
-                    }
+                    RepairError::Persistence
+                    | RepairError::InvalidCommand
+                    | RepairError::InvalidStoredEnum => "post_claim_persistence_failure",
                 };
                 if let Err(abort_error) = self
                     .persistence
@@ -139,7 +244,7 @@ where
                         "claimed repair moved to manual review after execution failure"
                     );
                 }
-                Err(error)
+                Ok(true)
             }
         }
     }
@@ -268,79 +373,60 @@ where
         let result = match execution_result {
             Ok(result) => result,
             Err(error) => {
-                let expected_run_version = run.version();
-                let mut failed_run = run.clone();
-                failed_run.mark_failed(Utc::now())?;
-                let mut failed_step = step.clone();
-                failed_step.fail()?;
-                let failure = failure_result();
-                let entry = ledger_entry(
-                    &failed_run,
-                    &failed_step,
-                    &finding,
-                    &failure,
-                    Some("owner_mutation_failed".to_string()),
-                    now,
-                )?;
-                self.persistence
-                    .commit_failure(
-                        &failed_run,
-                        &failed_step,
-                        &entry,
-                        expected_run_version,
-                        context.fence_version,
-                        &context.worker_id,
+                return self
+                    .persist_failure(
+                        run,
+                        step,
+                        &finding,
+                        failure_result(),
+                        &error,
+                        now,
                         &context.lease_token,
                     )
-                    .await?;
-                return Err(error);
+                    .await;
             }
         };
         if matches!(
             result.outcome,
             data_repair::RepairOutcome::Conflict | data_repair::RepairOutcome::Failed
         ) {
-            let expected_run_version = run.version();
-            let mut failed_run = run.clone();
-            failed_run.mark_failed(Utc::now())?;
-            let mut failed_step = step.clone();
-            failed_step.fail()?;
-            let entry = ledger_entry(
-                &failed_run,
-                &failed_step,
-                &finding,
-                &result,
-                Some(
-                    if result.outcome == data_repair::RepairOutcome::Conflict {
-                        "owner_mutation_conflict"
-                    } else {
-                        "owner_mutation_failed"
-                    }
-                    .to_string(),
-                ),
-                now,
-            )?;
-            self.persistence
-                .commit_failure(
-                    &failed_run,
-                    &failed_step,
-                    &entry,
-                    expected_run_version,
-                    context.fence_version,
-                    &context.worker_id,
-                    &context.lease_token,
-                )
-                .await?;
-            return Err(if result.outcome == data_repair::RepairOutcome::Conflict {
+            let error = if result.outcome == data_repair::RepairOutcome::Conflict {
                 RepairError::Conflict
             } else {
                 RepairError::Persistence
-            });
+            };
+            return self
+                .persist_failure(
+                    run,
+                    step,
+                    &finding,
+                    result,
+                    &error,
+                    now,
+                    &context.lease_token,
+                )
+                .await;
         }
         let command_for_verification = run.command().clone();
-        let verification = handler
+        let verification = match handler
             .verify_after_repair(&command_for_verification, &result)
-            .await?;
+            .await
+        {
+            Ok(verification) => verification,
+            Err(error) => {
+                return self
+                    .persist_failure(
+                        run,
+                        step,
+                        &finding,
+                        result,
+                        &error,
+                        now,
+                        &context.lease_token,
+                    )
+                    .await;
+            }
+        };
         let rule_verified = match self.rule_registry.as_ref() {
             Some(registry) => registry
                 .verify_finding(&finding)
@@ -349,33 +435,20 @@ where
             None => verification.valid,
         };
         if !verification.valid || !rule_verified {
-            let expected_run_version = run.version();
-            run.mark_needs_manual_review(Utc::now())?;
-            let mut review_step = step.clone();
-            review_step.require_manual_review()?;
-            let entry = ledger_entry(
-                &run,
-                &review_step,
-                &finding,
-                &RepairResult {
-                    outcome: data_repair::RepairOutcome::Failed,
-                    ..result.clone()
-                },
-                Some("verification_failed".to_string()),
-                now,
-            )?;
-            self.persistence
-                .commit_failure(
-                    &run,
-                    &review_step,
-                    &entry,
-                    expected_run_version,
-                    context.fence_version,
-                    &context.worker_id,
+            return self
+                .persist_failure(
+                    run,
+                    step,
+                    &finding,
+                    RepairResult {
+                        outcome: data_repair::RepairOutcome::Failed,
+                        ..result
+                    },
+                    &RepairError::Conflict,
+                    now,
                     &context.lease_token,
                 )
-                .await?;
-            return Err(RepairError::Conflict);
+                .await;
         }
         let expected_run_version = run.version();
         let mut completed = step;

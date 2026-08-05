@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 use audit::{
-    hash_record, AuditAppendPort, AuditChainScope, AuditChainVerification, AuditError, AuditEvent,
-    AuditPage, AuditQuery, AuditQueryRequest,
+    audit_chain_genesis, hash_record, AuditAppendPort, AuditChainScope, AuditChainVerification,
+    AuditError, AuditEvent, AuditPage, AuditQuery, AuditQueryRequest,
 };
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 use uuid::Uuid;
@@ -138,35 +138,48 @@ impl AuditQuery for SqliteAuditStore {
         .fetch_all(&self.pool)
         .await
         .map_err(|_| AuditError::Persistence)?;
-        let mut previous = None;
+        let genesis = audit_chain_genesis(scope.tenant_id);
+        let mut previous = genesis;
         let mut previous_sequence = None;
         let mut checked = 0_u64;
+        let mut legacy_count = 0_u64;
+        let mut verified_count = 0_u64;
         for row in rows {
             let event = row.into_event()?;
             if event.chain_version() == 0 {
                 if previous_sequence.is_some() {
                     return Ok(AuditChainVerification {
                         checked,
+                        legacy_count,
+                        verified_count,
                         valid: false,
                         first_broken_id: Some(event.id()),
+                        chain_version: 1,
                     });
                 }
+                legacy_count = legacy_count.saturating_add(1);
                 continue;
             }
             let hash = hash_record(&event)?;
-            if previous_sequence.is_none() && event.previous_hash().is_some()
-                || previous_sequence.is_some_and(|sequence| event.stream_sequence() != sequence + 1)
-                || event.previous_hash() != previous.as_deref()
+            if previous_sequence.is_some_and(|sequence| event.stream_sequence() != sequence + 1)
+                || event.previous_hash() != Some(previous.as_str())
                 || event.record_hash() != Some(hash.as_str())
             {
                 return Ok(AuditChainVerification {
                     checked,
+                    legacy_count,
+                    verified_count,
                     valid: false,
                     first_broken_id: Some(event.id()),
+                    chain_version: 1,
                 });
             }
-            previous = event.record_hash().map(str::to_string);
+            previous = event
+                .record_hash()
+                .ok_or(AuditError::Persistence)?
+                .to_string();
             previous_sequence = Some(event.stream_sequence());
+            verified_count = verified_count.saturating_add(1);
             if scope.from.is_none_or(|from| event.occurred_at() >= from)
                 && scope.to.is_none_or(|to| event.occurred_at() <= to)
             {
@@ -175,8 +188,11 @@ impl AuditQuery for SqliteAuditStore {
         }
         Ok(AuditChainVerification {
             checked,
+            legacy_count,
+            verified_count,
             valid: true,
             first_broken_id: None,
+            chain_version: i16::from(previous_sequence.is_some()),
         })
     }
 }
@@ -215,7 +231,8 @@ pub async fn append_sqlite_in_transaction(
     .fetch_optional(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?
-    .flatten();
+    .flatten()
+    .unwrap_or_else(|| audit_chain_genesis(event.tenant_id()));
     let sequence = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(stream_sequence), 0) + 1 FROM audit_events WHERE tenant_id = ?1",
     )
@@ -223,9 +240,10 @@ pub async fn append_sqlite_in_transaction(
     .fetch_one(&mut *connection)
     .await
     .map_err(|_| AuditError::Persistence)?;
-    let event = event
-        .clone()
-        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous)?;
+    let event =
+        event
+            .clone()
+            .with_chain_metadata(sequence, chrono::Utc::now(), 1, Some(previous))?;
     sqlx::query("INSERT INTO audit_events (id, tenant_id, action, resource_type, resource_id, details, trace_id, created_at, occurred_at, recorded_at, stream_sequence, chain_version, operation_id, actor_type, actor_id, correlation_id, causation_id, reason, result, failure_code, before_hash, after_hash, changed_fields, schema_version, previous_hash, record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
         .bind(event.id().to_string())
         .bind(event.tenant_id().to_string())
@@ -313,7 +331,7 @@ impl AuditRow {
             "denied" => audit::AuditResult::Denied,
             "cancelled" => audit::AuditResult::Cancelled,
             "succeeded" => audit::AuditResult::Succeeded,
-            _ => return Err(AuditError::Persistence),
+            _ => return Err(AuditError::InvalidStoredEnum),
         };
         let occurred_at = self
             .occurred_at
@@ -345,7 +363,8 @@ impl AuditRow {
                     "service" => audit::AuditActorType::Service,
                     "worker" => audit::AuditActorType::Worker,
                     "repairjob" | "repair_job" => audit::AuditActorType::RepairJob,
-                    _ => return Err(AuditError::Persistence),
+                    "system" => audit::AuditActorType::System,
+                    _ => return Err(AuditError::InvalidStoredEnum),
                 },
                 actor_id,
             },

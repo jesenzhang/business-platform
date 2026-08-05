@@ -3,8 +3,8 @@
 use chrono::Utc;
 use data_integrity::FindingStatus;
 use data_repair::{
-    RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
-    RepairTarget,
+    CreateRepairExecution, RepairCommand, RepairPersistencePort, RepairRun, RepairRunStatus,
+    RepairStep, RepairStepStatus, RepairTarget,
 };
 use document_processing_sqlite::{
     run_migrations as run_processing_migrations, SqliteProcessingStore,
@@ -130,7 +130,11 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     )
     .expect("valid repair step");
     governance
-        .create_repair_run(&run, &step)
+        .create_repair_execution(CreateRepairExecution {
+            run: run.clone(),
+            step: step.clone(),
+            expected_finding_version: finding.version(),
+        })
         .await
         .expect("create repair run and step atomically");
 
@@ -237,6 +241,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
         worker_id: "sqlite-governance-worker".to_string(),
         lease_duration_secs: 60,
         heartbeat_seconds: 5,
+        max_attempts: 3,
     };
     assert!(worker.execute_one().await.expect("execute repair"));
 
