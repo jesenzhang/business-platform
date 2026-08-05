@@ -2423,7 +2423,7 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         for row in rows {
             let task = to_ai_task(row)?;
             let (job_status, job_cancelled) = sqlx::query_as::<_, (String, i64)>(
-                "SELECT status, CASE WHEN status = 'cancelled' OR cancel_requested_at IS NOT NULL THEN 1 ELSE 0 END FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2",
+                "SELECT status, CASE WHEN status = 'cancelled' OR cancel_requested_at IS NOT NULL THEN 1::BIGINT ELSE 0::BIGINT END FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2",
             )
             .bind(task.tenant_id)
             .bind(task.job_id)

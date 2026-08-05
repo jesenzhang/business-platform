@@ -211,6 +211,93 @@ async fn postgres_processing_contract_claims_and_restarts() {
 
 #[tokio::test]
 #[ignore = "requires PostgreSQL and migrations"]
+async fn postgres_processing_contract_reclaims_expired_ai_task() {
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/business_platform".to_string()
+    });
+    let pool = PgPool::connect(&url)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    let (tenant, document, user) = setup(&pool).await;
+    let store = PostgresProcessingStore::new(pool.clone());
+    let created_at = Utc::now() - Duration::seconds(1);
+    let now = Utc::now();
+    let job = ProcessingJob::queue(
+        tenant,
+        document,
+        1,
+        format!("ai-reclaim-{}", Uuid::now_v7()),
+        user,
+        3,
+        created_at,
+    )
+    .unwrap_or_else(|_| unreachable!());
+    store.create(&job).await.unwrap_or_else(|_| unreachable!());
+
+    sqlx::query(
+        "UPDATE document_processing_jobs SET status = 'waiting_for_ai', current_step = 'extract_fields', updated_at = $1 WHERE tenant_id = $2 AND id = $3",
+    )
+    .bind(now)
+    .bind(tenant)
+    .bind(job.id())
+    .execute(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+
+    let task_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, lease_owner, lease_token, lease_expires_at, fence_version, created_at, updated_at) VALUES ($1, $2, $3, 'extract_fields', 'running', 'artifact-key', 0, 3, $4, 'crashed-ai-worker', 'stale-token', $5, 1, $6, $6)",
+    )
+    .bind(task_id)
+    .bind(tenant)
+    .bind(job.id())
+    .bind(now)
+    .bind(now - Duration::seconds(1))
+    .bind(now)
+    .execute(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+
+    assert_eq!(
+        ProcessingExecutionUnitOfWork::reclaim_expired_ai_tasks(&store, now)
+            .await
+            .unwrap_or_else(|_| unreachable!()),
+        1
+    );
+    let (status, lease_owner, lease_token, lease_expires_at): (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<chrono::DateTime<Utc>>,
+    ) = sqlx::query_as(
+        "SELECT status, lease_owner, lease_token, lease_expires_at FROM document_ai_tasks WHERE tenant_id = $1 AND id = $2",
+    )
+    .bind(tenant)
+    .bind(task_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert_eq!(status, "queued");
+    assert!(lease_owner.is_none());
+    assert!(lease_token.is_none());
+    assert!(lease_expires_at.is_none());
+
+    sqlx::query("DELETE FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2")
+        .bind(tenant)
+        .bind(job.id())
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
+        .bind(tenant)
+        .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+}
+
+#[tokio::test]
+#[ignore = "requires PostgreSQL and migrations"]
 #[allow(clippy::too_many_lines)]
 async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
