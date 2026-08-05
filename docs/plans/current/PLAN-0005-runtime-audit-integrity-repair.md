@@ -211,3 +211,21 @@ Governance ledger/finding state use separate local transactions across the
 bounded-context adapter boundary; leases, idempotency, and reconciliation keep
 the boundary recoverable, but a distributed transaction is intentionally not
 introduced.
+## Revision 2 local evidence (2026-08-05)
+
+Revision 2 implementation is present through local commit `c22d9f3`. The
+following results are local evidence only; the plan remains `Active` until the
+branch can be pushed and the complete Feature CI succeeds.
+
+| Gate / requirement | Result | Evidence |
+|---|---|---|
+| R2-01 trusted authorization | PASS | Server-configured authenticated principals prevent client identity or permission headers from elevating access; production remains fail-closed. |
+| R2-02 atomic repair creation | PASS | PostgreSQL and SQLite adapters use one transaction for Finding validation, idempotency, Run/Step creation, Finding transition, Audit, and Outbox evidence. |
+| R2-03 optimistic transitions | PASS | Management transition requests carry `expected_version`; adapter updates retain tenant/status/version compare-and-swap predicates. |
+| R2-04/R2-05 worker lifecycle | PASS | Bounded polling, validated worker settings, retry/permanent/manual-review classification, retry exhaustion, fenced failure commits, and lease-lost no-write behavior are implemented. |
+| R2-06 audit boundary | PASS | Legacy rows are `chain_version=0`; new rows use explicit tenant genesis and full-chain verification is independent of reporting ranges. |
+| R2-07/R2-08 decoding and startup integrity | PASS | Stored enum parsing fails closed and built-in rule registration errors fail worker startup. |
+| fmt / check / clippy / architecture | PASS | Local fmt, workspace check, workspace Clippy with `-D warnings`, and `scripts/check-architecture.ps1` pass. |
+| Targeted worker/governance tests | PASS | `governance-worker`, `data-repair`, and SQLite governance suites pass. |
+| Full workspace tests | BLOCKED | `cargo test --workspace --all-features` exceeded the local 120-second execution limit without a reported test failure. |
+| Feature CI / remote integration | BLOCKED | `git fetch origin --prune` cannot connect to GitHub from this environment; no Feature CI, Main CI, archive, or branch deletion was performed. |
