@@ -10,8 +10,9 @@ use data_integrity::{
     ScanRunStatus, TextArtifactIntegrityState,
 };
 use data_repair::{
-    repair_run_status_name, RepairCommand, RepairError, RepairLedgerEntry, RepairPersistencePort,
-    RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
+    repair_run_status_name, CreateRepairExecution, CreateRepairResult, RepairCommand, RepairError,
+    RepairLedgerEntry, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep,
+    RepairStepStatus,
 };
 use sqlx::{pool::PoolConnection, Sqlite, SqlitePool};
 use uuid::Uuid;
@@ -475,23 +476,93 @@ impl IntegrityQueryPort for SqliteGovernanceStore {
 #[allow(clippy::too_many_lines)]
 #[async_trait]
 impl RepairPersistencePort for SqliteGovernanceStore {
-    async fn create_repair_run(
+    async fn create_repair_execution(
         &self,
-        run: &RepairRun,
-        step: &RepairStep,
-    ) -> Result<(), RepairError> {
+        command: CreateRepairExecution,
+    ) -> Result<CreateRepairResult, RepairError> {
+        let CreateRepairExecution {
+            run,
+            step,
+            expected_finding_version,
+        } = command;
         run.command().validate()?;
         if run.id() != step.run_id()
             || run.finding_id() != step.finding_id()
             || run.command().integrity_finding_id != run.finding_id()
             || run.command().tenant_id != run.tenant_id()
             || step.fence_version() < 0
+            || expected_finding_version < 0
         {
             return Err(RepairError::Conflict);
         }
         let mut connection = begin_immediate(&self.pool)
             .await
             .map_err(|_| RepairError::Persistence)?;
+        let finding = sqlx::query_as::<_, (String, String, i64)>(
+            "SELECT tenant_id,status,version FROM data_integrity_findings WHERE id=?1",
+        )
+        .bind(run.finding_id().to_string())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?
+        .ok_or(RepairError::Conflict)?;
+        if finding.0 != run.tenant_id().to_string() {
+            return Err(RepairError::Conflict);
+        }
+        let existing = sqlx::query_as::<_, RepairRunRow>(
+            "SELECT id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,command,created_at,updated_at,version FROM data_repair_runs WHERE tenant_id=?1 AND idempotency_key=?2",
+        )
+        .bind(run.tenant_id().to_string())
+        .bind(&run.command().idempotency_key)
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| RepairError::Persistence)?;
+        if let Some(existing) = existing {
+            let existing_run = existing.into_domain()?;
+            if existing_run.command() != run.command() {
+                return Err(RepairError::IdempotencyConflict);
+            }
+            let row = sqlx::query_as::<_, (String, String, String, String, i64, Option<String>, Option<String>, Option<String>, i64, Option<String>, String)>(
+                "SELECT id,repair_run_id,finding_id,status,attempt_count,checkpoint,lease_owner,lease_token,fence_version,lease_expires_at,next_attempt_at FROM data_repair_steps WHERE repair_run_id=?1",
+            )
+            .bind(existing_run.id().to_string())
+            .fetch_one(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+            let parse_time = |value: &str| {
+                DateTime::parse_from_rfc3339(value)
+                    .map(|value| value.with_timezone(&Utc))
+                    .map_err(|_| RepairError::Persistence)
+            };
+            let existing_step = RepairStep::rehydrate(
+                Uuid::parse_str(&row.0).map_err(|_| RepairError::Persistence)?,
+                Uuid::parse_str(&row.1).map_err(|_| RepairError::Persistence)?,
+                Uuid::parse_str(&row.2).map_err(|_| RepairError::Persistence)?,
+                parse_step_status(&row.3)?,
+                u32::try_from(row.4).map_err(|_| RepairError::Persistence)?,
+                row.5
+                    .as_deref()
+                    .map(serde_json::from_str)
+                    .transpose()
+                    .map_err(|_| RepairError::Persistence)?,
+                row.6,
+                row.7,
+                row.8,
+                row.9.as_deref().map(parse_time).transpose()?,
+                parse_time(&row.10)?,
+            )?;
+            commit_immediate(&mut connection)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+            return Ok(CreateRepairResult {
+                run: existing_run,
+                step: existing_step,
+                replayed: true,
+            });
+        }
+        if finding.1 != "open" || finding.2 != expected_finding_version {
+            return Err(RepairError::Conflict);
+        }
         sqlx::query("INSERT INTO data_repair_runs (id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,idempotency_key,command,version,created_at,updated_at,next_attempt_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?11)")
             .bind(run.id().to_string())
             .bind(run.tenant_id().to_string())
@@ -523,10 +594,11 @@ impl RepairPersistencePort for SqliteGovernanceStore {
             .execute(&mut *connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='repair_planned',version=version+1,updated_at=?1 WHERE id=?2 AND tenant_id=?3 AND status='open'")
+        let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='repair_planned',version=version+1,updated_at=?1 WHERE id=?2 AND tenant_id=?3 AND status='open' AND version=?4")
             .bind(Utc::now().to_rfc3339())
             .bind(run.finding_id().to_string())
             .bind(run.tenant_id().to_string())
+            .bind(expected_finding_version)
             .execute(&mut *connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
@@ -559,11 +631,14 @@ impl RepairPersistencePort for SqliteGovernanceStore {
             .execute(&mut *connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        sqlx::query("COMMIT")
-            .execute(&mut *connection)
+        commit_immediate(&mut connection)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        Ok(())
+        Ok(CreateRepairResult {
+            run,
+            step,
+            replayed: false,
+        })
     }
 
     async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError> {
@@ -964,6 +1039,16 @@ impl RepairPersistencePort for SqliteGovernanceStore {
             .await
             .map_err(|_| RepairError::Persistence)?;
         let result: Result<(), RepairError> = async {
+            let finding_status = match run.status() {
+                RepairRunStatus::Queued => "repair_planned",
+                RepairRunStatus::Cancelled => "open",
+                RepairRunStatus::Failed | RepairRunStatus::NeedsManualReview => {
+                    "needs_manual_review"
+                }
+                _ => return Err(RepairError::InvalidTransition),
+            };
+            let finished_at = (!matches!(run.status(), RepairRunStatus::Queued))
+                .then(|| entry.finished_at().to_rfc3339());
             sqlx::query("INSERT INTO data_repair_events (id,tenant_id,repair_run_id,repair_step_id,finding_id,rule_id,repair_type,repair_version,actor_type,actor_id,reason,resource_type,resource_id,before_hash,after_hash,before_snapshot,after_snapshot,rows_affected,result,failure_code,trace_id,started_at,finished_at,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
                 .bind(entry.id().to_string()).bind(entry.tenant_id().to_string()).bind(entry.repair_run_id().to_string()).bind(entry.repair_step_id().to_string()).bind(entry.finding_id().to_string())
                 .bind(entry.rule_id()).bind(entry.repair_type()).bind(i64::from(entry.repair_version())).bind(entry.actor_type()).bind(entry.actor_id().to_string()).bind(entry.reason())
@@ -971,8 +1056,8 @@ impl RepairPersistencePort for SqliteGovernanceStore {
                 .bind(i64::from(entry.rows_affected())).bind(format!("{:?}", entry.result()).to_lowercase()).bind(entry.failure_code()).bind(entry.trace_id())
                 .bind(entry.started_at().to_rfc3339()).bind(entry.finished_at().to_rfc3339()).bind(entry.previous_hash()).bind(entry.record_hash())
                 .execute(&mut *connection).await.map_err(|_| RepairError::Persistence)?;
-            let finding_update = sqlx::query("UPDATE data_integrity_findings SET status='needs_manual_review',resolution_reason=?1,version=version+1,updated_at=?2 WHERE id=?3 AND tenant_id=?4 AND resource_type=?5 AND resource_id=?6 AND status IN ('open','repair_planned','repairing','needs_manual_review')")
-                .bind(entry.failure_code().unwrap_or("repair_failed"))
+            let finding_update = sqlx::query("UPDATE data_integrity_findings SET status=?1,resolution_reason=?2,version=version+1,updated_at=?3 WHERE id=?4 AND tenant_id=?5 AND resource_type=?6 AND resource_id=?7 AND status IN ('open','repair_planned','repairing','needs_manual_review')")
+                .bind(finding_status).bind(entry.failure_code().unwrap_or("repair_failed"))
                 .bind(Utc::now().to_rfc3339())
                 .bind(entry.finding_id().to_string())
                 .bind(run.tenant_id().to_string())
@@ -984,10 +1069,11 @@ impl RepairPersistencePort for SqliteGovernanceStore {
             if finding_update.rows_affected() != 1 {
                 return Err(RepairError::Conflict);
             }
-            let step_update = sqlx::query("UPDATE data_repair_steps SET status=?1,attempt_count=?2,checkpoint=?3,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,fence_version=?4,next_attempt_at=?5,updated_at=?6 WHERE id=?7 AND tenant_id=?8 AND repair_run_id=?9 AND finding_id=?10 AND fence_version=?11 AND status='running' AND lease_owner=?12 AND lease_token=?13 AND lease_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND EXISTS (SELECT 1 FROM data_repair_runs r WHERE r.id=data_repair_steps.repair_run_id AND r.tenant_id=data_repair_steps.tenant_id AND r.finding_id=data_repair_steps.finding_id AND r.status='running')")
+            let step_update = sqlx::query("UPDATE data_repair_steps SET status=?1,attempt_count=?2,checkpoint=?3,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,fence_version=?4,next_attempt_at=?5,failure_code=?6,last_error_category=?7,finished_at=?8,updated_at=?9 WHERE id=?10 AND tenant_id=?11 AND repair_run_id=?12 AND finding_id=?13 AND fence_version=?14 AND status='running' AND lease_owner=?15 AND lease_token=?16 AND lease_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND EXISTS (SELECT 1 FROM data_repair_runs r WHERE r.id=data_repair_steps.repair_run_id AND r.tenant_id=data_repair_steps.tenant_id AND r.finding_id=data_repair_steps.finding_id AND r.status='running')")
                 .bind(data_repair::repair_step_status_name(step.status()))
                 .bind(i64::from(step.attempt_count())).bind(step.checkpoint().map(ToString::to_string))
-                .bind(step.fence_version()).bind(step.next_attempt_at().to_rfc3339()).bind(Utc::now().to_rfc3339())
+                .bind(step.fence_version()).bind(step.next_attempt_at().to_rfc3339())
+                .bind(entry.failure_code()).bind(entry.failure_code()).bind(&finished_at).bind(Utc::now().to_rfc3339())
                 .bind(step.id().to_string()).bind(run.tenant_id().to_string())
                 .bind(run.id().to_string()).bind(run.finding_id().to_string())
                 .bind(expected_fence_version).bind(lease_owner).bind(lease_token)
@@ -995,8 +1081,8 @@ impl RepairPersistencePort for SqliteGovernanceStore {
             if step_update.rows_affected() != 1 {
                 return Err(RepairError::LeaseLost);
             }
-            let run_update = sqlx::query("UPDATE data_repair_runs SET status=?1,updated_at=?2,version=?3 WHERE id=?4 AND tenant_id=?5 AND version=?6 AND status='running'")
-                .bind(repair_run_status_name(run.status())).bind(Utc::now().to_rfc3339())
+            let run_update = sqlx::query("UPDATE data_repair_runs SET status=?1,failure_code=?2,last_error_category=?3,finished_at=?4,updated_at=?5,version=?6 WHERE id=?7 AND tenant_id=?8 AND version=?9 AND status='running'")
+                .bind(repair_run_status_name(run.status())).bind(entry.failure_code()).bind(entry.failure_code()).bind(&finished_at).bind(Utc::now().to_rfc3339())
                 .bind(run.version()).bind(run.id().to_string()).bind(run.tenant_id().to_string())
                 .bind(expected_run_version)
                 .execute(&mut *connection).await.map_err(|_| RepairError::Persistence)?;
@@ -1441,8 +1527,25 @@ fn parse_run_status(value: &str) -> Result<RepairRunStatus, RepairError> {
         "running" => Ok(RepairRunStatus::Running),
         "verifying" => Ok(RepairRunStatus::Verifying),
         "succeeded" => Ok(RepairRunStatus::Succeeded),
+        "failed" => Ok(RepairRunStatus::Failed),
         "cancelled" => Ok(RepairRunStatus::Cancelled),
         "needs_manual_review" => Ok(RepairRunStatus::NeedsManualReview),
-        _ => Err(RepairError::Persistence),
+        _ => Err(RepairError::InvalidStoredEnum),
+    }
+}
+
+fn parse_step_status(value: &str) -> Result<RepairStepStatus, RepairError> {
+    match value {
+        "draft" => Ok(RepairStepStatus::Draft),
+        "awaiting_approval" => Ok(RepairStepStatus::AwaitingApproval),
+        "approved" => Ok(RepairStepStatus::Approved),
+        "queued" => Ok(RepairStepStatus::Queued),
+        "running" => Ok(RepairStepStatus::Running),
+        "verifying" => Ok(RepairStepStatus::Verifying),
+        "succeeded" => Ok(RepairStepStatus::Succeeded),
+        "failed" => Ok(RepairStepStatus::Failed),
+        "cancelled" => Ok(RepairStepStatus::Cancelled),
+        "needs_manual_review" => Ok(RepairStepStatus::NeedsManualReview),
+        _ => Err(RepairError::InvalidStoredEnum),
     }
 }

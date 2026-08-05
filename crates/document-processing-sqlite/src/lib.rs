@@ -290,6 +290,30 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .await?;
         transaction.commit().await?;
     }
+    let applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(version), 0) FROM document_processing_migrations",
+    )
+    .fetch_one(pool)
+    .await?;
+    if applied < 6 {
+        let mut transaction = pool.begin().await?;
+        sqlx::raw_sql(include_str!(
+            "../migrations/006_runtime_governance_revision2.sql"
+        ))
+        .execute(&mut *transaction)
+        .await?;
+        sqlx::query(
+            "INSERT INTO document_processing_migrations (version, checksum, applied_at) VALUES (?1, ?2, ?3)",
+        )
+        .bind(6_i64)
+        .bind(
+            include_bytes!("../migrations/006_runtime_governance_revision2.sql").as_slice(),
+        )
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+    }
     ensure_revision1_finding_columns(pool).await?;
     Ok(())
 }

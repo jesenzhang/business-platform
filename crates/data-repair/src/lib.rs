@@ -224,6 +224,15 @@ pub enum RepairStepStatus {
     NeedsManualReview,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepairFailureDisposition {
+    Retry { backoff: chrono::Duration },
+    Permanent,
+    NeedsManualReview,
+    LeaseLost,
+    Cancelled,
+}
+
 #[must_use]
 pub fn repair_run_status_name(status: RepairRunStatus) -> &'static str {
     match status {
@@ -395,6 +404,48 @@ impl RepairRun {
 
     pub fn queue_for_execution(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
         if self.status != RepairRunStatus::Approved {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Queued;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn mark_running(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if self.status != RepairRunStatus::Queued {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Running;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn mark_verifying(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if self.status != RepairRunStatus::Running {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairRunStatus::Verifying;
+        self.updated_at = now;
+        self.version = self
+            .version
+            .checked_add(1)
+            .ok_or(RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub fn schedule_retry(&mut self, now: DateTime<Utc>) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairRunStatus::Running | RepairRunStatus::Verifying
+        ) {
             return Err(RepairError::InvalidTransition);
         }
         self.status = RepairRunStatus::Queued;
@@ -692,7 +743,10 @@ impl RepairStep {
     }
 
     pub fn succeed(&mut self) -> Result<(), RepairError> {
-        if self.status != RepairStepStatus::Running {
+        if !matches!(
+            self.status,
+            RepairStepStatus::Running | RepairStepStatus::Verifying
+        ) {
             return Err(RepairError::InvalidTransition);
         }
         self.status = RepairStepStatus::Succeeded;
@@ -703,7 +757,10 @@ impl RepairStep {
     }
 
     pub fn fail(&mut self) -> Result<(), RepairError> {
-        if self.status != RepairStepStatus::Running {
+        if !matches!(
+            self.status,
+            RepairStepStatus::Running | RepairStepStatus::Verifying
+        ) {
             return Err(RepairError::InvalidTransition);
         }
         self.status = RepairStepStatus::Failed;
@@ -713,14 +770,51 @@ impl RepairStep {
         Ok(())
     }
 
+    pub fn mark_verifying(&mut self) -> Result<(), RepairError> {
+        if self.status != RepairStepStatus::Running {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairStepStatus::Verifying;
+        Ok(())
+    }
+
+    pub fn schedule_retry(&mut self, next_attempt_at: DateTime<Utc>) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairStepStatus::Running | RepairStepStatus::Verifying
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairStepStatus::Queued;
+        self.next_attempt_at = next_attempt_at;
+        self.lease_owner = None;
+        self.lease_token = None;
+        self.lease_expires_at = None;
+        Ok(())
+    }
+
     pub fn require_manual_review(&mut self) -> Result<(), RepairError> {
         if !matches!(
             self.status,
-            RepairStepStatus::Running | RepairStepStatus::Failed
+            RepairStepStatus::Running | RepairStepStatus::Verifying | RepairStepStatus::Failed
         ) {
             return Err(RepairError::InvalidTransition);
         }
         self.status = RepairStepStatus::NeedsManualReview;
+        self.lease_owner = None;
+        self.lease_token = None;
+        self.lease_expires_at = None;
+        Ok(())
+    }
+
+    pub fn cancel(&mut self) -> Result<(), RepairError> {
+        if !matches!(
+            self.status,
+            RepairStepStatus::Queued | RepairStepStatus::Running | RepairStepStatus::Verifying
+        ) {
+            return Err(RepairError::InvalidTransition);
+        }
+        self.status = RepairStepStatus::Cancelled;
         self.lease_owner = None;
         self.lease_token = None;
         self.lease_expires_at = None;
@@ -1026,6 +1120,10 @@ pub enum RepairError {
     LeaseLost,
     #[error("repair target version conflicts")]
     Conflict,
+    #[error("repair idempotency key conflicts with another request")]
+    IdempotencyConflict,
+    #[error("stored repair data contains an unsupported value")]
+    InvalidStoredEnum,
     #[error("repair dependency is unavailable")]
     Unavailable,
     #[error("repair persistence failed")]
@@ -1037,18 +1135,28 @@ pub trait RepairHandlerRegistry: Send + Sync {
     async fn get(&self, repair_type: &str, version: u32) -> Option<Box<dyn RepairHandler>>;
 }
 
+#[derive(Debug, Clone)]
+pub struct CreateRepairExecution {
+    pub run: RepairRun,
+    pub step: RepairStep,
+    pub expected_finding_version: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateRepairResult {
+    pub run: RepairRun,
+    pub step: RepairStep,
+    pub replayed: bool,
+}
+
 #[async_trait]
 pub trait RepairPersistencePort: Send + Sync {
-    /// Atomically create a run and its first step. Adapters must implement
-    /// this with their local transaction primitive; the fail-closed default
-    /// prevents callers from accidentally falling back to two writes.
-    async fn create_repair_run(
+    /// Atomically validate the Finding version, enforce idempotency, create
+    /// Run and Step, transition the Finding, and append Audit/Outbox evidence.
+    async fn create_repair_execution(
         &self,
-        _run: &RepairRun,
-        _step: &RepairStep,
-    ) -> Result<(), RepairError> {
-        Err(RepairError::Persistence)
-    }
+        command: CreateRepairExecution,
+    ) -> Result<CreateRepairResult, RepairError>;
 
     async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError>;
     async fn save_step(&self, step: &RepairStep) -> Result<(), RepairError>;
