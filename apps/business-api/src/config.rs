@@ -65,6 +65,14 @@ pub struct AuthConfig {
     /// Server-side development grants; never sourced from request headers.
     #[serde(default)]
     pub dev_permissions: BTreeSet<String>,
+    #[serde(default)]
+    pub dev_tenant_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub dev_user_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub dev_subject: Option<String>,
+    #[serde(default)]
+    pub dev_roles: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -92,6 +100,7 @@ impl BusinessApiConfig {
         load_process_config("BUSINESS_API")
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn validate(&self) -> Result<(), ConfigValidationError> {
         let mut messages = Vec::new();
         if self.server.port == 0 {
@@ -120,6 +129,47 @@ impl BusinessApiConfig {
         if self.database.acquire_timeout_secs == 0 {
             messages.push("database.acquire_timeout_secs must be > 0".to_string());
         }
+        if self.auth.dev_auth_enabled {
+            if self
+                .auth
+                .dev_secret
+                .as_ref()
+                .is_none_or(|secret| secret.expose().trim().is_empty())
+            {
+                messages.push(
+                    "auth.dev_secret must be configured when dev auth is enabled".to_string(),
+                );
+            }
+            if self.auth.dev_tenant_id.is_none_or(|id| id.is_nil()) {
+                messages.push(
+                    "auth.dev_tenant_id must be a non-nil UUID when dev auth is enabled"
+                        .to_string(),
+                );
+            }
+            if self.auth.dev_user_id.is_none_or(|id| id.is_nil()) {
+                messages.push(
+                    "auth.dev_user_id must be a non-nil UUID when dev auth is enabled".to_string(),
+                );
+            }
+            if self
+                .auth
+                .dev_subject
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                messages.push(
+                    "auth.dev_subject must be configured when dev auth is enabled".to_string(),
+                );
+            }
+            if self
+                .auth
+                .dev_roles
+                .iter()
+                .any(|value| value.trim().is_empty())
+            {
+                messages.push("auth.dev_roles must not contain empty values".to_string());
+            }
+        }
         let scheme = self.database.url.expose().split(':').next();
         match self.database.backend {
             DatabaseBackend::Postgres if !matches!(scheme, Some("postgres" | "postgresql")) => {
@@ -142,6 +192,14 @@ impl BusinessApiConfig {
             }
             if self.auth.dev_secret.is_some() {
                 messages.push("auth.dev_secret must be absent in production".to_string());
+            }
+            if self.auth.dev_tenant_id.is_some()
+                || self.auth.dev_user_id.is_some()
+                || self.auth.dev_subject.is_some()
+                || !self.auth.dev_roles.is_empty()
+                || !self.auth.dev_permissions.is_empty()
+            {
+                messages.push("development identity must be absent in production".to_string());
             }
             if self.auth.issuer_url.trim().is_empty() {
                 messages.push("auth.issuer_url must not be empty in production".to_string());
@@ -226,6 +284,10 @@ mod tests {
                 dev_secret: None,
                 dev_auth_enabled: false,
                 dev_permissions: BTreeSet::new(),
+                dev_tenant_id: None,
+                dev_user_id: None,
+                dev_subject: None,
+                dev_roles: BTreeSet::new(),
             },
             observability: ObservabilityConfig::default(),
         }

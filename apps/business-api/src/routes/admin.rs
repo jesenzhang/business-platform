@@ -15,7 +15,8 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use data_integrity::{FindingStatus, IntegrityFinding, IntegrityScanScope};
 use data_repair::{
-    RepairCommand, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus, RepairTarget,
+    CreateRepairExecution, RepairCommand, RepairRun, RepairRunStatus, RepairStep, RepairStepStatus,
+    RepairTarget,
 };
 use runtime_governance::dry_run_repair as execute_dry_run_repair;
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,13 @@ pub struct RepairTargetRequest {
 #[serde(deny_unknown_fields)]
 pub struct ApprovalRequest {
     pub note: String,
+    pub expected_version: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepairTransitionRequest {
+    pub expected_version: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,7 +129,7 @@ fn require_permission(
     principal: &AuthenticatedPrincipal,
     permission: ManagementPermission,
 ) -> Result<(), ApiError> {
-    if principal.has_permission(permission) {
+    if principal.has_management_permission(permission) {
         Ok(())
     } else {
         Err(ApiError::from(shared_kernel::error::AppError::Forbidden(
@@ -155,14 +163,16 @@ fn map_repair_error(error: data_repair::RepairError) -> ApiError {
         | data_repair::RepairError::ApprovalRequired => ApiError::from(
             shared_kernel::error::AppError::Forbidden("repair approval required".to_string()),
         ),
-        data_repair::RepairError::Conflict => ApiError::from(
-            shared_kernel::error::AppError::Conflict("repair target changed".to_string()),
-        ),
-        data_repair::RepairError::Unavailable | data_repair::RepairError::Persistence => {
-            ApiError::from(shared_kernel::error::AppError::Database(
-                "repair persistence unavailable".to_string(),
+        data_repair::RepairError::Conflict | data_repair::RepairError::IdempotencyConflict => {
+            ApiError::from(shared_kernel::error::AppError::Conflict(
+                "repair target changed".to_string(),
             ))
         }
+        data_repair::RepairError::Unavailable
+        | data_repair::RepairError::Persistence
+        | data_repair::RepairError::InvalidStoredEnum => ApiError::from(
+            shared_kernel::error::AppError::Database("repair persistence unavailable".to_string()),
+        ),
         data_repair::RepairError::LeaseLost => ApiError::from(
             shared_kernel::error::AppError::Conflict("repair lease lost".to_string()),
         ),
@@ -364,19 +374,6 @@ pub async fn create_repair(
             "integrity finding is already resolved".to_string(),
         )));
     }
-    if let Some(existing) = services
-        .repair_persistence
-        .load_run_by_idempotency(tenant_id, &command.idempotency_key)
-        .await
-        .map_err(map_repair_error)?
-    {
-        if existing.command() == &command {
-            return Ok((StatusCode::OK, Json(ApiResponse::ok(existing))).into_response());
-        }
-        return Err(ApiError::from(shared_kernel::error::AppError::Conflict(
-            "idempotency key is already used for another repair".to_string(),
-        )));
-    }
     validate_target(&command, &finding)?;
     let handler = services
         .repair_handlers
@@ -422,12 +419,21 @@ pub async fn create_repair(
     };
     let step = RepairStep::new(Uuid::now_v7(), run.id(), run.finding_id(), step_status, now)
         .map_err(map_repair_error)?;
-    services
+    let result = services
         .repair_persistence
-        .create_repair_run(&run, &step)
+        .create_repair_execution(CreateRepairExecution {
+            run,
+            step,
+            expected_finding_version: finding.version(),
+        })
         .await
         .map_err(map_repair_error)?;
-    Ok((StatusCode::CREATED, Json(ApiResponse::ok(run))).into_response())
+    let status = if result.replayed {
+        StatusCode::OK
+    } else {
+        StatusCode::CREATED
+    };
+    Ok((status, Json(ApiResponse::ok(result.run))).into_response())
 }
 
 pub async fn get_repair(
@@ -472,7 +478,7 @@ pub async fn approve_repair(
             tenant_id,
             run.id(),
             approver,
-            run.version(),
+            body.expected_version,
             run.status(),
             body.note,
         )
@@ -486,6 +492,7 @@ pub async fn execute_repair(
     State(state): State<Arc<AppState>>,
     axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
+    Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
     require_permission(&principal, ManagementPermission::RepairExecute)?;
     let (tenant_id, _) = context(&auth)?;
@@ -499,7 +506,7 @@ pub async fn execute_repair(
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
-        .execute_repair(tenant_id, run.id(), run.version(), run.status())
+        .execute_repair(tenant_id, run.id(), body.expected_version, run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -510,6 +517,7 @@ pub async fn cancel_repair(
     State(state): State<Arc<AppState>>,
     axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
+    Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
     require_permission(&principal, ManagementPermission::RepairCancel)?;
     let (tenant_id, _) = context(&auth)?;
@@ -523,7 +531,7 @@ pub async fn cancel_repair(
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
-        .cancel_repair(tenant_id, run.id(), run.version(), run.status())
+        .cancel_repair(tenant_id, run.id(), body.expected_version, run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())
@@ -534,6 +542,7 @@ pub async fn resume_repair(
     State(state): State<Arc<AppState>>,
     axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
     Path(id): Path<Uuid>,
+    Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
     require_permission(&principal, ManagementPermission::RepairExecute)?;
     let (tenant_id, _) = context(&auth)?;
@@ -547,7 +556,7 @@ pub async fn resume_repair(
         .ok_or_else(|| ApiError::not_found("repair_run", id))?;
     let run = services
         .repair_persistence
-        .resume_repair(tenant_id, run.id(), run.version(), run.status())
+        .resume_repair(tenant_id, run.id(), body.expected_version, run.status())
         .await
         .map_err(map_repair_error)?;
     Ok((StatusCode::OK, Json(ApiResponse::ok(run))).into_response())

@@ -32,6 +32,8 @@ use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tower::ServiceExt;
 
 const DEV_SECRET: &str = "test-dev-secret";
+const DEV_TENANT_ID: uuid::Uuid = uuid::Uuid::from_u128(0x0000_0000_0000_0000_0000_0000_0000_0001);
+const DEV_USER_ID: uuid::Uuid = uuid::Uuid::from_u128(0x0000_0000_0000_0000_0000_0000_0000_0002);
 
 struct EmptyPorts;
 
@@ -106,6 +108,10 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             dev_secret: Some(Secret::new(DEV_SECRET.to_string())),
             dev_auth_enabled,
             dev_permissions: BTreeSet::new(),
+            dev_tenant_id: Some(DEV_TENANT_ID),
+            dev_user_id: Some(DEV_USER_ID),
+            dev_subject: Some("security-test-user".to_string()),
+            dev_roles: BTreeSet::new(),
         },
     }
 }
@@ -132,6 +138,10 @@ fn test_router_with_permissions(
         dev_auth_enabled,
         dev_secret: Some(DEV_SECRET.to_string()),
         dev_permissions,
+        dev_tenant_id: Some(DEV_TENANT_ID),
+        dev_user_id: Some(DEV_USER_ID),
+        dev_subject: Some("security-test-user".to_string()),
+        dev_roles: BTreeSet::new(),
     };
     create_router(state, auth_config, &config.server)
 }
@@ -267,7 +277,7 @@ async fn execute_permission_cannot_approve_repair() {
         .header("x-tenant-id", "00000000-0000-0000-0000-000000000001")
         .header("x-user-id", "00000000-0000-0000-0000-000000000002")
         .header("content-type", "application/json")
-        .body(Body::from(r#"{"note":"approve"}"#))
+        .body(Body::from(r#"{"note":"approve","expected_version":0}"#))
         .expect("request must build");
     let status = status_of(router, request).await;
     assert_eq!(status, StatusCode::FORBIDDEN);

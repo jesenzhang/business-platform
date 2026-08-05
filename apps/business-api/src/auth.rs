@@ -27,6 +27,8 @@ pub enum AuthError {
     InvalidToken,
     /// The token was valid but required tenant/user context was missing.
     MissingTenant,
+    /// The configured trusted identity is invalid.
+    InvalidPrincipal,
 }
 
 /// Management permissions are issued by the trusted authentication boundary,
@@ -74,16 +76,81 @@ impl FromStr for ManagementPermission {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthenticationType {
+    DevelopmentStaticToken,
+    Oidc,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthenticatedPrincipal {
-    pub tenant_id: uuid::Uuid,
-    pub user_id: uuid::Uuid,
-    pub permissions: BTreeSet<ManagementPermission>,
+    tenant_id: uuid::Uuid,
+    user_id: uuid::Uuid,
+    subject: String,
+    roles: BTreeSet<String>,
+    permissions: BTreeSet<ManagementPermission>,
+    authentication_type: AuthenticationType,
 }
 
 impl AuthenticatedPrincipal {
+    pub fn new(
+        tenant_id: uuid::Uuid,
+        user_id: uuid::Uuid,
+        subject: String,
+        roles: BTreeSet<String>,
+        permissions: BTreeSet<ManagementPermission>,
+        authentication_type: AuthenticationType,
+    ) -> Result<Self, AuthError> {
+        if tenant_id.is_nil()
+            || user_id.is_nil()
+            || subject.trim().is_empty()
+            || roles.iter().any(|role| role.trim().is_empty())
+        {
+            return Err(AuthError::InvalidPrincipal);
+        }
+        Ok(Self {
+            tenant_id,
+            user_id,
+            subject,
+            roles,
+            permissions,
+            authentication_type,
+        })
+    }
+
     #[must_use]
-    pub fn has_permission(&self, permission: ManagementPermission) -> bool {
+    pub fn tenant_id(&self) -> uuid::Uuid {
+        self.tenant_id
+    }
+
+    #[must_use]
+    pub fn user_id(&self) -> uuid::Uuid {
+        self.user_id
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    #[must_use]
+    pub fn roles(&self) -> &BTreeSet<String> {
+        &self.roles
+    }
+
+    #[must_use]
+    pub const fn authentication_type(&self) -> AuthenticationType {
+        self.authentication_type
+    }
+
+    #[must_use]
+    pub fn has_permission(&self, permission: &str) -> bool {
+        ManagementPermission::from_str(permission)
+            .is_ok_and(|permission| self.permissions.contains(&permission))
+    }
+
+    #[must_use]
+    pub fn has_management_permission(&self, permission: ManagementPermission) -> bool {
         self.permissions.contains(&permission)
     }
 }
@@ -99,6 +166,11 @@ pub struct AuthMiddlewareConfig {
     pub dev_secret: Option<String>,
     /// Server-side development grants. Client headers are ignored.
     pub dev_permissions: BTreeSet<ManagementPermission>,
+    /// Server-side fixed development identity. Request headers never replace it.
+    pub dev_tenant_id: Option<uuid::Uuid>,
+    pub dev_user_id: Option<uuid::Uuid>,
+    pub dev_subject: Option<String>,
+    pub dev_roles: BTreeSet<String>,
 }
 
 /// Middleware that extracts and validates authentication.
@@ -154,8 +226,7 @@ fn extract_bearer_token(request: &Request) -> Option<String> {
     }
 }
 
-/// Development-mode authentication: compare against the static dev secret and
-/// resolve tenant context from headers.
+/// Development-mode authentication against a server-configured fixed identity.
 fn authenticate_dev(
     config: &AuthMiddlewareConfig,
     token: &str,
@@ -180,40 +251,30 @@ fn authenticate_dev(
         return Err(unauthorized(AuthError::InvalidToken, "invalid token"));
     }
 
-    let tenant = header_str(request, "x-tenant-id");
-    let user = header_str(request, "x-user-id");
-
-    let (Some(tenant_id), Some(user_id)) = (tenant, user) else {
+    let (Some(tenant_id), Some(user_id), Some(subject)) = (
+        config.dev_tenant_id,
+        config.dev_user_id,
+        config.dev_subject.clone(),
+    ) else {
         return Err(unauthorized(
-            AuthError::MissingTenant,
-            "missing X-Tenant-Id or X-User-Id header",
+            AuthError::InvalidPrincipal,
+            "authentication misconfigured",
         ));
     };
 
-    let tenant_id: uuid::Uuid = tenant_id
-        .parse()
-        .map_err(|_| unauthorized(AuthError::MissingTenant, "invalid tenant context"))?;
-    let user_id: uuid::Uuid = user_id
-        .parse()
-        .map_err(|_| unauthorized(AuthError::MissingTenant, "invalid user context"))?;
-    let tenant_context = TenantContext::new(tenant_id.to_string(), user_id.to_string());
-    request.extensions_mut().insert(tenant_context);
-    request.extensions_mut().insert(AuthenticatedPrincipal {
+    let principal = AuthenticatedPrincipal::new(
         tenant_id,
         user_id,
-        permissions: config.dev_permissions.clone(),
-    });
+        subject,
+        config.dev_roles.clone(),
+        config.dev_permissions.clone(),
+        AuthenticationType::DevelopmentStaticToken,
+    )
+    .map_err(|error| unauthorized(error, "authentication misconfigured"))?;
+    let tenant_context = TenantContext::new(tenant_id.to_string(), user_id.to_string());
+    request.extensions_mut().insert(tenant_context);
+    request.extensions_mut().insert(principal);
     Ok(())
-}
-
-/// Read a header value as a trimmed, non-empty UTF-8 string.
-fn header_str(request: &Request, name: &str) -> Option<String> {
-    let value = request.headers().get(name)?.to_str().ok()?.trim();
-    if value.is_empty() {
-        None
-    } else {
-        Some(value.to_owned())
-    }
 }
 
 /// Build a fail-closed `401 Unauthorized` error. The `kind` is logged for
@@ -233,16 +294,20 @@ mod tests {
     fn client_permission_header_cannot_grant_access() {
         let mut permissions = BTreeSet::new();
         permissions.insert(ManagementPermission::IntegrityRead);
+        let tenant = uuid::Uuid::new_v4();
+        let user = uuid::Uuid::new_v4();
         let config = AuthMiddlewareConfig {
             dev_auth_enabled: true,
             dev_secret: Some("secret".to_string()),
             dev_permissions: permissions,
+            dev_tenant_id: Some(tenant),
+            dev_user_id: Some(user),
+            dev_subject: Some("dev-user".to_string()),
+            dev_roles: BTreeSet::new(),
         };
-        let tenant = uuid::Uuid::new_v4();
-        let user = uuid::Uuid::new_v4();
         let mut request = Request::builder()
-            .header("x-tenant-id", tenant.to_string())
-            .header("x-user-id", user.to_string())
+            .header("x-tenant-id", uuid::Uuid::new_v4().to_string())
+            .header("x-user-id", uuid::Uuid::new_v4().to_string())
             .header("x-management-permissions", "repair.execute,repair.approve")
             .body(Body::empty())
             .unwrap_or_else(|_| unreachable!());
@@ -251,10 +316,10 @@ mod tests {
             .extensions()
             .get::<AuthenticatedPrincipal>()
             .unwrap_or_else(|| unreachable!());
-        assert_eq!(principal.tenant_id, tenant);
-        assert_eq!(principal.user_id, user);
-        assert!(principal.has_permission(ManagementPermission::IntegrityRead));
-        assert!(!principal.has_permission(ManagementPermission::RepairExecute));
-        assert!(!principal.has_permission(ManagementPermission::RepairApprove));
+        assert_eq!(principal.tenant_id(), tenant);
+        assert_eq!(principal.user_id(), user);
+        assert!(principal.has_permission("integrity.read"));
+        assert!(!principal.has_permission("repair.execute"));
+        assert!(!principal.has_permission("repair.approve"));
     }
 }

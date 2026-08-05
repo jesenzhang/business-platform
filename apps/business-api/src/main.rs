@@ -186,6 +186,10 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|()| anyhow::anyhow!("invalid auth.dev_permissions value: {value}"))
             })
             .collect::<anyhow::Result<_>>()?,
+        dev_tenant_id: config.auth.dev_tenant_id,
+        dev_user_id: config.auth.dev_user_id,
+        dev_subject: config.auth.dev_subject.clone(),
+        dev_roles: config.auth.dev_roles.clone(),
     };
 
     let app = routes::create_router(state, auth_config, &config.server);

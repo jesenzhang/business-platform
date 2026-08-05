@@ -214,6 +214,10 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
+            dev_tenant_id: Some(Uuid::parse_str(TENANT_A).expect("tenant fixture")),
+            dev_user_id: Some(Uuid::parse_str(USER_A).expect("user fixture")),
+            dev_subject: Some("document-test-user".to_string()),
+            dev_roles: BTreeSet::new(),
         },
     };
     let state = Arc::new(AppState {
@@ -232,6 +236,10 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
             dev_permissions: BTreeSet::new(),
+            dev_tenant_id: Some(Uuid::parse_str(TENANT_A).expect("tenant fixture")),
+            dev_user_id: Some(Uuid::parse_str(USER_A).expect("user fixture")),
+            dev_subject: Some("document-test-user".to_string()),
+            dev_roles: BTreeSet::new(),
         },
         &config.server,
     )

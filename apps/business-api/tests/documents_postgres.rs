@@ -39,7 +39,7 @@ async fn run_migrations(pool: &sqlx::PgPool) {
         .expect("failed to run migrations");
 }
 
-fn test_router(pool: sqlx::PgPool) -> axum::Router {
+fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
     let config = BusinessApiConfig {
         env: RuntimeEnvironment::Development,
         server: ServerConfig {
@@ -67,6 +67,10 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
+            dev_tenant_id: Some(tenant_id),
+            dev_user_id: Some(Uuid::parse_str(USER_ID).expect("user fixture")),
+            dev_subject: Some("postgres-document-test-user".to_string()),
+            dev_roles: BTreeSet::new(),
         },
     };
     let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
@@ -92,6 +96,10 @@ fn test_router(pool: sqlx::PgPool) -> axum::Router {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
             dev_permissions: BTreeSet::new(),
+            dev_tenant_id: Some(tenant_id),
+            dev_user_id: Some(Uuid::parse_str(USER_ID).expect("user fixture")),
+            dev_subject: Some("postgres-document-test-user".to_string()),
+            dev_roles: BTreeSet::new(),
         },
         &config.server,
     )
@@ -130,7 +138,7 @@ async fn document_http_flow_is_atomic_idempotent_and_tenant_scoped() {
         "size_bytes": 42
     })
     .to_string();
-    let router = test_router(pool.clone());
+    let router = test_router(pool.clone(), tenant_a);
 
     let created = router
         .clone()
