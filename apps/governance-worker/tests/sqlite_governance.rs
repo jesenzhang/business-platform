@@ -165,7 +165,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     )
     .expect("valid crash-recovery run");
     governance
-        .save_run(&crash_run)
+        .insert_test_run(&crash_run)
         .await
         .expect("save crash-recovery run");
     let crash_step = RepairStep::new(
@@ -177,7 +177,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     )
     .expect("valid crash-recovery step");
     governance
-        .save_step(&crash_step)
+        .insert_test_step(&crash_step)
         .await
         .expect("save crash-recovery step");
     let crashed_at = Utc::now();
@@ -200,7 +200,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     stale_completion.succeed().expect("valid stale completion");
     assert!(matches!(
         governance
-            .save_step_fenced(&stale_completion, stale.fence_version())
+            .update_test_step_fenced(&stale_completion, stale.fence_version())
             .await,
         Err(data_repair::RepairError::LeaseLost)
     ));
@@ -220,7 +220,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     .expect("valid wrong-token fixture");
     assert!(matches!(
         governance
-            .save_step_fenced(&wrong_token, reclaimed.fence_version())
+            .update_test_step_fenced(&wrong_token, reclaimed.fence_version())
             .await,
         Err(data_repair::RepairError::LeaseLost)
     ));
@@ -229,7 +229,7 @@ async fn sqlite_scan_and_requeue_repair_are_durable() {
     let mut recovered_cleanup = reclaimed;
     recovered_cleanup.fail().expect("valid recovery cleanup");
     governance
-        .save_step(&recovered_cleanup)
+        .insert_test_step(&recovered_cleanup)
         .await
         .expect("cleanup recovery fixture");
 

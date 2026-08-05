@@ -593,8 +593,8 @@ pub async fn list_audit_events(
 ) -> Result<Response, ApiError> {
     require_permission(&principal, ManagementPermission::AuditRead)?;
     let (tenant_id, _) = context(&auth)?;
-    let actor = query.actor.as_deref().and_then(parse_actor_type);
-    let result = query.result.as_deref().and_then(parse_result);
+    let actor = parse_actor_type(query.actor.as_deref())?;
+    let result = parse_result(query.result.as_deref())?;
     let request = AuditQueryRequest {
         tenant_id,
         actor,
@@ -670,23 +670,48 @@ pub async fn verify_audit_chain(
     Ok((StatusCode::OK, Json(ApiResponse::ok(verification))).into_response())
 }
 
-fn parse_actor_type(value: &str) -> Option<AuditActorType> {
-    match value {
-        "user" => Some(AuditActorType::User),
-        "service" => Some(AuditActorType::Service),
-        "worker" => Some(AuditActorType::Worker),
-        "repair_job" | "repairjob" => Some(AuditActorType::RepairJob),
-        "system" => Some(AuditActorType::System),
-        _ => None,
-    }
+fn parse_actor_type(value: Option<&str>) -> Result<Option<AuditActorType>, ApiError> {
+    let Some(value) = value else { return Ok(None) };
+    let actor = match value {
+        "user" => AuditActorType::User,
+        "service" => AuditActorType::Service,
+        "worker" => AuditActorType::Worker,
+        "repair_job" | "repairjob" => AuditActorType::RepairJob,
+        "system" => AuditActorType::System,
+        _ => return Err(ApiError::validation("invalid audit actor filter")),
+    };
+    Ok(Some(actor))
 }
 
-fn parse_result(value: &str) -> Option<AuditResult> {
-    match value {
-        "succeeded" => Some(AuditResult::Succeeded),
-        "failed" => Some(AuditResult::Failed),
-        "denied" => Some(AuditResult::Denied),
-        "cancelled" => Some(AuditResult::Cancelled),
-        _ => None,
+fn parse_result(value: Option<&str>) -> Result<Option<AuditResult>, ApiError> {
+    let Some(value) = value else { return Ok(None) };
+    let result = match value {
+        "succeeded" => AuditResult::Succeeded,
+        "failed" => AuditResult::Failed,
+        "denied" => AuditResult::Denied,
+        "cancelled" => AuditResult::Cancelled,
+        _ => return Err(ApiError::validation("invalid audit result filter")),
+    };
+    Ok(Some(result))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_actor_type, parse_result};
+    use audit::{AuditActorType, AuditResult};
+
+    #[test]
+    fn unknown_audit_filters_fail_closed() {
+        assert!(parse_actor_type(Some("unknown")).is_err());
+        assert!(parse_result(Some("unknown")).is_err());
+        assert_eq!(parse_actor_type(None).unwrap_or(None), None);
+        assert_eq!(
+            parse_result(Some("succeeded")).unwrap_or(None),
+            Some(AuditResult::Succeeded)
+        );
+        assert_eq!(
+            parse_actor_type(Some("worker")).unwrap_or(None),
+            Some(AuditActorType::Worker)
+        );
     }
 }

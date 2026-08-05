@@ -1158,15 +1158,6 @@ pub trait RepairPersistencePort: Send + Sync {
         command: CreateRepairExecution,
     ) -> Result<CreateRepairResult, RepairError>;
 
-    async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError>;
-    async fn save_step(&self, step: &RepairStep) -> Result<(), RepairError>;
-    /// Persist a worker transition only when the caller still owns the same
-    /// fence.  Adapters override this with an optimistic `WHERE` predicate.
-    async fn save_step_fenced(
-        &self,
-        step: &RepairStep,
-        expected_fence_version: i64,
-    ) -> Result<(), RepairError>;
     async fn append_ledger(&self, entry: &RepairLedgerEntry) -> Result<(), RepairError>;
 
     /// Load the finding that owns a repair command.  Governance adapters
@@ -1205,6 +1196,25 @@ pub trait RepairPersistencePort: Send + Sync {
         lease_owner: &str,
         lease_token: &str,
     ) -> Result<(), RepairError>;
+
+    /// Atomically classify a failure after claim, including failures for
+    /// which the worker cannot rehydrate a complete run or finding. The
+    /// adapter must fence the transition by owner, token, and version.
+    #[allow(clippy::too_many_arguments)]
+    async fn classify_claimed_failure(
+        &self,
+        _step_id: Uuid,
+        _run_id: Uuid,
+        _lease_owner: &str,
+        _lease_token: &str,
+        _expected_fence_version: i64,
+        _disposition: RepairFailureDisposition,
+        _failure_code: &str,
+        _next_attempt_at: Option<DateTime<Utc>>,
+        _now: DateTime<Utc>,
+    ) -> Result<(), RepairError> {
+        Err(RepairError::Persistence)
+    }
 
     /// Atomically stop a claimed step when post-claim validation or provider
     /// setup fails before a complete run/finding aggregate is available.

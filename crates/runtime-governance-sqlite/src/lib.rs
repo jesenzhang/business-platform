@@ -11,8 +11,8 @@ use data_integrity::{
 };
 use data_repair::{
     repair_run_status_name, CreateRepairExecution, CreateRepairResult, RepairCommand, RepairError,
-    RepairLedgerEntry, RepairPersistencePort, RepairRun, RepairRunStatus, RepairStep,
-    RepairStepStatus,
+    RepairFailureDisposition, RepairLedgerEntry, RepairPersistencePort, RepairRun, RepairRunStatus,
+    RepairStep, RepairStepStatus,
 };
 use sqlx::{pool::PoolConnection, Sqlite, SqlitePool};
 use uuid::Uuid;
@@ -26,6 +26,59 @@ impl SqliteGovernanceStore {
     #[must_use]
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
+    }
+    pub async fn insert_test_run(&self, run: &RepairRun) -> Result<(), RepairError> {
+        sqlx::query("INSERT INTO data_repair_runs (id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,idempotency_key,command,version,created_at,updated_at,next_attempt_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?11) ON CONFLICT(id) DO UPDATE SET status=excluded.status,approved_by=excluded.approved_by,approval_note=excluded.approval_note,command=excluded.command,version=excluded.version,updated_at=excluded.updated_at")
+            .bind(run.id().to_string()).bind(run.tenant_id().to_string()).bind(run.finding_id().to_string())
+            .bind(repair_run_status_name(run.status())).bind(run.created_by().to_string()).bind(run.approved_by().map(|v| v.to_string()))
+            .bind(run.approval_note()).bind(&run.command().idempotency_key)
+            .bind(serde_json::to_string(run.command()).map_err(|_| RepairError::Persistence)?)
+            .bind(run.version()).bind(run.created_at().to_rfc3339())
+            .execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub async fn insert_test_step(&self, step: &RepairStep) -> Result<(), RepairError> {
+        sqlx::query("INSERT INTO data_repair_steps (id,tenant_id,repair_run_id,finding_id,status,attempt_count,checkpoint,lease_owner,lease_token,fence_version,lease_expires_at,next_attempt_at,created_at,updated_at) SELECT ?1,tenant_id,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?11 FROM data_repair_runs WHERE id=?2 ON CONFLICT(id) DO UPDATE SET status=excluded.status,attempt_count=excluded.attempt_count,checkpoint=excluded.checkpoint,lease_owner=excluded.lease_owner,lease_token=excluded.lease_token,fence_version=excluded.fence_version,lease_expires_at=excluded.lease_expires_at,next_attempt_at=excluded.next_attempt_at,updated_at=excluded.updated_at")
+            .bind(step.id().to_string()).bind(step.run_id().to_string()).bind(step.finding_id().to_string())
+            .bind(data_repair::repair_step_status_name(step.status())).bind(i64::from(step.attempt_count())).bind(step.checkpoint().map(ToString::to_string))
+            .bind(step.lease_owner()).bind(step.lease_token()).bind(step.fence_version()).bind(step.lease_expires_at().map(|v| v.to_rfc3339()))
+            .bind(step.next_attempt_at().to_rfc3339()).execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
+        Ok(())
+    }
+
+    pub async fn update_test_step_fenced(
+        &self,
+        step: &RepairStep,
+        expected_fence_version: i64,
+    ) -> Result<(), RepairError> {
+        let lease_owner = step.lease_owner().ok_or(RepairError::LeaseLost)?;
+        let lease_token = step.lease_token().ok_or(RepairError::LeaseLost)?;
+        if expected_fence_version <= 0 || step.fence_version() != expected_fence_version {
+            return Err(RepairError::LeaseLost);
+        }
+        let result = sqlx::query("UPDATE data_repair_steps SET status=?1,attempt_count=?2,checkpoint=?3,lease_owner=?4,lease_token=?5,fence_version=?6,lease_expires_at=?7,next_attempt_at=?8,updated_at=?9 WHERE id=?10 AND repair_run_id=?11 AND finding_id=?12 AND fence_version=?13 AND lease_owner=?4 AND lease_token=?5 AND lease_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND EXISTS (SELECT 1 FROM data_repair_runs r JOIN data_integrity_findings f ON f.id=r.finding_id AND f.tenant_id=r.tenant_id WHERE r.id=data_repair_steps.repair_run_id AND r.tenant_id=data_repair_steps.tenant_id AND r.finding_id=data_repair_steps.finding_id AND r.status='running' AND f.status='repairing')")
+            .bind(data_repair::repair_step_status_name(step.status()))
+            .bind(i64::from(step.attempt_count()))
+            .bind(step.checkpoint().map(ToString::to_string))
+            .bind(lease_owner)
+            .bind(lease_token)
+            .bind(step.fence_version())
+            .bind(step.lease_expires_at().map(|value| value.to_rfc3339()))
+            .bind(step.next_attempt_at().to_rfc3339())
+            .bind(Utc::now().to_rfc3339())
+            .bind(step.id().to_string())
+            .bind(step.run_id().to_string())
+            .bind(step.finding_id().to_string())
+            .bind(expected_fence_version)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| RepairError::Persistence)?;
+        if result.rows_affected() == 1 {
+            Ok(())
+        } else {
+            Err(RepairError::LeaseLost)
+        }
     }
 }
 
@@ -641,60 +694,6 @@ impl RepairPersistencePort for SqliteGovernanceStore {
         })
     }
 
-    async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError> {
-        sqlx::query("INSERT INTO data_repair_runs (id,tenant_id,finding_id,status,requested_by,approved_by,approval_note,idempotency_key,command,version,created_at,updated_at,next_attempt_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?11) ON CONFLICT(id) DO UPDATE SET status=excluded.status,approved_by=excluded.approved_by,approval_note=excluded.approval_note,command=excluded.command,version=excluded.version,updated_at=excluded.updated_at")
-            .bind(run.id().to_string()).bind(run.tenant_id().to_string()).bind(run.finding_id().to_string())
-            .bind(repair_run_status_name(run.status())).bind(run.created_by().to_string()).bind(run.approved_by().map(|v| v.to_string()))
-            .bind(run.approval_note()).bind(&run.command().idempotency_key)
-            .bind(serde_json::to_string(run.command()).map_err(|_| RepairError::Persistence)?)
-            .bind(run.version()).bind(run.created_at().to_rfc3339())
-            .execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
-        Ok(())
-    }
-
-    async fn save_step(&self, step: &RepairStep) -> Result<(), RepairError> {
-        sqlx::query("INSERT INTO data_repair_steps (id,tenant_id,repair_run_id,finding_id,status,attempt_count,checkpoint,lease_owner,lease_token,fence_version,lease_expires_at,next_attempt_at,created_at,updated_at) SELECT ?1,tenant_id,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?11 FROM data_repair_runs WHERE id=?2 ON CONFLICT(id) DO UPDATE SET status=excluded.status,attempt_count=excluded.attempt_count,checkpoint=excluded.checkpoint,lease_owner=excluded.lease_owner,lease_token=excluded.lease_token,fence_version=excluded.fence_version,lease_expires_at=excluded.lease_expires_at,next_attempt_at=excluded.next_attempt_at,updated_at=excluded.updated_at")
-            .bind(step.id().to_string()).bind(step.run_id().to_string()).bind(step.finding_id().to_string())
-            .bind(data_repair::repair_step_status_name(step.status())).bind(i64::from(step.attempt_count())).bind(step.checkpoint().map(ToString::to_string))
-            .bind(step.lease_owner()).bind(step.lease_token()).bind(step.fence_version()).bind(step.lease_expires_at().map(|v| v.to_rfc3339()))
-            .bind(step.next_attempt_at().to_rfc3339()).execute(&self.pool).await.map_err(|_| RepairError::Persistence)?;
-        Ok(())
-    }
-
-    async fn save_step_fenced(
-        &self,
-        step: &RepairStep,
-        expected_fence_version: i64,
-    ) -> Result<(), RepairError> {
-        let lease_owner = step.lease_owner().ok_or(RepairError::LeaseLost)?;
-        let lease_token = step.lease_token().ok_or(RepairError::LeaseLost)?;
-        if expected_fence_version <= 0 || step.fence_version() != expected_fence_version {
-            return Err(RepairError::LeaseLost);
-        }
-        let result = sqlx::query("UPDATE data_repair_steps SET status=?1,attempt_count=?2,checkpoint=?3,lease_owner=?4,lease_token=?5,fence_version=?6,lease_expires_at=?7,next_attempt_at=?8,updated_at=?9 WHERE id=?10 AND repair_run_id=?11 AND finding_id=?12 AND fence_version=?13 AND lease_owner=?4 AND lease_token=?5 AND lease_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND EXISTS (SELECT 1 FROM data_repair_runs r JOIN data_integrity_findings f ON f.id=r.finding_id AND f.tenant_id=r.tenant_id WHERE r.id=data_repair_steps.repair_run_id AND r.tenant_id=data_repair_steps.tenant_id AND r.finding_id=data_repair_steps.finding_id AND r.status='running' AND f.status='repairing')")
-            .bind(data_repair::repair_step_status_name(step.status()))
-            .bind(i64::from(step.attempt_count()))
-            .bind(step.checkpoint().map(ToString::to_string))
-            .bind(lease_owner)
-            .bind(lease_token)
-            .bind(step.fence_version())
-            .bind(step.lease_expires_at().map(|value| value.to_rfc3339()))
-            .bind(step.next_attempt_at().to_rfc3339())
-            .bind(Utc::now().to_rfc3339())
-            .bind(step.id().to_string())
-            .bind(step.run_id().to_string())
-            .bind(step.finding_id().to_string())
-            .bind(expected_fence_version)
-            .execute(&self.pool)
-            .await
-            .map_err(|_| RepairError::Persistence)?;
-        if result.rows_affected() == 1 {
-            Ok(())
-        } else {
-            Err(RepairError::LeaseLost)
-        }
-    }
-
     async fn append_ledger(&self, entry: &RepairLedgerEntry) -> Result<(), RepairError> {
         sqlx::query("INSERT INTO data_repair_events (id,tenant_id,repair_run_id,repair_step_id,finding_id,rule_id,repair_type,repair_version,actor_type,actor_id,reason,resource_type,resource_id,before_hash,after_hash,before_snapshot,after_snapshot,rows_affected,result,failure_code,trace_id,started_at,finished_at,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)")
             .bind(entry.id().to_string()).bind(entry.tenant_id().to_string()).bind(entry.repair_run_id().to_string()).bind(entry.repair_step_id().to_string()).bind(entry.finding_id().to_string())
@@ -1105,6 +1104,129 @@ impl RepairPersistencePort for SqliteGovernanceStore {
         }
     }
 
+    async fn classify_claimed_failure(
+        &self,
+        step_id: Uuid,
+        run_id: Uuid,
+        lease_owner: &str,
+        lease_token: &str,
+        expected_fence_version: i64,
+        disposition: RepairFailureDisposition,
+        failure_code: &str,
+        next_attempt_at: Option<DateTime<Utc>>,
+        now: DateTime<Utc>,
+    ) -> Result<(), RepairError> {
+        if step_id.is_nil()
+            || run_id.is_nil()
+            || lease_owner.trim().is_empty()
+            || lease_token.trim().is_empty()
+            || expected_fence_version <= 0
+            || failure_code.trim().is_empty()
+            || failure_code.len() > 128
+        {
+            return Err(RepairError::Conflict);
+        }
+        if matches!(disposition, RepairFailureDisposition::LeaseLost) {
+            return Err(RepairError::LeaseLost);
+        }
+        {
+            let mut connection = begin_immediate(&self.pool)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+            let row = sqlx::query_as::<_, (i64, i64, String, String)>(
+                "SELECT attempt_count,max_attempts,tenant_id,finding_id FROM data_repair_steps WHERE id=?1 AND repair_run_id=?2 AND status='running' AND lease_owner=?3 AND lease_token=?4 AND fence_version=?5 AND lease_expires_at > ?6",
+            )
+            .bind(step_id.to_string())
+            .bind(run_id.to_string())
+            .bind(lease_owner)
+            .bind(lease_token)
+            .bind(expected_fence_version)
+            .bind(now.to_rfc3339())
+            .fetch_optional(&mut *connection)
+            .await
+            .map_err(|_| RepairError::Persistence)?
+            .ok_or(RepairError::LeaseLost)?;
+            let retry_exhausted =
+                matches!(disposition, RepairFailureDisposition::Retry { .. }) && row.0 >= row.1;
+            let effective_code = if retry_exhausted {
+                "retry_exhausted"
+            } else {
+                failure_code
+            };
+            let (step_status, run_status, finding_status, finished_at) = if retry_exhausted {
+                (
+                    "failed",
+                    "failed",
+                    "needs_manual_review",
+                    Some(now.to_rfc3339()),
+                )
+            } else {
+                match disposition {
+                    RepairFailureDisposition::Retry { .. } => {
+                        ("queued", "queued", "repair_planned", None)
+                    }
+                    RepairFailureDisposition::Permanent => (
+                        "failed",
+                        "failed",
+                        "needs_manual_review",
+                        Some(now.to_rfc3339()),
+                    ),
+                    RepairFailureDisposition::NeedsManualReview => (
+                        "needs_manual_review",
+                        "needs_manual_review",
+                        "needs_manual_review",
+                        Some(now.to_rfc3339()),
+                    ),
+                    RepairFailureDisposition::Cancelled => {
+                        ("cancelled", "cancelled", "open", Some(now.to_rfc3339()))
+                    }
+                    RepairFailureDisposition::LeaseLost => unreachable!(),
+                }
+            };
+            let step_result = sqlx::query("UPDATE data_repair_steps SET status=?1,next_attempt_at=?2,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,failure_code=?3,last_error_category=?3,finished_at=?4,updated_at=?5 WHERE id=?6 AND repair_run_id=?7 AND tenant_id=?8 AND status='running' AND lease_owner=?9 AND lease_token=?10 AND fence_version=?11 AND lease_expires_at > ?5")
+                .bind(step_status)
+                .bind(next_attempt_at.unwrap_or(now).to_rfc3339())
+                .bind(effective_code)
+                .bind(&finished_at)
+                .bind(now.to_rfc3339())
+                .bind(step_id.to_string())
+                .bind(run_id.to_string())
+                .bind(&row.2)
+                .bind(lease_owner)
+                .bind(lease_token)
+                .bind(expected_fence_version)
+                .execute(&mut *connection)
+                .await
+                .map_err(|_| RepairError::Persistence)?;
+            if step_result.rows_affected() != 1 {
+                rollback_immediate(&mut connection)
+                    .await
+                    .map_err(|_| RepairError::Persistence)?;
+                return Err(RepairError::LeaseLost);
+            }
+            let run_result = sqlx::query("UPDATE data_repair_runs SET status=?1,failure_code=?2,last_error_category=?2,finished_at=?3,version=version+1,updated_at=?4 WHERE id=?5 AND tenant_id=?6 AND status='running'")
+                .bind(run_status).bind(effective_code).bind(&finished_at).bind(now.to_rfc3339()).bind(run_id.to_string()).bind(&row.2)
+                .execute(&mut *connection).await.map_err(|_| RepairError::Persistence)?;
+            if run_result.rows_affected() != 1 {
+                rollback_immediate(&mut connection)
+                    .await
+                    .map_err(|_| RepairError::Persistence)?;
+                return Err(RepairError::Conflict);
+            }
+            let finding_result = sqlx::query("UPDATE data_integrity_findings SET status=?1,resolution_reason=?2,version=version+1,updated_at=?3 WHERE id=?4 AND tenant_id=?5 AND status IN ('open','repair_planned','repairing','needs_manual_review')")
+                .bind(finding_status).bind(effective_code).bind(now.to_rfc3339()).bind(&row.3).bind(&row.2)
+                .execute(&mut *connection).await.map_err(|_| RepairError::Persistence)?;
+            if finding_result.rows_affected() != 1 {
+                rollback_immediate(&mut connection)
+                    .await
+                    .map_err(|_| RepairError::Persistence)?;
+                return Err(RepairError::Conflict);
+            }
+            commit_immediate(&mut connection)
+                .await
+                .map_err(|_| RepairError::Persistence)
+        }
+    }
     async fn abort_claimed_repair(
         &self,
         step: &RepairStep,

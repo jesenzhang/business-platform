@@ -21,34 +21,19 @@ struct FakeState {
     step: RepairStep,
     claimed: bool,
     ledger: Vec<RepairLedgerEntry>,
+    fail_load_run: bool,
+    fail_load_finding: bool,
 }
 
-#[async_trait]
-impl RepairPersistencePort for FakePersistence {
-    async fn create_repair_execution(
-        &self,
-        _command: CreateRepairExecution,
-    ) -> Result<CreateRepairResult, RepairError> {
-        Err(RepairError::Persistence)
-    }
-
-    async fn save_run(&self, run: &RepairRun) -> Result<(), RepairError> {
+impl FakePersistence {
+    fn persist_run(&self, run: &RepairRun) {
         self.state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .run = run.clone();
-        Ok(())
     }
 
-    async fn save_step(&self, step: &RepairStep) -> Result<(), RepairError> {
-        self.state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .step = step.clone();
-        Ok(())
-    }
-
-    async fn save_step_fenced(
+    fn persist_step_fenced(
         &self,
         step: &RepairStep,
         expected_fence_version: i64,
@@ -67,6 +52,16 @@ impl RepairPersistencePort for FakePersistence {
         state.step = step.clone();
         Ok(())
     }
+}
+
+#[async_trait]
+impl RepairPersistencePort for FakePersistence {
+    async fn create_repair_execution(
+        &self,
+        _command: CreateRepairExecution,
+    ) -> Result<CreateRepairResult, RepairError> {
+        Err(RepairError::Persistence)
+    }
 
     async fn append_ledger(&self, entry: &RepairLedgerEntry) -> Result<(), RepairError> {
         self.state
@@ -82,6 +77,9 @@ impl RepairPersistencePort for FakePersistence {
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.fail_load_finding {
+            return Err(RepairError::Persistence);
+        }
         let run = &state.run;
         Ok(Some(
             IntegrityFinding::rehydrate(
@@ -138,9 +136,10 @@ impl RepairPersistencePort for FakePersistence {
         _lease_owner: &str,
         _lease_token: &str,
     ) -> Result<(), RepairError> {
-        self.save_step_fenced(step, expected_fence_version).await?;
+        self.persist_step_fenced(step, expected_fence_version)?;
         self.append_ledger(entry).await?;
-        self.save_run(run).await
+        self.persist_run(run);
+        Ok(())
     }
 
     async fn commit_failure(
@@ -153,12 +152,66 @@ impl RepairPersistencePort for FakePersistence {
         _lease_owner: &str,
         _lease_token: &str,
     ) -> Result<(), RepairError> {
-        self.save_step_fenced(step, expected_fence_version).await?;
+        self.persist_step_fenced(step, expected_fence_version)?;
         self.append_ledger(entry).await?;
-        self.save_run(run).await
+        self.persist_run(run);
+        Ok(())
     }
 
+    async fn classify_claimed_failure(
+        &self,
+        step_id: Uuid,
+        run_id: Uuid,
+        lease_owner: &str,
+        lease_token: &str,
+        expected_fence_version: i64,
+        disposition: data_repair::RepairFailureDisposition,
+        _failure_code: &str,
+        next_attempt_at: Option<chrono::DateTime<Utc>>,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<(), RepairError> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if state.step.id() != step_id
+            || state.step.run_id() != run_id
+            || state.step.lease_owner() != Some(lease_owner)
+            || state.step.lease_token() != Some(lease_token)
+            || state.step.fence_version() != expected_fence_version
+        {
+            return Err(RepairError::LeaseLost);
+        }
+        match disposition {
+            data_repair::RepairFailureDisposition::Retry { .. } => {
+                state.step.schedule_retry(next_attempt_at.unwrap_or(now))?;
+                state.run.schedule_retry(now)?;
+            }
+            data_repair::RepairFailureDisposition::Permanent => {
+                state.step.fail()?;
+                state.run.mark_failed(now)?;
+            }
+            data_repair::RepairFailureDisposition::NeedsManualReview => {
+                state.step.require_manual_review()?;
+                state.run.mark_needs_manual_review(now)?;
+            }
+            data_repair::RepairFailureDisposition::Cancelled => {
+                state.step.cancel()?;
+                state.run.cancel(now)?;
+            }
+            data_repair::RepairFailureDisposition::LeaseLost => return Err(RepairError::LeaseLost),
+        }
+        Ok(())
+    }
     async fn load_run(&self, _id: Uuid) -> Result<Option<RepairRun>, RepairError> {
+        if self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .fail_load_run
+        {
+            return Err(RepairError::Persistence);
+        }
         Ok(Some(
             self.state
                 .lock()
@@ -432,6 +485,8 @@ async fn repair_worker_executes_once_and_records_ledger() {
         step,
         claimed: false,
         ledger: Vec::new(),
+        fail_load_run: false,
+        fail_load_finding: false,
     }));
     let worker = RepairWorker {
         persistence: Arc::new(FakePersistence {
@@ -457,4 +512,38 @@ async fn repair_worker_executes_once_and_records_ledger() {
     assert_eq!(state.run.status(), RepairRunStatus::Succeeded);
     assert_eq!(state.step.status(), RepairStepStatus::Succeeded);
     assert_eq!(state.ledger.len(), 1);
+}
+
+#[tokio::test]
+async fn transient_post_claim_load_failure_is_requeued() {
+    let (run, step) = fixture();
+    let state = Arc::new(Mutex::new(FakeState {
+        run,
+        step,
+        claimed: false,
+        ledger: Vec::new(),
+        fail_load_run: true,
+        fail_load_finding: false,
+    }));
+    let worker = RepairWorker {
+        persistence: Arc::new(FakePersistence {
+            state: Arc::clone(&state),
+        }),
+        handlers: Arc::new(FakeRegistry),
+        rule_registry: None,
+        worker_id: "worker-transient".to_string(),
+        lease_duration_secs: 30,
+        heartbeat_seconds: 5,
+        max_attempts: 3,
+    };
+
+    assert!(worker.execute_one().await.is_ok());
+    let state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    assert_eq!(state.run.status(), RepairRunStatus::Queued);
+    assert_eq!(state.step.status(), RepairStepStatus::Queued);
+    assert!(state.step.lease_owner().is_none());
+    assert!(state.step.lease_token().is_none());
+    assert!(state.step.next_attempt_at() > Utc::now());
 }

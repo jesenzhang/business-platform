@@ -1,3 +1,5 @@
+#![allow(clippy::panic, clippy::expect_used, clippy::too_many_lines)]
+
 use chrono::{Duration, Utc};
 use document_processing::ports::{
     CompleteAiTaskCommand, ExecutionFence, ProcessingExecutionUnitOfWork, ProcessingJobQuery,
@@ -149,7 +151,7 @@ async fn postgres_minio_processing_adapter_round_trip() {
         .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     let ai_claimed_at = Utc::now();
     let ai_claim = store
-        .claim_next_ai_task("minio-ai-worker", ai_claimed_at, 30)
+        .claim_ai_task_for_test(task.id, "minio-ai-worker", ai_claimed_at, 30)
         .await
         .unwrap_or_else(|error| {
             panic!(
@@ -235,6 +237,41 @@ async fn postgres_minio_processing_adapter_round_trip() {
         .delete(&object_key)
         .await
         .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
+    sqlx::query(
+        "DELETE FROM document_processing_audit_events WHERE tenant_id = $1 AND job_id = $2",
+    )
+    .bind(tenant)
+    .bind(job.id())
+    .execute(&pool)
+    .await
+    .unwrap_or_else(|error| {
+        panic!(
+            "processing audit cleanup failed tenant={tenant} job_id={}: {error:?}",
+            job.id()
+        )
+    });
+    sqlx::query("DELETE FROM outbox_events WHERE tenant_id = $1 AND aggregate_id = $2")
+        .bind(tenant.to_string())
+        .bind(job.id().to_string())
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "outbox cleanup failed tenant={tenant} job_id={}: {error:?}",
+                job.id()
+            )
+        });
+    sqlx::query("DELETE FROM audit_events WHERE tenant_id = $1 AND resource_id = $2")
+        .bind(tenant)
+        .bind(job.id().to_string())
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "audit cleanup failed tenant={tenant} job_id={}: {error:?}",
+                job.id()
+            )
+        });
     sqlx::query("DELETE FROM document_processing_jobs WHERE tenant_id = $1 AND document_id = $2")
         .bind(tenant)
         .bind(document)

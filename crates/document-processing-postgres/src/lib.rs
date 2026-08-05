@@ -164,6 +164,61 @@ impl PostgresProcessingStore {
         &self.pool
     }
 
+    /// Test-only deterministic claim seam. Production workers must use the
+    /// global `SKIP LOCKED` queue through `claim_next_ai_task`; this method
+    /// exists only for shared-database adapter tests to avoid queue pollution.
+    #[doc(hidden)]
+    pub async fn claim_ai_task_for_test(
+        &self,
+        task_id: Uuid,
+        worker_id: &str,
+        now: DateTime<Utc>,
+        lease_duration_secs: i64,
+    ) -> Result<Option<AiTask>, ProcessingRepositoryError> {
+        if task_id.is_nil() || worker_id.trim().is_empty() || lease_duration_secs <= 0 {
+            return Err(ProcessingRepositoryError::Failed);
+        }
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id = $1 AND status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= $2 FOR UPDATE");
+        let Some(row) = sqlx::query_as::<_, AiTaskRow>(&query)
+            .bind(task_id)
+            .bind(now)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?
+        else {
+            transaction.commit().await.map_err(map_sql_error)?;
+            return Ok(None);
+        };
+        let fence = row
+            .fence_version
+            .checked_add(1)
+            .ok_or(ProcessingRepositoryError::Failed)?;
+        let token = Uuid::now_v7().to_string();
+        let expires_at = now + Duration::seconds(lease_duration_secs);
+        let updated = sqlx::query("UPDATE document_ai_tasks SET status='running',lease_owner=$1,lease_token=$2,lease_expires_at=$3,fence_version=$4,attempt_count=attempt_count+1,updated_at=$5 WHERE id=$6 AND status='queued' AND attempt_count < max_attempts AND fence_version=$7")
+            .bind(worker_id)
+            .bind(&token)
+            .bind(expires_at)
+            .bind(fence)
+            .bind(now)
+            .bind(task_id)
+            .bind(row.fence_version)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        if updated.rows_affected() != 1 {
+            return Err(ProcessingRepositoryError::Conflict);
+        }
+        let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id=$1");
+        let updated = sqlx::query_as::<_, AiTaskRow>(&query)
+            .bind(task_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        transaction.commit().await.map_err(map_sql_error)?;
+        to_ai_task(updated).map(Some)
+    }
     async fn preview_processing_repair<F>(
         &self,
         command: &RepairCommand,

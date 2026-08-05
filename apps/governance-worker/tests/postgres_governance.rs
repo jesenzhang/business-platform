@@ -108,7 +108,10 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         now,
     )
     .expect("valid repair run");
-    governance.save_run(&run).await.expect("save repair run");
+    governance
+        .insert_test_run(&run)
+        .await
+        .expect("save repair run");
     let step = RepairStep::new(
         Uuid::new_v4(),
         run.id(),
@@ -117,7 +120,10 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         now,
     )
     .expect("valid repair step");
-    governance.save_step(&step).await.expect("save repair step");
+    governance
+        .insert_test_step(&step)
+        .await
+        .expect("save repair step");
 
     let processing = Arc::new(PostgresProcessingStore::new(pool.clone()));
     let worker = RepairWorker {

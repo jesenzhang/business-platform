@@ -208,42 +208,36 @@ where
                     );
                     return Ok(true);
                 }
-                let reason = match &error {
-                    RepairError::Conflict | RepairError::IdempotencyConflict => {
-                        "post_claim_conflict"
-                    }
-                    RepairError::InvalidDescriptor => "post_claim_invalid_descriptor",
-                    RepairError::InvalidTransition => "post_claim_invalid_transition",
-                    RepairError::ApprovalRequired => "post_claim_approval_required",
-                    RepairError::ApprovalSeparation => "post_claim_approval_separation",
-                    RepairError::LeaseLost => "post_claim_lease_lost",
-                    RepairError::Unavailable => "post_claim_dependency_unavailable",
-                    RepairError::Persistence
-                    | RepairError::InvalidCommand
-                    | RepairError::InvalidStoredEnum => "post_claim_persistence_failure",
+                let disposition = failure_disposition(&error);
+                let next_attempt_at = match disposition {
+                    RepairFailureDisposition::Retry { backoff } => Some(Utc::now() + backoff),
+                    _ => None,
                 };
-                if let Err(abort_error) = self
-                    .persistence
-                    .abort_claimed_repair(&claim_snapshot, &self.worker_id, reason)
+                let code = failure_code(&error, &disposition);
+                self.persistence
+                    .classify_claimed_failure(
+                        claim_snapshot.id(),
+                        claim_snapshot.run_id(),
+                        &self.worker_id,
+                        claim_snapshot.lease_token().ok_or(RepairError::LeaseLost)?,
+                        claim_snapshot.fence_version(),
+                        disposition,
+                        code,
+                        next_attempt_at,
+                        Utc::now(),
+                    )
                     .await
-                {
-                    tracing::error!(
-                        worker_id = %self.worker_id,
-                        step_id = %claim_snapshot.id(),
-                        run_id = %claim_snapshot.run_id(),
-                        error = %abort_error,
-                        original_error = %error,
-                        "failed to durably abort claimed repair"
-                    );
-                } else {
-                    tracing::error!(
-                        worker_id = %self.worker_id,
-                        step_id = %claim_snapshot.id(),
-                        run_id = %claim_snapshot.run_id(),
-                        error = %error,
-                        "claimed repair moved to manual review after execution failure"
-                    );
-                }
+                    .map_err(|classification_error| {
+                        tracing::error!(
+                            worker_id = %self.worker_id,
+                            step_id = %claim_snapshot.id(),
+                            run_id = %claim_snapshot.run_id(),
+                            error = %classification_error,
+                            original_error = %error,
+                            "failed to durably classify claimed repair failure"
+                        );
+                        classification_error
+                    })?;
                 Ok(true)
             }
         }
@@ -514,7 +508,7 @@ where
                 // Keep a bounded heartbeat cadence while draining a queue;
                 // this also prevents an accidental tight loop on a hot queue.
                 sleep(TokioDuration::from_secs(
-                    heartbeat_seconds.min(1).cast_unsigned(),
+                    heartbeat_seconds.clamp(1, 5).cast_unsigned(),
                 ))
                 .await;
             }
