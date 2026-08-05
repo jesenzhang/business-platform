@@ -187,6 +187,10 @@ impl ReadinessProbe for ReadyProbe {
 }
 
 fn test_router(store: Arc<FakeStore>) -> axum::Router {
+    test_router_for_tenant(store, TENANT_A)
+}
+
+fn test_router_for_tenant(store: Arc<FakeStore>, tenant: &str) -> axum::Router {
     let config = BusinessApiConfig {
         env: RuntimeEnvironment::Development,
         server: ServerConfig {
@@ -214,7 +218,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
-            dev_tenant_id: Some(Uuid::parse_str(TENANT_A).expect("tenant fixture")),
+            dev_tenant_id: Some(Uuid::parse_str(tenant).expect("tenant fixture")),
             dev_user_id: Some(Uuid::parse_str(USER_A).expect("user fixture")),
             dev_subject: Some("document-test-user".to_string()),
             dev_roles: BTreeSet::new(),
@@ -236,7 +240,7 @@ fn test_router(store: Arc<FakeStore>) -> axum::Router {
             dev_auth_enabled: true,
             dev_secret: Some(SECRET.to_string()),
             dev_permissions: BTreeSet::new(),
-            dev_tenant_id: Some(Uuid::parse_str(TENANT_A).expect("tenant fixture")),
+            dev_tenant_id: Some(Uuid::parse_str(tenant).expect("tenant fixture")),
             dev_user_id: Some(Uuid::parse_str(USER_A).expect("user fixture")),
             dev_subject: Some("document-test-user".to_string()),
             dev_roles: BTreeSet::new(),
@@ -362,7 +366,9 @@ async fn document_http_responses_never_expose_storage_locations() {
 
 #[tokio::test]
 async fn fake_idempotency_is_scoped_by_tenant_and_fingerprint() {
-    let router = test_router(Arc::new(FakeStore::default()));
+    let store = Arc::new(FakeStore::default());
+    let router = test_router(store.clone());
+    let other_router = test_router_for_tenant(store, TENANT_B);
     let first_body = serde_json::json!({
         "original_filename": "first.pdf",
         "content_type": "application/pdf",
@@ -381,8 +387,7 @@ async fn fake_idempotency_is_scoped_by_tenant_and_fingerprint() {
         .expect("router must respond");
     assert_eq!(first.status(), StatusCode::CREATED);
 
-    let other_tenant = router
-        .clone()
+    let other_tenant = other_router
         .oneshot(request(
             "POST",
             "/api/v1/documents",
@@ -442,13 +447,14 @@ async fn invalid_or_legacy_http_cursors_are_rejected() {
 async fn cross_tenant_get_is_not_found() {
     let store = Arc::new(FakeStore::default());
     let router = test_router(store.clone());
+    let other_router = test_router_for_tenant(store, TENANT_B);
     let body = serde_json::json!({
         "original_filename": "secret.pdf",
         "content_type": "application/pdf",
         "object_key": "secret.pdf"
     })
     .to_string();
-    let response = router
+    let response = other_router
         .clone()
         .oneshot(request("POST", "/api/v1/documents", TENANT_A, Some(body)))
         .await

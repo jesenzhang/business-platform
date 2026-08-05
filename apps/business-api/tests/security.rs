@@ -218,14 +218,16 @@ async fn dev_auth_with_wrong_token_is_rejected() {
 }
 
 #[tokio::test]
-async fn dev_auth_missing_tenant_header_is_rejected() {
+async fn dev_auth_without_client_tenant_header_uses_trusted_principal() {
     let router = test_router(true);
     let status = status_of(
         router,
         authorized_get("/api/v1/anything", DEV_SECRET, false),
     )
     .await;
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    // The server-configured principal is authoritative; client tenant headers
+    // are intentionally unnecessary and ignored.
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
