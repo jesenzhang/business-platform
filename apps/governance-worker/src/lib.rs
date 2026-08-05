@@ -199,6 +199,7 @@ where
         match self.execute_claimed(step).await {
             Ok(result) => Ok(result),
             Err(error) => {
+                eprintln!("[DEBUG-PLAN0005] execute_claimed failed: {error:?}");
                 if matches!(error, RepairError::LeaseLost) {
                     tracing::warn!(
                         worker_id = %self.worker_id,
