@@ -1,6 +1,6 @@
 # PLAN-0005: Runtime Audit, Data Integrity and Controlled Repair Foundation
 
-> Status: Active
+> Status: Accepted Candidate
 > Revision: 2
 > Revision Reason: Authorization, atomicity, lifecycle, and audit-chain hardening
 > Date: 2026-08-05
@@ -46,8 +46,7 @@ gaps before any fast-forward into `main`.
 
 This revision does not introduce a generic scheduler, a workflow DAG, an
 arbitrary SQL repair surface, or distributed transactions. It does not start
-PLAN-0006. PLAN-0005 remains `Active` until the complete Revision 2 Feature CI
-evidence is green.
+PLAN-0006; the green Revision 2 Feature CI acceptance is recorded below.
 
 ## Architecture preflight
 
@@ -213,9 +212,8 @@ the boundary recoverable, but a distributed transaction is intentionally not
 introduced.
 ## Revision 2 local evidence (2026-08-05)
 
-Revision 2 implementation is present through local commit `be1a399`. The
-following results are local evidence only; the plan remains `Active` until the
-branch can be pushed and the complete Feature CI succeeds.
+Revision 2 implementation is present through final commit `24e70f4`. The
+following results include the completed Feature CI acceptance evidence below.
 
 | Gate / requirement | Result | Evidence |
 |---|---|---|
@@ -228,5 +226,27 @@ branch can be pushed and the complete Feature CI succeeds.
 | fmt / check / clippy / architecture | PASS | Local fmt, workspace check, workspace Clippy with `-D warnings`, and `scripts/check-architecture.ps1` pass. |
 | Targeted worker/governance tests | PASS | `governance-worker`, `data-repair`, and SQLite governance suites pass. |
 | Authentication regression tests | PASS | `business-api` security suite: 10 passed; PostgreSQL document E2E compiles, but execution is `NOT RUN` locally because `DATABASE_URL` is not configured. |
-| Full workspace tests | BLOCKED | `cargo test --workspace --all-features` exceeded the local 120-second execution limit without a reported test failure. |
-| Feature CI / remote integration | BLOCKED | Feature CI run `30997090891` reached Governance PostgreSQL E2E successfully but failed the business-api PostgreSQL tenant-scope assertion; commits `45a2fe9` and `be1a399` align that test with trusted server-side identity. Push/rerun is blocked because this environment cannot connect to GitHub. |
+| Full workspace tests | PASS | `cargo test --workspace --all-features` completed successfully locally; infrastructure-dependent cases remain ignored without local services. |
+| Feature CI / remote integration | PASS | Feature CI run `31021778597` for final SHA `24e70f4` passed all six jobs, including PostgreSQL + MinIO + E2E contracts and architecture/diff checks. |
+
+## Revision 2 acceptance evidence (2026-08-05)
+
+Revision 2 is an Accepted Candidate on final commit `24e70f4`.
+
+| Gate / requirement | Result | Evidence |
+|---|---|---|
+| Final Feature CI | PASS | Run `31021778597` (`https://github.com/jesenzhang/business-platform/actions/runs/31021778597`) passed Format, Check, Clippy, Unit tests, Architecture Fitness, and PostgreSQL + MinIO + E2E contracts, including architecture/diff checks. |
+| Local fmt/check/clippy/test | PASS | `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --all-features`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo test --workspace --all-features`. |
+| PostgreSQL AI reclaim regression | PASS in CI / NOT RUN locally | Added a contract that reclaims an expired `running` `extract_fields` task to `queued` and clears its lease. Local `--include-ignored` execution was not available because no PostgreSQL service was configured. |
+| Windows PostgreSQL/MinIO execution | NOT RUN | Linux CI provided the required external-infrastructure evidence; Windows has no local PostgreSQL/MinIO service. |
+| Branch policy | PASS | No merge to `main`, pull request, branch archival/deletion, or PLAN-0006 start was performed. |
+
+### Final defect and repair
+
+The failing E2E path was PostgreSQL AI lease recovery. The reclaim query
+selected a `CASE` expression inferred by PostgreSQL as `integer`, while SQLx
+decoded it as `i64`; row retrieval succeeded but decoding failed before the
+queued/failed/cancelled update, causing the transaction to roll back on every
+reclaim attempt. The expression now explicitly casts both branches to
+`BIGINT`, and the regression contract verifies the fenced lease cleanup and
+requeue transition.
