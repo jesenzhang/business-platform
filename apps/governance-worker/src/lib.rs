@@ -260,6 +260,7 @@ where
             .lease_token()
             .ok_or(RepairError::LeaseLost)?
             .to_string();
+        eprintln!("[DEBUG-PLAN0005] worker stage=fence1_start");
         self.persistence
             .validate_repair_fence(
                 step.id(),
@@ -269,6 +270,7 @@ where
                 now,
             )
             .await?;
+        eprintln!("[DEBUG-PLAN0005] worker stage=fence1_ok");
         step = self
             .persistence
             .heartbeat_repair_step(
@@ -280,19 +282,24 @@ where
                 self.lease_duration_secs,
             )
             .await?;
+        eprintln!("[DEBUG-PLAN0005] worker stage=heartbeat1_ok");
+        eprintln!("[DEBUG-PLAN0005] worker stage=load_run_start");
         let Some(mut run) = self.persistence.load_run(step.run_id()).await? else {
             return Err(RepairError::Persistence);
         };
+        eprintln!("[DEBUG-PLAN0005] worker stage=load_run_ok");
         if run.command().integrity_finding_id != run.finding_id()
             || run.command().tenant_id != run.tenant_id()
         {
             return Err(RepairError::Conflict);
         }
+        eprintln!("[DEBUG-PLAN0005] worker stage=load_finding_start");
         let finding = self
             .persistence
             .load_finding(run.finding_id())
             .await?
             .ok_or(RepairError::Conflict)?;
+        eprintln!("[DEBUG-PLAN0005] worker stage=load_finding_ok");
         if finding.tenant_id() != run.tenant_id()
             || finding.resource_type() != run.command().target.resource_type
             || finding.resource_id() != run.command().target.resource_id
@@ -312,6 +319,7 @@ where
         ) {
             return Err(RepairError::InvalidTransition);
         }
+        eprintln!("[DEBUG-PLAN0005] worker stage=handler_start");
         let Some(handler) = self
             .handlers
             .get(&run.command().repair_type, run.command().repair_version)
@@ -319,6 +327,7 @@ where
         else {
             return Err(RepairError::InvalidDescriptor);
         };
+        eprintln!("[DEBUG-PLAN0005] worker stage=handler_ok");
         let descriptor = handler.descriptor();
         descriptor.validate()?;
         if descriptor.requires_approval && run.approved_by().is_none() {
@@ -339,6 +348,7 @@ where
             now,
             lease_expires_at: step.lease_expires_at().ok_or(RepairError::LeaseLost)?,
         };
+        eprintln!("[DEBUG-PLAN0005] worker stage=fence2_start");
         self.persistence
             .validate_repair_fence(
                 step.id(),
@@ -348,6 +358,7 @@ where
                 Utc::now(),
             )
             .await?;
+        eprintln!("[DEBUG-PLAN0005] worker stage=fence2_ok");
         let heartbeat_interval = TokioDuration::from_secs(
             self.heartbeat_seconds
                 .max(1)
@@ -456,6 +467,7 @@ where
         completed.succeed()?;
         run.mark_succeeded(Utc::now())?;
         let entry = ledger_entry(&run, &completed, &finding, &result, None, now)?;
+        eprintln!("[DEBUG-PLAN0005] worker stage=final_fence_start");
         self.persistence
             .validate_repair_fence(
                 completed.id(),
