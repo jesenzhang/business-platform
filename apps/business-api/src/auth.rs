@@ -1,6 +1,7 @@
 //! Authentication and tenant context extraction.
 //!
-//! Development mode: accepts a static dev token and extracts tenant from headers.
+//! Development mode: accepts a static dev token and uses a server-configured
+//! fixed identity.
 //! Production mode: validates JWT against OIDC issuer (skeleton for now).
 
 use axum::extract::{Request, State};
@@ -177,8 +178,8 @@ pub struct AuthMiddlewareConfig {
 ///
 /// In development mode (when `dev_auth_enabled` is true):
 /// - Accepts any Bearer token that equals the configured `dev_secret`
-/// - Reads `tenant_id` from the `X-Tenant-Id` header
-/// - Reads `user_id` from the `X-User-Id` header
+/// - Uses the server-configured tenant and user identity
+/// - Ignores request-controlled tenant, user, and permission headers
 ///
 /// In production mode:
 /// - Would validate JWT against the OIDC issuer (not yet implemented)
