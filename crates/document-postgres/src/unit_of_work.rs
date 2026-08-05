@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
+use audit::{
+    audit_chain_genesis, AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource,
+    AuditResult,
+};
 use document::domain::{
     AggregateVersion, ContentRevision, DocumentMetadata, RehydrateDocumentMetadata,
 };
@@ -289,7 +292,8 @@ async fn insert_audit(
     .fetch_optional(&mut **transaction)
     .await
     .map_err(map_sqlx_error)?
-    .flatten();
+    .flatten()
+    .unwrap_or_else(|| audit_chain_genesis(document.tenant_id()));
     let sequence = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(stream_sequence),0)+1 FROM audit_events WHERE tenant_id=$1",
     )
@@ -298,7 +302,7 @@ async fn insert_audit(
     .await
     .map_err(map_sqlx_error)?;
     let event = event
-        .with_chain_metadata(sequence, chrono::Utc::now(), 1, previous)
+        .with_chain_metadata(sequence, chrono::Utc::now(), 1, Some(previous))
         .map_err(|_| ApplicationPortError::Failed)?;
     sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)")
         .bind(event.id())
