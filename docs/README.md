@@ -111,24 +111,22 @@ docs/
 
 ## 8. 当前实施
 
-- 当前计划：[`plans/current/PLAN-0005-runtime-audit-integrity-repair.md`](plans/current/PLAN-0005-runtime-audit-integrity-repair.md)
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md`](plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md)（`Integrated`，main `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI `30868701290`）
+- 已归档：[`plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)（`Integrated`，main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI `31026047403`，Feature CI `31021778597`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 
-Phase 1 Foundation Integrity、Phase 2 Persistence and Query Hardening 与
-Phase 3 First Durable Business Flow 均已完成。PLAN-0002、PLAN-0003 与
-PLAN-0004 均采用 local solo fast-forward 且不创建 PR；PLAN-0004 集成 SHA
-为 `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI run `30868701290`
-已通过真实 PostgreSQL/MinIO、Document E2E 与架构门禁。Phase 4 Runtime
-Governance Foundation 的 PLAN-0005 已重开 Revision 1（Governance trust and
-correctness hardening）；旧候选为 `71a2a8495033aec7d8e40752fc80fd2ba30dc485`，
-旧证据 HEAD 为 `ab01288cd3477107c567e342ff45b7f624ec5396`。本计划不启动
-PLAN-0006。
+Phase 1 Foundation Integrity、Phase 2 Persistence and Query Hardening、
+Phase 3 First Durable Business Flow 与 Phase 4 Runtime Governance Foundation
+均已完成。PLAN-0002 至 PLAN-0005 均采用 local solo fast-forward 且不创建 PR；
+PLAN-0005 集成 SHA 为 `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI run
+`31026047403` 已通过真实 PostgreSQL/MinIO、E2E 与架构门禁。Runtime Audit、
+Integrity Finding、Controlled Repair、Repair Ledger 与 Lease/Fence Recovery
+已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。PLAN-0006 未启动。
 
 ## 9. 合并后的后续任务规则
 

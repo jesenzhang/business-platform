@@ -1,6 +1,6 @@
 # PLAN-0005: Runtime Audit, Data Integrity and Controlled Repair Foundation
 
-> Status: Accepted Candidate
+> Status: Integrated
 > Revision: 2
 > Revision Reason: Authorization, atomicity, lifecycle, and audit-chain hardening
 > Date: 2026-08-05
@@ -231,7 +231,7 @@ following results include the completed Feature CI acceptance evidence below.
 
 ## Revision 2 acceptance evidence (2026-08-05)
 
-Revision 2 is an Accepted Candidate on final commit `24e70f4`.
+Revision 2 was accepted on candidate commit `24e70f4` before solo-fast-forward integration.
 
 | Gate / requirement | Result | Evidence |
 |---|---|---|
@@ -250,3 +250,28 @@ queued/failed/cancelled update, causing the transaction to roll back on every
 reclaim attempt. The expression now explicitly casts both branches to
 `BIGINT`, and the regression contract verifies the fenced lease cleanup and
 requeue transition.
+
+## Integration and closeout (2026-08-06)
+
+Status: Integrated
+
+Implementation SHA: `24e70f4182ca3315d94033178952113c4faba717`
+Accepted Candidate SHA: `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`
+Feature CI: `31021778597` — PASS
+Evidence CI: `31022731371` — PASS
+Main integration SHA: `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`
+Main CI: `31026047403` — PASS
+Integration mode: solo-fast-forward
+Merge commit: NO
+GitHub Linux PostgreSQL/MinIO/E2E: PASS
+Windows PostgreSQL/MinIO: NOT RUN
+
+PostgreSQL inferred the AI reclaim CASE result as INTEGER, while SQLx
+decoded it as i64. Both CASE branches were explicitly cast to BIGINT.
+The PostgreSQL regression contract verifies that an expired running AI task
+is requeued and its lease owner, token, and expiry are cleared.
+
+The accepted limitations remain: PROC-INT-008 is metadata/checkpoint based;
+the hash chain is tamper evidence rather than WORM; and cross-bounded-context
+coordination uses local transactions, leases, idempotency, and reconciliation
+rather than distributed transactions. PLAN-0006 was not started.

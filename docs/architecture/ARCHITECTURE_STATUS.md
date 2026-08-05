@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-04
-> 当前阶段：Phase 4 Runtime Governance Foundation
-> 当前计划：`PLAN-0005-runtime-audit-integrity-repair`
+> 最后更新：2026-08-06
+> 当前阶段：Phase 4 Runtime Governance Foundation — Integrated
+> 当前计划：无（PLAN-0005 已 Integrated / Archived）
 > 集成方式：local solo fast-forward，无 PR
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -55,6 +55,20 @@
 > Implementation evidence is committed at `f1e10a0942c18715f5591b56619d5c6dae21f06e`;
 > the push attempt could not reach GitHub HTTPS/443, so no new Feature CI run
 > was created.
+
+> 2026-08-06: PLAN-0005 Revision 2 was integrated and archived at main
+> `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac` by solo fast-forward. Implementation
+> SHA is `24e70f4182ca3315d94033178952113c4faba717`; Candidate SHA is
+> `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`; Main CI `31026047403` passed all
+> six jobs, including GitHub Linux PostgreSQL/MinIO/E2E and Architecture Fitness.
+> Evidence CI `31022731371` and Feature CI `31021778597` also passed. Windows
+> PostgreSQL/MinIO remains NOT RUN.
+>
+> Runtime Audit, Integrity Finding, Controlled Repair, Repair Ledger, and
+> Lease/Fence Recovery are integrated. The accepted boundaries remain:
+> PROC-INT-008 is metadata/checkpoint based; the hash chain is tamper evidence,
+> not WORM; and cross-bounded-context coordination uses local transactions,
+> leases, idempotency, and reconciliation rather than distributed transactions.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
@@ -133,7 +147,7 @@ Hardening 与 Phase 3 First Durable Business Flow；PLAN-0001 至 PLAN-0004
   Document Processing 执行边界已落在独立 processing adapters 中；
 - Worker 与 Migration 已具备该固定切片的运行实现，其他 Agent Adapter 能力
   仍处于骨架阶段；Runtime Governance 的统一 Audit、Integrity 与 Repair
-  能力由 PLAN-0005 收敛；
+  能力已由 PLAN-0005 收敛并集成；
 - API/Event 契约尚未全部形成可生成 Schema；
 - 质量属性尚未形成性能和恢复证据；
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
@@ -213,7 +227,7 @@ PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
-PLAN-0005：Active，Revision 1（Governance trust and correctness hardening；previous candidate `71a2a8495033aec7d8e40752fc80fd2ba30dc485`；previous evidence HEAD `ab01288cd3477107c567e342ff45b7f624ec5396`）
+PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Implementation `24e70f4182ca3315d94033178952113c4faba717`；Candidate `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Main CI `31026047403`；Windows PostgreSQL/MinIO NOT RUN）
 ```
 
 ## 8. PLAN-0002 采用动作
