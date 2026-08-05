@@ -1,12 +1,13 @@
 # PLAN-0005: Runtime Audit, Data Integrity and Controlled Repair Foundation
 
 > Status: Active
-> Revision: 1
-> Revision Reason: Governance trust and correctness hardening
-> Date: 2026-08-04
+> Revision: 2
+> Revision Reason: Authorization, atomicity, lifecycle, and audit-chain hardening
+> Date: 2026-08-05
 > Owner: Platform Foundation / Runtime Governance
 > Base SHA: `6fd065c33471665e828a3da3a2cc3fae8d6d2afc`
 > Previous Candidate SHA: `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
+> Previous Candidate Feature CI: `30879843925` (`PASS`)
 > Previous Evidence HEAD: `ab01288cd3477107c567e342ff45b7f624ec5396`
 > Revision 1 Implementation SHA: `f1e10a0942c18715f5591b56619d5c6dae21f06e`
 > Integration Mode: local solo fast-forward
@@ -22,6 +23,31 @@ continues to own document revisions and storage references; Document
 Intelligence owns processing jobs, steps, AI tasks, candidates, and reviews.
 Governance may inspect those owners through typed query ports and may request
 only allow-listed owner operations through typed repair handlers.
+
+## Revision 2 scope
+
+Revision 1 candidate `71a2a8495033aec7d8e40752fc80fd2ba30dc485`
+passed Feature CI run `30879843925`, but the subsequent correctness review
+found security, transaction, concurrency, recovery, and persistence-decoding
+gaps that prevent integration. Revision 2 reopens the candidate to close those
+gaps before any fast-forward into `main`.
+
+| ID | Scope |
+|---|---|
+| R2-01 | Trusted authorization context |
+| R2-02 | Atomic repair creation |
+| R2-03 | Optimistic repair transitions |
+| R2-04 | Durable repair worker loop |
+| R2-05 | Repair retry/failure lifecycle |
+| R2-06 | Legacy audit chain boundary |
+| R2-07 | Fail-closed persistence decoding |
+| R2-08 | Startup rule registration integrity |
+| R2-09 | Regression and CI evidence |
+
+This revision does not introduce a generic scheduler, a workflow DAG, an
+arbitrary SQL repair surface, or distributed transactions. It does not start
+PLAN-0006. PLAN-0005 remains `Active` until the complete Revision 2 Feature CI
+evidence is green.
 
 ## Architecture preflight
 
