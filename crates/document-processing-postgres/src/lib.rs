@@ -4,7 +4,10 @@
 //! is fenced by the lease token and monotonically increasing fence version.
 
 use async_trait::async_trait;
-use audit::{AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource, AuditResult};
+use audit::{
+    audit_chain_genesis, AuditAction, AuditActor, AuditActorType, AuditEvent, AuditResource,
+    AuditResult,
+};
 use chrono::{DateTime, Duration, Utc};
 use data_repair::{
     RepairCommand, RepairError, RepairExecutionContext, RepairOutcome, RepairPreview, RepairResult,
@@ -1254,7 +1257,8 @@ async fn insert_unified_audit(
     .fetch_optional(&mut *connection)
     .await
     .map_err(map_sql_error)?
-    .flatten();
+    .flatten()
+    .unwrap_or_else(|| audit_chain_genesis(job.tenant_id()));
     let sequence = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(stream_sequence),0)+1 FROM audit_events WHERE tenant_id=$1",
     )
@@ -1263,7 +1267,7 @@ async fn insert_unified_audit(
     .await
     .map_err(map_sql_error)?;
     event = event
-        .with_chain_metadata(sequence, Utc::now(), 1, previous)
+        .with_chain_metadata(sequence, Utc::now(), 1, Some(previous))
         .map_err(|_| ProcessingRepositoryError::Failed)?;
     sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,details,trace_id,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,correlation_id,causation_id,reason,result,failure_code,before_hash,after_hash,changed_fields,schema_version,previous_hash,record_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)")
         .bind(event.id())
