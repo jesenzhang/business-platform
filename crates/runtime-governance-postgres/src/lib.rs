@@ -1355,7 +1355,7 @@ impl RepairPersistencePort for PostgresGovernanceStore {
         now: DateTime<Utc>,
     ) -> Result<(), RepairError> {
         let owned = sqlx::query_scalar::<_, i64>(
-            "SELECT 1 FROM data_repair_steps s JOIN data_repair_runs r ON r.id=s.repair_run_id AND r.tenant_id=s.tenant_id AND r.finding_id=s.finding_id JOIN data_integrity_findings f ON f.id=s.finding_id AND f.tenant_id=s.tenant_id WHERE s.id=$1 AND s.status='running' AND s.lease_owner=$2 AND s.lease_token=$3 AND s.fence_version=$4 AND s.lease_expires_at > $5 AND r.status='running' AND f.status='repairing'",
+            "SELECT 1::bigint FROM data_repair_steps s JOIN data_repair_runs r ON r.id=s.repair_run_id AND r.tenant_id=s.tenant_id AND r.finding_id=s.finding_id JOIN data_integrity_findings f ON f.id=s.finding_id AND f.tenant_id=s.tenant_id WHERE s.id=$1 AND s.status='running' AND s.lease_owner=$2 AND s.lease_token=$3 AND s.fence_version=$4 AND s.lease_expires_at > $5 AND r.status='running' AND f.status='repairing'",
         )
         .bind(step_id)
         .bind(lease_owner)

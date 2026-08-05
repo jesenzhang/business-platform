@@ -130,59 +130,6 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
         max_attempts: 3,
     };
     assert!(worker.execute_one().await.expect("execute repair"));
-    let run_state: (String, Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT status, failure_code, last_error_category FROM data_repair_runs WHERE id=$1",
-    )
-    .bind(run.id())
-    .fetch_one(&pool)
-    .await
-    .expect("read repair run state");
-    let step_state: (String, Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT status, failure_code, last_error_category FROM data_repair_steps WHERE id=$1",
-    )
-    .bind(step.id())
-    .fetch_one(&pool)
-    .await
-    .expect("read repair step state");
-    let ai_task_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM document_ai_tasks WHERE tenant_id=$1 AND job_id=$2",
-    )
-    .bind(tenant_id)
-    .bind(job_id)
-    .fetch_one(&pool)
-    .await
-    .expect("read debug AI task count");
-    let processing_audit_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM document_processing_audit_events WHERE tenant_id=$1 AND job_id=$2",
-    )
-    .bind(tenant_id)
-    .bind(job_id)
-    .fetch_one(&pool)
-    .await
-    .expect("read debug processing audit count");
-    let unified_audit_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM audit_events WHERE tenant_id=$1 AND action='document_processing.ai_task_requeued'",
-    )
-    .bind(tenant_id)
-    .fetch_one(&pool)
-    .await
-    .expect("read debug unified audit count");
-    let owner_outbox_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM outbox_events WHERE tenant_id=$1 AND event_type='document.processing.waiting-for-ai.v1'",
-    )
-    .bind(tenant_id.to_string())
-    .fetch_one(&pool)
-    .await
-    .expect("read debug owner outbox count");
-    let repair_ledger_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM data_repair_events WHERE repair_run_id=$1")
-            .bind(run.id())
-            .fetch_one(&pool)
-            .await
-            .expect("read debug repair ledger count");
-    eprintln!(
-        "[DEBUG-PLAN0005] run={run_state:?} step={step_state:?} ai_tasks={ai_task_count} processing_audits={processing_audit_count} unified_audits={unified_audit_count} owner_outbox={owner_outbox_count} repair_ledger={repair_ledger_count}"
-    );
     let finding = governance
         .load_finding(finding_id)
         .await

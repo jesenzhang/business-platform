@@ -2664,7 +2664,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
             .begin()
             .await
             .map_err(|_| RepairError::Persistence)?;
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=begin");
         let Some(job) =
             load_job_for_update(&mut transaction, command.tenant_id, command.target.uuid()?)
                 .await
@@ -2672,7 +2671,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         else {
             return Err(RepairError::Conflict);
         };
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=load_job");
         let before = job.aggregate_version().value();
         if command
             .target
@@ -2691,7 +2689,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         .fetch_optional(&mut *transaction)
         .await
         .map_err(|_| RepairError::Persistence)?;
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=active_query");
         if active.is_some() {
             transaction
                 .commit()
@@ -2708,7 +2705,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         .await
         .map_err(|_| RepairError::Persistence)?
         .flatten();
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=checkpoint_query");
         let artifact =
             artifact_from_checkpoint(checkpoint.as_ref(), job.document_content_revision())?;
         let next_attempt = sqlx::query_scalar::<_, Option<i32>>(
@@ -2721,9 +2717,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         .map_err(|_| RepairError::Persistence)?
         .unwrap_or(-1)
         .saturating_add(1);
-        eprintln!(
-            "[DEBUG-PLAN0005] postgres owner stage=attempt_query next_attempt={next_attempt}"
-        );
         if next_attempt >= job.max_attempts() {
             return Err(RepairError::Conflict);
         }
@@ -2739,10 +2732,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
             .execute(&mut *transaction)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        eprintln!(
-            "[DEBUG-PLAN0005] postgres owner stage=insert_task rows={}",
-            inserted.rows_affected()
-        );
         if inserted.rows_affected() != 1 {
             return Err(RepairError::Conflict);
         }
@@ -2754,10 +2743,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
             .execute(&mut *transaction)
             .await
             .map_err(|_| RepairError::Persistence)?;
-        eprintln!(
-            "[DEBUG-PLAN0005] postgres owner stage=update_job rows={}",
-            updated.rows_affected()
-        );
         if updated.rows_affected() != 1 {
             return Err(RepairError::Conflict);
         }
@@ -2770,7 +2755,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         )
         .await
         .map_err(|_| RepairError::Persistence)?;
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=outbox");
         insert_processing_audit(
             &mut transaction,
             &job,
@@ -2781,7 +2765,6 @@ impl ProcessingRepairPort for PostgresProcessingStore {
         )
         .await
         .map_err(|_| RepairError::Persistence)?;
-        eprintln!("[DEBUG-PLAN0005] postgres owner stage=processing_audit");
         transaction
             .commit()
             .await
