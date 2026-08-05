@@ -228,9 +228,22 @@ async fn document_http_flow_is_atomic_idempotent_and_tenant_scoped() {
         .expect("router must respond");
     assert_eq!(own_get.status(), StatusCode::OK);
 
-    // Tenant scope comes from the trusted server-side principal. A client
-    // header must not switch the identity used by the handler, so create a
-    // separate router configured for tenant_b to exercise the real boundary.
+    // The client-controlled tenant header cannot switch the trusted tenant_a
+    // principal, so this request still reads the document successfully.
+    let forged_tenant_get = router
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/api/v1/documents/{document_id}"),
+            tenant_b,
+            None,
+        ))
+        .await
+        .expect("router must respond");
+    assert_eq!(forged_tenant_get.status(), StatusCode::OK);
+
+    // A genuinely cross-tenant request uses a router whose server-configured
+    // principal belongs to tenant_b and cannot see tenant_a's document.
     let tenant_b_router = test_router(pool.clone(), tenant_b);
     let cross_tenant_get = tenant_b_router
         .oneshot(request(
