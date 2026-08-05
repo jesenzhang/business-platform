@@ -213,7 +213,7 @@ the boundary recoverable, but a distributed transaction is intentionally not
 introduced.
 ## Revision 2 local evidence (2026-08-05)
 
-Revision 2 implementation is present through local commit `c22d9f3`. The
+Revision 2 implementation is present through local commit `be1a399`. The
 following results are local evidence only; the plan remains `Active` until the
 branch can be pushed and the complete Feature CI succeeds.
 
@@ -227,5 +227,6 @@ branch can be pushed and the complete Feature CI succeeds.
 | R2-07/R2-08 decoding and startup integrity | PASS | Stored enum parsing fails closed and built-in rule registration errors fail worker startup. |
 | fmt / check / clippy / architecture | PASS | Local fmt, workspace check, workspace Clippy with `-D warnings`, and `scripts/check-architecture.ps1` pass. |
 | Targeted worker/governance tests | PASS | `governance-worker`, `data-repair`, and SQLite governance suites pass. |
+| Authentication regression tests | PASS | `business-api` security suite: 10 passed; PostgreSQL document E2E compiles, but execution is `NOT RUN` locally because `DATABASE_URL` is not configured. |
 | Full workspace tests | BLOCKED | `cargo test --workspace --all-features` exceeded the local 120-second execution limit without a reported test failure. |
-| Feature CI / remote integration | BLOCKED | `git fetch origin --prune` cannot connect to GitHub from this environment; no Feature CI, Main CI, archive, or branch deletion was performed. |
+| Feature CI / remote integration | BLOCKED | Feature CI run `30997090891` reached Governance PostgreSQL E2E successfully but failed the business-api PostgreSQL tenant-scope assertion; commits `45a2fe9` and `be1a399` align that test with trusted server-side identity. Push/rerun is blocked because this environment cannot connect to GitHub. |
