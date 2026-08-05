@@ -19,7 +19,9 @@ async fn setup(pool: &PgPool) -> (Uuid, Uuid, Uuid, ObjectKey) {
     let object_key = ObjectKey::new(format!(
         "tenants/{tenant}/documents/{document}/v1/processing.txt"
     ))
-    .unwrap_or_else(|_| unreachable!());
+    .unwrap_or_else(|error| {
+        panic!("object key construction failed tenant={tenant} document={document}: {error:?}")
+    });
     sqlx::query(
         "INSERT INTO documents (id, tenant_id, original_filename, content_type, object_key, status, version, content_revision, created_by, created_at, updated_at) VALUES ($1, $2, 'processing.txt', 'text/plain', $4, 'active', 1, 1, $3, NOW(), NOW())",
     )
@@ -29,7 +31,7 @@ async fn setup(pool: &PgPool) -> (Uuid, Uuid, Uuid, ObjectKey) {
     .bind(object_key.as_str())
     .execute(pool)
     .await
-    .unwrap_or_else(|_| unreachable!());
+    .unwrap_or_else(|error| panic!("document setup insert failed tenant={tenant} document={document}: {error:?}"));
     (tenant, document, user, object_key)
 }
 
@@ -42,7 +44,7 @@ async fn postgres_minio_processing_adapter_round_trip() {
     });
     let pool = PgPool::connect(&url)
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("PostgreSQL connection failed url={url}: {error:?}"));
     let endpoint =
         std::env::var("MINIO_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:9000".to_string());
     let access_key = std::env::var("MINIO_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string());
@@ -58,7 +60,9 @@ async fn postgres_minio_processing_adapter_round_trip() {
             "text/plain",
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| {
+            panic!("MinIO put_object failed tenant={tenant} object_key={object_key:?}: {error:?}")
+        });
     let store = PostgresProcessingStore::new(pool.clone());
     let now = Utc::now() - Duration::seconds(1);
     let job = ProcessingJob::queue(
@@ -70,17 +74,24 @@ async fn postgres_minio_processing_adapter_round_trip() {
         3,
         now,
     )
-    .unwrap_or_else(|_| unreachable!());
-    store.create(&job).await.unwrap_or_else(|_| unreachable!());
+    .unwrap_or_else(|error| {
+        panic!("processing job construction failed tenant={tenant} document={document}: {error:?}")
+    });
+    store.create(&job).await.unwrap_or_else(|error| {
+        panic!(
+            "processing job create failed tenant={tenant} job_id={}: {error:?}",
+            job.id()
+        )
+    });
     let claimed = store
         .claim_next("minio-worker", Utc::now(), 30)
         .await
-        .unwrap_or_else(|_| unreachable!())
-        .unwrap_or_else(|| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure operation failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()))
+        .unwrap_or_else(|| panic!("infrastructure claim returned no item tenant={tenant} job_id={} stage=postgres_minio_round_trip", job.id()));
     let bytes = storage
         .get_object(&object_key)
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     let run = FixedPipelineRunner
         .run_inline(
             &claimed.job,
@@ -90,7 +101,7 @@ async fn postgres_minio_processing_adapter_round_trip() {
             &DeterministicLocalExtractor,
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     let business_fence = ExecutionFence::new(
         "minio-worker",
         claimed.lease_token.clone(),
@@ -103,11 +114,11 @@ async fn postgres_minio_processing_adapter_round_trip() {
         store
             .start_step(tenant, job.id(), step, &business_fence, Utc::now())
             .await
-            .unwrap_or_else(|_| unreachable!());
+            .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
         store
             .complete_step(tenant, job.id(), step, None, &business_fence, Utc::now())
             .await
-            .unwrap_or_else(|_| unreachable!());
+            .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     }
     store
         .start_step(
@@ -118,7 +129,7 @@ async fn postgres_minio_processing_adapter_round_trip() {
             Utc::now(),
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     let task = store
         .enqueue_ai_and_wait(
             tenant,
@@ -135,12 +146,38 @@ async fn postgres_minio_processing_adapter_round_trip() {
             Utc::now(),
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
+    let ai_claimed_at = Utc::now();
     let ai_claim = store
-        .claim_next_ai_task("minio-ai-worker", Utc::now(), 30)
+        .claim_next_ai_task("minio-ai-worker", ai_claimed_at, 30)
         .await
-        .unwrap_or_else(|_| unreachable!())
-        .unwrap_or_else(|| unreachable!());
+        .unwrap_or_else(|error| {
+            panic!(
+                "AI task claim failed tenant={tenant} job_id={} stage=extract_fields: {error:?}",
+                job.id()
+            )
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "AI task claim returned no task tenant={tenant} job_id={} stage=extract_fields",
+                job.id()
+            )
+        });
+    assert_eq!(ai_claim.id, task.id, "AI task claim selected unexpected task tenant={tenant} job_id={} expected_task_id={} actual_task_id={}", job.id(), task.id, ai_claim.id);
+    assert_eq!(ai_claim.tenant_id, tenant);
+    assert_eq!(ai_claim.job_id, job.id());
+    assert_eq!(ai_claim.step_kind, ProcessingStepKind::ExtractFields);
+    assert_eq!(ai_claim.status, "running");
+    assert_eq!(ai_claim.lease_owner.as_deref(), Some("minio-ai-worker"));
+    assert!(!ai_claim
+        .lease_token
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty());
+    assert!(ai_claim.fence_version > 0);
+    assert!(ai_claim
+        .lease_expires_at
+        .is_some_and(|expires| expires > ai_claimed_at));
     store
         .complete_ai_and_resume(
             CompleteAiTaskCommand {
@@ -157,12 +194,12 @@ async fn postgres_minio_processing_adapter_round_trip() {
             Utc::now(),
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("complete_ai_and_resume failed tenant={tenant} job_id={} task_id={} stage=extract_fields: {error:?}", job.id(), task.id));
     let candidate_claim = store
         .claim_next("minio-worker-2", Utc::now(), 30)
         .await
-        .unwrap_or_else(|_| unreachable!())
-        .unwrap_or_else(|| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure operation failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()))
+        .unwrap_or_else(|| panic!("infrastructure claim returned no item tenant={tenant} job_id={} stage=postgres_minio_round_trip", job.id()));
     let candidate_fence = ExecutionFence::new(
         "minio-worker-2",
         candidate_claim.lease_token,
@@ -177,7 +214,7 @@ async fn postgres_minio_processing_adapter_round_trip() {
             Utc::now(),
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     store
         .save_candidate_and_wait_for_review(
             tenant,
@@ -187,27 +224,27 @@ async fn postgres_minio_processing_adapter_round_trip() {
             Utc::now(),
         )
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     assert!(store
         .detail(tenant, job.id())
         .await
-        .unwrap_or_else(|_| unreachable!())
+        .unwrap_or_else(|error| panic!("infrastructure operation failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()))
         .and_then(|detail| detail.candidate)
         .is_some());
     storage
         .delete(&object_key)
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     sqlx::query("DELETE FROM document_processing_jobs WHERE tenant_id = $1 AND document_id = $2")
         .bind(tenant)
         .bind(document)
         .execute(&pool)
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
     sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
         .bind(tenant)
         .bind(document)
         .execute(&pool)
         .await
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("infrastructure step failed tenant={tenant} job_id={} stage=postgres_minio_round_trip: {error:?}", job.id()));
 }
