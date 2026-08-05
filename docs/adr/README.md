@@ -37,6 +37,7 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0010`](ADR-0010-durable-processing-job-and-fixed-pipeline.md) | Durable Processing Job and Fixed Pipeline | Accepted | Durable job state with a versioned fixed MVP pipeline, not a general workflow engine |
 | [`ADR-0011`](ADR-0011-worker-leases-fencing-and-crash-recovery.md) | Worker Leases, Fencing, and Crash Recovery | Accepted | PostgreSQL claim/fencing and SQLite single-process recovery semantics |
 | [`ADR-0012`](ADR-0012-document-candidate-and-human-review.md) | Document Candidate and Human Review | Accepted | Versioned extraction candidates remain suggestions until optimistic human review |
+| [`ADR-0013`](ADR-0013-platform-native-audit-analytics-and-visualization.md) | 平台原生审计、分析与可视化 | Accepted | 业务模块声明领域语义，平台统一提供审计、投影、指标、受控查询、Dashboard、报表与 Agent 分析边界 |
 
 ## 4. ADR-0003 的完整 Baseline
 
@@ -57,7 +58,17 @@ ADR-0003 不是只约束代码目录，而是由完整服务端架构文档集�
 
 后续实现任务必须遵循以上文档，而不是只引用 ADR 标题。
 
-## 5. 后续 ADR 触发条件
+## 5. ADR-0013 的完整 Baseline
+
+ADR-0013 由以下文档共同落实：
+
+- `docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`
+- `docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md`
+- `企业AI业务平台与智能助手总体架构方案_v2.md`
+
+后续涉及审计、分析投影、指标、Dataset、Dashboard、报表、导出或 Agent 分析的任务，必须同时遵守数据所有权、持久化查询、安全、部署、可观测性和质量属性 Baseline。
+
+## 6. 后续 ADR 触发条件
 
 以下变化必须创建或替代 ADR：
 
@@ -68,11 +79,12 @@ ADR-0003 不是只约束代码目录，而是由完整服务端架构文档集�
 - 改变身份、租户和授权模型；
 - 引入全局基础设施、框架或供应商；
 - 改变长时任务 claim、lease、重试和恢复语义；
+- 改变平台级审计、指标语义、分析查询或分析存储边界；
 - 改变 API/Event 兼容性策略；
 - 调整关键质量属性、RPO/RTO 或安全风险接受；
 - 建立或废弃遗留迁移路径。
 
-## 6. 决策原则
+## 7. 决策原则
 
 ADR 优先记录稳定的架构语义和约束，而不是把当前产品名称提升为业务核心概念。
 
@@ -86,7 +98,7 @@ ADR 优先记录稳定的架构语义和约束，而不是把当前产品名称�
 迁移和回滚
 ```
 
-## 7. 模板与治理
+## 8. 模板与治理
 
 模板见 [`../templates/ADR_TEMPLATE.md`](../templates/ADR_TEMPLATE.md)。
 
