@@ -155,7 +155,7 @@ Agent 可以理解意图、补充参数和提出结构化操作，但最终执�
 │                                                              │
 │ Identity   Organization   Customer   Contract   Project       │
 │ Approval   Finance        Document   Notification   Audit     │
-│ Runtime Governance   Analytics / Visualization               │
+│ Runtime Governance   Analytics / Visualization (Planned)    │
 │                                                              │
 │ Domain Model / Application Service / Repository / Policy     │
 │ Transaction / State Machine / Domain Event / Validation      │
@@ -1056,28 +1056,92 @@ Loki + Tempo
 
 ## 19. 分阶段实施
 
-### 已完成：基础平台与 Runtime Governance
+### 19.1 已完成阶段
 
-以下能力已在主干集成并归档：
+以下阶段已经在主干集成并归档：
 
-- Rust 服务基座、核心业务垂直切片和文档处理固定 Pipeline；
-- Runtime Audit；
-- Integrity Finding；
-- Controlled Repair；
-- Repair Ledger；
-- Lease/Fence Recovery。
+1. **Foundation Integrity**：Rust 服务基座、分层依赖、基础错误/配置/对象存储/消息能力和首个业务垂直切片。
+2. **Persistence and Query Hardening**：Persistence/Query seam、PostgreSQL/SQLite 适配边界、Read DTO、幂等、游标和查询契约。
+3. **Durable Document Processing MVP**：固定 `ValidateSource → DetectType → ExtractText → ExtractFields → ValidateCandidate → AwaitReview` Pipeline，以及 Job/Step/AI Task、租约、fencing、重试、取消和恢复。
+4. **Runtime Governance Foundation**：Runtime Audit、Integrity Finding、Controlled Repair、Repair Ledger 和 Lease/Fence Recovery。
 
-PLAN-0005 已 Integrated / Archived。其既有审计原子性、Finding、Repair 和 Ledger 语义继续由对应 Baseline 约束；本架构不重新定义它们。
+这些阶段不等于完整业务平台、通用 Workflow、完整 Agent 或 Analytics Runtime 已经实现。PLAN-0005 已 Integrated / Archived；其既有审计原子性、Finding、Repair 和 Ledger 语义继续由对应 Baseline 约束，本架构不重新定义它们。
 
-### 后续阶段：平台原生 Analytics/Visualization
+### 19.2 后续业务与平台阶段
 
-1. **分析投影基座**：事件/Outbox 消费、Inbox、offset、幂等、重放、重建、缺口、血缘和质量检查。
+#### 核心业务领域迁移与建模
+
+- Identity / Organization；
+- Customer；
+- Contract；
+- Approval；
+- Project；
+- Finance；
+- Notification；
+- 其他业务 Bounded Context。
+
+迁移以完整业务能力为单位，先建立统一语言、数据所有权、不变量和应用用例，再逐步切换读写；不得按 Controller、数据库表或 SDK 逐行翻译。
+
+#### AI 业务能力扩展
+
+- AI Provider 抽象与替换策略；
+- OCR / LLM / VLM / Parser；
+- 文档抽取、分类、摘要和其他业务 AI 能力；
+- 版本化候选结果、证据和人工复核；
+- Provider 故障隔离、成本预算、重试、降级和恢复。
+
+PLAN-0004 已完成固定 Document Processing 切片，但不代表全部 AI Application 能力已经完成。
+
+#### 通用 Durable Task / Workflow
+
+- Durable Task Execution；
+- 定时任务和可靠唤醒；
+- Process Manager / Saga；
+- 重试、补偿、取消、超时和恢复；
+- 人工工作流与介入点；
+- 严格分离业务状态、业务流程状态和执行状态。
+
+当前只有 Document Processing 固定 Pipeline 具备该类运行实现；不能把它声称为通用 Workflow 已实现。
+
+#### 平台原生 Analytics / Visualization
+
+1. **分析投影基座**：事件/Outbox 消费、Inbox、offset、幂等、版本、重放、重建、重复/乱序/缺口处理、血缘和质量检查。
 2. **指标语义层**：Metric、Measure、Dimension、Time Dimension、Dataset、Metric Version、Filter Policy 和 Lineage。
 3. **Analytics Query Service**：身份、租户、行列策略、脱敏、查询预算、超时、并发、扫描量、结果限制和查询审计。
-4. **声明式 Dashboard 与报表**：共享受控查询、下钻、快照、报表产物、导出和恢复。
+4. **声明式 Dashboard 与 Report**：共享受控查询、下钻、快照、报表产物、导出和恢复。
 5. **Agent 受控分析技能**：只读白名单工具、口径/新鲜度披露和受限导出，仍不得直接 SQL 或访问数据库。
 
-每个后续阶段必须以独立 PLAN 实施，提供契约、性能、恢复、安全、可观测性和架构门禁证据；本 PR 只更新架构文档。
+Analytics Baseline 已由 ADR-0017 建立，但 Runtime 尚未实现；以上五步必须通过后续独立 PLAN 推进，不能写成当前已交付能力。
+
+#### Agent 只读与分析能力
+
+- 受控业务查询和状态查询；
+- 已发布 Metric Version 的指标查询；
+- Dashboard 和 Report 读取；
+- 用户身份、委托关系和租户传播；
+- Skill 选择、参数校验和权限拒绝；
+- 口径、数据新鲜度、分页和截断状态披露。
+
+Agent 仍只能调用白名单 Application/Query 能力，不得生成或执行任意 SQL、浏览 Schema、查询任意表或访问分析服务外的数据库凭证。
+
+#### Agent 受控写入
+
+- 服务端 ActionPlan；
+- `Prepare → Preview → Confirm → Execute`；
+- 乐观锁和资源版本检查；
+- 二次认证和高风险审批；
+- 幂等、批量上限和风险分级；
+- 完整 AuditEvent、结果和失败证据。
+
+#### 高级智能化
+
+- 跨系统业务流程；
+- 主动通知和建议；
+- 专业领域 Agent；
+- 桌面、移动和语音入口；
+- 仅在明确业务价值、权限/审计/成本治理和故障恢复成熟后引入多 Agent。
+
+每个后续阶段必须以独立 PLAN 实施，提供契约、性能、恢复、安全、可观测性和架构门禁证据；本 PR 仍只更新架构文档。
 
 ---
 

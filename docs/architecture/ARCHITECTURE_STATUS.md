@@ -155,6 +155,23 @@ Hardening 与 Phase 3 First Durable Business Flow；PLAN-0001 至 PLAN-0004
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
 - 生产 Runbook 尚未完成。
 
+## 3.1 总体架构第 19 章后续路线
+
+与总体架构第 19 章保持一致，以下能力仍未完成，不能从当前 Runtime Governance 或
+Document Processing 实现推断为已交付：
+
+- 核心业务领域迁移与建模：Identity/Organization、Customer、Contract、Approval、
+  Project、Finance、Notification 和其他 Bounded Context；
+- AI 业务能力扩展：Provider、OCR/LLM/VLM/Parser、抽取/分类/摘要、候选复核、成本和恢复；
+- 通用 Durable Task / Workflow：定时任务、Process Manager、重试、补偿、取消、恢复和人工工作流；
+- 平台原生 Analytics/Visualization：投影基座、指标语义、Analytics Query Service、
+  Dashboard/Report 和受控 Agent 分析技能，Runtime 尚未实现；
+- Agent 只读与分析、Agent 受控写入，以及高级智能化和桌面/移动/语音入口。
+
+当前只有 PLAN-0004 的固定 Document Processing Pipeline 和 PLAN-0005 的 Runtime
+Governance Foundation 具备集成运行实现；通用 Workflow、完整 Agent 和 Analytics
+Runtime 均仍需独立 PLAN。
+
 ## 4. PLAN-0001 集成结果
 
 `PLAN-0001` 当前为 `Integrated / Archived`。其候选提交
