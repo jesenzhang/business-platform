@@ -1,9 +1,9 @@
 # 服务端后端架构清单与执行契约
 
 > 文档 ID：ARCH-MANIFEST-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
-> 生效日期：2026-07-30  
+> 生效日期：2026-08-06  
 > 适用范围：所有服务端设计、计划、代码、测试、部署与审查任务
 
 ## 1. 目的
@@ -18,6 +18,7 @@
 + 数据所有权与一致性
 + 接口、事件与集成契约
 + 长时任务与流程协调
++ Enterprise AI Workspace 与 Agent Capability
 + 安全、质量属性与可运维性
 + 部署、可观测性与演进治理
 + 自动化架构适配门禁
@@ -33,6 +34,7 @@
 | 业务边界 | `BOUNDED_CONTEXT_MAP.md` | 系统由哪些业务上下文组成 |
 | 数据与一致性 | `DATA_OWNERSHIP_AND_CONSISTENCY.md` | 谁拥有数据、如何保证一致性 |
 | 长时任务 | `WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md` | 长任务、流程与业务状态如何分离 |
+| Enterprise AI Workspace | `ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md` | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 如何与业务平台分层 |
 | 质量属性 | `QUALITY_ATTRIBUTE_SCENARIOS.md` | 性能、可用性、恢复、安全目标 |
 | 安全架构 | `SECURITY_ARCHITECTURE.md` | 身份、租户、授权和数据保护 |
 | 部署架构 | `DEPLOYMENT_ARCHITECTURE.md` | 进程、节点、环境与扩缩容 |
@@ -50,6 +52,15 @@
 | 查询与数据库适配 | `../standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md` | Read DTO、分页、查询性能、SQL/ORM 与层级数据规则 |
 
 任何单份文档都不能脱离其余文档单独解释为完整架构。
+
+涉及 AI Workspace、Agent、Skill、Context、Tool、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 的任务，必须同时遵守：
+
+```text
+ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
+SECURITY_ARCHITECTURE.md
+OBSERVABILITY_ARCHITECTURE.md
+ADR-0017-enterprise-ai-workspace-and-capability-security.md
+```
 
 ## 3. 架构决策层级
 
@@ -108,6 +119,18 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 
 能够通过依赖检查、契约测试、集成测试和 CI 验证的规则，不应长期只依赖人工记忆。
 
+### 4.11 Agent 权限必须任务化和资源化
+
+Agent 传播原用户委托身份，但不得自动继承用户全部环境权限。每个 Agent Run 只能通过短期、可撤销、租户和资源范围明确的 Capability Grant 调用白名单业务 Tool。
+
+### 4.12 Workspace 和 Artifact 不得成为第二业务内核
+
+Workspace、Conversation、Skill、Context、Observation、Artifact 和 Generated App 可以拥有自身产品状态，但不得拥有合同、客户、审批、财务、项目或文档正式状态。正式业务写入只能进入拥有该事实的 Application Use Case。
+
+### 4.13 生成代码必须独立隔离
+
+任何 Agent 生成代码不得在 `business-api`、业务 Worker、AI Worker 或 Agent Adapter 进程内执行。未来 Generated App 必须通过独立 Sandbox Runtime 和 Capability Binding 访问业务能力。
+
 ## 5. 新任务架构准入
 
 任何新增能力在进入编码前必须回答：
@@ -123,7 +146,18 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 9. 需要满足哪些质量属性场景？
 10. 是否改变公开契约、数据所有权、部署边界或长期技术决策？
 
-缺少以上关键答案时，不应直接以数据库表或 Handler 为起点实施。
+Agent/Workspace 相关任务还必须回答：
+
+11. Workspace、Agent Run、Skill、Context、Tool 或 Artifact 中谁拥有该状态？
+12. Agent 使用什么 Delegated Principal 和 Capability Grant？
+13. Grant 的资源、动作、字段、期限和撤销边界是什么？
+14. Tool 是否只调用公开 Application API/Port？
+15. 读取数据是否产生 Observation，派生产物如何重新授权？
+16. 是否意外引入通用 SQL、Shell、文件系统、任意 HTTP 或数据库凭证？
+17. Agent Runtime 是否仍可替换？
+18. 生成代码是否被错误地放入核心业务进程？
+
+缺少以上关键答案时，不应直接以数据库表、Handler、Prompt、Skill 文件、MCP 配置或 SDK 为起点实施。
 
 ## 6. 计划文档要求
 
@@ -140,6 +174,16 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 - 架构适配测试；
 - 文档同步清单。
 
+Agent/Workspace 计划还必须列出：
+
+- Workspace/Registry/Run/Artifact 数据所有者；
+- Delegation 与 Capability 模型；
+- Tool 白名单和风险等级；
+- Observation/Artifact lineage；
+- Agent Runtime 可替换契约；
+- Prompt Injection 和敏感数据最小化；
+- Generated App 是否明确排除或具有独立 ADR。
+
 计划不得用具体基础设施操作代替业务和能力设计。
 
 ## 7. 代码评审要求
@@ -155,7 +199,13 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 - 是否实现必要的幂等、冲突和补偿；
 - 是否更新接口、事件、迁移和架构文档；
 - 是否增加相应层级的测试；
-- 是否通过架构 Fitness Functions。
+- 是否通过架构 Fitness Functions；
+- Agent Adapter 是否直接访问业务数据库；
+- Skill 是否复制业务规则；
+- Tool 参数是否可以扩大 Capability 范围；
+- Observation 是否泄漏无界敏感内容；
+- Artifact 分享是否重新验证来源访问要求；
+- Agent 生成代码是否进入核心业务进程。
 
 ## 8. 完成定义
 
@@ -169,6 +219,16 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 + 测试和 CI 通过
 + 架构文档同步
 + 必要 ADR 已接受
+```
+
+Agent/Workspace 任务还必须证明：
+
+```text
+Task Capability 不扩权
++ Agent Runtime 可替换
++ Tool 无直接持久化绕过
++ Observation/Artifact 不泄漏
++ 业务平台在 Agent 停止后仍正常
 ```
 
 仅“代码可以运行”不能视为架构完成。
@@ -185,26 +245,40 @@ Bounded Context 首先表现为代码、数据和治理边界。只有出现客�
 - 引入全局框架或基础设施产品；
 - 改变长时任务可靠性语义；
 - 改变公开 API 或事件的兼容性策略；
-- 接受偏离质量属性基线的长期风险。
+- 接受偏离质量属性基线的长期风险；
+- 选择 Agent Runtime 作为长期强依赖；
+- 选择 workerd、WASI、容器、isolate 或 microVM 作为 Generated App 全局运行时；
+- 改变 Capability、Observation 或 Artifact 的长期所有权与安全语义。
 
 ## 10. 对当前阶段的约束
 
-当前 `PLAN-0001` 属于基础服务加固，不负责完成全部业务建模，但其结果必须：
+PLAN-0001 至 PLAN-0005 已完成基础服务、持久化查询、Durable Document Processing 与 Runtime Governance。
 
-- 为上述架构提供可实施的代码骨架；
-- 不固化错误的数据所有权；
-- 不让基础设施实现进入核心层；
-- 通过首个垂直切片证明分层、端口、事务、租户和事件边界可行；
-- 在合并前同步本架构文档集。
+下一阶段 PLAN-0006 只允许建立 Enterprise AI Workspace 的最小基础和一个只读业务垂直切片。其结果必须：
+
+- 不改变现有业务数据所有权；
+- 不复制 Runtime Audit 或 Durable Processing；
+- 不让 Agent Adapter 直接持久化业务数据；
+- 证明 Workspace、Registry、Capability、Tool、Observation 和流式恢复边界；
+- 不引入任意 Generated App、通用工具或高风险业务写入；
+- 在合并前通过新增 Agent/Workspace Fitness Functions。
 
 ## 11. 合并与采用
 
-本架构文档位于 PR #2 的 `docs/ddd-backend-architecture` 分支。在 PR #2 合并前，其他实现分支可读取该分支作为待生效基线；PR #2 合并后，所有实现任务必须以 `origin/main` 中的本架构文档集为权威来源。
+本清单和专题 Baseline 位于文档分支时，PLAN-0006 不得被描述为 Active。文档变更进入 `main` 后，后续 Agent/Workspace 实现必须以 `origin/main` 中的以下文件为权威来源：
 
-正在实施的 PLAN-0001 分支必须在最终审查前同步合并后的 `main`，解决冲突并重新运行架构门禁。不得以“计划启动时尚无此文档”为理由保留与本架构冲突的实现。
+```text
+docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
+docs/adr/ADR-0017-enterprise-ai-workspace-and-capability-security.md
+docs/plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md
+```
+
+正在实施的后续分支必须在最终审查前同步合并后的 `main`，解决冲突并重新运行架构门禁。
 
 ## 12. 最终原则
 
 > 后续任务不是“参考”本架构，而是必须证明符合本架构。
 
 > 架构 Baseline 定义长期边界，计划定义阶段实施，代码提供实现证据，测试和 CI 提供持续证明。
+
+> Agent 负责理解和协助，Capability 限制其可做之事，业务 Application Service 对最终事实负责。
