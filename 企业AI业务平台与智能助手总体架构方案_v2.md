@@ -1,15 +1,17 @@
 # 企业 AI 业务平台与智能助手总体架构方案
 
-> 版本：v2.0  
-> 状态：建议稿  
-> 日期：2026-07-30  
+> 文档 ID：ARCH-OVERALL-001
+> 版本：v2.1
+> 状态：Baseline
+> 日期：2026-08-06
+> 替代版本：v2.0
 > 适用范围：企业内部管理系统、合同/客户/项目/审批/文档等业务平台，以及其上的 AI 助手能力
 
 ---
 
 ## 1. 文档目的
 
-本文定义企业业务系统从现有 Python 后端逐步演进为 Rust 后端后的总体架构。
+本文定义企业业务系统从现有 Python 后端逐步演进为 Rust 后端后的总体架构，并把平台原生数据治理、Runtime Audit、分析与可视化纳入同一权威边界。
 
 本方案明确：
 
@@ -17,8 +19,9 @@
 2. Web、移动端、开放 API、后台任务和 Agent 都是业务平台的访问渠道。
 3. LLM、OCR、文档解析、Embedding 等 AI 能力通过外部 API 接入。
 4. Agent 是可选、可替换的智能交互入口，不是系统运行的前置依赖。
-5. 所有业务规则、权限、事务、状态机和审计必须由 Rust 业务平台掌握。
-6. 第一阶段优先采用模块化单体，只有出现明确的独立扩缩容、故障隔离或安全隔离需求时才拆分微服务。
+5. 所有业务规则、权限、事务、状态机、Runtime Audit 和治理操作必须由 Rust 业务平台掌握。
+6. 平台原生分析与可视化消费权威业务数据、领域事件和既有 Runtime Audit，产出可重建派生读模型，不成为业务事实所有者。
+7. 第一阶段优先采用模块化单体，只有出现明确的独立扩缩容、故障隔离或安全隔离需求时才拆分微服务。
 
 ---
 
@@ -34,7 +37,8 @@
 - 文档上传、解析、OCR、字段抽取、分类和摘要
 - AI 自动填充建议与人工复核
 - 长任务、定时任务、异步工作流、失败重试和补偿
-- 完整的审计、追踪和可观测性
+- 完整的 Runtime Audit、数据完整性治理、追踪和可观测性
+- 平台原生指标、Dashboard、报表和受控导出
 - 通过 Agent 使用自然语言查询和操作业务
 - 在 Agent 不可用时，所有业务能力仍可通过普通 UI 和 API 正常使用
 
@@ -44,8 +48,8 @@
 - 将 AI 模型调用封装为稳定的 Provider 接口
 - 避免业务代码直接依赖具体模型厂商
 - 使用明确的领域边界和应用服务承载业务逻辑
-- 以 PostgreSQL 作为权威状态存储
-- 以 MinIO/S3 管理文档和文件
+- 以 PostgreSQL 作为权威状态存储，并承载初期可重建分析投影、物化视图和指标快照
+- 以 MinIO/S3 管理文档、报表产物和文件
 - 以 NATS JetStream 或现有消息平台承载异步任务
 - 通过 OpenTelemetry 建立端到端链路追踪
 - 允许 Agent Runtime 随时替换，而不影响业务平台
@@ -151,6 +155,7 @@ Agent 可以理解意图、补充参数和提出结构化操作，但最终执�
 │                                                              │
 │ Identity   Organization   Customer   Contract   Project       │
 │ Approval   Finance        Document   Notification   Audit     │
+│ Runtime Governance   Analytics / Visualization               │
 │                                                              │
 │ Domain Model / Application Service / Repository / Policy     │
 │ Transaction / State Machine / Domain Event / Validation      │
@@ -800,13 +805,14 @@ Context：
 
 保存：
 
-- 权威业务数据
+- 权威业务数据（由各 Bounded Context 持有）
 - 用户和权限
 - 工作流和任务
 - AI 抽取结果
 - ActionPlan
 - Agent 调用记录
-- 审计事件
+- AuditEvent、Finding、Repair 和 Ledger（按 Runtime Governance 所有权）
+- 分析投影、物化视图、指标版本和查询元数据（可重建派生数据）
 - Outbox
 
 ### 14.2 MinIO/S3
@@ -820,7 +826,26 @@ Context：
 - 导出文件
 - 历史版本
 
-### 14.3 消息系统
+### 14.3 平台原生数据治理、分析与可视化
+
+Runtime Governance 已由 PLAN-0005 集成，负责统一 Audit、完整性 Finding、受控修复、Repair Ledger 和 Lease/Fence Recovery；本总体方案不把这些能力描述为未来首次建设。Analytics/Visualization 是后续平台能力，只拥有可重建投影、指标/版本、Dataset、Dashboard/Report 定义、查询元数据、快照和报表产物。
+
+其统一数据流为：
+
+```text
+权威业务事务
+→ 领域事件 / Outbox / 受控 AuditEvent 读取
+→ 可重建分析投影
+→ 版本化指标语义层
+→ Analytics Query Service
+→ UI / Open API / Report / Agent
+```
+
+UI、API、报表和 Agent 共享同一受控指标语义和查询服务。Agent 位于分析平台之上，不得生成或执行任意 SQL、查询任意表、浏览 Schema、导出未脱敏数据或持有分析服务外数据库凭证。初期使用 PostgreSQL 投影；只有可测量的延迟、并发、扫描量、重建恢复或资源隔离证据触发时，才评估独立 `analytics-worker` 或 OLAP。
+
+---
+
+### 14.4 消息系统
 
 消息中只传递：
 
@@ -912,6 +937,10 @@ Agent Message
 ```
 
 ### 16.2 指标
+
+正式业务状态、AuditEvent 和相关 Outbox 必须由数据所有者在同一本地事务中写入。AuditEvent 写入失败时，业务事务必须失败并回滚；Outbox 只负责后续事件发布，不替代权威审计记录。审计载荷以 `change_summary`、`changed_field_names`、`resource_version`、策略允许时的 `redacted_before_after` 和 `stable_failure_code` 为边界，不强制保存完整敏感 Before/After；Secret、凭证、内部路径、完整文件和未脱敏个人数据不得进入审计载荷。
+
+分析指标必须标注来源、Metric Version、租户、时间基准、延迟和脱敏策略；分析延迟或缺口不能改变权威业务状态。
 
 业务指标：
 
@@ -1027,94 +1056,28 @@ Loki + Tempo
 
 ## 19. 分阶段实施
 
-### 阶段一：Rust 服务基座
+### 已完成：基础平台与 Runtime Governance
 
-目标：
+以下能力已在主干集成并归档：
 
-- 建立 Rust Workspace
-- Axum API
-- PostgreSQL + SQLx
-- OIDC/SSO
-- 统一错误协议
-- 日志和 OpenTelemetry
-- 健康检查
-- Docker 和 CI
-- 数据迁移机制
+- Rust 服务基座、核心业务垂直切片和文档处理固定 Pipeline；
+- Runtime Audit；
+- Integrity Finding；
+- Controlled Repair；
+- Repair Ledger；
+- Lease/Fence Recovery。
 
-### 阶段二：迁移核心业务
+PLAN-0005 已 Integrated / Archived。其既有审计原子性、Finding、Repair 和 Ledger 语义继续由对应 Baseline 约束；本架构不重新定义它们。
 
-顺序建议：
+### 后续阶段：平台原生 Analytics/Visualization
 
-1. 身份和权限
-2. 文件和文档元数据
-3. 客户
-4. 合同
-5. 审批
-6. 项目
-7. 财务及其他模块
+1. **分析投影基座**：事件/Outbox 消费、Inbox、offset、幂等、重放、重建、缺口、血缘和质量检查。
+2. **指标语义层**：Metric、Measure、Dimension、Time Dimension、Dataset、Metric Version、Filter Policy 和 Lineage。
+3. **Analytics Query Service**：身份、租户、行列策略、脱敏、查询预算、超时、并发、扫描量、结果限制和查询审计。
+4. **声明式 Dashboard 与报表**：共享受控查询、下钻、快照、报表产物、导出和恢复。
+5. **Agent 受控分析技能**：只读白名单工具、口径/新鲜度披露和受限导出，仍不得直接 SQL 或访问数据库。
 
-迁移以完整业务能力为单位，不按 Controller 或文件逐行翻译。
-
-### 阶段三：AI 业务能力
-
-- 统一 AI Provider
-- OCR API
-- LLM API
-- 文档解析 API
-- 文档任务状态机
-- 结构化结果模型
-- 自动填充建议
-- 人工复核
-
-### 阶段四：异步任务与工作流
-
-- NATS/Kafka
-- Outbox
-- Worker
-- 幂等
-- 重试
-- 补偿
-- 任务恢复
-- 进度通知
-
-### 阶段五：Agent 只读能力
-
-开放：
-
-- 查询合同
-- 查询客户
-- 查询审批
-- 查询任务进度
-- 查询业务制度
-
-验证：
-
-- 多轮上下文
-- Skill 选择
-- 用户身份
-- 租户隔离
-- 审计
-
-### 阶段六：Agent 受控写入
-
-增加：
-
-- ActionPlan
-- 预览
-- 显式确认
-- 二次认证
-- 乐观锁
-- 批量限制
-- 高风险操作控制
-
-### 阶段七：高级智能化
-
-- 跨系统流程
-- 主动通知
-- 专业领域 Agent
-- 语音入口
-- 桌面助手
-- 移动端助手
+每个后续阶段必须以独立 PLAN 实施，提供契约、性能、恢复、安全、可观测性和架构门禁证据；本 PR 只更新架构文档。
 
 ---
 
@@ -1221,6 +1184,10 @@ Agent 只生成结构化意图；权限、事务和最终执行由 Rust 应用�
 ```text
 完整的 Rust 企业业务平台
 +
+平台原生数据治理与 Runtime Audit
++
+平台原生分析与可视化
++
 内建的 AI 业务能力
 +
 可选、可替换的 Agent 智能入口
@@ -1229,7 +1196,9 @@ Agent 只生成结构化意图；权限、事务和最终执行由 Rust 应用�
 权威关系如下：
 
 ```text
-业务事实        → Rust Business Platform
+业务事实        → 各业务 Bounded Context
+Runtime Audit   → Runtime Governance
+分析投影与指标  → Analytics（可重建派生数据）
 业务规则        → Domain/Application Service
 权限与事务      → Rust Business Platform
 AI 候选结果     → AI Application Layer
