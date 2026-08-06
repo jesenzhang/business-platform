@@ -5,6 +5,7 @@
 > 当前阶段：Phase 4 Runtime Governance Foundation — Integrated
 > 当前计划：无（PLAN-0005 已 Integrated / Archived）
 > 集成方式：local solo fast-forward，无 PR
+> Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
 > was fast-forwarded at `ad47544505b66d577ccdcb8f300812c294d3d7bf`; main CI
@@ -112,6 +113,7 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 - `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`
 - `docs/architecture/CODE_ARCHITECTURE.md`
 - `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`
+- `docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`
 
 标准：
 
@@ -147,7 +149,7 @@ Hardening 与 Phase 3 First Durable Business Flow；PLAN-0001 至 PLAN-0004
   Document Processing 执行边界已落在独立 processing adapters 中；
 - Worker 与 Migration 已具备该固定切片的运行实现，其他 Agent Adapter 能力
   仍处于骨架阶段；Runtime Governance 的统一 Audit、Integrity 与 Repair
-  能力已由 PLAN-0005 收敛并集成；
+  能力已由 PLAN-0005 收敛并集成；平台原生 Analytics/Visualization 架构 Baseline 已建立，运行时实现尚未开始；
 - API/Event 契约尚未全部形成可生成 Schema；
 - 质量属性尚未形成性能和恢复证据；
 - 架构依赖规则已新增 PowerShell Fitness Function，本地与 CI 运行证据均已建立；
@@ -228,6 +230,7 @@ PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Implementation `24e70f4182ca3315d94033178952113c4faba717`；Candidate `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Main CI `31026047403`；Windows PostgreSQL/MinIO NOT RUN）
+Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始；PLAN-0006 未启动
 ```
 
 ## 8. PLAN-0002 采用动作
@@ -256,4 +259,5 @@ PLAN-0002 进入 Accepted Candidate 前：
 - PLAN-0004 Gate 0 通过并进入 durable processing implementation；
 - PLAN-0004 Revision 1 集成并归档，或开始下一项明确计划；
 - PLAN-0005 Runtime Governance Foundation 建立并通过架构门禁；
+- 平台原生 Analytics/Visualization Baseline 建立；后续投影、指标、查询、Dashboard、报表和 Agent 技能必须由独立 PLAN 推进；
 - 开始第一个遗留业务迁移切片。

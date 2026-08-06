@@ -37,9 +37,13 @@
 | 安全架构 | `SECURITY_ARCHITECTURE.md` | 身份、租户、授权和数据保护 |
 | 部署架构 | `DEPLOYMENT_ARCHITECTURE.md` | 进程、节点、环境与扩缩容 |
 | 可观测性 | `OBSERVABILITY_ARCHITECTURE.md` | 日志、指标、追踪和审计 |
+| Runtime Audit | `RUNTIME_AUDIT_ARCHITECTURE.md` | 统一 AuditEvent、原子写入和查询验证 |
+| 数据完整性与修复 | `DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md` | Finding、受控修复、Repair 和 Lease/Fence 边界 |
+| 审计保留与篡改证据 | `AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md` | 保留、归档和 Hash Chain 证据 |
 | 遗留迁移 | `LEGACY_MIGRATION_ARCHITECTURE.md` | 从现有系统如何渐进迁移 |
 | 代码架构 | `CODE_ARCHITECTURE.md` | crate、分层与代码依赖规则 |
 | 持久化、查询与多数据库 | `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md` | Command/Query seam、Projection、跨 Context 读取与数据库适配策略 |
+| 数据治理、分析与可视化 | `DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md` | 可重建分析投影、指标语义、受控查询、Dashboard、报表和 Agent 边界 |
 | API 与事件 | `../standards/API_AND_EVENT_CONTRACT_STANDARD.md` | 对外协议和兼容性规则 |
 | 架构门禁 | `../standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` | 如何自动证明架构符合性 |
 | Rust 编码 | `../standards/RUST_CODING_STANDARD.md` | 具体编码和测试规范 |

@@ -19,7 +19,7 @@
 
 | 类别 | 文档 | 状态 | 作用 |
 |---|---|---|---|
-| 总体架构 | [`../企业AI业务平台与智能助手总体架构方案_v2.md`](../企业AI业务平台与智能助手总体架构方案_v2.md) | Baseline | 产品、系统主体、Agent 与总体部署边界 |
+| 总体架构 | [`../企业AI业务平台与智能助手总体架构方案_v2.md`](../企业AI业务平台与智能助手总体架构方案_v2.md) | Baseline（内部 v2.1） | 产品、系统主体、Agent 与总体部署边界 |
 | 完整服务端架构清单 | [`architecture/BACKEND_ARCHITECTURE_MANIFEST.md`](architecture/BACKEND_ARCHITECTURE_MANIFEST.md) | Baseline | 定义完整架构文档集、权威关系和任务准入 |
 | 服务端总体架构 | [`architecture/SERVER_BACKEND_ARCHITECTURE.md`](architecture/SERVER_BACKEND_ARCHITECTURE.md) | Baseline | 战略 DDD、模块化单体、分层、数据所有权和质量属性 |
 | Bounded Context Map | [`architecture/BOUNDED_CONTEXT_MAP.md`](architecture/BOUNDED_CONTEXT_MAP.md) | Baseline | 业务能力、上下文职责与协作关系 |
@@ -32,6 +32,7 @@
 | Runtime Audit | [`architecture/RUNTIME_AUDIT_ARCHITECTURE.md`](architecture/RUNTIME_AUDIT_ARCHITECTURE.md) | Baseline profile | 统一审计模型、原子写入和查询 |
 | Integrity and Repair | [`architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md`](architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md) | Baseline profile | Finding、受控修复和恢复边界 |
 | Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
+| 数据治理、分析与可视化 | [`architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md) | Baseline | 可重建分析投影、指标语义、受控查询、Dashboard 与报表边界 |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -65,6 +66,7 @@
 - [`adr/ADR-0014-data-integrity-finding-lifecycle.md`](adr/ADR-0014-data-integrity-finding-lifecycle.md)：完整性 Finding 生命周期。
 - [`adr/ADR-0015-controlled-repair-and-approval.md`](adr/ADR-0015-controlled-repair-and-approval.md)：受控修复与审批。
 - [`adr/ADR-0016-repair-ledger-and-verification.md`](adr/ADR-0016-repair-ledger-and-verification.md)：Repair Ledger 与验证。
+- [`adr/ADR-0017-platform-native-analytics-and-visualization.md`](adr/ADR-0017-platform-native-analytics-and-visualization.md)：平台原生分析与可视化，建立在 ADR-0008 与 ADR-0013～0016 之上。
 
 ## 5. 文档目录
 
@@ -127,6 +129,11 @@ PLAN-0005 集成 SHA 为 `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI ru
 `31026047403` 已通过真实 PostgreSQL/MinIO、E2E 与架构门禁。Runtime Audit、
 Integrity Finding、Controlled Repair、Repair Ledger 与 Lease/Fence Recovery
 已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。PLAN-0006 未启动。
+
+平台原生 Analytics/Visualization Baseline 已由 ADR-0017 建立，但运行时实现尚未开始。
+后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式
+Dashboard/Report 和受控 Agent 分析技能；本入口仍保持总体架构文件的稳定 `_v2.md` 路径，
+其内部版本已更新为 v2.1。
 
 ## 9. 合并后的后续任务规则
 

@@ -185,7 +185,7 @@ WP-06 和 WP-08 可并行，但不得在真实对象存储和 Migration 未完�
 | `fbe6300` | WP-09 | feat: make outbox claiming reliable for multi-worker delivery |
 | `8fac234` | WP-10 | feat: add document metadata vertical slice |
 
-实施审查见 [`../../reviews/2026-07-30-plan-0001-implementation-review.md`](../../reviews/2026-07-30-plan-0001-implementation-review.md)。
+实施审查见 [`../../../reviews/2026-07-30-plan-0001-implementation-review.md`](../../../reviews/2026-07-30-plan-0001-implementation-review.md)。
 
 ## 10. Revision
 

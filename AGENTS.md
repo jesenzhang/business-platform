@@ -34,6 +34,7 @@
 - `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`，涉及现有系统迁移时
 - `docs/architecture/CODE_ARCHITECTURE.md`
 - `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`，涉及持久化、查询或数据库适配时
+- `docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`，涉及指标、分析查询、数据投影、Dashboard、报表、导出、Agent 问数或领域分析时
 - `docs/standards/API_AND_EVENT_CONTRACT_STANDARD.md`
 - `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`
 - `docs/standards/RUST_CODING_STANDARD.md`
@@ -95,6 +96,7 @@
 - 正式写入必须具有租户、权限、版本和幂等策略。
 - 消费者按至少一次交付设计并处理重复、乱序和重放。
 - Read Model 可重建，不得成为正式写入权威。
+- 分析投影必须可重建，不得成为业务写入权威；正式指标口径必须来自版本化语义层；
 - 文件与业务元数据通过状态机、checksum、补偿和一致性扫描协调。
 
 ## 8. 工作流和长时任务
@@ -127,6 +129,7 @@
 - Repository、ObjectKey、Cache、Event 和日志均保持租户隔离。
 - 外部 AI、OCR、文档、消息和 Tool 输出一律视为不可信输入。
 - 不新增通用 SQL、Shell、文件系统或任意 HTTP Agent 工具。
+- Agent 不得直接生成或执行任意数据库 SQL，不得浏览数据库 Schema 或绕过 Analytics Query Service；
 - 高风险写操作使用 Prepare → Preview → Confirm → Execute，并绑定主体、租户、资源版本和过期时间。
 - 错误响应、日志和 trace 不得泄漏底层错误、连接字符串、Secret 或敏感正文。
 

@@ -37,6 +37,11 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0010`](ADR-0010-durable-processing-job-and-fixed-pipeline.md) | Durable Processing Job and Fixed Pipeline | Accepted | Durable job state with a versioned fixed MVP pipeline, not a general workflow engine |
 | [`ADR-0011`](ADR-0011-worker-leases-fencing-and-crash-recovery.md) | Worker Leases, Fencing, and Crash Recovery | Accepted | PostgreSQL claim/fencing and SQLite single-process recovery semantics |
 | [`ADR-0012`](ADR-0012-document-candidate-and-human-review.md) | Document Candidate and Human Review | Accepted | Versioned extraction candidates remain suggestions until optimistic human review |
+| [`ADR-0013`](ADR-0013-unified-runtime-audit-model.md) | Unified Runtime Audit Model | Accepted | Tenant-scoped append-only audit, atomic owner transaction and verification boundary |
+| [`ADR-0014`](ADR-0014-data-integrity-finding-lifecycle.md) | Data Integrity Finding Lifecycle | Accepted | Finding identity, recurrence and lifecycle transitions |
+| [`ADR-0015`](ADR-0015-controlled-repair-and-approval.md) | Controlled Repair and Approval | Accepted | Typed owner operations with prepare, approve, execute and verify |
+| [`ADR-0016`](ADR-0016-repair-ledger-and-verification.md) | Repair Ledger and Verification | Accepted | Append-only repair evidence, verification and fencing |
+| [`ADR-0017`](ADR-0017-platform-native-analytics-and-visualization.md) | Platform-Native Analytics and Visualization | Accepted | Rebuildable projections, versioned metrics and one controlled query layer |
 
 ## 4. ADR-0003 的完整 Baseline
 
