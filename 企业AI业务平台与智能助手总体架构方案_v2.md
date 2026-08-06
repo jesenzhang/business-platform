@@ -1,7 +1,7 @@
 # 企业 AI 业务平台与智能助手总体架构方案
 
 > 文档 ID：ARCH-OVERALL-001
-> 版本：v2.1
+> 版本：v2.2
 > 状态：Baseline
 > 日期：2026-08-06
 > 替代版本：v2.0
@@ -151,6 +151,14 @@ Agent 可以理解意图、补充参数和提出结构化操作，但最终执�
 │ OIDC/SSO、租户识别、路由、限流、请求追踪、API 版本、SSE/WS    │
 └──────────────────────────────┬───────────────────────────────┘
                                ▼
+┌──────────────────── Enterprise AI Workspace ──────────────────┐
+│ Workspace / Conversation / Thread / Turn                      │
+│ Skill / Context / Tool Registry                               │
+│ Capability Grant / Observation / Artifact / Blueprint         │
+│ 可替换 Agent Runtime Adapter / 未来受控 Model Gateway          │
+│ （不拥有业务事实；当前仅有架构 Baseline，尚未实现 Runtime）      │
+└──────────────────────────────┬───────────────────────────────┘
+                               ▼
 ┌──────────────────── Rust Business Platform ──────────────────┐
 │                                                              │
 │ Identity   Organization   Customer   Contract   Project       │
@@ -180,27 +188,26 @@ Agent 可以理解意图、补充参数和提出结构化操作，但最终执�
 │ PostgreSQL    MinIO/S3    NATS/Kafka    Redis（可选）         │
 │ OpenTelemetry Prometheus  Grafana       Loki/Tempo           │
 └──────────────────────────────────────────────────────────────┘
-
-
-可选 Agent 扩展：
-
-┌──────────────────────────┐
-│ 开源 Agent Runtime       │
-│ nanobot / Agno / Goose   │
-└────────────┬─────────────┘
-             │ MCP / HTTP
-             ▼
-┌──────────────────────────┐
-│ Rust Agent Adapter       │
-│ Skill / ActionPlan       │
-│ 身份委托 / 确认 / 审计   │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│ Rust Business Platform   │
-└──────────────────────────┘
 ```
+
+
+### 4.1 Enterprise AI Workspace 层
+
+Enterprise AI Workspace 是 Rust Business Platform 之上的独立产品能力层，负责
+Workspace、Conversation、Thread、Turn、Skill、Context、Capability、Observation、
+Artifact 和 Blueprint 的任务边界与血缘。它只保存可撤销的委托、执行和派生状态，
+不拥有 Customer、Contract、Approval、Finance、Project、Document 或其他正式业务事实。
+
+Agent Runtime 通过稳定的 Adapter/Port 接入并可替换；nanobot、Agno、Goose、jarvis-rs
+或其他实现都不能直接访问业务数据库。未来 Model Gateway 负责受控的模型选择、策略、
+成本和故障隔离，但本版本不把 Gateway 或任何具体 Provider 写成已实现能力。Generated
+App 与 Sandbox 是未来独立边界，排除在 PLAN-0006 和本次文档集成之外。
+
+Workspace 的正式业务读写仍回到 Rust Business Platform 的 Application Service，遵循
+身份、租户、Capability、版本、幂等、Prepare → Preview → Confirm → Execute 和审计规则。
+
+本次 v2.2 只校正总体架构 Baseline；Workspace Runtime、API、迁移、依赖、生产配置、
+Generated App 和 Sandbox 均尚未实现。
 
 ---
 

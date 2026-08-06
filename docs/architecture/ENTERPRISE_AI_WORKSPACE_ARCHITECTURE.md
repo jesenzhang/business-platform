@@ -21,7 +21,7 @@
 - Business Platform、jarvis-rs 或其他 Agent Runtime 如何分工；
 - 如何吸收 Cloudflare OS 的参考价值而不绑定其运行时。
 
-本文由 `ADR-0017-enterprise-ai-workspace-and-capability-security.md` 接受。
+本文由 `ADR-0018-enterprise-ai-workspace-and-capability-security.md` 接受。
 
 ## 2. 不变原则
 

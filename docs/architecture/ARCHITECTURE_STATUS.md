@@ -72,7 +72,7 @@
 > leases, idempotency, and reconciliation rather than distributed transactions.
 >
 > 2026-08-06: Cloudflare OS was reviewed as an Enterprise AI Workspace reference.
-> ADR-0017 accepts an explicit Workspace product layer, task-scoped Capability
+> ADR-0018 accepts an explicit Workspace product layer, task-scoped Capability
 > Grants, Agent Observation lineage, non-authoritative Artifact/Blueprint state,
 > and a future independent Generated App sandbox. Cloudflare OS remains a
 > reference only and is not a runtime dependency. PLAN-0006 is Proposed on the
@@ -175,7 +175,7 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 
 Enterprise AI Workspace 现状：
 
-- 架构 Baseline、ADR-0017、参考分析和 PLAN-0006 Proposed 已形成；
+- 架构 Baseline、ADR-0018、参考分析和 PLAN-0006 Proposed 已形成；
 - `crates/agent-integration` 仍只有 TODO 骨架；
 - `apps/agent-adapter` 仍只有配置和 tracing 启动；
 - Workspace/Conversation/Thread/Turn 尚未实现；
@@ -313,7 +313,7 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 
 PLAN-0006 进入 Active 前：
 
-1. 将 ADR-0017、Workspace Baseline、Cloudflare OS 参考分析和计划文档集成到 `main`；
+1. 保持 ADR-0018、Workspace Baseline、Cloudflare OS 参考分析和 Proposed 计划文档的语义一致；
 2. 对 PLAN-0006 的 Workspace、Capability、Observation 和 Tool 所有权做独立审查；
 3. 确认第一垂直切片只读且只使用 Document Processing 公共 Query Port；
 4. 明确 Agent Runtime Port 与 deterministic Fake Runtime；

@@ -166,7 +166,7 @@ PLAN-0010  Generated App Sandbox, subject to separate ADR
 
 PLAN-0006 进入实现前必须满足：
 
-- ADR-0017 被接受；
+- ADR-0018 被接受；
 - Workspace、Capability、Observation 和 Artifact 的所有权明确；
 - 不将 Cloudflare OS Runtime 作为隐式依赖；
 - 第一阶段工具白名单和只读范围明确；

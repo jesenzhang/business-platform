@@ -19,7 +19,7 @@
 
 | 类别 | 文档 | 状态 | 作用 |
 |---|---|---|---|
-| 总体架构 | [`../企业AI业务平台与智能助手总体架构方案_v2.md`](../企业AI业务平台与智能助手总体架构方案_v2.md) | Baseline（内部 v2.1） | 产品、系统主体、Agent 与总体部署边界 |
+| 总体架构 | [`../企业AI业务平台与智能助手总体架构方案_v2.md`](../企业AI业务平台与智能助手总体架构方案_v2.md) | Baseline（内部 v2.2） | 产品、系统主体、Agent 与总体部署边界 |
 | 完整服务端架构清单 | [`architecture/BACKEND_ARCHITECTURE_MANIFEST.md`](architecture/BACKEND_ARCHITECTURE_MANIFEST.md) | Baseline | 定义完整架构文档集、权威关系和任务准入 |
 | 服务端总体架构 | [`architecture/SERVER_BACKEND_ARCHITECTURE.md`](architecture/SERVER_BACKEND_ARCHITECTURE.md) | Baseline | 战略 DDD、模块化单体、分层、数据所有权和质量属性 |
 | Bounded Context Map | [`architecture/BOUNDED_CONTEXT_MAP.md`](architecture/BOUNDED_CONTEXT_MAP.md) | Baseline | 业务能力、上下文职责与协作关系 |
@@ -149,7 +149,7 @@ Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已�
 平台原生 Analytics/Visualization Baseline 已由 ADR-0017 建立，但运行时实现尚未开始。
 后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式
 Dashboard/Report 和受控 Agent 分析技能；本入口仍保持总体架构文件的稳定 `_v2.md` 路径，
-其内部版本已更新为 v2.1。
+其内部版本已更新为 v2.2。
 
 ## 9. 合并后的后续任务规则
 

@@ -4,11 +4,11 @@
 > Revision: 0  
 > Date: 2026-08-06  
 > Owner: Platform Foundation / Agent Integration  
-> Base SHA: `f5870e58ee5b371e80ce125bbac0a8e16288b208`  
+> Base SHA: `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`
 > Integration Mode: local solo fast-forward  
 > Pull Request: not required  
 > Stop Policy: blockers-only  
-> Architecture Decision: `ADR-0017-enterprise-ai-workspace-and-capability-security.md`
+> Architecture Decision: `ADR-0018-enterprise-ai-workspace-and-capability-security.md`
 
 ## 1. Goal
 
@@ -214,7 +214,7 @@ full provider errors, database details, or unrestricted audit payloads.
 
 | ID | Scope | Required evidence |
 |---|---|---|
-| WP-00 | Accept ADR-0017 and synchronize architecture/reference/plan docs | Documentation review |
+| WP-00 | Adopt ADR-0018 and synchronize architecture/reference/plan docs | Documentation review |
 | WP-01 | Workspace domain and application contracts | Pure domain + Fake port tests |
 | WP-02 | Skill, Context and Tool registries with version/status semantics | Registry contract tests |
 | WP-03 | Delegated Agent principal and task-scoped Capability Grant | Policy/domain/security tests |
@@ -565,4 +565,4 @@ At proposal time the following are intentionally deferred:
 - broad enterprise knowledge retrieval.
 
 Deferral is not permission to create hidden shortcuts. Interfaces must preserve
-replaceability and the security boundaries in ADR-0017.
+replaceability and the security boundaries in ADR-0018.

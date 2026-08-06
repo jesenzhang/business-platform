@@ -1,4 +1,4 @@
-# ADR-0017: Enterprise AI Workspace and Agent Capability Security
+# ADR-0018: Enterprise AI Workspace and Agent Capability Security
 
 > Status: Accepted  
 > Date: 2026-08-06

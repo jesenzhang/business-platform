@@ -59,7 +59,7 @@
 ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
 SECURITY_ARCHITECTURE.md
 OBSERVABILITY_ARCHITECTURE.md
-ADR-0017-enterprise-ai-workspace-and-capability-security.md
+ADR-0018-enterprise-ai-workspace-and-capability-security.md
 ```
 
 ## 3. 架构决策层级
@@ -269,7 +269,7 @@ PLAN-0001 至 PLAN-0005 已完成基础服务、持久化查询、Durable Docume
 
 ```text
 docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
-docs/adr/ADR-0017-enterprise-ai-workspace-and-capability-security.md
+docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
 docs/plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md
 ```
 

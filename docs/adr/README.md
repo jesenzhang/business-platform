@@ -42,6 +42,7 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0015`](ADR-0015-controlled-repair-and-approval.md) | Controlled Repair and Approval | Accepted | Typed owner operations with prepare, approve, execute and verify |
 | [`ADR-0016`](ADR-0016-repair-ledger-and-verification.md) | Repair Ledger and Verification | Accepted | Append-only repair evidence, verification and fencing |
 | [`ADR-0017`](ADR-0017-platform-native-analytics-and-visualization.md) | Platform-Native Analytics and Visualization | Accepted | Rebuildable projections, versioned metrics and one controlled query layer |
+| [`ADR-0018`](ADR-0018-enterprise-ai-workspace-and-capability-security.md) | Enterprise AI Workspace and Agent Capability Security | Accepted | Workspace product layer, task-scoped Capability grants, observation lineage and non-authoritative artifacts |
 
 ## 4. ADR-0003 的完整 Baseline
 

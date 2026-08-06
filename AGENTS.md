@@ -35,6 +35,7 @@
 - `docs/architecture/CODE_ARCHITECTURE.md`
 - `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`，涉及持久化、查询或数据库适配时
 - `docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`，涉及指标、分析查询、数据投影、Dashboard、报表、导出、Agent 问数或领域分析时
+- `docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md`，涉及 Workspace、Skill、Context、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 时
 - `docs/standards/API_AND_EVENT_CONTRACT_STANDARD.md`
 - `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`
 - `docs/standards/RUST_CODING_STANDARD.md`
