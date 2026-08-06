@@ -25,6 +25,7 @@
 | Bounded Context Map | [`architecture/BOUNDED_CONTEXT_MAP.md`](architecture/BOUNDED_CONTEXT_MAP.md) | Baseline | 业务能力、上下文职责与协作关系 |
 | 数据与一致性 | [`architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`](architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md) | Baseline | 数据所有权、事务、事件、幂等和补偿 |
 | 长时任务 | [`architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md`](architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md) | Baseline | 业务状态、流程协调和可靠执行边界 |
+| Enterprise AI Workspace | [`architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md`](architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md) | Baseline | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 边界 |
 | 质量属性 | [`architecture/QUALITY_ATTRIBUTE_SCENARIOS.md`](architecture/QUALITY_ATTRIBUTE_SCENARIOS.md) | Baseline | 性能、可用性、安全、恢复和容量验收 |
 | 安全架构 | [`architecture/SECURITY_ARCHITECTURE.md`](architecture/SECURITY_ARCHITECTURE.md) | Baseline | 身份、租户、授权、文件、AI 和 Agent 安全 |
 | 部署架构 | [`architecture/DEPLOYMENT_ARCHITECTURE.md`](architecture/DEPLOYMENT_ARCHITECTURE.md) | Baseline | 进程、网络、环境、发布和扩缩容 |
@@ -67,6 +68,7 @@
 - [`adr/ADR-0015-controlled-repair-and-approval.md`](adr/ADR-0015-controlled-repair-and-approval.md)：受控修复与审批。
 - [`adr/ADR-0016-repair-ledger-and-verification.md`](adr/ADR-0016-repair-ledger-and-verification.md)：Repair Ledger 与验证。
 - [`adr/ADR-0017-platform-native-analytics-and-visualization.md`](adr/ADR-0017-platform-native-analytics-and-visualization.md)：平台原生分析与可视化，建立在 ADR-0008 与 ADR-0013～0016 之上。
+- [`adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`](adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)：接受 Enterprise AI Workspace、任务级 Capability、Observation 血缘与 Artifact 非权威边界；Cloudflare OS 仅作为参考项目。
 
 ## 5. 文档目录
 
@@ -109,10 +111,19 @@ docs/
 7. 改变长期边界时新增 ADR；
 8. 代码、测试和文档在同一变更中更新。
 
-禁止从数据库表、Handler、消息 Topic 或 SDK 直接推导业务边界。
+涉及 AI Workspace、Agent、Skill、Context、Tool、Artifact 或 Generated App 时，同时阅读：
+
+```text
+architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
+adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
+reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
+```
+
+禁止从数据库表、Handler、消息 Topic、Prompt、Skill 文件或 SDK 直接推导业务边界。
 
 ## 8. 当前实施
 
+- 当前提案：[`plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md`](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md)（`Proposed`，尚未激活）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
@@ -121,6 +132,8 @@ docs/
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
+- AI Workspace 差距审查：[`reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`](reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md)
+- Cloudflare OS 参考分析：[`reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md)
 
 Phase 1 Foundation Integrity、Phase 2 Persistence and Query Hardening、
 Phase 3 First Durable Business Flow 与 Phase 4 Runtime Governance Foundation
@@ -128,7 +141,10 @@ Phase 3 First Durable Business Flow 与 Phase 4 Runtime Governance Foundation
 PLAN-0005 集成 SHA 为 `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI run
 `31026047403` 已通过真实 PostgreSQL/MinIO、E2E 与架构门禁。Runtime Audit、
 Integrity Finding、Controlled Repair、Repair Ledger 与 Lease/Fence Recovery
-已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。PLAN-0006 未启动。
+已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。
+
+Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已形成 Baseline，
+但对应运行代码尚未实现。PLAN-0006 为 `Proposed`，不得被表述为 Active 或已开始编码。
 
 平台原生 Analytics/Visualization Baseline 已由 ADR-0017 建立，但运行时实现尚未开始。
 后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式
@@ -147,6 +163,13 @@ docs/architecture/QUALITY_ATTRIBUTE_SCENARIOS.md
 docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md
 ```
 
+涉及 AI Workspace、Agent、Capability、Observation、Artifact 或生成应用时，必须同时引用：
+
+```text
+docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
+docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
+```
+
 涉及安全、长时任务、部署、可观测性或迁移时，同时引用对应专题 Baseline。
 
 功能测试通过但架构门禁失败，任务不得声明完成。
@@ -161,6 +184,8 @@ docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md
 - 数据库和对象存储恢复；
 - 安全事件响应；
 - Provider 故障和任务恢复；
+- Agent Runtime、Workspace Turn 和 SSE 恢复；
+- Capability 撤销与安全事件响应；
 - 遗留系统切流与回滚。
 
 Runbook 是架构的操作实现，不得修改 Baseline 语义。
