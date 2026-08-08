@@ -81,6 +81,14 @@
 
 > 2026-08-07: PLAN-0007 is Active for the external Business API surface, independent React console, remote CLI, and read-only MCP adapter. PLAN-0006 remains Proposed / NOT ACTIVE; no Workspace or Capability runtime is introduced.
 
+> 2026-08-09: PLAN-0008 reached Accepted Candidate on branch
+> `codex/plan-0008-document-lifecycle-revision-and-evidence-foundation`, with
+> implementation checkpoint `bfc5f2c` based on `35d1d01`. Document Management now
+> owns immutable DocumentRevision and typed links; Document Intelligence binds
+> ProcessingJob/Run/Artifact/Evidence to an exact revision. Local format, check,
+> Clippy, workspace tests, OpenAPI, and Architecture Fitness are green. PostgreSQL,
+> MinIO, and real-infrastructure E2E remain NOT RUN locally.
+
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
 rows `chain_version=0`; only new sequence-based rows are chain-protected.
