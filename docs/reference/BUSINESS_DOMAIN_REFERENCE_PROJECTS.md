@@ -1,9 +1,9 @@
 # 企业业务领域参考项目分析
 
-> 类型：Reference  
-> 检查日期：2026-08-08  
-> 适用范围：合同、财务、法务、项目、客户、HR/绩效、文档和跨部门业务建模  
-> 决策入口：[`../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)  
+> 类型：Reference
+> 检查日期：2026-08-08
+> 适用范围：合同、财务、法务、项目、客户、HR/绩效、文档和跨部门业务建模
+> 决策入口：[`../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)
 > Baseline：[`../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
 
 ## 1. 使用说明

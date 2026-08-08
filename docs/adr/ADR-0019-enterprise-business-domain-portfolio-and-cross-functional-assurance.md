@@ -1,10 +1,10 @@
 # ADR-0019：Enterprise Business Domain Portfolio and Cross-Functional Assurance
 
-> 状态：Accepted  
-> 日期：2026-08-08  
-> 决策所有者：Business Architecture / Platform Foundation  
-> 关联文档：[`../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)、[`../architecture/BOUNDED_CONTEXT_MAP.md`](../architecture/BOUNDED_CONTEXT_MAP.md)、[`../architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`](../architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md)、[`../architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](../architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md)  
-> 替代：无  
+> 状态：Accepted
+> 日期：2026-08-08
+> 决策所有者：Business Architecture / Platform Foundation
+> 关联文档：[`../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)、[`../architecture/BOUNDED_CONTEXT_MAP.md`](../architecture/BOUNDED_CONTEXT_MAP.md)、[`../architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`](../architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md)、[`../architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](../architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md)
+> 替代：无
 > 被替代：无
 
 ## 1. 背景

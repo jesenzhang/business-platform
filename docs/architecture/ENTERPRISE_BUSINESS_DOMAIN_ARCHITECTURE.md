@@ -1,11 +1,11 @@
 # 企业业务领域与跨部门协作架构
 
-> 文档 ID：ARCH-BUSINESS-001  
-> 版本：1.0  
-> 状态：Baseline  
-> 生效日期：2026-08-08  
-> 所有者/责任模块：Business Architecture / Platform Foundation  
-> 关联 ADR：ADR-0019  
+> 文档 ID：ARCH-BUSINESS-001
+> 版本：1.0
+> 状态：Baseline
+> 生效日期：2026-08-08
+> 所有者/责任模块：Business Architecture / Platform Foundation
+> 关联 ADR：ADR-0019
 > 关联 Baseline：BOUNDED_CONTEXT_MAP、DATA_OWNERSHIP_AND_CONSISTENCY、DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE、DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE
 
 ## 1. 目的
