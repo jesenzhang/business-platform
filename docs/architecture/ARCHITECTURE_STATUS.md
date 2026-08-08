@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-06
+> 最后更新：2026-08-07
 > 当前阶段：Phase 5 Enterprise AI Workspace Architecture — Proposed
-> 当前计划：PLAN-0006 `Proposed`，尚未激活实现
+> 当前计划：PLAN-0007 Active；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -78,6 +78,8 @@
 > reference only and is not a runtime dependency. PLAN-0006 is Proposed on the
 > documentation branch; no Agent implementation, activation, integration, or
 > PLAN-0007 start has occurred.
+
+> 2026-08-07: PLAN-0007 is Active for the external Business API surface, independent React console, remote CLI, and read-only MCP adapter. PLAN-0006 remains Proposed / NOT ACTIVE; no Workspace or Capability runtime is introduced.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
@@ -177,7 +179,7 @@ Enterprise AI Workspace 现状：
 
 - 架构 Baseline、ADR-0018、参考分析和 PLAN-0006 Proposed 已形成；
 - `crates/agent-integration` 仍只有 TODO 骨架；
-- `apps/agent-adapter` 仍只有配置和 tracing 启动；
+- apps/agent-adapter 在 PLAN-0007 中提供窄的 HTTP MCP read-only adapter；PLAN-0006 的 Workspace/Agent Runtime 仍未实现；
 - Workspace/Conversation/Thread/Turn 尚未实现；
 - Skill/Context/Tool Registry 尚未实现；
 - Delegated Agent Capability Grant 尚未实现；
@@ -307,6 +309,8 @@ PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc098
 PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Implementation `24e70f4182ca3315d94033178952113c4faba717`；Candidate `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Main CI `31026047403`；Windows PostgreSQL/MinIO NOT RUN）
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
+
+PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 ```
 
 ## 8. PLAN-0006 采用前动作

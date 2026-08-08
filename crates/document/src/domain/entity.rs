@@ -49,6 +49,70 @@ impl TryFrom<&str> for DocumentStatus {
     }
 }
 
+/// Business lifecycle, independent from deletion/recovery state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum DocumentLifecycleState {
+    Active,
+    Archived,
+}
+
+impl DocumentLifecycleState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Archived => "archived",
+        }
+    }
+}
+
+impl TryFrom<&str> for DocumentLifecycleState {
+    type Error = DocumentStatusParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "active" => Ok(Self::Active),
+            "archived" => Ok(Self::Archived),
+            _ => Err(DocumentStatusParseError),
+        }
+    }
+}
+
+/// Deletion state. A trashed document still owns its revisions and evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum DocumentDeletionState {
+    Present,
+    Trashed,
+    PendingPurge,
+    Purged,
+}
+
+impl DocumentDeletionState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Present => "present",
+            Self::Trashed => "trashed",
+            Self::PendingPurge => "pending_purge",
+            Self::Purged => "purged",
+        }
+    }
+}
+
+impl TryFrom<&str> for DocumentDeletionState {
+    type Error = DocumentStatusParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "present" => Ok(Self::Present),
+            "trashed" => Ok(Self::Trashed),
+            "pending_purge" => Ok(Self::PendingPurge),
+            "purged" => Ok(Self::Purged),
+            _ => Err(DocumentStatusParseError),
+        }
+    }
+}
+
 /// Document metadata aggregate root.
 ///
 /// Invariants:
@@ -75,6 +139,14 @@ pub struct DocumentMetadata {
     aggregate_version: AggregateVersion,
     /// File-content revision used by object storage paths.
     content_revision: ContentRevision,
+    /// Stable identity of the current immutable content revision.
+    current_revision_id: Uuid,
+    /// Business lifecycle, kept separate from deletion state.
+    lifecycle_state: DocumentLifecycleState,
+    /// Deletion/recovery state.
+    deletion_state: DocumentDeletionState,
+    /// Lifecycle to restore after a trash operation.
+    pre_trash_lifecycle: DocumentLifecycleState,
     /// File size in bytes (may be unknown at creation).
     size_bytes: Option<i64>,
     /// User who created this document.
@@ -97,6 +169,10 @@ pub struct RehydrateDocumentMetadata {
     pub status: DocumentStatus,
     pub aggregate_version: AggregateVersion,
     pub content_revision: ContentRevision,
+    pub current_revision_id: Uuid,
+    pub lifecycle_state: DocumentLifecycleState,
+    pub deletion_state: DocumentDeletionState,
+    pub pre_trash_lifecycle: DocumentLifecycleState,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
@@ -104,6 +180,26 @@ pub struct RehydrateDocumentMetadata {
 }
 
 impl DocumentMetadata {
+    #[must_use]
+    pub const fn legacy_states(
+        status: DocumentStatus,
+    ) -> (DocumentLifecycleState, DocumentDeletionState) {
+        match status {
+            DocumentStatus::Active => (
+                DocumentLifecycleState::Active,
+                DocumentDeletionState::Present,
+            ),
+            DocumentStatus::Archived => (
+                DocumentLifecycleState::Archived,
+                DocumentDeletionState::Present,
+            ),
+            DocumentStatus::Deleted => (
+                DocumentLifecycleState::Active,
+                DocumentDeletionState::Trashed,
+            ),
+        }
+    }
+
     #[must_use]
     pub const fn id(&self) -> Uuid {
         self.id
@@ -155,6 +251,43 @@ impl DocumentMetadata {
     }
 
     #[must_use]
+    pub const fn current_revision_id(&self) -> Uuid {
+        self.current_revision_id
+    }
+
+    #[must_use]
+    pub const fn lifecycle_state(&self) -> DocumentLifecycleState {
+        self.lifecycle_state
+    }
+
+    #[must_use]
+    pub const fn deletion_state(&self) -> DocumentDeletionState {
+        self.deletion_state
+    }
+
+    /// Materialize the immutable R1 record for persistence.
+    pub fn initial_revision(
+        &self,
+    ) -> Result<super::revision::DocumentRevision, super::revision::DocumentRevisionError> {
+        super::revision::DocumentRevision::initial(self)
+    }
+
+    pub fn assert_expected_revision(
+        &self,
+        expected: Uuid,
+    ) -> Result<(), super::revision::DocumentRevisionError> {
+        if expected != self.current_revision_id {
+            return Err(
+                super::revision::DocumentRevisionError::StaleCurrentRevision {
+                    expected,
+                    actual: self.current_revision_id,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    #[must_use]
     pub const fn size_bytes(&self) -> Option<i64> {
         self.size_bytes
     }
@@ -179,14 +312,46 @@ impl DocumentMetadata {
         if state.tenant_id.is_nil() || state.created_by.is_nil() || state.id.is_nil() {
             return Err(DocumentDomainError::InvalidIdentity);
         }
-        let content_reference = DocumentContentReference::parse_storage_key(
+        let parsed_reference = DocumentContentReference::parse_storage_key(
             state.tenant_id,
             state.id,
             &state.object_key,
         )
         .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
-        if content_reference.content_revision() != state.content_revision {
-            return Err(DocumentDomainError::ContentRevisionMismatch);
+        if state.current_revision_id.is_nil() {
+            return Err(DocumentDomainError::InvalidIdentity);
+        }
+        let content_reference = if parsed_reference.revision_id().is_some() {
+            if parsed_reference.revision_id() != Some(state.current_revision_id) {
+                return Err(DocumentDomainError::ContentRevisionMismatch);
+            }
+            DocumentContentReference::new_revision(
+                state.tenant_id,
+                state.id,
+                state.current_revision_id,
+                state.content_revision,
+            )
+            .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?
+        } else {
+            if parsed_reference.content_revision() != state.content_revision {
+                return Err(DocumentDomainError::ContentRevisionMismatch);
+            }
+            parsed_reference
+        };
+        if matches!(state.deletion_state, DocumentDeletionState::Present)
+            && state.lifecycle_state.as_str() != state.status.as_str()
+        {
+            return Err(DocumentDomainError::InvalidStatus);
+        }
+        if !matches!(state.deletion_state, DocumentDeletionState::Present)
+            && state.status != DocumentStatus::Deleted
+        {
+            return Err(DocumentDomainError::InvalidStatus);
+        }
+        if state.pre_trash_lifecycle != state.lifecycle_state
+            && matches!(state.deletion_state, DocumentDeletionState::Present)
+        {
+            return Err(DocumentDomainError::InvalidStatus);
         }
         if state.aggregate_version.value() <= 0 {
             return Err(DocumentDomainError::InvalidVersion);
@@ -212,6 +377,10 @@ impl DocumentMetadata {
             status: state.status,
             aggregate_version: state.aggregate_version,
             content_revision: state.content_revision,
+            current_revision_id: state.current_revision_id,
+            lifecycle_state: state.lifecycle_state,
+            deletion_state: state.deletion_state,
+            pre_trash_lifecycle: state.pre_trash_lifecycle,
             size_bytes: state.size_bytes,
             created_by: state.created_by,
             created_at: state.created_at,
@@ -232,7 +401,27 @@ impl DocumentMetadata {
         created_by: Uuid,
         size_bytes: Option<i64>,
     ) -> Result<Self, DocumentDomainError> {
-        if tenant_id.is_nil() || created_by.is_nil() {
+        Self::create_with_id(
+            Uuid::now_v7(),
+            tenant_id,
+            original_filename,
+            content_type,
+            object_key,
+            created_by,
+            size_bytes,
+        )
+    }
+
+    pub fn create_with_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        original_filename: String,
+        content_type: String,
+        object_key: String,
+        created_by: Uuid,
+        size_bytes: Option<i64>,
+    ) -> Result<Self, DocumentDomainError> {
+        if id.is_nil() || tenant_id.is_nil() || created_by.is_nil() {
             return Err(DocumentDomainError::InvalidIdentity);
         }
         if size_bytes.is_some_and(|size| size < 0) {
@@ -244,18 +433,42 @@ impl DocumentMetadata {
         if content_type.trim().is_empty() {
             return Err(DocumentDomainError::EmptyContentType);
         }
+        Self::create_with_revision_id(
+            id,
+            tenant_id,
+            original_filename,
+            content_type,
+            object_key,
+            created_by,
+            size_bytes,
+            Uuid::now_v7(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_revision_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        original_filename: String,
+        content_type: String,
+        object_key: String,
+        created_by: Uuid,
+        size_bytes: Option<i64>,
+        revision_id: Uuid,
+    ) -> Result<Self, DocumentDomainError> {
         if object_key.trim().is_empty() {
             return Err(DocumentDomainError::EmptyObjectKey);
         }
 
         let now = Utc::now();
-        let id = Uuid::now_v7();
         let aggregate_version =
             AggregateVersion::new(1).map_err(|_| DocumentDomainError::InvalidVersion)?;
         let content_revision =
             ContentRevision::new(1).map_err(|_| DocumentDomainError::InvalidContentRevision)?;
+        DocumentContentReference::new(tenant_id, id, content_revision, object_key)
+            .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
         let content_reference =
-            DocumentContentReference::new(tenant_id, id, content_revision, object_key)
+            DocumentContentReference::new_revision(tenant_id, id, revision_id, content_revision)
                 .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
 
         Ok(Self {
@@ -267,6 +480,10 @@ impl DocumentMetadata {
             status: DocumentStatus::Active,
             aggregate_version,
             content_revision,
+            current_revision_id: revision_id,
+            lifecycle_state: DocumentLifecycleState::Active,
+            deletion_state: DocumentDeletionState::Present,
+            pre_trash_lifecycle: DocumentLifecycleState::Active,
             size_bytes,
             created_by,
             created_at: now,
@@ -284,6 +501,7 @@ impl DocumentMetadata {
         }
         self.bump_version()?;
         self.status = DocumentStatus::Archived;
+        self.lifecycle_state = DocumentLifecycleState::Archived;
         Ok(())
     }
 
@@ -297,38 +515,143 @@ impl DocumentMetadata {
         }
         self.bump_version()?;
         self.status = DocumentStatus::Active;
+        self.lifecycle_state = DocumentLifecycleState::Active;
+        Ok(())
+    }
+
+    /// Move a document to the recoverable trash state without changing its
+    /// content revision or current revision identity.
+    pub fn trash(&mut self) -> Result<(), DocumentDomainError> {
+        if self.deletion_state != DocumentDeletionState::Present {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "trash",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.pre_trash_lifecycle = self.lifecycle_state;
+        self.deletion_state = DocumentDeletionState::Trashed;
+        self.status = DocumentStatus::Deleted;
+        Ok(())
+    }
+
+    /// Restore a trashed document to the lifecycle it had before trashing.
+    pub fn restore_from_trash(&mut self) -> Result<(), DocumentDomainError> {
+        if self.deletion_state != DocumentDeletionState::Trashed {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "restore_from_trash",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.deletion_state = DocumentDeletionState::Present;
+        self.lifecycle_state = self.pre_trash_lifecycle;
+        self.status = match self.lifecycle_state {
+            DocumentLifecycleState::Active => DocumentStatus::Active,
+            DocumentLifecycleState::Archived => DocumentStatus::Archived,
+        };
+        Ok(())
+    }
+
+    /// Mark a trashed document for asynchronous object-store garbage
+    /// collection after all cross-context preconditions have been checked.
+    pub fn request_purge(
+        &mut self,
+        retention_released: bool,
+        has_business_reference: bool,
+        has_active_hold: bool,
+    ) -> Result<(), DocumentDomainError> {
+        if self.deletion_state != DocumentDeletionState::Trashed {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "request_purge",
+                status: self.status,
+            });
+        }
+        if !retention_released {
+            return Err(DocumentDomainError::PurgeRetentionNotReleased);
+        }
+        if has_business_reference {
+            return Err(DocumentDomainError::PurgeReferenced);
+        }
+        if has_active_hold {
+            return Err(DocumentDomainError::PurgeHeld);
+        }
+        self.bump_version()?;
+        self.deletion_state = DocumentDeletionState::PendingPurge;
+        Ok(())
+    }
+
+    /// Complete the database side of an idempotent asynchronous purge after
+    /// the storage GC worker has deleted and verified all source objects.
+    pub fn complete_purge(&mut self) -> Result<(), DocumentDomainError> {
+        if self.deletion_state != DocumentDeletionState::PendingPurge {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "complete_purge",
+                status: self.status,
+            });
+        }
+        self.bump_version()?;
+        self.deletion_state = DocumentDeletionState::Purged;
         Ok(())
     }
 
     /// Soft-delete an active or archived document.
     pub fn mark_deleted(&mut self) -> Result<(), DocumentDomainError> {
-        if !matches!(
-            self.status,
-            DocumentStatus::Active | DocumentStatus::Archived
-        ) {
-            return Err(DocumentDomainError::InvalidStatusTransition {
-                operation: "mark_deleted",
-                status: self.status,
-            });
-        }
-        self.bump_version()?;
-        self.status = DocumentStatus::Deleted;
-        Ok(())
+        self.trash()
     }
 
     /// Replace the file content while preserving lifecycle state.
     pub fn replace_content(&mut self, logical_path: String) -> Result<(), DocumentDomainError> {
+        let _ = self.replace_content_revision(logical_path, None)?;
+        Ok(())
+    }
+
+    /// Create and select a new immutable content revision.
+    pub fn replace_content_revision(
+        &mut self,
+        _logical_path: String,
+        change_reason: Option<String>,
+    ) -> Result<super::revision::DocumentRevision, DocumentDomainError> {
+        if !matches!(self.deletion_state, DocumentDeletionState::Present) {
+            return Err(DocumentDomainError::InvalidStatusTransition {
+                operation: "replace_content",
+                status: self.status,
+            });
+        }
+        let previous_revision_id = self.current_revision_id;
         let content_revision = self
             .content_revision
             .increment()
             .map_err(|_| DocumentDomainError::InvalidContentRevision)?;
-        let content_reference =
-            DocumentContentReference::new(self.tenant_id, self.id, content_revision, logical_path)
-                .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
+        let revision_id = Uuid::now_v7();
+        let content_reference = DocumentContentReference::new_revision(
+            self.tenant_id,
+            self.id,
+            revision_id,
+            content_revision,
+        )
+        .map_err(|error| DocumentDomainError::InvalidObjectKey(error.to_string()))?;
+        let revision = super::revision::DocumentRevision::new(
+            revision_id,
+            self.tenant_id,
+            self.id,
+            content_revision.value(),
+            Some(previous_revision_id),
+            content_reference.as_storage_key(),
+            None,
+            self.content_type.clone(),
+            self.size_bytes,
+            self.original_filename.clone(),
+            self.created_by,
+            Utc::now(),
+            change_reason,
+        )
+        .map_err(|_| DocumentDomainError::InvalidObjectKey("invalid revision".to_string()))?;
         self.bump_version()?;
         self.content_revision = content_revision;
         self.content_reference = content_reference;
-        Ok(())
+        self.current_revision_id = revision_id;
+        Ok(revision)
     }
 
     fn bump_version(&mut self) -> Result<(), DocumentDomainError> {
@@ -539,6 +862,10 @@ mod tests {
             aggregate_version: AggregateVersion::new(0)
                 .unwrap_or_else(|_| AggregateVersion::new(1).unwrap_or_else(|_| unreachable!())),
             content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
+            current_revision_id: Uuid::now_v7(),
+            lifecycle_state: DocumentLifecycleState::Active,
+            deletion_state: DocumentDeletionState::Present,
+            pre_trash_lifecycle: DocumentLifecycleState::Active,
             size_bytes: Some(-1),
             created_by: Uuid::now_v7(),
             created_at: now,

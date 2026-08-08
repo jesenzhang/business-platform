@@ -215,6 +215,7 @@ pub struct ProcessingJob {
     id: Uuid,
     tenant_id: Uuid,
     document_id: Uuid,
+    document_revision_id: Option<Uuid>,
     document_content_revision: i64,
     request_key: String,
     status: ProcessingJobStatus,
@@ -269,6 +270,7 @@ impl ProcessingJob {
             id: Uuid::now_v7(),
             tenant_id,
             document_id,
+            document_revision_id: None,
             document_content_revision,
             request_key,
             status: ProcessingJobStatus::Queued,
@@ -286,6 +288,35 @@ impl ProcessingJob {
             fence_version: 0,
             lease: None,
         })
+    }
+
+    /// Queue a run against one immutable `DocumentRevision`. A revision can
+    /// have many processing jobs; the run identity is deliberately separate.
+    #[allow(clippy::too_many_arguments)]
+    pub fn queue_for_revision(
+        tenant_id: Uuid,
+        document_id: Uuid,
+        document_revision_id: Uuid,
+        document_content_revision: i64,
+        request_key: String,
+        created_by: Uuid,
+        max_attempts: i32,
+        now: DateTime<Utc>,
+    ) -> Result<Self, ProcessingDomainError> {
+        if document_revision_id.is_nil() {
+            return Err(ProcessingDomainError::InvalidDocumentRevision);
+        }
+        let mut job = Self::queue(
+            tenant_id,
+            document_id,
+            document_content_revision,
+            request_key,
+            created_by,
+            max_attempts,
+            now,
+        )?;
+        job.document_revision_id = Some(document_revision_id);
+        Ok(job)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -439,6 +470,7 @@ impl ProcessingJob {
             id,
             tenant_id,
             document_id,
+            document_revision_id: None,
             document_content_revision,
             request_key,
             status,
@@ -473,6 +505,28 @@ impl ProcessingJob {
     #[must_use]
     pub const fn document_content_revision(&self) -> i64 {
         self.document_content_revision
+    }
+
+    #[must_use]
+    pub const fn document_revision_id(&self) -> Option<Uuid> {
+        self.document_revision_id
+    }
+
+    pub fn bind_document_revision(
+        &mut self,
+        revision_id: Uuid,
+    ) -> Result<(), ProcessingDomainError> {
+        if revision_id.is_nil() {
+            return Err(ProcessingDomainError::InvalidDocumentRevision);
+        }
+        if let Some(existing) = self.document_revision_id {
+            if existing != revision_id {
+                return Err(ProcessingDomainError::InvalidDocumentRevision);
+            }
+        } else {
+            self.document_revision_id = Some(revision_id);
+        }
+        Ok(())
     }
     #[must_use]
     pub fn request_key(&self) -> &str {

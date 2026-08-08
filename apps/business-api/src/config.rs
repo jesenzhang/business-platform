@@ -12,6 +12,8 @@ pub struct BusinessApiConfig {
     pub env: RuntimeEnvironment,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
+    #[serde(default)]
+    pub storage: StorageConfig,
     pub auth: AuthConfig,
     #[serde(default)]
     pub observability: ObservabilityConfig,
@@ -50,6 +52,46 @@ pub enum DatabaseBackend {
     #[default]
     Postgres,
     Sqlite,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageBackend {
+    #[default]
+    S3,
+    Local,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct StorageConfig {
+    #[serde(default)]
+    pub backend: StorageBackend,
+    #[serde(default = "default_storage_endpoint")]
+    pub endpoint: String,
+    #[serde(default = "default_storage_access_key")]
+    pub access_key: String,
+    #[serde(default = "default_storage_secret_key")]
+    pub secret_key: String,
+    #[serde(default = "default_storage_region")]
+    pub region: String,
+    #[serde(default = "default_storage_bucket")]
+    pub bucket: String,
+    #[serde(default = "default_storage_local_path")]
+    pub local_path: String,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            backend: StorageBackend::S3,
+            endpoint: default_storage_endpoint(),
+            access_key: default_storage_access_key(),
+            secret_key: default_storage_secret_key(),
+            region: default_storage_region(),
+            bucket: default_storage_bucket(),
+            local_path: default_storage_local_path(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -111,6 +153,16 @@ impl BusinessApiConfig {
         }
         if self.server.body_limit_bytes == 0 {
             messages.push("server.body_limit_bytes must be > 0".to_string());
+        }
+        if self.storage.backend == StorageBackend::S3
+            && (self.storage.endpoint.trim().is_empty() || self.storage.bucket.trim().is_empty())
+        {
+            messages.push("storage endpoint and bucket must be configured".to_string());
+        }
+        if self.env == RuntimeEnvironment::Production
+            && self.storage.backend == StorageBackend::Local
+        {
+            messages.push("storage.backend must not be local in production".to_string());
         }
         if self.database.max_connections == 0 {
             messages.push("database.max_connections must be > 0".to_string());
@@ -216,6 +268,24 @@ impl BusinessApiConfig {
     }
 }
 
+fn default_storage_endpoint() -> String {
+    "http://localhost:9000".to_string()
+}
+fn default_storage_access_key() -> String {
+    "minioadmin".to_string()
+}
+fn default_storage_secret_key() -> String {
+    "minioadmin".to_string()
+}
+fn default_storage_region() -> String {
+    "us-east-1".to_string()
+}
+fn default_storage_bucket() -> String {
+    "enterprise-documents".to_string()
+}
+fn default_storage_local_path() -> String {
+    ".data/storage".to_string()
+}
 fn default_host() -> String {
     "0.0.0.0".to_string()
 }
@@ -278,6 +348,7 @@ mod tests {
                 min_connections: 0,
                 acquire_timeout_secs: 1,
             },
+            storage: StorageConfig::default(),
             auth: AuthConfig {
                 issuer_url: String::new(),
                 audience: None,

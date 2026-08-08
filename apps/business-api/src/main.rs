@@ -3,12 +3,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
-use business_api::config::{BusinessApiConfig, DatabaseBackend};
+use business_api::config::{BusinessApiConfig, DatabaseBackend, StorageBackend};
 use business_api::routes;
 use business_api::state::{
     AppState, DocumentServices, GovernanceServices, PostgresReadinessProbe, ReadinessProbe,
-    SqliteReadinessProbe,
+    SqliteReadinessProbe, StorageServices,
 };
+use object_storage::{LocalStorageClient, ObjectStorageClient, S3Client};
 
 type PersistenceAdapters = (
     Arc<dyn document::ports::CreateDocumentUnitOfWork>,
@@ -41,6 +42,21 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     tracing::info!(service = %config.observability.service_name, "Starting business-api");
+
+    let storage: Arc<dyn ObjectStorageClient> = match config.storage.backend {
+        StorageBackend::S3 => Arc::new(S3Client::new(
+            &config.storage.endpoint,
+            &config.storage.access_key,
+            &config.storage.secret_key,
+            &config.storage.bucket,
+            &config.storage.region,
+        )),
+        StorageBackend::Local => Arc::new(
+            LocalStorageClient::new(&config.storage.local_path)
+                .await
+                .map_err(|_| anyhow::anyhow!("failed to initialize local object storage"))?,
+        ),
+    };
 
     let (
         unit_of_work,
@@ -168,6 +184,7 @@ async fn main() -> anyhow::Result<()> {
         }),
         governance: Some(governance),
         readiness,
+        storage: Some(StorageServices { objects: storage }),
     });
 
     let auth_config = AuthMiddlewareConfig {

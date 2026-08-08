@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use document::domain::{
-    AggregateVersion, ContentRevision, DocumentContentReference, DocumentMetadata, DocumentStatus,
-    RehydrateDocumentMetadata,
+    AggregateVersion, ContentRevision, DocumentContentReference, DocumentDeletionState,
+    DocumentLifecycleState, DocumentMetadata, DocumentStatus, RehydrateDocumentMetadata,
 };
 use document::ports::{ApplicationPortError, CreateDocumentUnitOfWork, PersistNewDocument};
 use document::query::{
@@ -373,6 +373,10 @@ fn verify_invalid_stored_data() {
         status: DocumentStatus::Active,
         aggregate_version: AggregateVersion::new(1).unwrap_or_else(|_| unreachable!()),
         content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
+        current_revision_id: Uuid::now_v7(),
+        lifecycle_state: DocumentLifecycleState::Active,
+        deletion_state: DocumentDeletionState::Present,
+        pre_trash_lifecycle: DocumentLifecycleState::Active,
         size_bytes: Some(1),
         created_by: Uuid::now_v7(),
         created_at: Utc::now(),
@@ -408,6 +412,22 @@ fn rehydrated_document(
         status,
         aggregate_version: AggregateVersion::new(1).unwrap_or_else(|_| unreachable!()),
         content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
+        current_revision_id: Uuid::now_v7(),
+        lifecycle_state: if matches!(status, DocumentStatus::Archived) {
+            DocumentLifecycleState::Archived
+        } else {
+            DocumentLifecycleState::Active
+        },
+        deletion_state: if matches!(status, DocumentStatus::Deleted) {
+            DocumentDeletionState::Trashed
+        } else {
+            DocumentDeletionState::Present
+        },
+        pre_trash_lifecycle: if matches!(status, DocumentStatus::Archived) {
+            DocumentLifecycleState::Archived
+        } else {
+            DocumentLifecycleState::Active
+        },
         size_bytes: Some(1),
         created_by,
         created_at,

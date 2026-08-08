@@ -365,3 +365,15 @@ CI 构建不可变镜像
 - [ ] 资源限额和多租户配额明确；
 - [ ] 外部 Provider 故障被隔离；
 - [ ] 部署变化不破坏 Bounded Context 和数据所有权。
+- [ ] 生产配置默认拒绝不安全降级。
+
+## 20. PLAN-0007 外部访问与本地 Demo 部署
+
+PLAN-0007 的 `deploy/demo/docker-compose.yml` 是本地演示拓扑，不是新的生产
+部署基线。它编排 PostgreSQL、MinIO、migration、Business API、Document
+Processing workers、无状态 MCP Adapter 和静态 Business Console；Console 与
+MCP 可独立停止，Business API/worker 不依赖它们继续运行。
+
+Demo 使用显式开发身份和 deterministic local extractor，仅由 development
+配置启用。生产配置仍必须使用 PostgreSQL、对象存储和非开发认证；Demo 的
+固定 token、端口和数据卷不得作为生产部署默认值。

@@ -9,6 +9,7 @@ use document::query::{DocumentDetailQuery, DocumentListQuery};
 use document_processing::ports::{
     CandidateQuery, ProcessingExecutionUnitOfWork, ProcessingJobQuery, ProcessingStepQuery,
 };
+use object_storage::ObjectStorageClient;
 use runtime_governance::IntegrityScanPort;
 use sqlx::PgPool;
 
@@ -102,11 +103,17 @@ pub struct ReadinessReport {
 
 /// HTTP application state. No handler receives a database pool.
 #[derive(Clone)]
+pub struct StorageServices {
+    pub objects: Arc<dyn ObjectStorageClient>,
+}
+
+#[derive(Clone)]
 pub struct AppState {
     pub documents: DocumentServices,
     pub processing: Option<ProcessingServices>,
     pub governance: Option<GovernanceServices>,
     pub readiness: Arc<dyn ReadinessProbe>,
+    pub storage: Option<StorageServices>,
 }
 
 pub struct PostgresReadinessProbe {

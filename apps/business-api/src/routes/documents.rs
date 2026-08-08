@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use shared_kernel::TenantContext;
 use uuid::Uuid;
 
+use public_api_contracts as contracts;
+
 use crate::api_error::ApiError;
 use crate::api_response::ApiResponse;
 use crate::state::AppState;
@@ -41,6 +43,9 @@ pub struct DocumentResponse {
     pub status: String,
     pub version: i64,
     pub content_revision: i64,
+    pub revision_id: Uuid,
+    pub revision_no: i64,
+    pub is_current: bool,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -57,6 +62,9 @@ impl From<document::domain::DocumentMetadata> for DocumentResponse {
             status: document.status().as_str().to_string(),
             version: document.version(),
             content_revision: document.content_revision().value(),
+            revision_id: document.current_revision_id(),
+            revision_no: document.content_revision().value(),
+            is_current: true,
             size_bytes: document.size_bytes(),
             created_by: document.created_by(),
             created_at: document.created_at(),
@@ -75,6 +83,9 @@ impl From<document::query::DocumentDetailView> for DocumentResponse {
             status: document.status.as_str().to_string(),
             version: document.version,
             content_revision: document.content_revision,
+            revision_id: document.revision_id,
+            revision_no: document.revision_no,
+            is_current: document.is_current,
             size_bytes: document.size_bytes,
             created_by: document.created_by,
             created_at: document.created_at,
@@ -85,7 +96,7 @@ impl From<document::query::DocumentDetailView> for DocumentResponse {
 
 #[derive(Debug, Serialize)]
 struct DocumentListResponse {
-    items: Vec<document::query::DocumentListItem>,
+    items: Vec<contracts::Document>,
     next_cursor: Option<String>,
 }
 
@@ -130,10 +141,15 @@ pub fn router() -> axum::Router<Arc<AppState>> {
             "/",
             axum::routing::post(create_document).get(list_documents),
         )
+        .route(
+            "/upload",
+            axum::routing::post(crate::routes::upload::upload_document),
+        )
         .route("/{id}", axum::routing::get(get_document))
         .route(
             "/{id}/processing-jobs",
-            axum::routing::post(crate::routes::processing::create_for_document),
+            axum::routing::post(crate::routes::processing::create_for_document)
+                .get(crate::routes::processing::list_for_document),
         )
 }
 
@@ -177,6 +193,7 @@ pub async fn create_document(
         content_type: body.content_type,
         object_key: body.object_key,
         size_bytes: body.size_bytes,
+        revision_id: None,
         idempotency_key,
     };
     let result = state
@@ -213,7 +230,7 @@ pub async fn get_document(
         .ok_or_else(|| trace_error(ApiError::not_found("document", document_id), &headers))?;
     Ok((
         StatusCode::OK,
-        Json(ApiResponse::ok(DocumentResponse::from(result))),
+        Json(ApiResponse::ok(crate::routes::public_dto::document(result))),
     )
         .into_response())
 }
@@ -260,7 +277,11 @@ pub async fn list_documents(
         .await
         .map_err(|error| trace_error(ApiError::from(error), &headers))?;
     let response = DocumentListResponse {
-        items: result.items,
+        items: result
+            .items
+            .into_iter()
+            .map(crate::routes::public_dto::document_list_item)
+            .collect(),
         next_cursor: result.next_cursor.map(encode_cursor),
     };
     Ok((StatusCode::OK, Json(ApiResponse::ok(response))).into_response())

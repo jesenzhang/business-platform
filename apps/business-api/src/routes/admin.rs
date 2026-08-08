@@ -23,6 +23,8 @@ use serde::{Deserialize, Serialize};
 use shared_kernel::TenantContext;
 use uuid::Uuid;
 
+use public_api_contracts as contracts;
+
 use crate::api_error::ApiError;
 use crate::api_response::ApiResponse;
 use crate::auth::{AuthenticatedPrincipal, ManagementPermission};
@@ -105,7 +107,7 @@ pub struct VerifyChainRequest {
 
 #[derive(Debug, Serialize)]
 pub struct AuditPageResponse {
-    pub items: Vec<audit::AuditEvent>,
+    pub items: Vec<contracts::AuditEvent>,
     pub next_cursor: Option<String>,
 }
 
@@ -254,7 +256,17 @@ pub async fn list_findings(
         .list_findings(tenant_id, query.status, query.limit)
         .await
         .map_err(map_integrity_error)?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(findings))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(ApiResponse::ok(contracts::Page {
+            items: findings
+                .iter()
+                .map(crate::routes::public_dto::finding)
+                .collect(),
+            next_cursor: None,
+        })),
+    )
+        .into_response())
 }
 
 pub async fn get_finding(
@@ -273,7 +285,13 @@ pub async fn get_finding(
         .map_err(map_integrity_error)?
         .filter(|finding| finding.tenant_id() == tenant_id)
         .ok_or_else(|| ApiError::not_found("integrity_finding", id))?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(finding))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(ApiResponse::ok(crate::routes::public_dto::finding(
+            &finding,
+        ))),
+    )
+        .into_response())
 }
 
 fn command(body: RepairRequest, tenant_id: Uuid, user_id: Uuid) -> RepairCommand {
@@ -619,7 +637,11 @@ pub async fn list_audit_events(
             ))
         })?;
     let response = AuditPageResponse {
-        items: page.items,
+        items: page
+            .items
+            .iter()
+            .map(crate::routes::public_dto::audit)
+            .collect(),
         next_cursor: encode_cursor(page.next_cursor)?,
     };
     Ok((StatusCode::OK, Json(ApiResponse::ok(response))).into_response())
@@ -643,7 +665,11 @@ pub async fn get_audit_event(
             ))
         })?
         .ok_or_else(|| ApiError::not_found("audit_event", id))?;
-    Ok((StatusCode::OK, Json(ApiResponse::ok(event))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(ApiResponse::ok(crate::routes::public_dto::audit(&event))),
+    )
+        .into_response())
 }
 
 pub async fn verify_audit_chain(

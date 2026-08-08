@@ -33,6 +33,7 @@ pub struct DocumentContentReference {
     tenant_id: Uuid,
     document_id: Uuid,
     content_revision: ContentRevision,
+    revision_id: Option<Uuid>,
     logical_path: String,
 }
 
@@ -51,7 +52,32 @@ impl DocumentContentReference {
             tenant_id,
             document_id,
             content_revision,
+            revision_id: None,
             logical_path,
+        })
+    }
+
+    /// Create the immutable source key for a first-class document revision.
+    ///
+    /// The logical filename is metadata only; the object identity is the
+    /// revision UUID and the fixed `source` leaf. This prevents an upload from
+    /// overwriting a prior revision or accidentally using a provider version
+    /// as a business identifier.
+    pub fn new_revision(
+        tenant_id: Uuid,
+        document_id: Uuid,
+        revision_id: Uuid,
+        content_revision: ContentRevision,
+    ) -> Result<Self, ContentReferenceError> {
+        if tenant_id.is_nil() || document_id.is_nil() || revision_id.is_nil() {
+            return Err(ContentReferenceError::InvalidIdentity);
+        }
+        Ok(Self {
+            tenant_id,
+            document_id,
+            content_revision,
+            revision_id: Some(revision_id),
+            logical_path: "source".to_string(),
         })
     }
 
@@ -76,6 +102,21 @@ impl DocumentContentReference {
             Uuid::parse_str(parts[3]).map_err(|_| ContentReferenceError::InvalidFormat)?;
         if document_id != expected_document_id {
             return Err(ContentReferenceError::DocumentMismatch);
+        }
+        if parts[4] == "revisions" {
+            if parts.len() != 7 || parts[6] != "source" {
+                return Err(ContentReferenceError::InvalidFormat);
+            }
+            let revision_id =
+                Uuid::parse_str(parts[5]).map_err(|_| ContentReferenceError::InvalidRevision)?;
+            // The integer revision remains a compatibility value. The UUID
+            // is the business identity and is never taken from S3 VersionId.
+            return Self::new_revision(
+                tenant_id,
+                document_id,
+                revision_id,
+                ContentRevision::new(1).map_err(|_| ContentReferenceError::InvalidRevision)?,
+            );
         }
         let revision_value = parts[4]
             .strip_prefix('v')
@@ -108,16 +149,27 @@ impl DocumentContentReference {
     }
 
     #[must_use]
+    pub const fn revision_id(&self) -> Option<Uuid> {
+        self.revision_id
+    }
+
+    #[must_use]
     pub fn logical_path(&self) -> &str {
         &self.logical_path
     }
 
     #[must_use]
     pub fn as_storage_key(&self) -> String {
-        format!(
-            "tenants/{}/documents/{}/v{}/{}",
-            self.tenant_id, self.document_id, self.content_revision, self.logical_path
-        )
+        match self.revision_id {
+            Some(revision_id) => format!(
+                "tenants/{}/documents/{}/revisions/{revision_id}/source",
+                self.tenant_id, self.document_id
+            ),
+            None => format!(
+                "tenants/{}/documents/{}/v{}/{}",
+                self.tenant_id, self.document_id, self.content_revision, self.logical_path
+            ),
+        }
     }
 }
 

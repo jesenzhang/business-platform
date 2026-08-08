@@ -9,11 +9,11 @@ use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
     AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
-    ServerConfig,
+    ServerConfig, StorageConfig,
 };
 use business_api::routes;
 use business_api::state::{
-    AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
+    AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus, StorageServices,
 };
 use document::application::CreateDocumentMetadata;
 use document::domain::DocumentMetadata;
@@ -21,10 +21,12 @@ use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
 use document::query::{
-    DocumentDetailQuery, DocumentDetailView, DocumentListCursor, DocumentListItem,
-    DocumentListPage, DocumentListQuery, DocumentListRequest, DocumentStatusView, QueryError,
+    DocumentDetailQuery, DocumentDetailView, DocumentListCursor, DocumentListFilter,
+    DocumentListItem, DocumentListPage, DocumentListQuery, DocumentListRequest, DocumentStatusView,
+    QueryError,
 };
 use http_body_util::BodyExt;
+use object_storage::{LocalStorageClient, ObjectStorageClient};
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tokio::sync::RwLock;
 use tower::ServiceExt;
@@ -37,6 +39,7 @@ const USER_A: &str = "11111111-1111-1111-1111-111111111111";
 
 struct FakeStore {
     state: RwLock<FakeState>,
+    fail_create: bool,
 }
 
 #[derive(Default)]
@@ -56,6 +59,16 @@ impl Default for FakeStore {
     fn default() -> Self {
         Self {
             state: RwLock::new(FakeState::default()),
+            fail_create: false,
+        }
+    }
+}
+
+impl FakeStore {
+    fn failing() -> Self {
+        Self {
+            state: RwLock::new(FakeState::default()),
+            fail_create: true,
         }
     }
 }
@@ -66,6 +79,9 @@ impl CreateDocumentUnitOfWork for FakeStore {
         &self,
         command: PersistNewDocument,
     ) -> Result<CreateDocumentResult, ApplicationPortError> {
+        if self.fail_create {
+            return Err(ApplicationPortError::Failed);
+        }
         let mut state = self.state.write().await;
         let key = (
             command.document.tenant_id(),
@@ -136,6 +152,9 @@ impl DocumentDetailQuery for FakeStore {
                 status: view_status(item.status()),
                 version: item.version(),
                 content_revision: item.content_revision().value(),
+                revision_id: item.current_revision_id(),
+                revision_no: item.content_revision().value(),
+                is_current: true,
                 size_bytes: item.size_bytes(),
                 created_by: item.created_by(),
                 created_at: item.created_at(),
@@ -161,6 +180,9 @@ impl DocumentListQuery for FakeStore {
                 status: view_status(item.status()),
                 version: item.version(),
                 content_revision: item.content_revision().value(),
+                revision_id: item.current_revision_id(),
+                revision_no: item.content_revision().value(),
+                is_current: true,
                 size_bytes: item.size_bytes(),
                 created_at: item.created_at(),
                 updated_at: item.updated_at(),
@@ -170,6 +192,17 @@ impl DocumentListQuery for FakeStore {
         items.truncate(request.limit as usize);
         let next_cursor = None::<DocumentListCursor>;
         Ok(DocumentListPage { items, next_cursor })
+    }
+
+    async fn count(&self, tenant_id: Uuid, _filter: DocumentListFilter) -> Result<u64, QueryError> {
+        Ok(self
+            .state
+            .read()
+            .await
+            .documents
+            .iter()
+            .filter(|item| item.tenant_id() == tenant_id)
+            .count() as u64)
     }
 }
 
@@ -187,10 +220,18 @@ impl ReadinessProbe for ReadyProbe {
 }
 
 fn test_router(store: Arc<FakeStore>) -> axum::Router {
-    test_router_for_tenant(store, TENANT_A)
+    test_router_with_storage(store, TENANT_A, None)
 }
 
 fn test_router_for_tenant(store: Arc<FakeStore>, tenant: &str) -> axum::Router {
+    test_router_with_storage(store, tenant, None)
+}
+
+fn test_router_with_storage(
+    store: Arc<FakeStore>,
+    tenant: &str,
+    storage: Option<Arc<dyn ObjectStorageClient>>,
+) -> axum::Router {
     let config = BusinessApiConfig {
         env: RuntimeEnvironment::Development,
         server: ServerConfig {
@@ -212,6 +253,7 @@ fn test_router_for_tenant(store: Arc<FakeStore>, tenant: &str) -> axum::Router {
             otlp_endpoint: None,
             log_level: "info".to_string(),
         },
+        storage: StorageConfig::default(),
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
@@ -233,6 +275,7 @@ fn test_router_for_tenant(store: Arc<FakeStore>, tenant: &str) -> axum::Router {
         processing: None,
         governance: None,
         readiness: Arc::new(ReadyProbe),
+        storage: storage.map(|objects| StorageServices { objects }),
     });
     routes::create_router(
         state,
@@ -247,6 +290,25 @@ fn test_router_for_tenant(store: Arc<FakeStore>, tenant: &str) -> axum::Router {
         },
         &config.server,
     )
+}
+
+fn multipart_request(key: &str, content_type: &str, filename: &str) -> Request<Body> {
+    let boundary = "business-platform-test-boundary";
+    let body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: {content_type}\r\n\r\ntest document\r\n--{boundary}--\r\n"
+    );
+    Request::builder()
+        .method("POST")
+        .uri("/api/v1/documents/upload")
+        .header("authorization", format!("Bearer {SECRET}"))
+        .header("x-request-id", "upload-test-request")
+        .header("idempotency-key", key)
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(Body::from(body))
+        .unwrap_or_else(|_| unreachable!())
 }
 
 fn request(method: &str, uri: &str, tenant: &str, body: Option<String>) -> Request<Body> {
@@ -477,4 +539,115 @@ async fn cross_tenant_get_is_not_found() {
         .await
         .expect("router must respond");
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn multipart_upload_is_idempotent_and_does_not_expose_object_key() {
+    let path = std::env::temp_dir().join(format!("business-api-upload-{}", Uuid::now_v7()));
+    let storage = Arc::new(
+        LocalStorageClient::new(&path)
+            .await
+            .unwrap_or_else(|_| unreachable!()),
+    );
+    let router = test_router_with_storage(
+        Arc::new(FakeStore::default()),
+        TENANT_A,
+        Some(storage.clone()),
+    );
+    let first = router
+        .clone()
+        .oneshot(multipart_request("upload-1", "text/plain", "demo.txt"))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(first.status(), StatusCode::CREATED);
+    let first_payload = response_json(first).await;
+    assert!(first_payload["data"]["id"].is_string());
+
+    let replay = router
+        .oneshot(multipart_request("upload-1", "text/plain", "demo.txt"))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(replay.status(), StatusCode::OK);
+    response_json(replay).await;
+
+    let files = walk_files(&path);
+    assert_eq!(files.len(), 1);
+    let _ = tokio::fs::remove_dir_all(path).await;
+}
+
+#[tokio::test]
+async fn upload_rejects_unsupported_content_type_before_persistence() {
+    let path = std::env::temp_dir().join(format!("business-api-upload-{}", Uuid::now_v7()));
+    let storage = Arc::new(
+        LocalStorageClient::new(&path)
+            .await
+            .unwrap_or_else(|_| unreachable!()),
+    );
+    let router = test_router_with_storage(Arc::new(FakeStore::default()), TENANT_A, Some(storage));
+    let response = router
+        .oneshot(multipart_request(
+            "upload-invalid",
+            "application/octet-stream",
+            "demo.bin",
+        ))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let _ = tokio::fs::remove_dir_all(path).await;
+}
+
+#[tokio::test]
+async fn upload_compensates_object_storage_when_document_persistence_fails() {
+    let path = std::env::temp_dir().join(format!("business-api-upload-{}", Uuid::now_v7()));
+    let storage = Arc::new(
+        LocalStorageClient::new(&path)
+            .await
+            .unwrap_or_else(|_| unreachable!()),
+    );
+    let router = test_router_with_storage(Arc::new(FakeStore::failing()), TENANT_A, Some(storage));
+    let response = router
+        .oneshot(multipart_request(
+            "upload-compensation",
+            "text/plain",
+            "demo.txt",
+        ))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(walk_files(&path).is_empty());
+    let _ = tokio::fs::remove_dir_all(path).await;
+}
+
+#[tokio::test]
+async fn overview_fails_closed_when_processing_service_is_unavailable() {
+    let router = test_router(Arc::new(FakeStore::default()));
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/api/v1/operations/overview",
+            TENANT_A,
+            None,
+        ))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let payload = response_json(response).await;
+    assert_eq!(payload["code"], "EXTERNAL_SERVICE_ERROR");
+    assert!(!payload.to_string().contains("sqlx"));
+}
+
+fn walk_files(path: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return files;
+    };
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            files.extend(walk_files(&entry_path));
+        } else {
+            files.push(entry_path);
+        }
+    }
+    files
 }

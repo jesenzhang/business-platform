@@ -475,6 +475,8 @@ pub trait IntegrityPersistencePort: Send + Sync {
 /// rows or provider/storage fields.
 #[async_trait]
 pub trait IntegrityQueryPort: Send + Sync {
+    async fn count_unresolved(&self, tenant_id: Uuid) -> Result<u64, IntegrityError>;
+
     async fn get_scan_run(
         &self,
         tenant_id: Option<Uuid>,

@@ -22,7 +22,7 @@ impl DocumentListQuery for SqliteDocumentListQuery {
     async fn execute(&self, request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
         let limit = request.limit.clamp(1, 200);
         let mut builder = QueryBuilder::<Sqlite>::new(
-            "SELECT id, original_filename, content_type, status, version, content_revision, size_bytes, created_at, updated_at FROM documents WHERE tenant_id = ",
+            "SELECT id, original_filename, content_type, status, version, content_revision, current_revision_id, size_bytes, created_at, updated_at FROM documents WHERE tenant_id = ",
         );
         builder.push_bind(request.tenant_id.to_string());
         if let Some(status) = request.filter.status {
@@ -80,5 +80,35 @@ impl DocumentListQuery for SqliteDocumentListQuery {
             None
         };
         Ok(DocumentListPage { items, next_cursor })
+    }
+
+    async fn count(
+        &self,
+        tenant_id: uuid::Uuid,
+        filter: document::query::DocumentListFilter,
+    ) -> Result<u64, QueryError> {
+        let count = sqlx::query_scalar::<_, i64>(
+            r"SELECT COUNT(*)
+              FROM documents
+              WHERE tenant_id = ?1
+                AND (?2 IS NULL OR status = ?2)
+                AND (?3 IS NULL OR original_filename LIKE '%' || ?3 || '%' ESCAPE '\')
+                AND (?4 IS NULL OR created_at >= ?4)
+                AND (?5 IS NULL OR created_at < ?5)",
+        )
+        .bind(tenant_id.to_string())
+        .bind(filter.status.map(|value| value.as_str().to_string()))
+        .bind(
+            filter
+                .filename_contains
+                .as_deref()
+                .map(document::query::escape_like_literal),
+        )
+        .bind(filter.created_after.map(|value| value.to_rfc3339()))
+        .bind(filter.created_before.map(|value| value.to_rfc3339()))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_query_error)?;
+        u64::try_from(count).map_err(|_| QueryError::InvalidStoredData)
     }
 }

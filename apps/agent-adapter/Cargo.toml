@@ -6,11 +6,17 @@ rust-version.workspace = true
 
 [dependencies]
 tokio = { workspace = true }
+axum = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 runtime-config = { workspace = true }
 observability = { workspace = true }
+business-api-client = { workspace = true }
+public-api-contracts = { workspace = true }
 
 [lints]
 workspace = true

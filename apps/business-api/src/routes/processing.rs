@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use chrono::Utc;
+use base64::Engine;
+use chrono::{DateTime, Utc};
 use document_processing::ports::FinalizeReviewCommand;
 use document_processing::{
     ProcessingJob, ProcessingJobStatus, ProcessingRepositoryError, ReviewCandidateCommand,
@@ -17,6 +18,7 @@ use uuid::Uuid;
 
 use crate::api_error::ApiError;
 use crate::api_response::ApiResponse;
+use crate::routes::public_dto;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +43,7 @@ pub struct ProcessingJobResponse {
     pub job_id: Uuid,
     pub document_id: Uuid,
     pub content_revision: i64,
+    pub revision_id: Option<Uuid>,
     pub status: ProcessingJobStatus,
     pub current_step: document_processing::ProcessingStepKind,
     pub attempt_count: i32,
@@ -50,48 +53,6 @@ pub struct ProcessingJobResponse {
     pub review_available: bool,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CandidateResponse {
-    pub candidate_id: Uuid,
-    pub job_id: Uuid,
-    pub content_revision: i64,
-    pub schema_version: String,
-    pub payload: document_processing::CandidatePayload,
-    pub evidence: Vec<document_processing::CandidateEvidence>,
-    pub provider: String,
-    pub model: String,
-    pub prompt_version: String,
-    pub version: i64,
-    pub created_at: chrono::DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ReviewResponse {
-    #[serde(flatten)]
-    pub review: document_processing::CandidateReview,
-    pub replayed: bool,
-}
-
-impl From<document_processing::ExtractionCandidate> for CandidateResponse {
-    fn from(candidate: document_processing::ExtractionCandidate) -> Self {
-        let version = candidate.version();
-        let created_at = candidate.created_at();
-        Self {
-            candidate_id: candidate.id(),
-            job_id: candidate.job_id(),
-            content_revision: candidate.content_revision(),
-            schema_version: candidate.schema_version,
-            payload: candidate.payload,
-            evidence: candidate.evidence,
-            provider: candidate.provider,
-            model: candidate.model,
-            prompt_version: candidate.prompt_version,
-            version,
-            created_at,
-        }
-    }
 }
 
 fn context(context: &TenantContext) -> Result<(Uuid, Uuid), ApiError> {
@@ -150,6 +111,7 @@ fn response(detail: &document_processing::ports::ProcessingJobDetail) -> Process
         job_id: detail.job.id(),
         document_id: detail.job.document_id(),
         content_revision: detail.job.document_content_revision(),
+        revision_id: detail.job.document_revision_id(),
         status: detail.job.status(),
         current_step: detail.job.current_step(),
         attempt_count: detail.job.attempt_count(),
@@ -166,6 +128,105 @@ fn response(detail: &document_processing::ports::ProcessingJobDetail) -> Process
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ListProcessingParams {
+    #[serde(default = "default_list_limit")]
+    pub limit: u32,
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ProcessingCursorToken {
+    version: u8,
+    created_at: DateTime<Utc>,
+    id: Uuid,
+}
+
+fn default_list_limit() -> u32 {
+    20
+}
+
+fn encode_processing_cursor(cursor: document_processing::ports::ProcessingJobCursor) -> String {
+    let token = ProcessingCursorToken {
+        version: 1,
+        created_at: cursor.created_at,
+        id: cursor.id,
+    };
+    let bytes = serde_json::to_vec(&token).unwrap_or_default();
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+fn decode_processing_cursor(
+    value: &str,
+) -> Result<document_processing::ports::ProcessingJobCursor, ApiError> {
+    if value.is_empty() || value.len() > 512 {
+        return Err(ApiError::validation("invalid cursor"));
+    }
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| ApiError::validation("invalid cursor"))?;
+    let token: ProcessingCursorToken =
+        serde_json::from_slice(&bytes).map_err(|_| ApiError::validation("invalid cursor"))?;
+    if token.version != 1 || token.id.is_nil() {
+        return Err(ApiError::validation("invalid cursor"));
+    }
+    Ok(document_processing::ports::ProcessingJobCursor {
+        created_at: token.created_at,
+        id: token.id,
+    })
+}
+
+#[derive(Debug, Serialize)]
+struct ProcessingPageResponse {
+    items: Vec<ProcessingJobResponse>,
+    next_cursor: Option<String>,
+}
+
+pub async fn list_jobs(
+    axum::Extension(auth): axum::Extension<TenantContext>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<ListProcessingParams>,
+) -> Result<Response, ApiError> {
+    let (tenant_id, _) = context(&auth).map_err(|error| trace(error, &headers))?;
+    let cursor = params
+        .cursor
+        .as_deref()
+        .map(decode_processing_cursor)
+        .transpose()
+        .map_err(|error| trace(error, &headers))?;
+    let page = processing_services(&state)?
+        .queries
+        .list(document_processing::ports::ProcessingJobListRequest {
+            tenant_id,
+            document_id: None,
+            cursor,
+            limit: params.limit.clamp(1, 100),
+        })
+        .await
+        .map_err(|error| trace(map_error(&error), &headers))?;
+    let response = ProcessingPageResponse {
+        items: page.items.iter().map(response).collect(),
+        next_cursor: page.next_cursor.map(encode_processing_cursor),
+    };
+    Ok((StatusCode::OK, Json(ApiResponse::ok(response))).into_response())
+}
+
+pub async fn list_for_document(
+    axum::Extension(auth): axum::Extension<TenantContext>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(document_id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    let (tenant_id, _) = context(&auth).map_err(|error| trace(error, &headers))?;
+    let jobs = processing_services(&state)?
+        .queries
+        .list_for_document(tenant_id, document_id)
+        .await
+        .map_err(|error| trace(map_error(&error), &headers))?;
+    let response: Vec<ProcessingJobResponse> = jobs.iter().map(response).collect();
+    Ok((StatusCode::OK, Json(ApiResponse::ok(response))).into_response())
+}
 pub async fn create_for_document(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
@@ -207,9 +268,10 @@ pub async fn create_for_document(
         ));
     }
     let services = processing_services(&state)?;
-    let job = ProcessingJob::queue(
+    let job = ProcessingJob::queue_for_revision(
         tenant_id,
         document_id,
+        document.revision_id,
         body.content_revision,
         key.to_string(),
         user_id,
@@ -297,7 +359,7 @@ pub async fn get_candidate(
         .ok_or_else(|| trace(ApiError::not_found("candidate", job_id), &headers))?;
     Ok((
         StatusCode::OK,
-        Json(ApiResponse::ok(CandidateResponse::from(candidate))),
+        Json(ApiResponse::ok(public_dto::candidate(candidate))),
     )
         .into_response())
 }
@@ -378,8 +440,8 @@ pub async fn review_candidate(
         .map_err(|error| trace(map_error(&error), &headers))?;
     Ok((
         StatusCode::OK,
-        Json(ApiResponse::ok(ReviewResponse {
-            review: finalized.review,
+        Json(ApiResponse::ok(public_api_contracts::ReviewResult {
+            review: public_dto::review(finalized.review),
             replayed: finalized.replayed,
         })),
     )

@@ -13,12 +13,13 @@ pub use application::{
 };
 
 pub use domain::{
-    extract_text_artifact, CandidateEvidence, CandidateEvidenceSource, CandidatePayload,
-    CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionCandidate,
-    ExtractionError, ExtractionRequest, FixedPipeline, JobVersion, ProcessingDomainError,
-    ProcessingEvent, ProcessingEventEnvelope, ProcessingFailureKind, ProcessingJob,
-    ProcessingJobStatus, ProcessingStepKind, ProcessingStepStatus, ReviewDecision, ReviewError,
-    TextArtifact, TextCheckpoint,
+    extract_text_artifact, ArtifactKind, CandidateEvidence, CandidateEvidenceSource,
+    CandidatePayload, CandidateReview, DeterministicLocalExtractor, DocumentFieldExtractor,
+    Evidence, ExtractionCandidate, ExtractionError, ExtractionRequest, FixedPipeline, JobVersion,
+    ProcessingArtifact, ProcessingArtifactError, ProcessingDomainError, ProcessingEvent,
+    ProcessingEventEnvelope, ProcessingFailureKind, ProcessingJob, ProcessingJobStatus,
+    ProcessingRun, ProcessingRunStatus, ProcessingStepKind, ProcessingStepStatus, ReviewDecision,
+    ReviewError, TextArtifact, TextCheckpoint,
 };
 pub use ports::{
     CandidateQuery, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,

@@ -76,6 +76,33 @@ Assert-NotContains "apps/governance-worker/src" @(
     "DELETE FROM audit_events",
     "UPDATE audit_events"
 ) "governance worker must use typed repair ports"
+
+# PLAN-0007 external access and client boundaries.
+Assert-NotContains "crates/public-api-contracts/Cargo.toml" @(
+    "axum", "sqlx", "reqwest", "object-storage", "document-postgres", "document-processing-postgres"
+) "public API contracts must remain transport and infrastructure neutral"
+Assert-NotContains "apps/business-cli/Cargo.toml" @(
+    "sqlx", "object-storage", "document-postgres", "document-processing-postgres"
+) "business CLI must use the typed Business API client"
+Assert-NotContains "apps/agent-adapter/Cargo.toml" @(
+    "sqlx", "object-storage", "document-postgres", "document-processing-postgres"
+) "MCP adapter must use the typed Business API client"
+Assert-NotContains "apps/agent-adapter/src" @(
+    "sqlx::", "PgPool", "S3Client", "STORAGE_SECRET_KEY", "execute_sql"
+) "MCP adapter must not access persistence or object storage"
+Assert-NotContains "apps/business-cli/src" @(
+    "sqlx::", "PgPool", "S3Client", "STORAGE_SECRET_KEY", "execute_sql"
+) "business CLI must not access persistence or object storage"
+Assert-NotContains "apps/business-console/src" @(
+    "postgres", "sqlx", "object_key", "storage_key", "internal_path"
+) "business console must remain a replaceable REST client"
+if (-not (Test-Path (Join-Path $root "openapi.json"))) {
+    throw "PLAN-0007 public OpenAPI contract is missing"
+}
+& (Join-Path $PSScriptRoot "check-openapi.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "OpenAPI contract fitness failed"
+}
 $processingPorts = Get-Content -Raw (Join-Path $root "crates/document-processing/src/ports.rs")
 foreach ($requiredProcessingPort in @("ProcessingExecutionUnitOfWork", "ExecutionFence", "TextArtifactReference")) {
     if ($processingPorts -notmatch [regex]::Escape($requiredProcessingPort)) {

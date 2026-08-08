@@ -8,7 +8,7 @@ use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
     AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
-    ServerConfig,
+    ServerConfig, StorageConfig,
 };
 use business_api::routes;
 use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
@@ -61,6 +61,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
             otlp_endpoint: None,
             log_level: "info".to_string(),
         },
+        storage: StorageConfig::default(),
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
@@ -89,6 +90,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
         processing: None,
         governance: None,
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
+        storage: None,
     });
     routes::create_router(
         state,

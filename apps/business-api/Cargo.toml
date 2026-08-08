@@ -22,6 +22,10 @@ chrono = { workspace = true }
 base64 = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+sha2 = { workspace = true }
+tokio-util = { workspace = true }
 runtime-config = { workspace = true }
 runtime-migration = { workspace = true }
 
@@ -42,11 +46,17 @@ data-repair = { workspace = true }
 runtime-governance = { workspace = true }
 runtime-governance-postgres = { workspace = true }
 runtime-governance-sqlite = { workspace = true }
+object-storage = { workspace = true }
+public-api-contracts = { workspace = true }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 async-trait = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+sha2 = { workspace = true }
+tokio-util = { workspace = true }
 
 [lints]
 workspace = true

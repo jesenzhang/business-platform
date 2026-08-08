@@ -8,8 +8,11 @@ use shared_kernel::error::AppError;
 pub struct ErrorBody {
     pub code: String,
     pub message: String,
+    pub request_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 
 #[derive(Debug)]
@@ -74,7 +77,12 @@ impl IntoResponse for ApiError {
                 } else {
                     self.error.to_string()
                 },
+                request_id: self
+                    .trace_id
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
                 trace_id: self.trace_id,
+                details: None,
             }),
         )
             .into_response()

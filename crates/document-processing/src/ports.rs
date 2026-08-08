@@ -39,6 +39,37 @@ pub struct ProcessingJobDetail {
     pub review: Option<CandidateReview>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProcessingJobCursor {
+    pub created_at: DateTime<Utc>,
+    pub id: Uuid,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessingJobListRequest {
+    pub tenant_id: Uuid,
+    pub document_id: Option<Uuid>,
+    pub cursor: Option<ProcessingJobCursor>,
+    pub limit: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessingJobPage {
+    pub items: Vec<ProcessingJobDetail>,
+    pub next_cursor: Option<ProcessingJobCursor>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ProcessingJobStatusCounts {
+    pub queued: u64,
+    pub running: u64,
+    pub waiting_for_ai: u64,
+    pub waiting_for_review: u64,
+    pub succeeded: u64,
+    pub failed: u64,
+    pub cancelled: u64,
+    pub rejected: u64,
+}
 #[derive(Debug, Clone)]
 pub struct StepCheckpoint {
     pub job_id: Uuid,
@@ -193,11 +224,22 @@ pub trait ProcessingJobClaimPort: Send + Sync {
 
 #[async_trait]
 pub trait ProcessingJobQuery: Send + Sync {
+    async fn status_counts(
+        &self,
+        tenant_id: Uuid,
+    ) -> Result<ProcessingJobStatusCounts, ProcessingRepositoryError>;
+
     async fn detail(
         &self,
         tenant_id: Uuid,
         job_id: Uuid,
     ) -> Result<Option<ProcessingJobDetail>, ProcessingRepositoryError>;
+
+    async fn list(
+        &self,
+        request: ProcessingJobListRequest,
+    ) -> Result<ProcessingJobPage, ProcessingRepositoryError>;
+
     async fn list_for_document(
         &self,
         tenant_id: Uuid,

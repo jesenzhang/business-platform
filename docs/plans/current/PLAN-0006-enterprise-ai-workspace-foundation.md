@@ -210,6 +210,17 @@ Output is a bounded Agent Read DTO containing:
 It must not return object-store keys, raw extracted text, prompts, credentials,
 full provider errors, database details, or unrestricted audit payloads.
 
+### Document revision precondition
+
+PLAN-0006 depends on PLAN-0008's Document Revision contract. A workspace page
+context and `document.processing_status.get` must prefer the stable
+`document_revision_id` when a revision is selected. During the compatibility
+window, a request containing only `document_id` resolves the current revision
+through the Document Management query port; clients must not infer a revision
+from a storage key or provider version. Workspace/Agent state remains
+non-authoritative and PLAN-0006 remains Proposed until its own activation
+gate is satisfied.
+
 ## 7. Work packages
 
 | ID | Scope | Required evidence |

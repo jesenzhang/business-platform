@@ -12,6 +12,7 @@ pub(crate) struct DocumentRow {
     pub status: String,
     pub version: i64,
     pub content_revision: i64,
+    pub current_revision_id: Option<String>,
     pub size_bytes: Option<i64>,
     pub created_by: String,
     pub created_at: String,
@@ -41,6 +42,14 @@ impl TryFrom<DocumentRow> for DocumentDetailView {
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
             content_revision: row.content_revision,
+            revision_id: row
+                .current_revision_id
+                .as_deref()
+                .map(uuid)
+                .transpose()?
+                .ok_or(QueryError::InvalidStoredData)?,
+            revision_no: row.content_revision,
+            is_current: true,
             size_bytes: row.size_bytes,
             created_by: uuid(&row.created_by)?,
             created_at: timestamp(&row.created_at)?,
@@ -57,6 +66,7 @@ pub(crate) struct ListRow {
     pub status: String,
     pub version: i64,
     pub content_revision: i64,
+    pub current_revision_id: Option<String>,
     pub size_bytes: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
@@ -74,6 +84,14 @@ impl TryFrom<ListRow> for DocumentListItem {
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
             content_revision: row.content_revision,
+            revision_id: row
+                .current_revision_id
+                .as_deref()
+                .map(uuid)
+                .transpose()?
+                .ok_or(QueryError::InvalidStoredData)?,
+            revision_no: row.content_revision,
+            is_current: true,
             size_bytes: row.size_bytes,
             created_at: timestamp(&row.created_at)?,
             updated_at: timestamp(&row.updated_at)?,
@@ -143,6 +161,7 @@ mod tests {
             status: "active".to_string(),
             version: 1,
             content_revision: 1,
+            current_revision_id: Some(Uuid::now_v7().to_string()),
             size_bytes: Some(1),
             created_by: Uuid::now_v7().to_string(),
             created_at: now.clone(),
@@ -178,6 +197,13 @@ mod tests {
         unknown_status.status = "future".to_string();
         assert_eq!(
             DocumentDetailView::try_from(unknown_status),
+            Err(QueryError::InvalidStoredData)
+        );
+
+        let mut missing_revision = document_row();
+        missing_revision.current_revision_id = None;
+        assert_eq!(
+            DocumentDetailView::try_from(missing_revision),
             Err(QueryError::InvalidStoredData)
         );
     }

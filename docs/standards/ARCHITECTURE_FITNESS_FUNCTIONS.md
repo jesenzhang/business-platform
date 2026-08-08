@@ -380,3 +380,21 @@ heartbeat tasks are owned and joined, and that migration 011/SQLite 002 are
 manifested without historical edits. Contract tests cover atomic review
 replay/rollback, AI retry/reclaim, stale fences, artifact metadata, and the
 SQLite `BEGIN IMMEDIATE` single-writer boundary.
+
+## 25. PLAN-0007 external access gates
+
+PLAN-0007 additionally requires:
+
+- `scripts/check-openapi.ps1` to parse `openapi.json`, assert the stable v1 paths
+  and reject internal storage fields;
+- `scripts/check-architecture.ps1` to reject database/object-storage dependencies
+  from `business-cli`, `agent-adapter` and `public-api-contracts`, and database
+  references from `business-console`;
+- CLI parser/unit contracts and MCP allow-list, malformed-argument, auth and
+  upstream-unavailable contracts;
+- multipart upload idempotency, content-type, tenant isolation and object/database
+  compensation tests;
+- frontend lint, strict typecheck, unit, build and Playwright smoke checks;
+- the local Demo compose topology and seed script to remain outside the production
+  configuration path. Docker/PostgreSQL/MinIO execution is evidence-required when
+  the local host does not provide those runtimes and must be reported as `NOT RUN`.

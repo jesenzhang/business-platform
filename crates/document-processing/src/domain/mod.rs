@@ -1,9 +1,14 @@
+mod artifact;
 mod candidate;
 mod error;
 mod events;
 mod job;
 pub mod pipeline;
 
+pub use artifact::{
+    ArtifactKind, Evidence, ProcessingArtifact, ProcessingArtifactError, ProcessingRun,
+    ProcessingRunStatus,
+};
 pub use candidate::{
     CandidateEvidence, CandidateEvidenceSource, CandidatePayload, CandidateReview,
     ExtractionCandidate, ReviewDecision,

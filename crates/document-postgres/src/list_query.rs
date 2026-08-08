@@ -36,6 +36,7 @@ impl DocumentListQuery for PostgresDocumentListQuery {
         let cursor_id = request.cursor.map(|cursor| cursor.id);
         let rows = sqlx::query_as::<_, ListRow>(
             r"SELECT id, original_filename, content_type, status, version, content_revision,
+                     current_revision_id,
                      size_bytes, created_at, updated_at
               FROM documents
               WHERE tenant_id = $1
@@ -75,5 +76,39 @@ impl DocumentListQuery for PostgresDocumentListQuery {
         };
         items.shrink_to_fit();
         Ok(DocumentListPage { items, next_cursor })
+    }
+
+    async fn count(
+        &self,
+        tenant_id: uuid::Uuid,
+        filter: document::query::DocumentListFilter,
+    ) -> Result<u64, QueryError> {
+        let count = sqlx::query_scalar::<_, i64>(
+            r"SELECT COUNT(*)
+              FROM documents
+              WHERE tenant_id = $1
+                AND ($2::text IS NULL OR status = $2)
+                AND ($3::text IS NULL OR original_filename ILIKE '%' || $3 || '%' ESCAPE '\')
+                AND ($4::timestamptz IS NULL OR created_at >= $4)
+                AND ($5::timestamptz IS NULL OR created_at < $5)",
+        )
+        .bind(tenant_id)
+        .bind(
+            filter
+                .status
+                .map(document::query::DocumentStatusFilter::as_str),
+        )
+        .bind(
+            filter
+                .filename_contains
+                .as_deref()
+                .map(document::query::escape_like_literal),
+        )
+        .bind(filter.created_after)
+        .bind(filter.created_before)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_query_error)?;
+        u64::try_from(count).map_err(|_| QueryError::InvalidStoredData)
     }
 }

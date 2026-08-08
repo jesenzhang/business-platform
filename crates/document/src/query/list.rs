@@ -14,4 +14,6 @@ pub struct DocumentListRequest {
 #[async_trait]
 pub trait DocumentListQuery: Send + Sync {
     async fn execute(&self, request: DocumentListRequest) -> Result<DocumentListPage, QueryError>;
+
+    async fn count(&self, tenant_id: Uuid, filter: DocumentListFilter) -> Result<u64, QueryError>;
 }

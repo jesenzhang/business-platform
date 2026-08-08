@@ -331,3 +331,15 @@ Connection URLs are secret-bearing runtime values. They are rendered in
 redacted form by `Debug` and `Display`; parsing and validation failures expose
 only field-level rules. Plaintext is read only at the immediate infrastructure
 client construction boundary.
+
+## 23. PLAN-0007 外部访问面
+
+React、CLI 和 MCP 都是 Business API 的客户端。CLI 只依赖 typed HTTP client；
+MCP Adapter 只依赖同一 client 并固定 read-only tool allow-list；两者不得接收
+tenant、permission、object key 或 credentials 作为业务参数。租户和权限由
+Business API 的可信认证上下文决定，MCP 的 adapter token 不能扩大 API bearer
+身份的权限。
+
+公共 DTO、OpenAPI 和 MCP result 不返回 object/storage key、bucket、内部路径、
+raw text、prompt、credential 或 provider 原始错误。Demo 静态 token 只用于本地
+development；生产配置对开发认证 fail-closed。

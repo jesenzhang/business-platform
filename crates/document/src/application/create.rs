@@ -20,6 +20,9 @@ pub struct CreateDocumentCommand {
     /// Logical object path. The domain adds tenant/document/version segments.
     pub object_key: String,
     pub size_bytes: Option<i64>,
+    /// Optional caller-generated revision identity used by streaming upload so
+    /// the storage write and metadata transaction share one business ID.
+    pub revision_id: Option<Uuid>,
     pub idempotency_key: String,
 }
 
@@ -49,6 +52,14 @@ impl CreateDocumentMetadata {
         &self,
         command: CreateDocumentCommand,
     ) -> Result<CreateDocumentResult, CreateDocumentError> {
+        self.execute_with_id(None, command).await
+    }
+
+    pub async fn execute_with_id(
+        &self,
+        document_id: Option<Uuid>,
+        command: CreateDocumentCommand,
+    ) -> Result<CreateDocumentResult, CreateDocumentError> {
         let idempotency_key = command.idempotency_key.trim();
         if idempotency_key.is_empty() || idempotency_key.len() > 255 {
             return Err(CreateDocumentError::Validation(
@@ -57,14 +68,49 @@ impl CreateDocumentMetadata {
         }
 
         let fingerprint = request_fingerprint(&command);
-        let document = DocumentMetadata::create(
-            command.tenant_id,
-            command.original_filename,
-            command.content_type,
-            command.object_key,
-            command.user_id,
-            command.size_bytes,
-        )
+        let document = match document_id {
+            Some(document_id) => match command.revision_id {
+                Some(revision_id) => DocumentMetadata::create_with_revision_id(
+                    document_id,
+                    command.tenant_id,
+                    command.original_filename.clone(),
+                    command.content_type.clone(),
+                    command.object_key.clone(),
+                    command.user_id,
+                    command.size_bytes,
+                    revision_id,
+                ),
+                None => DocumentMetadata::create_with_id(
+                    document_id,
+                    command.tenant_id,
+                    command.original_filename.clone(),
+                    command.content_type.clone(),
+                    command.object_key.clone(),
+                    command.user_id,
+                    command.size_bytes,
+                ),
+            },
+            None => match command.revision_id {
+                Some(revision_id) => DocumentMetadata::create_with_revision_id(
+                    Uuid::now_v7(),
+                    command.tenant_id,
+                    command.original_filename,
+                    command.content_type,
+                    command.object_key,
+                    command.user_id,
+                    command.size_bytes,
+                    revision_id,
+                ),
+                None => DocumentMetadata::create(
+                    command.tenant_id,
+                    command.original_filename,
+                    command.content_type,
+                    command.object_key,
+                    command.user_id,
+                    command.size_bytes,
+                ),
+            },
+        }
         .map_err(|error| map_domain_error(&error))?;
 
         self.unit_of_work
@@ -87,6 +133,13 @@ fn request_fingerprint(command: &CreateDocumentCommand) -> String {
     update_string(&mut hasher, &command.original_filename);
     update_string(&mut hasher, &command.content_type);
     update_string(&mut hasher, &command.object_key);
+    match command.revision_id {
+        None => hasher.update([0]),
+        Some(revision_id) => {
+            hasher.update([1]);
+            hasher.update(revision_id.as_bytes());
+        }
+    }
     match command.size_bytes {
         None => hasher.update([0]),
         Some(size) => {
@@ -156,6 +209,7 @@ mod tests {
                 content_type: "application/pdf".to_string(),
                 object_key: "report.pdf".to_string(),
                 size_bytes: Some(10),
+                revision_id: None,
                 idempotency_key: "key-1".to_string(),
             })
             .await
@@ -182,6 +236,7 @@ mod tests {
                 content_type: "application/pdf".to_string(),
                 object_key: "report.pdf".to_string(),
                 size_bytes: None,
+                revision_id: None,
                 idempotency_key: String::new(),
             })
             .await;
@@ -201,6 +256,7 @@ mod tests {
             content_type: "application/pdf".to_string(),
             object_key: "report.pdf".to_string(),
             size_bytes: None,
+            revision_id: None,
             idempotency_key: "key-1".to_string(),
         };
         let zero_sized = CreateDocumentCommand {

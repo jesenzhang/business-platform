@@ -1,0 +1,38 @@
+# Build the small set of binaries needed by the local Business Platform demo.
+FROM rust:1.94-bookworm AS builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY migrations/ migrations/
+COPY crates/ crates/
+COPY apps/ apps/
+
+RUN cargo build --release \
+    --bin business-api \
+    --bin business-worker \
+    --bin ai-worker \
+    --bin migration \
+    --bin agent-adapter
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /usr/sbin/nologin appuser
+
+WORKDIR /app
+COPY --from=builder /app/target/release/business-api /app/business-api
+COPY --from=builder /app/target/release/business-worker /app/business-worker
+COPY --from=builder /app/target/release/ai-worker /app/ai-worker
+COPY --from=builder /app/target/release/migration /app/migration
+COPY --from=builder /app/target/release/agent-adapter /app/agent-adapter
+
+USER appuser
+ENV RUST_LOG=info
+
+CMD ["/bin/false"]

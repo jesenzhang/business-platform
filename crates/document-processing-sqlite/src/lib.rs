@@ -22,7 +22,8 @@ use document_processing::ports::{
     AiTask, CandidateQuery, ClaimedProcessingJob, ClassifiedProcessingFailure,
     CompleteAiTaskCommand, ExecutionFence, FinalizeReviewCommand, FinalizeReviewResult,
     ProcessingExecutionUnitOfWork, ProcessingFailureDisposition, ProcessingJobClaimPort,
-    ProcessingJobCommandPort, ProcessingJobDetail, ProcessingJobQuery, ProcessingRepositoryError,
+    ProcessingJobCommandPort, ProcessingJobCursor, ProcessingJobDetail, ProcessingJobListRequest,
+    ProcessingJobPage, ProcessingJobQuery, ProcessingJobStatusCounts, ProcessingRepositoryError,
     ProcessingStepQuery, StepCheckpoint, StoredStep, TextArtifactReference,
 };
 use runtime_governance::processing_repairs::ProcessingRepairPort;
@@ -317,6 +318,36 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .await?;
         transaction.commit().await?;
     }
+    let applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(version), 0) FROM document_processing_migrations",
+    )
+    .fetch_one(pool)
+    .await?;
+    if applied < 7 {
+        let column_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM pragma_table_info('document_processing_jobs') WHERE name = 'document_revision_id'",
+        )
+        .fetch_one(pool)
+        .await?
+            > 0;
+        let mut transaction = pool.begin().await?;
+        if !column_exists {
+            sqlx::raw_sql(include_str!(
+                "../migrations/007_document_revision_binding.sql"
+            ))
+            .execute(&mut *transaction)
+            .await?;
+        }
+        sqlx::query(
+            "INSERT INTO document_processing_migrations (version, checksum, applied_at) VALUES (?1, ?2, ?3)",
+        )
+        .bind(7_i64)
+        .bind(include_bytes!("../migrations/007_document_revision_binding.sql").as_slice())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+    }
     ensure_revision1_finding_columns(pool).await?;
     Ok(())
 }
@@ -496,6 +527,7 @@ struct JobRow {
     id: String,
     tenant_id: String,
     document_id: String,
+    document_revision_id: Option<String>,
     content_revision: i64,
     request_key: String,
     status: String,
@@ -609,7 +641,7 @@ fn to_job(row: JobRow) -> Result<ProcessingJob, ProcessingRepositoryError> {
         (None, None, None) => None,
         _ => return Err(ProcessingRepositoryError::Failed),
     };
-    ProcessingJob::rehydrate_with_fence(
+    let mut job = ProcessingJob::rehydrate_with_fence(
         parse_uuid(&row.id)?,
         parse_uuid(&row.tenant_id)?,
         parse_uuid(&row.document_id)?,
@@ -632,7 +664,12 @@ fn to_job(row: JobRow) -> Result<ProcessingJob, ProcessingRepositoryError> {
         row.fence_version,
         lease,
     )
-    .map_err(|_| ProcessingRepositoryError::Failed)
+    .map_err(|_| ProcessingRepositoryError::Failed)?;
+    if let Some(revision_id) = row.document_revision_id {
+        job.bind_document_revision(parse_uuid(&revision_id)?)
+            .map_err(|_| ProcessingRepositoryError::Failed)?;
+    }
+    Ok(job)
 }
 
 async fn load_job(
@@ -641,7 +678,7 @@ async fn load_job(
     job_id: Uuid,
 ) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
     let row = sqlx::query_as::<_, JobRow>(
-        "SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND id = ?2",
+        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND id = ?2",
     )
     .bind(tenant_id.to_string())
     .bind(job_id.to_string())
@@ -656,7 +693,7 @@ async fn load_job_by_id(
     job_id: Uuid,
 ) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
     let row = sqlx::query_as::<_, JobRow>(
-        "SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE id = ?1",
+        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE id = ?1",
     )
     .bind(job_id.to_string())
     .fetch_optional(&mut *connection)
@@ -736,7 +773,7 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
             .await
             .map_err(map_sql_error)?;
         let existing = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND document_id = ?2 AND request_key = ?3",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND document_id = ?2 AND request_key = ?3",
         )
         .bind(job.tenant_id().to_string())
         .bind(job.document_id().to_string())
@@ -746,7 +783,9 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
         .map_err(map_sql_error)?;
         if let Some(existing) = existing {
             let existing = to_job(existing)?;
-            if existing.document_content_revision() != job.document_content_revision() {
+            if existing.document_content_revision() != job.document_content_revision()
+                || existing.document_revision_id() != job.document_revision_id()
+            {
                 rollback(&mut connection).await?;
                 return Err(ProcessingRepositoryError::IdempotencyConflict);
             }
@@ -757,11 +796,12 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
             return Ok(existing);
         }
         let result = sqlx::query(
-            "INSERT INTO document_processing_jobs (id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?11, ?12, ?13, ?14)",
+            "INSERT INTO document_processing_jobs (id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?12, ?13, ?14, ?15)",
         )
         .bind(job.id().to_string())
         .bind(job.tenant_id().to_string())
         .bind(job.document_id().to_string())
+        .bind(job.document_revision_id().map(|id| id.to_string()))
         .bind(job.document_content_revision())
         .bind(job.request_key())
         .bind(job.status().as_str())
@@ -791,6 +831,7 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
             serde_json::json!({
                 "job_id": job.id(),
                 "document_id": job.document_id(),
+                "document_revision_id": job.document_revision_id(),
                 "content_revision": job.document_content_revision()
             })
             .to_string(),
@@ -886,7 +927,7 @@ impl ProcessingJobClaimPort for SqliteProcessingStore {
             .await
             .map_err(map_sql_error)?;
         let row = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE status = 'queued' AND cancel_requested_at IS NULL AND next_attempt_at <= ?1 AND (lease_expires_at IS NULL OR lease_expires_at <= ?1) ORDER BY created_at, id LIMIT 1",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE status = 'queued' AND cancel_requested_at IS NULL AND next_attempt_at <= ?1 AND (lease_expires_at IS NULL OR lease_expires_at <= ?1) ORDER BY created_at, id LIMIT 1",
         )
         .bind(now.to_rfc3339())
         .fetch_optional(&mut *connection)
@@ -961,7 +1002,7 @@ impl ProcessingJobClaimPort for SqliteProcessingStore {
     async fn reclaim_expired(&self, now: DateTime<Utc>) -> Result<u64, ProcessingRepositoryError> {
         let mut connection = self.pool.acquire().await.map_err(map_sql_error)?;
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= ?1",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= ?1",
         )
         .bind(now.to_rfc3339())
         .fetch_all(&mut *connection)
@@ -985,6 +1026,72 @@ impl ProcessingJobClaimPort for SqliteProcessingStore {
 
 #[async_trait]
 impl ProcessingJobQuery for SqliteProcessingStore {
+    async fn status_counts(
+        &self,
+        tenant_id: Uuid,
+    ) -> Result<ProcessingJobStatusCounts, ProcessingRepositoryError> {
+        let rows = sqlx::query_as::<_, (String, i64)>(
+            "SELECT status, COUNT(*) FROM document_processing_jobs WHERE tenant_id = ?1 GROUP BY status",
+        )
+        .bind(tenant_id.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sql_error)?;
+        let mut counts = ProcessingJobStatusCounts::default();
+        for (status, count) in rows {
+            let count = u64::try_from(count).map_err(|_| ProcessingRepositoryError::Failed)?;
+            match status.as_str() {
+                "queued" => counts.queued = count,
+                "running" => counts.running = count,
+                "waiting_for_ai" => counts.waiting_for_ai = count,
+                "waiting_for_review" => counts.waiting_for_review = count,
+                "succeeded" => counts.succeeded = count,
+                "failed" => counts.failed = count,
+                "cancelled" => counts.cancelled = count,
+                "rejected" => counts.rejected = count,
+                _ => return Err(ProcessingRepositoryError::Failed),
+            }
+        }
+        Ok(counts)
+    }
+    async fn list(
+        &self,
+        request: ProcessingJobListRequest,
+    ) -> Result<ProcessingJobPage, ProcessingRepositoryError> {
+        let limit = request.limit.clamp(1, 100);
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT id, created_at FROM document_processing_jobs WHERE tenant_id = ?1 AND (?2 IS NULL OR document_id = ?2) AND (?3 IS NULL OR (created_at < ?3 OR (created_at = ?3 AND id < ?4))) ORDER BY created_at DESC, id DESC LIMIT ?5",
+        )
+        .bind(request.tenant_id.to_string())
+        .bind(request.document_id.map(|id| id.to_string()))
+        .bind(request.cursor.map(|cursor| cursor.created_at.to_rfc3339()))
+        .bind(request.cursor.map(|cursor| cursor.id.to_string()))
+        .bind(i64::from(limit) + 1)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sql_error)?;
+        let take = usize::try_from(limit).unwrap_or(100);
+        let next_cursor = if rows.len() > take {
+            let row = &rows[take - 1];
+            Some(ProcessingJobCursor {
+                created_at: DateTime::parse_from_rfc3339(&row.1)
+                    .map_err(|_| ProcessingRepositoryError::Failed)?
+                    .with_timezone(&Utc),
+                id: Uuid::parse_str(&row.0).map_err(|_| ProcessingRepositoryError::Failed)?,
+            })
+        } else {
+            None
+        };
+        let mut items = Vec::with_capacity(rows.len().min(take));
+        for (id, _) in rows.into_iter().take(take) {
+            let id = Uuid::parse_str(&id).map_err(|_| ProcessingRepositoryError::Failed)?;
+            if let Some(detail) = self.detail(request.tenant_id, id).await? {
+                items.push(detail);
+            }
+        }
+        Ok(ProcessingJobPage { items, next_cursor })
+    }
+
     async fn detail(
         &self,
         tenant_id: Uuid,
@@ -1483,7 +1590,7 @@ impl AiTaskPort for SqliteProcessingStore {
     }
 }
 
-const JOB_COLUMNS: &str = "id, tenant_id, document_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at";
+const JOB_COLUMNS: &str = "id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at";
 
 struct ImmediateSqliteConnection {
     inner: PoolConnection<Sqlite>,

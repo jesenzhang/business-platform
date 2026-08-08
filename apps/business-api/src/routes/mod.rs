@@ -1,7 +1,10 @@
 pub mod admin;
 pub mod documents;
 pub mod health;
+mod operations;
 pub mod processing;
+mod public_dto;
+mod upload;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,6 +44,8 @@ pub fn create_router(
 
     let protected_routes = Router::new()
         .nest("/api/v1/documents", documents::router())
+        .route("/api/v1/processing-jobs", get(processing::list_jobs))
+        .route("/api/v1/operations/overview", get(operations::overview))
         .route("/api/v1/processing-jobs/{job_id}", get(processing::get_job))
         .route(
             "/api/v1/processing-jobs/{job_id}/cancel",

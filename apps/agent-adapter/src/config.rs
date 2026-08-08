@@ -6,7 +6,40 @@ pub struct AgentAdapterConfig {
     #[serde(default)]
     pub env: RuntimeEnvironment,
     #[serde(default)]
+    pub server: ServerConfig,
+    pub business_api: BusinessApiConfig,
+    pub auth: AuthConfig,
+    #[serde(default)]
     pub observability: ObservabilityConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ServerConfig {
+    #[serde(default = "default_host")]
+    pub host: String,
+    #[serde(default = "default_port")]
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: default_host(),
+            port: default_port(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BusinessApiConfig {
+    #[serde(default = "default_api_url")]
+    pub base_url: String,
+    pub bearer_token: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuthConfig {
+    pub bearer_token: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -32,6 +65,15 @@ impl AgentAdapterConfig {
     }
 }
 
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+const fn default_port() -> u16 {
+    3100
+}
+fn default_api_url() -> String {
+    "http://localhost:3000".to_string()
+}
 fn default_log_level() -> String {
     "info".to_string()
 }

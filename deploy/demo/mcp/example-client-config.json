@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "business-platform-demo": {
+      "url": "http://localhost:3100/mcp",
+      "headers": {
+        "Authorization": "Bearer mcp-demo-token"
+      }
+    }
+  }
+}

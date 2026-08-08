@@ -25,7 +25,7 @@ impl DocumentDetailQuery for PostgresDocumentDetailQuery {
     ) -> Result<Option<DocumentDetailView>, QueryError> {
         sqlx::query_as::<_, DetailRow>(
             r"SELECT id, tenant_id, original_filename, content_type, status,
-                     version, content_revision, size_bytes, created_by, created_at, updated_at
+                     version, content_revision, current_revision_id, size_bytes, created_by, created_at, updated_at
               FROM documents WHERE tenant_id = $1 AND id = $2",
         )
         .bind(tenant_id)

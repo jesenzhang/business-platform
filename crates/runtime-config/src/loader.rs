@@ -36,17 +36,20 @@ where
     T: DeserializeOwned,
 {
     let environment = read_environment(prefix);
+    let environment_source = config::Environment::with_prefix(prefix)
+        .separator("__")
+        .try_parsing(true)
+        .list_separator(",")
+        .with_list_parse_key("server.cors_origins")
+        .with_list_parse_key("auth.dev_permissions")
+        .with_list_parse_key("auth.dev_roles");
     let settings = config::Config::builder()
         .add_source(config::File::with_name("config/default").required(false))
         .add_source(
             config::File::with_name(&format!("config/{}", environment.config_name()))
                 .required(false),
         )
-        .add_source(
-            config::Environment::with_prefix(prefix)
-                .separator("__")
-                .try_parsing(true),
-        )
+        .add_source(environment_source)
         .build()
         .map_err(|_| ConfigLoadError)?;
     settings.try_deserialize().map_err(|_| ConfigLoadError)

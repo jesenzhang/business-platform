@@ -70,6 +70,7 @@ pub struct ExtractionCandidate {
     tenant_id: Uuid,
     job_id: Uuid,
     content_revision: i64,
+    document_revision_id: Option<Uuid>,
     pub schema_version: String,
     pub payload: CandidatePayload,
     pub evidence: Vec<CandidateEvidence>,
@@ -113,6 +114,7 @@ impl ExtractionCandidate {
             tenant_id,
             job_id,
             content_revision,
+            document_revision_id: None,
             schema_version: payload.schema_version.clone(),
             payload,
             evidence,
@@ -122,6 +124,40 @@ impl ExtractionCandidate {
             version: 1,
             created_at,
         })
+    }
+
+    /// Compatibility constructor that records the exact immutable revision.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_for_revision(
+        tenant_id: Uuid,
+        job_id: Uuid,
+        document_revision_id: Uuid,
+        content_revision: i64,
+        payload: CandidatePayload,
+        evidence: Vec<CandidateEvidence>,
+        provider: String,
+        model: String,
+        prompt_version: String,
+        line_count: u32,
+        created_at: DateTime<Utc>,
+    ) -> Result<Self, super::error::ExtractionError> {
+        if document_revision_id.is_nil() {
+            return Err(super::error::ExtractionError::CandidateValidationFailed);
+        }
+        let mut candidate = Self::new(
+            tenant_id,
+            job_id,
+            content_revision,
+            payload,
+            evidence,
+            provider,
+            model,
+            prompt_version,
+            line_count,
+            created_at,
+        )?;
+        candidate.document_revision_id = Some(document_revision_id);
+        Ok(candidate)
     }
 
     #[must_use]
@@ -139,6 +175,10 @@ impl ExtractionCandidate {
     #[must_use]
     pub const fn content_revision(&self) -> i64 {
         self.content_revision
+    }
+    #[must_use]
+    pub const fn document_revision_id(&self) -> Option<Uuid> {
+        self.document_revision_id
     }
     #[must_use]
     pub const fn version(&self) -> i64 {

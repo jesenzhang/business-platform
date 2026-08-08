@@ -12,6 +12,7 @@ pub(crate) struct DetailRow {
     pub status: String,
     pub version: i64,
     pub content_revision: i64,
+    pub current_revision_id: Option<Uuid>,
     pub size_bytes: Option<i64>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
@@ -31,6 +32,11 @@ impl TryFrom<DetailRow> for DocumentDetailView {
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
             content_revision: row.content_revision,
+            revision_id: row
+                .current_revision_id
+                .ok_or(QueryError::InvalidStoredData)?,
+            revision_no: row.content_revision,
+            is_current: true,
             size_bytes: row.size_bytes,
             created_by: row.created_by,
             created_at: row.created_at,
@@ -47,6 +53,7 @@ pub(crate) struct ListRow {
     pub status: String,
     pub version: i64,
     pub content_revision: i64,
+    pub current_revision_id: Option<Uuid>,
     pub size_bytes: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -64,6 +71,11 @@ impl TryFrom<ListRow> for DocumentListItem {
             status: DocumentStatusView::parse(&row.status)?,
             version: row.version,
             content_revision: row.content_revision,
+            revision_id: row
+                .current_revision_id
+                .ok_or(QueryError::InvalidStoredData)?,
+            revision_no: row.content_revision,
+            is_current: true,
             size_bytes: row.size_bytes,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -125,6 +137,7 @@ mod tests {
             status: "active".to_string(),
             version: 1,
             content_revision: 1,
+            current_revision_id: Some(Uuid::now_v7()),
             size_bytes: Some(1),
             created_by: Uuid::now_v7(),
             created_at: now,
@@ -159,6 +172,13 @@ mod tests {
         unknown_status.status = "future".to_string();
         assert_eq!(
             DocumentDetailView::try_from(unknown_status),
+            Err(QueryError::InvalidStoredData)
+        );
+
+        let mut missing_revision = detail_row();
+        missing_revision.current_revision_id = None;
+        assert_eq!(
+            DocumentDetailView::try_from(missing_revision),
             Err(QueryError::InvalidStoredData)
         );
     }

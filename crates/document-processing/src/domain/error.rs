@@ -6,6 +6,8 @@ pub enum ProcessingDomainError {
     InvalidIdentity,
     #[error("content revision must be positive")]
     InvalidContentRevision,
+    #[error("document revision identity must not be nil")]
+    InvalidDocumentRevision,
     #[error("request key must not be empty")]
     EmptyRequestKey,
     #[error("max attempts must be at least one")]

@@ -452,6 +452,19 @@ impl ScanRunRow {
 
 #[async_trait]
 impl IntegrityQueryPort for PostgresGovernanceStore {
+    async fn count_unresolved(&self, tenant_id: Uuid) -> Result<u64, IntegrityError> {
+        if tenant_id.is_nil() {
+            return Err(IntegrityError::InvalidFinding);
+        }
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM data_integrity_findings WHERE tenant_id=$1 AND status NOT IN ('repaired','ignored','false_positive')",
+        )
+        .bind(tenant_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| IntegrityError::DependencyUnavailable)?;
+        u64::try_from(count).map_err(|_| IntegrityError::Persistence)
+    }
     async fn get_scan_run(
         &self,
         tenant_id: Option<Uuid>,

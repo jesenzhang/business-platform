@@ -5,6 +5,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use super::entity::DocumentMetadata;
+use super::revision::DocumentRevision;
 use super::version::AggregateVersion;
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,7 @@ pub trait DocumentRepository: Send + Sync {
     async fn save(
         &self,
         document: &DocumentMetadata,
+        new_revision: Option<&DocumentRevision>,
         expected_version: AggregateVersion,
     ) -> Result<(), RepositoryError>;
 }

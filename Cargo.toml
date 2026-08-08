@@ -6,6 +6,7 @@ members = [
     "apps/ai-worker",
     "apps/governance-worker",
     "apps/agent-adapter",
+    "apps/business-cli",
     "apps/migration",
     "crates/runtime-migration",
     "crates/architecture-check",
@@ -38,6 +39,8 @@ members = [
     "crates/workflow",
     "crates/ai-application",
     "crates/agent-integration",
+    "crates/public-api-contracts",
+    "crates/business-api-client",
     "crates/policy",
     "crates/object-storage",
     "crates/messaging",
@@ -72,7 +75,7 @@ missing_panics_doc = "allow"
 tokio = { version = "1", features = ["full"] }
 
 # Web framework
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "multipart"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "timeout", "compression-gzip", "limit"] }
 
@@ -114,6 +117,7 @@ tokio-util = { version = "0.7", features = ["io"] }
 http-body = "1"
 http-body-util = "0.1"
 http = "1"
+urlencoding = "2"
 
 # Internal crates
 shared-kernel = { path = "crates/shared-kernel" }
@@ -147,3 +151,5 @@ data-repair = { path = "crates/data-repair" }
 workflow = { path = "crates/workflow" }
 ai-application = { path = "crates/ai-application" }
 agent-integration = { path = "crates/agent-integration" }
+public-api-contracts = { path = "crates/public-api-contracts" }
+business-api-client = { path = "crates/business-api-client" }

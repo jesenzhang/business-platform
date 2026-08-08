@@ -1,0 +1,137 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Business Platform Public API",
+    "version": "v1",
+    "description": "Stable tenant-scoped REST surface for documents, durable processing, governance, and audit. Internal storage keys, raw text, credentials, and provider prompts are never public fields."
+  },
+  "servers": [{ "url": "http://localhost:3000" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/health/live": { "get": { "security": [], "responses": { "200": { "description": "Liveness" } } } },
+    "/health/ready": { "get": { "security": [], "responses": { "200": { "description": "Readiness" }, "503": { "$ref": "#/components/responses/Error" } } } },
+    "/api/v1/documents": {
+      "get": {
+        "summary": "List documents",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": { "200": { "description": "Document page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentPageResponse" } } } }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/documents/upload": {
+      "post": {
+        "summary": "Upload a document and create its metadata",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": { "201": { "description": "Created document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentResponse" } } } }, "200": { "description": "Idempotent replay", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/documents/{documentId}": {
+      "get": {
+        "summary": "Get a document",
+        "parameters": [{ "$ref": "#/components/parameters/DocumentId" }],
+        "responses": { "200": { "description": "Document", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/documents/{documentId}/processing-jobs": {
+      "get": {
+        "summary": "List processing jobs for a document",
+        "parameters": [{ "$ref": "#/components/parameters/DocumentId" }],
+        "responses": { "200": { "description": "Processing jobs", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProcessingJobArrayResponse" } } } } }
+      },
+      "post": {
+        "summary": "Start durable processing for a content revision",
+        "parameters": [{ "$ref": "#/components/parameters/DocumentId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StartProcessingRequest" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/ProcessingJob" }, "200": { "$ref": "#/components/responses/ProcessingJob" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/processing-jobs": {
+      "get": {
+        "summary": "List processing jobs",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": { "200": { "description": "Processing job page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProcessingJobPageResponse" } } } } }
+      }
+    },
+    "/api/v1/processing-jobs/{jobId}": {
+      "get": { "summary": "Get a processing job", "parameters": [{ "$ref": "#/components/parameters/JobId" }], "responses": { "200": { "$ref": "#/components/responses/ProcessingJob" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/processing-jobs/{jobId}/candidate": {
+      "get": { "summary": "Get a bounded extraction candidate", "parameters": [{ "$ref": "#/components/parameters/JobId" }], "responses": { "200": { "$ref": "#/components/responses/Candidate" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/processing-jobs/{jobId}/review": {
+      "post": {
+        "summary": "Review a candidate",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/ReviewResult" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/operations/overview": {
+      "get": { "summary": "Get the fixed operational overview", "responses": { "200": { "description": "Operational overview", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OverviewResponse" } } } } } }
+    },
+    "/api/v1/admin/integrity/findings": {
+      "get": { "summary": "List integrity findings", "parameters": [{ "$ref": "#/components/parameters/Limit" }], "responses": { "200": { "description": "Finding page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FindingPageResponse" } } } } } }
+    },
+    "/api/v1/admin/integrity/findings/{id}": {
+      "get": { "summary": "Get an integrity finding", "parameters": [{ "$ref": "#/components/parameters/FindingId" }], "responses": { "200": { "$ref": "#/components/responses/Finding" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/admin/audit-events": {
+      "get": { "summary": "List bounded audit events", "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "description": "Audit page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditPageResponse" } } } } } }
+    },
+    "/api/v1/admin/audit-events/{id}": {
+      "get": { "summary": "Get an audit event", "parameters": [{ "$ref": "#/components/parameters/AuditId" }], "responses": { "200": { "$ref": "#/components/responses/Audit" }, "404": { "$ref": "#/components/responses/Error" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
+    "parameters": {
+      "Limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+      "Cursor": { "name": "cursor", "in": "query", "schema": { "type": "string", "description": "Versioned opaque cursor" } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "maxLength": 255 } },
+      "DocumentId": { "name": "documentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "JobId": { "name": "jobId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "FindingId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "AuditId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "Error": { "description": "Stable error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "ProcessingJob": { "description": "Processing job", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProcessingJobResponse" } } } },
+      "ReviewResult": { "description": "Review result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewResultResponse" } } } },
+      "Candidate": { "description": "Extraction candidate", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CandidateResponse" } } } },
+      "Finding": { "description": "Integrity finding", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FindingResponse" } } } },
+      "Audit": { "description": "Audit event", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditResponse" } } } }
+    },
+    "schemas": {
+      "ErrorResponse": { "type": "object", "required": ["code", "message", "request_id"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "request_id": { "type": "string" }, "trace_id": { "type": ["string", "null"] }, "details": { "type": ["object", "null"] } } },
+      "Document": { "type": "object", "required": ["id", "original_filename", "content_type", "status", "version", "content_revision", "created_at", "updated_at"], "properties": { "id": { "type": "string", "format": "uuid" }, "original_filename": { "type": "string" }, "content_type": { "type": "string" }, "status": { "type": "string" }, "version": { "type": "integer" }, "content_revision": { "type": "integer" }, "size_bytes": { "type": ["integer", "null"] }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" } } },
+      "ProcessingJob": { "type": "object", "required": ["job_id", "document_id", "content_revision", "status", "current_step", "attempt_count", "cancel_requested", "candidate_available", "review_available", "created_at", "updated_at"], "properties": { "job_id": { "type": "string", "format": "uuid" }, "document_id": { "type": "string", "format": "uuid" }, "content_revision": { "type": "integer" }, "status": { "type": "string" }, "current_step": { "type": "string" }, "attempt_count": { "type": "integer" }, "failure_code": { "type": ["string", "null"] }, "cancel_requested": { "type": "boolean" }, "candidate_available": { "type": "boolean" }, "review_available": { "type": "boolean" }, "created_at": { "type": "string", "format": "date-time" }, "updated_at": { "type": "string", "format": "date-time" } } },
+      "Candidate": { "type": "object", "required": ["candidate_id", "job_id", "content_revision", "schema_version", "payload", "evidence", "provider", "model", "prompt_version", "version", "created_at"], "properties": { "candidate_id": { "type": "string", "format": "uuid" }, "job_id": { "type": "string", "format": "uuid" }, "content_revision": { "type": "integer" }, "schema_version": { "type": "string" }, "payload": { "type": "object" }, "evidence": { "type": "array", "items": { "type": "object" } }, "provider": { "type": "string" }, "model": { "type": "string" }, "prompt_version": { "type": "string" }, "version": { "type": "integer" }, "created_at": { "type": "string", "format": "date-time" } } },
+      "Review": { "type": "object", "required": ["id", "candidate_id", "decision", "candidate_version", "created_at"], "properties": { "id": { "type": "string", "format": "uuid" }, "candidate_id": { "type": "string", "format": "uuid" }, "decision": { "type": "string", "enum": ["accepted", "rejected"] }, "patch": { "type": ["object", "null"] }, "comment": { "type": ["string", "null"] }, "candidate_version": { "type": "integer" }, "created_at": { "type": "string", "format": "date-time" } } },
+      "ReviewResult": { "type": "object", "required": ["review", "replayed"], "properties": { "review": { "$ref": "#/components/schemas/Review" }, "replayed": { "type": "boolean" } } },
+      "Finding": { "type": "object", "required": ["id", "rule_id", "bounded_context", "resource_type", "resource_id", "severity", "status", "repairability", "first_detected_at", "last_detected_at", "occurrence_count", "version"], "properties": { "id": { "type": "string", "format": "uuid" }, "rule_id": { "type": "string" }, "bounded_context": { "type": "string" }, "resource_type": { "type": "string" }, "resource_id": { "type": "string" }, "severity": { "type": "string" }, "status": { "type": "string" }, "repairability": { "type": "string" }, "first_detected_at": { "type": "string", "format": "date-time" }, "last_detected_at": { "type": "string", "format": "date-time" }, "occurrence_count": { "type": "integer" }, "version": { "type": "integer" } } },
+      "AuditEvent": { "type": "object", "required": ["id", "action", "resource_type", "resource_id", "result", "occurred_at", "stream_sequence", "schema_version"], "properties": { "id": { "type": "string", "format": "uuid" }, "action": { "type": "string" }, "resource_type": { "type": "string" }, "resource_id": { "type": "string" }, "result": { "type": "string" }, "failure_code": { "type": ["string", "null"] }, "trace_id": { "type": ["string", "null"] }, "occurred_at": { "type": "string", "format": "date-time" }, "stream_sequence": { "type": "integer" }, "schema_version": { "type": "string" }, "details": { "type": ["object", "null"] } } },
+      "ProcessingStatusCounts": { "type": "object", "additionalProperties": { "type": "integer" } },
+      "Overview": { "type": "object", "required": ["document_total", "document_created_today", "processing_by_status", "review_pending", "unresolved_findings", "recent_jobs", "recent_audit_events"], "properties": { "document_total": { "type": "integer" }, "document_created_today": { "type": "integer" }, "processing_by_status": { "$ref": "#/components/schemas/ProcessingStatusCounts" }, "review_pending": { "type": "integer" }, "unresolved_findings": { "type": "integer" }, "recent_jobs": { "type": "array", "items": { "$ref": "#/components/schemas/ProcessingJob" } }, "recent_audit_events": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } },
+      "StartProcessingRequest": { "type": "object", "required": ["content_revision"], "properties": { "content_revision": { "type": "integer", "minimum": 1 } }, "additionalProperties": false },
+      "ReviewRequest": { "type": "object", "required": ["decision", "candidate_version"], "properties": { "decision": { "type": "string", "enum": ["accepted", "rejected"] }, "candidate_version": { "type": "integer", "minimum": 1 }, "patch": { "type": ["object", "null"] }, "comment": { "type": ["string", "null"] } }, "additionalProperties": false },
+      "Page": { "type": "object", "required": ["items"], "properties": { "items": { "type": "array" }, "next_cursor": { "type": ["string", "null"] } } },
+      "DocumentPage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Document" } } } }] },
+      "ProcessingJobPage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/ProcessingJob" } } } }] },
+      "FindingPage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Finding" } } } }] },
+      "AuditPage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } }] },
+      "ApiEnvelope": { "type": "object", "required": ["success"], "properties": { "success": { "type": "boolean" }, "data": {}, "message": { "type": ["string", "null"] } } },
+      "DocumentResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Document" } } }] },
+      "ProcessingJobResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ProcessingJob" } } }] },
+      "ReviewResultResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ReviewResult" } } }] },
+      "CandidateResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Candidate" } } }] },
+      "FindingResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Finding" } } }] },
+      "AuditResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/AuditEvent" } } }] },
+      "DocumentPageResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/DocumentPage" } } }] },
+      "ProcessingJobPageResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ProcessingJobPage" } } }] },
+      "ProcessingJobArrayResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ProcessingJob" } } } }] },
+      "FindingPageResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/FindingPage" } } }] },
+      "AuditPageResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/AuditPage" } } }] },
+      "OverviewResponse": { "allOf": [{ "$ref": "#/components/schemas/ApiEnvelope" }, { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Overview" } } }] }
+    }
+  }
+}

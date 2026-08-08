@@ -133,7 +133,8 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 
 ## 8. 当前实施
 
-- 当前提案：[`plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md`](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md)（`Proposed`，尚未激活）
+- 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
+- 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）

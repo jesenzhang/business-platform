@@ -15,7 +15,7 @@ use axum::http::{HeaderValue, Method, Request, StatusCode};
 use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
 use business_api::config::{
     AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
-    ServerConfig,
+    ServerConfig, StorageConfig,
 };
 use business_api::routes::create_router;
 use business_api::state::{
@@ -25,8 +25,8 @@ use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
 };
 use document::query::{
-    DocumentDetailQuery, DocumentDetailView, DocumentListPage, DocumentListQuery,
-    DocumentListRequest, QueryError,
+    DocumentDetailQuery, DocumentDetailView, DocumentListFilter, DocumentListPage,
+    DocumentListQuery, DocumentListRequest, QueryError,
 };
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tower::ServiceExt;
@@ -66,6 +66,14 @@ impl DocumentListQuery for EmptyPorts {
             next_cursor: None,
         })
     }
+
+    async fn count(
+        &self,
+        _tenant_id: uuid::Uuid,
+        _filter: DocumentListFilter,
+    ) -> Result<u64, QueryError> {
+        Ok(0)
+    }
 }
 
 #[async_trait]
@@ -102,6 +110,7 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             otlp_endpoint: None,
             log_level: "off".to_string(),
         },
+        storage: StorageConfig::default(),
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
@@ -133,6 +142,7 @@ fn test_router_with_permissions(
         processing: None,
         governance: None,
         readiness: ports,
+        storage: None,
     });
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled,

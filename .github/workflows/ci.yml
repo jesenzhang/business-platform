@@ -58,7 +58,57 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - shell: pwsh
-        run: ./scripts/check-architecture.ps1
+        run: |
+          ./scripts/check-architecture.ps1
+          ./scripts/check-openapi.ps1
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/business-console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/business-console/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  frontend-e2e:
+    name: Frontend Playwright smoke
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/business-console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/business-console/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  external-access-contracts:
+    name: CLI and MCP contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p business-cli --all-targets
+      - run: cargo test -p agent-adapter --all-targets
+      - run: cargo test -p business-api-client --all-targets
+      - run: python -c "import json; json.load(open('openapi.json', encoding='utf-8')); print('OpenAPI JSON: PASS')"
 
   unit:
     name: Unit tests

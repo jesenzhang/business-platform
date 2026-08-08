@@ -73,4 +73,13 @@ pub enum DocumentDomainError {
     /// A persisted status value is not part of the lifecycle.
     #[error("unknown document status")]
     InvalidStatus,
+
+    #[error("document purge is not allowed before retention expires")]
+    PurgeRetentionNotReleased,
+
+    #[error("document purge is blocked by a business reference")]
+    PurgeReferenced,
+
+    #[error("document purge is blocked by a legal or audit hold")]
+    PurgeHeld,
 }
