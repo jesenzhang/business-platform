@@ -1,9 +1,9 @@
 # 服务端后端架构清单与执行契约
 
 > 文档 ID：ARCH-MANIFEST-001  
-> 版本：1.1  
+> 版本：1.2  
 > 状态：Baseline  
-> 生效日期：2026-08-06  
+> 生效日期：2026-08-08  
 > 适用范围：所有服务端设计、计划、代码、测试、部署与审查任务
 
 ## 1. 目的
@@ -14,6 +14,7 @@
 
 ```text
 业务能力与领域边界
++ 企业业务领域组合与跨部门协作
 + 应用用例与依赖方向
 + 数据所有权与一致性
 + 接口、事件与集成契约
@@ -32,6 +33,7 @@
 |---|---|---|
 | 总体服务端架构 | `SERVER_BACKEND_ARCHITECTURE.md` | 系统采用什么架构及依赖方向 |
 | 业务边界 | `BOUNDED_CONTEXT_MAP.md` | 系统由哪些业务上下文组成 |
+| 企业业务领域组合 | `ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md` | 合同、财务、法务、Party、HR/绩效、跨部门核对/审计和正式报告如何组合并保持所有权 |
 | 数据与一致性 | `DATA_OWNERSHIP_AND_CONSISTENCY.md` | 谁拥有数据、如何保证一致性 |
 | 长时任务 | `WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md` | 长任务、流程与业务状态如何分离 |
 | Enterprise AI Workspace | `ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md` | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 如何与业务平台分层 |
@@ -52,6 +54,16 @@
 | 查询与数据库适配 | `../standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md` | Read DTO、分页、查询性能、SQL/ORM 与层级数据规则 |
 
 任何单份文档都不能脱离其余文档单独解释为完整架构。
+
+涉及合同、财务、法务、Party/Counterparty、HR/绩效、跨部门审计/核对/合并、正式专业报告或共享业务数据的任务，必须同时遵守：
+
+```text
+ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md
+BOUNDED_CONTEXT_MAP.md
+DATA_OWNERSHIP_AND_CONSISTENCY.md
+DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
+ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
+```
 
 涉及 AI Workspace、Agent、Skill、Context、Tool、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 的任务，必须同时遵守：
 
@@ -131,6 +143,14 @@ Workspace、Conversation、Skill、Context、Observation、Artifact 和 Generate
 
 任何 Agent 生成代码不得在 `business-api`、业务 Worker、AI Worker 或 Agent Adapter 进程内执行。未来 Generated App 必须通过独立 Sandbox Runtime 和 Capability Binding 访问业务能力。
 
+### 4.14 专业结论、分析报表和 Runtime Audit 必须分离
+
+法律意见、财务结算、绩效结果和 Business Assurance Conclusion 是专业业务事实；Analytics Report 是可重建派生产物；Runtime Audit 是不可抵赖操作记录。三者可以关联，但不能共享一个所有权模型或互相替代。
+
+### 4.15 跨部门历史结论使用 Reference + Snapshot
+
+跨上下文 Case、审计、核对、绩效和正式报告必须保存稳定资源引用、资源版本和必要的不可变 Snapshot。只保存当前外键不足以证明历史结论依据。
+
 ## 5. 新任务架构准入
 
 任何新增能力在进入编码前必须回答：
@@ -146,16 +166,27 @@ Workspace、Conversation、Skill、Context、Observation、Artifact 和 Generate
 9. 需要满足哪些质量属性场景？
 10. 是否改变公开契约、数据所有权、部署边界或长期技术决策？
 
+合同、财务、法务、HR/绩效或跨部门专业业务还必须回答：
+
+11. 引用了哪些其他 Context 的 ID，谁是 Source Owner？
+12. 哪些历史事实必须保存 `resource_version` 和 Snapshot？
+13. 哪些文件/证据必须绑定明确 Document Revision？
+14. 输出是 Analytics Artifact、Runtime Audit 还是正式 Professional Result？
+15. 是否需要 Approval/Sign-off，以及决定后由哪个 Owner Context 执行？
+16. “合并”属于分析汇总、财务正式合并、业务审计结论还是主数据去重？
+17. Finance/Legal/HR 等高敏字段在查询、Report 和 Agent 中如何保持权限不降级？
+18. 删除、恢复、替代、保留和历史证明语义是什么？
+
 Agent/Workspace 相关任务还必须回答：
 
-11. Workspace、Agent Run、Skill、Context、Tool 或 Artifact 中谁拥有该状态？
-12. Agent 使用什么 Delegated Principal 和 Capability Grant？
-13. Grant 的资源、动作、字段、期限和撤销边界是什么？
-14. Tool 是否只调用公开 Application API/Port？
-15. 读取数据是否产生 Observation，派生产物如何重新授权？
-16. 是否意外引入通用 SQL、Shell、文件系统、任意 HTTP 或数据库凭证？
-17. Agent Runtime 是否仍可替换？
-18. 生成代码是否被错误地放入核心业务进程？
+19. Workspace、Agent Run、Skill、Context、Tool 或 Artifact 中谁拥有该状态？
+20. Agent 使用什么 Delegated Principal 和 Capability Grant？
+21. Grant 的资源、动作、字段、期限和撤销边界是什么？
+22. Tool 是否只调用公开 Application API/Port？
+23. 读取数据是否产生 Observation，派生产物如何重新授权？
+24. 是否意外引入通用 SQL、Shell、文件系统、任意 HTTP 或数据库凭证？
+25. Agent Runtime 是否仍可替换？
+26. 生成代码是否被错误地放入核心业务进程？
 
 缺少以上关键答案时，不应直接以数据库表、Handler、Prompt、Skill 文件、MCP 配置或 SDK 为起点实施。
 
@@ -173,6 +204,16 @@ Agent/Workspace 相关任务还必须回答：
 - 新增或修改的 ADR；
 - 架构适配测试；
 - 文档同步清单。
+
+跨部门专业业务计划还必须列出：
+
+- SourceRef / Snapshot 策略；
+- Party/Organization/Employee/Customer 的身份边界；
+- DocumentRevision / ProcessingRun / Evidence 绑定；
+- Formal Result 与 Analytics Report / Runtime Audit 的边界；
+- Approval/Sign-off 和 Owner Context 回写路径；
+- 高敏 Finance/Legal/HR 字段授权；
+- 真实跨部门垂直切片验收场景。
 
 Agent/Workspace 计划还必须列出：
 
@@ -200,6 +241,10 @@ Agent/Workspace 计划还必须列出：
 - 是否更新接口、事件、迁移和架构文档；
 - 是否增加相应层级的测试；
 - 是否通过架构 Fitness Functions；
+- Party、Customer、Organization、Employee 是否发生身份混用；
+- 专业结论是否错误落入 Analytics 或 Runtime Audit；
+- 历史跨部门结论是否缺少 Source Version/Snapshot；
+- 业务文件和 AI Evidence 是否只绑定可变的 Document 当前状态；
 - Agent Adapter 是否直接访问业务数据库；
 - Skill 是否复制业务规则；
 - Tool 参数是否可以扩大 Capability 范围；
@@ -263,6 +308,8 @@ PLAN-0001 至 PLAN-0005 已完成基础服务、持久化查询、Durable Docume
 - 不引入任意 Generated App、通用工具或高风险业务写入；
 - 在合并前通过新增 Agent/Workspace Fitness Functions。
 
+ADR-0019 已接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标业务边界，但不自动扩大 PLAN-0006。对应运行时代码、迁移和 API 必须由独立后续 Plan 激活。
+
 ## 11. 合并与采用
 
 本清单和专题 Baseline 位于文档分支时，PLAN-0006 不得被描述为 Active。文档变更进入 `main` 后，后续 Agent/Workspace 实现必须以 `origin/main` 中的以下文件为权威来源：
@@ -273,12 +320,15 @@ docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
 docs/plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md
 ```
 
+后续专业业务实现必须同时以以下文件为权威来源：
+
+```text
+docs/architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md
+docs/adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
+```
+
 正在实施的后续分支必须在最终审查前同步合并后的 `main`，解决冲突并重新运行架构门禁。
 
 ## 12. 最终原则
 
 > 后续任务不是“参考”本架构，而是必须证明符合本架构。
-
-> 架构 Baseline 定义长期边界，计划定义阶段实施，代码提供实现证据，测试和 CI 提供持续证明。
-
-> Agent 负责理解和协助，Capability 限制其可做之事，业务 Application Service 对最终事实负责。

@@ -23,6 +23,7 @@
 | 完整服务端架构清单 | [`architecture/BACKEND_ARCHITECTURE_MANIFEST.md`](architecture/BACKEND_ARCHITECTURE_MANIFEST.md) | Baseline | 定义完整架构文档集、权威关系和任务准入 |
 | 服务端总体架构 | [`architecture/SERVER_BACKEND_ARCHITECTURE.md`](architecture/SERVER_BACKEND_ARCHITECTURE.md) | Baseline | 战略 DDD、模块化单体、分层、数据所有权和质量属性 |
 | Bounded Context Map | [`architecture/BOUNDED_CONTEXT_MAP.md`](architecture/BOUNDED_CONTEXT_MAP.md) | Baseline | 业务能力、上下文职责与协作关系 |
+| 企业业务领域与跨部门协作 | [`architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md) | Baseline | 合同/财务/法务/HR/绩效、Party 主数据、跨部门审计核对、正式报告和共享数据边界 |
 | 数据与一致性 | [`architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md`](architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md) | Baseline | 数据所有权、事务、事件、幂等和补偿 |
 | 长时任务 | [`architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md`](architecture/WORKFLOW_AND_LONG_RUNNING_TASK_ARCHITECTURE.md) | Baseline | 业务状态、流程协调和可靠执行边界 |
 | Enterprise AI Workspace | [`architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md`](architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md) | Baseline | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 边界 |
@@ -69,6 +70,7 @@
 - [`adr/ADR-0016-repair-ledger-and-verification.md`](adr/ADR-0016-repair-ledger-and-verification.md)：Repair Ledger 与验证。
 - [`adr/ADR-0017-platform-native-analytics-and-visualization.md`](adr/ADR-0017-platform-native-analytics-and-visualization.md)：平台原生分析与可视化，建立在 ADR-0008 与 ADR-0013～0016 之上。
 - [`adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`](adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)：接受 Enterprise AI Workspace、任务级 Capability、Observation 血缘与 Artifact 非权威边界；Cloudflare OS 仅作为参考项目。
+- [`adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)：接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标领域边界和跨部门 Reference + Snapshot 协作模式。
 
 ## 5. 文档目录
 
@@ -111,6 +113,14 @@ docs/
 7. 改变长期边界时新增 ADR；
 8. 代码、测试和文档在同一变更中更新。
 
+涉及合同、财务、法务、HR/绩效、Party 主数据、跨部门审计/核对/合并、正式业务报告或共享专业数据时，同时阅读：
+
+```text
+architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md
+adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
+reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md
+```
+
 涉及 AI Workspace、Agent、Skill、Context、Tool、Artifact 或 Generated App 时，同时阅读：
 
 ```text
@@ -134,6 +144,8 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 - AI Workspace 差距审查：[`reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`](reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md)
 - Cloudflare OS 参考分析：[`reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md)
+- 企业业务领域 Baseline：[`architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
+- 企业业务领域参考项目：[`reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md)
 
 Phase 1 Foundation Integrity、Phase 2 Persistence and Query Hardening、
 Phase 3 First Durable Business Flow 与 Phase 4 Runtime Governance Foundation
@@ -151,6 +163,10 @@ Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已�
 Dashboard/Report 和受控 Agent 分析技能；本入口仍保持总体架构文件的稳定 `_v2.md` 路径，
 其内部版本已更新为 v2.2。
 
+ADR-0019 已接受目标业务领域组合和跨部门协作边界，但不自动激活新业务实现。Party、
+Document Revision、Legal、Finance、Business Assurance、People & Performance 应分别通过
+后续 Plan 进入实现，并优先用一个合同 → 法务 → 审批 → 财务核对 → 正式报告的真实垂直切片验证架构。
+
 ## 9. 合并后的后续任务规则
 
 所有新计划和实施指令必须明确引用：
@@ -161,6 +177,13 @@ docs/architecture/BOUNDED_CONTEXT_MAP.md
 docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md
 docs/architecture/QUALITY_ATTRIBUTE_SCENARIOS.md
 docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md
+```
+
+涉及合同、财务、法务、HR/绩效、跨部门核对/审计、Party 主数据或正式专业报告时，必须同时引用：
+
+```text
+docs/architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md
+docs/adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
 ```
 
 涉及 AI Workspace、Agent、Capability、Observation、Artifact 或生成应用时，必须同时引用：
