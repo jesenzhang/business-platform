@@ -263,16 +263,9 @@ async fn document_http_flow_is_atomic_idempotent_and_tenant_scoped() {
         .execute(&pool)
         .await
         .expect("cleanup idempotency");
-    sqlx::query("DELETE FROM document_revisions WHERE tenant_id = $1")
-        .bind(tenant_a)
-        .execute(&pool)
-        .await
-        .expect("cleanup revisions");
-    sqlx::query("DELETE FROM documents WHERE tenant_id = $1")
-        .bind(tenant_a)
-        .execute(&pool)
-        .await
-        .expect("cleanup documents");
+    // PLAN-0008 revisions are immutable, including DELETE. The E2E database
+    // is ephemeral and this tenant is unique, so retain the document history
+    // rather than weakening the production integrity fence for test cleanup.
     sqlx::query("DELETE FROM audit_events WHERE tenant_id = $1")
         .bind(tenant_a)
         .execute(&pool)
