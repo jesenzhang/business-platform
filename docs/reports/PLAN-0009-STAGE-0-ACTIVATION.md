@@ -50,6 +50,16 @@ unresolved data-quality signals, not evidence that missing objects may be guesse
 Stage 1 must classify every reference using physical SHA-256 and preserve the
 original source record evidence.
 
+## Source-boundary evidence limitation
+
+This activation record contains a coordinator-observed source dirty-tree
+baseline, but not a cryptographic pre/post snapshot of every source-repository
+status entry or source-side filesystem journal. The read-only boundary and its
+focused tests are the enforceable control; the baseline narrative must not be
+represented as independent proof that no source-side state could have changed.
+Any later controlled-migration decision requires an explicit pre/post source
+snapshot and an independent review of that evidence.
+
 ## Three legacy import paths
 
 The analyzer must cover all three observed ways data entered the C system:
@@ -134,7 +144,10 @@ is not implied by a rehearsal PASS.
 - The source/target guard tests pass.
 - PLAN-0009 is Active / Rehearsal Only; PLAN-0008 remains Integrated and PLAN-0006
   remains Proposed / NOT ACTIVE.
-- No file under the C source tree is changed by this Goal.
+- The C source tree is protected by the read-only boundary; no source-write
+  path is authorized. Because this Stage did not capture a cryptographic
+  pre/post source snapshot, future readiness decisions must not treat this
+  record alone as independent proof of source-side immutability.
 
 Stage 1 may start only after an independent reviewer returns `PASS` for the exact
 Stage 0 candidate.
