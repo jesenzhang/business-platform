@@ -95,12 +95,43 @@ impl DocumentLink {
         created_by: Uuid,
         created_at: DateTime<Utc>,
     ) -> Result<Self, DocumentLinkError> {
-        if tenant_id.is_nil() || document_id.is_nil() || resource_id.is_nil() || created_by.is_nil()
+        Self::new_with_id(
+            Uuid::now_v7(),
+            tenant_id,
+            document_id,
+            resource_kind,
+            resource_id,
+            role,
+            created_by,
+            created_at,
+        )
+    }
+
+    /// Build a link with a caller-supplied identity for deterministic imports.
+    ///
+    /// The identity is still validated by the domain; callers use this only
+    /// when an idempotent application command already owns the identity.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        document_id: Uuid,
+        resource_kind: DocumentResourceKind,
+        resource_id: Uuid,
+        role: DocumentLinkRole,
+        created_by: Uuid,
+        created_at: DateTime<Utc>,
+    ) -> Result<Self, DocumentLinkError> {
+        if tenant_id.is_nil()
+            || document_id.is_nil()
+            || resource_id.is_nil()
+            || created_by.is_nil()
+            || id.is_nil()
         {
             return Err(DocumentLinkError::InvalidIdentity);
         }
         Ok(Self {
-            id: Uuid::now_v7(),
+            id,
             tenant_id,
             document_id,
             resource_kind,
@@ -142,5 +173,32 @@ impl DocumentLink {
     #[must_use]
     pub const fn created_by(&self) -> Uuid {
         self.created_by
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deterministic_identity_is_preserved_by_domain_validation() {
+        let id = Uuid::from_u128(0x1000);
+        let tenant_id = Uuid::from_u128(0x2000);
+        let document_id = Uuid::from_u128(0x3000);
+        let resource_id = Uuid::from_u128(0x4000);
+        let created_by = Uuid::from_u128(0x5000);
+        let link = DocumentLink::new_with_id(
+            id,
+            tenant_id,
+            document_id,
+            DocumentResourceKind::Contract,
+            resource_id,
+            DocumentLinkRole::MainContract,
+            created_by,
+            Utc::now(),
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert_eq!(link.id(), id);
+        assert_eq!(link.resource_id(), resource_id);
     }
 }

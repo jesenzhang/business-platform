@@ -20,6 +20,10 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, SqlitePool};
 use thiserror::Error;
 
+mod stage2;
+
+pub use stage2::{run_stage2, Stage2Summary};
+
 const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v7";
 const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024;
 const ENV_DATA_ROOT: &str = "DATA_ROOT";
@@ -256,14 +260,14 @@ struct AuditRun {
     classification_counts: Vec<ClassificationCount>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct SourceFingerprint {
     env_file_sha256: String,
     database: DatabaseFingerprint,
     table_counts: Vec<TableCount>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct DatabaseFingerprint {
     bytes: u64,
     sha256: String,
@@ -273,13 +277,13 @@ struct DatabaseFingerprint {
     foreign_key_violation_count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct TableCount {
     table: String,
     count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct PhysicalRootFingerprint {
     label: String,
     file_count: u64,

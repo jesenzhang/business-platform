@@ -73,7 +73,7 @@ impl RehearsalBoundary {
     }
 
     /// Validate multiple source roots, such as a legacy repository and a
-    /// separately configured DATA_ROOT, against one isolated target.
+    /// separately configured `DATA_ROOT`, against one isolated target.
     pub fn validate_sources<I, P>(
         source_roots: I,
         isolation_root: impl AsRef<Path>,

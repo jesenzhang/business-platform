@@ -3052,6 +3052,11 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "plan-0009-rehearsal"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "document",
+ "document-processing",
+ "document-processing-sqlite",
+ "document-sqlite",
  "legacy-migration-rehearsal",
  "serde",
  "serde_json",
@@ -3059,6 +3064,7 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.19",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
