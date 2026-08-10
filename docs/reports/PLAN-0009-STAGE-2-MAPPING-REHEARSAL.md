@@ -2,7 +2,7 @@
 
 状态：Coordinator Verified；独立 Reviewer attempt 1 = FAIL；repair candidate pending independent re-review  
 日期：2026-08-10  
-原始实现候选：`dc4c492`；repair candidate：`4a6ef75`  
+原始实现候选：`dc4c492`；repair candidates：`4a6ef75`、`8c9967f`  
 范围：Stage 1 frozen manifest → isolated target only；不执行 production migration，不激活 PLAN-0006
 
 ## 1. 结论
@@ -65,8 +65,12 @@ evidence-wording defect. Repair candidate `4a6ef75`:
 
 The clean target was recreated only at the exact isolated Stage 2 target path,
 then executed once and replayed twice with the same Stage 1 manifest. The
-result below is from that repaired candidate. Independent re-review is still
+result below is from the repaired candidates. Independent re-review is still
 required.
+
+Repair 2 also routes the isolated Document SQLite adapter through deterministic
+audit/outbox event identities and timestamps, so a clean Exact run has no
+wall-clock event drift outside the six mapped entities.
 
 ## 4. 真实运行证据
 
@@ -128,7 +132,7 @@ fabricated success claim.
 
 - `cargo fmt --all -- --check`：PASS。
 - `cargo check -p plan-0009-rehearsal --all-targets`：PASS。
-- `cargo test -p plan-0009-rehearsal -p document -p document-processing --all-targets`：45 passed。
+- `cargo test -p plan-0009-rehearsal -p document -p document-processing -p document-sqlite --all-targets --all-features`：53 passed。
 - 真实 Stage 2 frozen + replay：PASS。
 - target digest、audit、SQLite integrity/FK 和敏感字段扫描：PASS。
 
@@ -148,11 +152,14 @@ fabricated success claim.
   - HIGH: Exact replay used wall-clock timestamps and only partial row checks.
   - LOW: source no-write wording exceeded the committed evidence.
 - Coordinator repair candidate: `4a6ef75`; focused tests and repaired real
-  Stage 2 frozen/replay rerun passed. Independent re-review is pending.
+  Stage 2 frozen/replay rerun passed.
+- Coordinator repair candidate 2: `8c9967f`; deterministic audit/outbox
+  behavior is covered by focused compilation/tests. The final independent
+  re-review must use the post-report candidate HEAD.
 
 ## 7. 进入 Stage 3 的条件
 
-Stage 3 只能在独立 Reviewer 对 repair candidate `4a6ef75` 和本报告返回 PASS 后开始。当前仍禁止：
+Stage 3 只能在独立 Reviewer 对 all repair candidates and the post-report candidate HEAD 返回 PASS 后开始。当前仍禁止：
 
 - production migration；
 - 任何 C source write；
