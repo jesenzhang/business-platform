@@ -3049,6 +3049,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
+name = "plan-0009-rehearsal"
+version = "0.1.0"
+dependencies = [
+ "legacy-migration-rehearsal",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.19",
+ "tokio",
+]
+
+[[package]]
 name = "policy"
 version = "0.1.0"
 dependencies = [

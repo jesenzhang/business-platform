@@ -8,6 +8,7 @@ members = [
     "apps/agent-adapter",
     "apps/business-cli",
     "apps/migration",
+    "apps/plan-0009-rehearsal",
     "crates/runtime-migration",
     "crates/architecture-check",
     "crates/runtime-config",

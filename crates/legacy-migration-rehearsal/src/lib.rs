@@ -248,6 +248,75 @@ fn existing_directory(path: &Path, kind: RootKind) -> Result<PathBuf, BoundaryEr
     fs::canonicalize(path).map_err(BoundaryError::PathResolution)
 }
 
+/// The fixed rehearsal sample size required by PLAN-0009.
+pub const REHEARSAL_SELECTION_LIMIT: usize = 120;
+
+/// Stable classification values shared by inventory, planning, and replay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum InventoryClassification {
+    Exact,
+    Probable,
+    Ambiguous,
+    Conflict,
+    Orphan,
+    Missing,
+    Rejected,
+}
+
+impl InventoryClassification {
+    /// Return the contract-level spelling used in the frozen manifest.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Exact => "Exact",
+            Self::Probable => "Probable",
+            Self::Ambiguous => "Ambiguous",
+            Self::Conflict => "Conflict",
+            Self::Orphan => "Orphan",
+            Self::Missing => "Missing",
+            Self::Rejected => "Rejected",
+        }
+    }
+
+    /// All classifications in their stable manifest and count order.
+    pub const ALL: [Self; 7] = [
+        Self::Exact,
+        Self::Probable,
+        Self::Ambiguous,
+        Self::Conflict,
+        Self::Orphan,
+        Self::Missing,
+        Self::Rejected,
+    ];
+}
+
+/// Errors raised when the deterministic 120-contract selection cannot be made.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum SelectionError {
+    #[error("the source inventory contains fewer than {REHEARSAL_SELECTION_LIMIT} contracts")]
+    TooFewContracts,
+}
+
+/// Select exactly 120 distinct contract identifiers in stable ascending order.
+///
+/// The caller supplies identifiers read from the authoritative source. The
+/// function deliberately sorts and deduplicates before truncating so replay is
+/// independent of database cursor order while still failing closed when the
+/// source cannot satisfy the fixed rehearsal size.
+pub fn select_rehearsal_contract_ids<I>(ids: I) -> Result<Vec<i64>, SelectionError>
+where
+    I: IntoIterator<Item = i64>,
+{
+    let mut ids = ids.into_iter().collect::<Vec<_>>();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() < REHEARSAL_SELECTION_LIMIT {
+        return Err(SelectionError::TooFewContracts);
+    }
+    ids.truncate(REHEARSAL_SELECTION_LIMIT);
+    Ok(ids)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -255,7 +324,10 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::{BoundaryError, ExecutionMode, RehearsalBoundary};
+    use super::{
+        select_rehearsal_contract_ids, BoundaryError, ExecutionMode, RehearsalBoundary,
+        SelectionError, REHEARSAL_SELECTION_LIMIT,
+    };
 
     static NEXT_CASE: AtomicUsize = AtomicUsize::new(0);
 
@@ -386,5 +458,23 @@ mod tests {
         let mut content = String::new();
         file.read_to_string(&mut content).expect("read source file");
         assert_eq!(content, "read-only input");
+    }
+
+    #[test]
+    fn rehearsal_selection_is_sorted_distinct_and_exactly_120() {
+        let ids = (1_i64..=121).rev().chain([1, 2, 3]);
+        let selected = select_rehearsal_contract_ids(ids).expect("120 contracts");
+        assert_eq!(selected.len(), REHEARSAL_SELECTION_LIMIT);
+        assert_eq!(selected.first(), Some(&1));
+        assert_eq!(selected.last(), Some(&120));
+        assert!(selected.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn rehearsal_selection_fails_closed_when_source_is_too_small() {
+        assert_eq!(
+            select_rehearsal_contract_ids(1_i64..=119),
+            Err(SelectionError::TooFewContracts)
+        );
     }
 }

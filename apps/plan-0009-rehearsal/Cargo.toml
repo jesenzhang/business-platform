@@ -1,0 +1,21 @@
+[package]
+name = "plan-0009-rehearsal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "plan-0009-rehearsal"
+path = "src/main.rs"
+
+[dependencies]
+legacy-migration-rehearsal = { path = "../../crates/legacy-migration-rehearsal" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true
