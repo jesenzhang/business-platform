@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 1 — read-only inventory and frozen manifest
 
-Status: **candidate — independent Reviewer pending**.
+Status: **PASS — coordinator verified and independent Reviewer passed**.
 
 This report records the real C-project rehearsal only. It does not authorize a
 production migration and it does not activate PLAN-0006.
@@ -141,10 +141,13 @@ manifest and must not reuse the superseded v8 artifact.
 - v9 repair: upgraded the manifest schema, preserved the complete ordered
   provenance list per evidence entry, retained record-level orphan provenance,
   and reran the real freeze/replay.
-- Current independent review: pending for the complete v9 repair candidate.
+- Independent Reviewer (clean HEAD `afc136c`, Stage 1 scope): `PASS`; no
+  remaining Stage 1 findings. The review explicitly verified the v9 artifact,
+  complete multi-source provenance, report accuracy, and package-level check /
+  test closure.
 
 ## Exit decision
 
-Coordinator evidence is complete for the v9 candidate. Stage 1 remains open
-until an independent Reviewer verifies the implementation, report, and real
-frozen artifacts and returns `PASS`.
+Coordinator evidence and the independent review are complete for v9. Stage 1
+is closed for this rehearsal and authorizes only the next isolated rehearsal
+stage; it does not authorize production migration or PLAN-0006 activation.
