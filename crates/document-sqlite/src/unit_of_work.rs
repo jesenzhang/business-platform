@@ -283,6 +283,7 @@ async fn execute_in_transaction(
         .initial_revision_with_sha256(command.initial_revision_sha256.as_deref())
         .map_err(|_| ApplicationPortError::Failed)?;
     insert_revision(connection, &initial_revision).await?;
+    set_current_revision(connection, &command.document).await?;
     insert_audit(connection, &command).await?;
     insert_outbox(connection, &command).await?;
     sqlx::query("INSERT INTO document_idempotency (tenant_id, idempotency_key, request_fingerprint, fingerprint_version, document_id) VALUES (?1, ?2, ?3, ?4, ?5)")
@@ -304,7 +305,7 @@ async fn insert_document(
         .bind(document.id().to_string()).bind(document.tenant_id().to_string())
         .bind(document.original_filename()).bind(document.content_type()).bind(document.object_key())
         .bind(document.status().as_str()).bind(document.version())
-        .bind(document.content_revision().value()).bind(document.current_revision_id().to_string())
+        .bind(document.content_revision().value()).bind(Option::<String>::None)
         .bind(document.deletion_state().as_str()).bind(document.lifecycle_state().as_str())
         .bind(document.size_bytes())
         .bind(document.created_by().to_string()).bind(document.created_at().to_rfc3339())
@@ -333,6 +334,25 @@ async fn insert_revision(
         .execute(&mut *tx)
         .await
         .map_err(map_error)?;
+    Ok(())
+}
+
+async fn set_current_revision(
+    tx: &mut SqliteConnection,
+    document: &DocumentMetadata,
+) -> Result<(), ApplicationPortError> {
+    let result = sqlx::query(
+        "UPDATE documents SET current_revision_id = ?1 WHERE tenant_id = ?2 AND id = ?3 AND current_revision_id IS NULL",
+    )
+    .bind(document.current_revision_id().to_string())
+    .bind(document.tenant_id().to_string())
+    .bind(document.id().to_string())
+    .execute(&mut *tx)
+    .await
+    .map_err(map_error)?;
+    if result.rows_affected() != 1 {
+        return Err(ApplicationPortError::Failed);
+    }
     Ok(())
 }
 

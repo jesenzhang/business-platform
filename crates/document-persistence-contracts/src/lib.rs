@@ -77,7 +77,7 @@ async fn verify_create(
     let created = unit_of_work
         .execute(context.command.clone())
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("create: {error}"))?;
     if created.replayed || created.document.id() != context.first.id() {
         return Err("create did not return the new document".to_string());
     }
@@ -91,7 +91,7 @@ async fn verify_idempotency(
     let replay = unit_of_work
         .execute(context.command.clone())
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("idempotent replay: {error}"))?;
     if !replay.replayed || replay.document.id() != context.first.id() {
         return Err("idempotent replay did not return the original document".to_string());
     }
@@ -111,14 +111,14 @@ async fn verify_tenant_isolation(
     let found = detail
         .execute(context.tenant, context.first.id())
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("detail query: {error}"))?;
     if found.as_ref().map(|view| view.id) != Some(context.first.id()) {
         return Err("detail query did not return created document".to_string());
     }
     if detail
         .execute(context.other_tenant, context.first.id())
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| format!("cross-tenant detail query: {error}"))?
         .is_some()
     {
         return Err("detail query crossed tenant boundary".to_string());
@@ -131,7 +131,7 @@ async fn verify_tenant_isolation(
             limit: 20,
         })
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("cross-tenant list query: {error}"))?;
     if !foreign_page.items.is_empty() {
         return Err("list query crossed tenant boundary".to_string());
     }
@@ -185,7 +185,7 @@ async fn verify_filters(
                 initial_revision_sha256: None,
             })
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("filter fixture {filename:?}: {error}"))?;
     }
 
     verify_status_filter(list, context).await?;
@@ -208,7 +208,7 @@ async fn verify_status_filter(
             limit: 200,
         })
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("status filter query: {error}"))?;
     if archived.items.len() != 1
         || archived.items[0].status != document::query::DocumentStatusView::Archived
     {
@@ -235,7 +235,7 @@ async fn verify_filename_filters(
             limit: 200,
         })
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("filename/date filter query: {error}"))?;
     if name_and_date.items.len() != 1 || name_and_date.items[0].original_filename != "Report.PDF" {
         return Err("combined filename/date filters did not match exactly".to_string());
     }
@@ -259,7 +259,7 @@ async fn verify_filename_filters(
                 limit: 200,
             })
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("filename filter {needle:?}: {error}"))?;
         if page.items.len() != 1 {
             return Err(format!(
                 "LIKE literal filter returned wrong rows for {needle:?}"
@@ -278,7 +278,7 @@ async fn verify_filename_filters(
             limit: 200,
         })
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("no-match filter query: {error}"))?;
     if !no_match.items.is_empty() {
         return Err("no-match filter returned rows".to_string());
     }
@@ -298,7 +298,7 @@ async fn verify_limit_clamp(
                 limit,
             })
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("limit query ({limit}): {error}"))?;
         if page.items.len() > 200 || (limit == 1 && page.items.len() > 1) {
             return Err("list limit clamp contract failed".to_string());
         }
@@ -330,7 +330,7 @@ async fn verify_cursor(
                 initial_revision_sha256: None,
             })
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("cursor fixture {index}: {error}"))?;
     }
 
     let mut cursor = None;
@@ -347,7 +347,7 @@ async fn verify_cursor(
                 limit: 2,
             })
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("cursor page: {error}"))?;
         ids.extend(page.items.iter().map(|item| item.id));
         cursor = page.next_cursor;
         if cursor.is_none() {

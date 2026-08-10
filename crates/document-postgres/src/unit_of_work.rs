@@ -82,6 +82,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
             .initial_revision_with_sha256(command.initial_revision_sha256.as_deref())
             .map_err(|_| ApplicationPortError::Failed)?;
         insert_revision(&mut transaction, &initial_revision).await?;
+        set_current_revision(&mut transaction, &command.document).await?;
         insert_audit(&mut transaction, &command.document).await?;
         insert_outbox(&mut transaction, &command.document).await?;
         insert_idempotency(&mut transaction, &command).await?;
@@ -295,7 +296,10 @@ async fn insert_document(
     .bind(document.status().as_str())
     .bind(document.version())
     .bind(document.content_revision().value())
-    .bind(document.current_revision_id())
+    // The document and its first immutable revision have circular foreign
+    // keys. Insert the document with a temporary NULL, then bind the
+    // revision after its row exists within this same transaction.
+    .bind(None::<Uuid>)
     .bind(document.deletion_state().as_str())
     .bind(document.lifecycle_state().as_str())
     .bind(document.size_bytes())
@@ -335,6 +339,25 @@ async fn insert_revision(
     .execute(&mut **transaction)
     .await
     .map_err(map_sqlx_error)?;
+    Ok(())
+}
+
+async fn set_current_revision(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    document: &DocumentMetadata,
+) -> Result<(), ApplicationPortError> {
+    let result = sqlx::query(
+        "UPDATE documents SET current_revision_id = $1 WHERE tenant_id = $2 AND id = $3 AND current_revision_id IS NULL",
+    )
+    .bind(document.current_revision_id())
+    .bind(document.tenant_id())
+    .bind(document.id())
+    .execute(&mut **transaction)
+    .await
+    .map_err(map_sqlx_error)?;
+    if result.rows_affected() != 1 {
+        return Err(ApplicationPortError::Failed);
+    }
     Ok(())
 }
 
