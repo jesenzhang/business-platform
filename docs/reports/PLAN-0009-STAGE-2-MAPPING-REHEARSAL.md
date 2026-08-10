@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 2 — Deterministic Mapping and Isolated Target Rehearsal
 
-状态：Coordinator Verified；独立 Reviewer attempt 1 = FAIL；repair candidate pending independent re-review  
+状态：**PASS**；Coordinator Verified；独立 Reviewer attempt 2 = PASS  
 日期：2026-08-10  
 原始实现候选：`dc4c492`；repair candidates：`4a6ef75`、`8c9967f`、`8255813`  
 范围：Stage 1 frozen manifest → isolated target only；不执行 production migration，不激活 PLAN-0006
@@ -163,11 +163,14 @@ fabricated success claim.
   re-review must use the post-report candidate HEAD.
 - Coordinator repair candidate 3: `8255813`; materialized Exact rows now have
   a complete read-only equivalence check instead of an early return. Focused
-  tests pass; independent re-review is required again.
+  tests pass.
+- Independent Reviewer attempt 2, exact range `3ab1bb9..eb5462d`, model
+  `gpt-5.4` / code-reviewer: `PASS`; no findings.
 
 ## 7. 进入 Stage 3 的条件
 
-Stage 3 只能在独立 Reviewer 对 all repair candidates and the post-report candidate HEAD 返回 PASS 后开始。当前仍禁止：
+Stage 3 may start after independent Reviewer PASS on exact range
+`3ab1bb9..eb5462d`. The following remain prohibited:
 
 - production migration；
 - 任何 C source write；
