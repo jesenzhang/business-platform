@@ -10,7 +10,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, LocalResult, TimeZone, Utc};
 use document::application::{CreateDocumentCommand, CreateDocumentMetadata};
 use document::domain::{DocumentLink, DocumentLinkRole, DocumentResourceKind};
 use document_processing::{ArtifactKind, Evidence, ProcessingArtifact, ProcessingRun};
@@ -443,7 +443,11 @@ fn build_mapping_record(
         record.source_contract_id,
         0,
     );
-    let target_object_ref = format!("objects/{evidence_id}.bin");
+    let target_object_ref = revision_object_key(
+        parse_fixed_uuid(REHEARSAL_TENANT)?,
+        document_id,
+        revision_id,
+    );
     Ok(MappingPlanRecord {
         selection_rank: record.selection_rank,
         source_contract_id: record.source_contract_id,
@@ -489,6 +493,19 @@ fn deterministic_uuid(
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     Uuid::from_bytes(bytes)
+}
+
+fn revision_object_key(tenant_id: Uuid, document_id: Uuid, revision_id: Uuid) -> String {
+    format!("tenants/{tenant_id}/documents/{document_id}/revisions/{revision_id}/source")
+}
+
+fn deterministic_rehearsal_time(source_contract_id: i64) -> DateTime<Utc> {
+    let offset = source_contract_id.rem_euclid(86_400);
+    let seconds = 1_735_689_600_i64 + offset;
+    match Utc.timestamp_opt(seconds, 0) {
+        LocalResult::Single(value) => value,
+        _ => DateTime::<Utc>::UNIX_EPOCH,
+    }
 }
 
 fn mapping_plan_digest(plan: &MappingPlan) -> Result<String, Stage2Error> {
@@ -720,6 +737,20 @@ async fn materialize_exact(
     manifest: &FrozenManifest,
     record: &MappingPlanRecord,
 ) -> Result<(), Stage2Error> {
+    let materialized = sqlx::query_scalar::<_, i64>(
+        "SELECT materialized FROM plan_0009_mapping_records \
+         WHERE manifest_sha256 = ?1 AND source_contract_id = ?2",
+    )
+    .bind(&manifest.canonical_manifest_sha256)
+    .bind(record.source_contract_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(Stage2Error::Database)?
+    .ok_or(Stage2Error::TargetConflict)?;
+    if materialized == 1 {
+        return Ok(());
+    }
+
     let source_record = manifest
         .records
         .iter()
@@ -734,9 +765,18 @@ async fn materialize_exact(
         .observed_sha256
         .as_deref()
         .ok_or(Stage2Error::ClassificationInvariant)?;
+    let tenant_id = parse_fixed_uuid(REHEARSAL_TENANT)?;
+    let actor_id = parse_fixed_uuid(REHEARSAL_ACTOR)?;
+    let document_id =
+        Uuid::parse_str(&record.candidate_document_id).map_err(|_| Stage2Error::TargetConflict)?;
+    let revision_id =
+        Uuid::parse_str(&record.candidate_revision_id).map_err(|_| Stage2Error::TargetConflict)?;
+    let link_id =
+        Uuid::parse_str(&record.candidate_link_id).map_err(|_| Stage2Error::TargetConflict)?;
     let evidence_id =
         Uuid::parse_str(&record.candidate_evidence_id).map_err(|_| Stage2Error::TargetConflict)?;
-    let object_path = target_objects.join(format!("{evidence_id}.bin"));
+    let object_key = revision_object_key(tenant_id, document_id, revision_id);
+    let object_path = target_objects.join(&object_key);
     copy_exact_source(
         boundary,
         config,
@@ -746,23 +786,16 @@ async fn materialize_exact(
         checksum,
     )?;
 
-    let tenant_id = parse_fixed_uuid(REHEARSAL_TENANT)?;
-    let actor_id = parse_fixed_uuid(REHEARSAL_ACTOR)?;
-    let document_id =
-        Uuid::parse_str(&record.candidate_document_id).map_err(|_| Stage2Error::TargetConflict)?;
-    let revision_id =
-        Uuid::parse_str(&record.candidate_revision_id).map_err(|_| Stage2Error::TargetConflict)?;
-    let link_id =
-        Uuid::parse_str(&record.candidate_link_id).map_err(|_| Stage2Error::TargetConflict)?;
     let source_size =
         i64::try_from(evidence.size_bytes).map_err(|_| Stage2Error::DomainValidation)?;
     let extension = evidence.extension.as_deref().unwrap_or("bin");
     let filename = format!("legacy-contract-{}.{extension}", record.source_contract_id);
     let content_type = content_type_for_extension(extension);
+    let created_at = deterministic_rehearsal_time(record.source_contract_id);
     let document_app =
         CreateDocumentMetadata::new(Arc::new(SqliteCreateDocumentUnitOfWork::new(pool.clone())));
     let document_result = document_app
-        .execute_with_id(
+        .execute_with_id_at(
             Some(document_id),
             CreateDocumentCommand {
                 tenant_id,
@@ -778,11 +811,15 @@ async fn materialize_exact(
                     manifest.canonical_manifest_sha256, record.source_contract_id
                 ),
             },
+            created_at,
         )
         .await
         .map_err(|_| Stage2Error::DomainValidation)?;
     if document_result.document.id() != document_id
         || document_result.document.current_revision_id() != revision_id
+        || document_result.document.object_key() != object_key
+        || document_result.document.created_at() != created_at
+        || document_result.document.updated_at() != created_at
     {
         return Err(Stage2Error::TargetConflict);
     }
@@ -801,7 +838,7 @@ async fn materialize_exact(
         resource_id,
         DocumentLinkRole::MainContract,
         actor_id,
-        Utc::now(),
+        created_at,
     )
     .map_err(|_| Stage2Error::DomainValidation)?;
     persist_document_link(pool, &link).await?;
@@ -811,7 +848,6 @@ async fn materialize_exact(
             .map_err(|_| Stage2Error::TargetConflict)?;
         let artifact_id = Uuid::parse_str(&record.candidate_artifact_id)
             .map_err(|_| Stage2Error::TargetConflict)?;
-        let now = Utc::now();
         let mut run = ProcessingRun::start_with_id(
             run_id,
             tenant_id,
@@ -822,13 +858,13 @@ async fn materialize_exact(
             None,
             None,
             actor_id,
-            now,
+            created_at,
         )
         .map_err(|_| Stage2Error::DomainValidation)?;
-        run.finish_succeeded(now)
+        run.finish_succeeded(created_at)
             .map_err(|_| Stage2Error::DomainValidation)?;
         let artifact_kind = artifact_kind_for(record);
-        let storage_ref = format!("objects/{evidence_id}.bin");
+        let storage_ref = object_key.clone();
         let artifact = ProcessingArtifact::new_with_id(
             artifact_id,
             tenant_id,
@@ -837,7 +873,7 @@ async fn materialize_exact(
             storage_ref,
             checksum.to_string(),
             "legacy-rehearsal.v1".to_string(),
-            now,
+            created_at,
         )
         .map_err(|_| Stage2Error::DomainValidation)?;
         let evidence_entity = Evidence::new_with_id(
@@ -852,7 +888,7 @@ async fn materialize_exact(
                 "path_sha256": evidence.relative_path_sha256,
             }),
             checksum.to_string(),
-            now,
+            created_at,
         )
         .map_err(|_| Stage2Error::DomainValidation)?;
         persist_processing_entities(pool, &run, &artifact, &evidence_entity).await?;
@@ -959,6 +995,9 @@ fn copy_exact_source(
         }
         return Ok(());
     }
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(|_| Stage2Error::TargetWrite)?;
+    }
     let mut source = source;
     let mut target = OpenOptions::new()
         .write(true)
@@ -998,8 +1037,8 @@ async fn persist_document_link(pool: &SqlitePool, link: &DocumentLink) -> Result
         .execute(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?;
-        let existing = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-            "SELECT tenant_id, document_id, resource_kind, resource_id, role, created_by \
+        let existing = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT tenant_id, document_id, resource_kind, resource_id, role, created_at, created_by \
              FROM document_links WHERE id = ?1",
         )
         .bind(link.id().to_string())
@@ -1012,7 +1051,8 @@ async fn persist_document_link(pool: &SqlitePool, link: &DocumentLink) -> Result
             || existing.2 != link.resource_kind().as_str()
             || existing.3 != link.resource_id().to_string()
             || existing.4 != link.role().as_str()
-            || existing.5 != link.created_by().to_string()
+            || existing.5 != link.created_at().to_rfc3339()
+            || existing.6 != link.created_by().to_string()
         {
             return Err(Stage2Error::TargetConflict);
         }
@@ -1071,15 +1111,45 @@ async fn persist_processing_entities(
         .execute(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?;
-        let run_revision = sqlx::query_scalar::<_, String>(
-            "SELECT document_revision_id FROM document_processing_runs WHERE id = ?1",
+        let existing_run = sqlx::query_as::<_, (
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+        )>(
+            "SELECT tenant_id, document_revision_id, pipeline_version, parser_name,
+                    parser_version, model_provider, model_name, status, started_at,
+                    finished_at, failure_code, created_by, created_at
+             FROM document_processing_runs WHERE id = ?1",
         )
         .bind(run.id().to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?
         .ok_or(Stage2Error::TargetConflict)?;
-        if run_revision != run.document_revision_id().to_string() {
+        if existing_run.0 != run.tenant_id().to_string()
+            || existing_run.1 != run.document_revision_id().to_string()
+            || existing_run.2 != run.pipeline_version()
+            || existing_run.3 != run.parser_name()
+            || existing_run.4 != run.parser_version()
+            || existing_run.5.as_deref() != run.model_provider()
+            || existing_run.6.as_deref() != run.model_name()
+            || existing_run.7 != processing_run_status(run.status())
+            || existing_run.8 != run.started_at().map(|value| value.to_rfc3339())
+            || existing_run.9 != run.finished_at().map(|value| value.to_rfc3339())
+            || existing_run.10.as_deref() != run.failure_code()
+            || existing_run.11 != run.created_by().to_string()
+            || existing_run.12 != run.created_at().to_rfc3339()
+        {
             return Err(Stage2Error::TargetConflict);
         }
         sqlx::query(
@@ -1098,18 +1168,28 @@ async fn persist_processing_entities(
         .execute(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?;
-        let artifact_run = sqlx::query_scalar::<_, String>(
-            "SELECT processing_run_id FROM document_processing_artifacts WHERE id = ?1",
+        let existing_artifact = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT tenant_id, processing_run_id, kind, storage_ref, checksum,
+                    schema_version, created_at
+             FROM document_processing_artifacts WHERE id = ?1",
         )
         .bind(artifact.id().to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?
         .ok_or(Stage2Error::TargetConflict)?;
-        if artifact_run != run.id().to_string() {
+        if existing_artifact.0 != artifact.tenant_id().to_string()
+            || existing_artifact.1 != artifact.processing_run_id().to_string()
+            || existing_artifact.2 != artifact.kind().as_str()
+            || existing_artifact.3 != artifact.storage_ref()
+            || existing_artifact.4 != artifact.checksum()
+            || existing_artifact.5 != artifact.schema_version()
+            || existing_artifact.6 != artifact.created_at().to_rfc3339()
+        {
             return Err(Stage2Error::TargetConflict);
         }
-        let location_json = serde_json::to_string(evidence.location()).map_err(Stage2Error::Serialization)?;
+        let location_json =
+            serde_json::to_string(evidence.location()).map_err(Stage2Error::Serialization)?;
         sqlx::query(
             "INSERT OR IGNORE INTO document_processing_evidence \
              (id, tenant_id, document_revision_id, processing_run_id, artifact_id, location_json,\
@@ -1121,21 +1201,30 @@ async fn persist_processing_entities(
         .bind(evidence.document_revision_id().to_string())
         .bind(evidence.processing_run_id().to_string())
         .bind(evidence.artifact_id().to_string())
-        .bind(location_json)
+        .bind(&location_json)
         .bind(evidence.source_checksum())
         .bind(evidence.created_at().to_rfc3339())
         .execute(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?;
-        let evidence_run = sqlx::query_scalar::<_, String>(
-            "SELECT processing_run_id FROM document_processing_evidence WHERE id = ?1",
+        let existing_evidence = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT tenant_id, document_revision_id, processing_run_id, artifact_id,
+                    location_json, source_checksum, created_at
+             FROM document_processing_evidence WHERE id = ?1",
         )
         .bind(evidence.id().to_string())
         .fetch_optional(&mut *connection)
         .await
         .map_err(Stage2Error::Database)?
         .ok_or(Stage2Error::TargetConflict)?;
-        if evidence_run != run.id().to_string() {
+        if existing_evidence.0 != evidence.tenant_id().to_string()
+            || existing_evidence.1 != evidence.document_revision_id().to_string()
+            || existing_evidence.2 != evidence.processing_run_id().to_string()
+            || existing_evidence.3 != evidence.artifact_id().to_string()
+            || existing_evidence.4 != location_json
+            || existing_evidence.5 != evidence.source_checksum()
+            || existing_evidence.6 != evidence.created_at().to_rfc3339()
+        {
             return Err(Stage2Error::TargetConflict);
         }
         Ok::<(), Stage2Error>(())
