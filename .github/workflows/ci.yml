@@ -109,7 +109,8 @@ jobs:
       - run: cargo test -p business-cli --all-targets
       - run: cargo test -p agent-adapter --all-targets
       - run: cargo test -p business-api-client --all-targets
-      - run: python -c "import json; json.load(open('openapi.json', encoding='utf-8')); print('OpenAPI JSON: PASS')"
+      - run: |
+          python -c "import json; json.load(open('openapi.json', encoding='utf-8')); print('OpenAPI JSON: PASS')"
 
   unit:
     name: Unit tests
