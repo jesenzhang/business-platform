@@ -58,6 +58,7 @@ impl ContractContext {
             idempotency_key: "contract-key-a".to_string(),
             request_fingerprint: "a".repeat(64),
             fingerprint_version: 1,
+            initial_revision_sha256: None,
         };
         Ok(Self {
             tenant,
@@ -181,6 +182,7 @@ async fn verify_filters(
                 idempotency_key: format!("contract-filter-{index}"),
                 request_fingerprint: format!("filter-{index}").repeat(8),
                 fingerprint_version: 1,
+                initial_revision_sha256: None,
             })
             .await
             .map_err(|error| error.to_string())?;
@@ -325,6 +327,7 @@ async fn verify_cursor(
                 idempotency_key: format!("contract-cursor-{index}"),
                 request_fingerprint: format!("cursor-{index}").repeat(8),
                 fingerprint_version: 1,
+                initial_revision_sha256: None,
             })
             .await
             .map_err(|error| error.to_string())?;

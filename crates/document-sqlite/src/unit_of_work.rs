@@ -280,7 +280,7 @@ async fn execute_in_transaction(
     insert_document(connection, &command).await?;
     let initial_revision = command
         .document
-        .initial_revision()
+        .initial_revision_with_sha256(command.initial_revision_sha256.as_deref())
         .map_err(|_| ApplicationPortError::Failed)?;
     insert_revision(connection, &initial_revision).await?;
     insert_audit(connection, &command).await?;

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "feat/PLAN-*"
+      - "codex/plan-0008-*"
   pull_request:
     branches:
       - main
@@ -185,6 +186,7 @@ jobs:
           cargo test -p object-storage --lib --all-features
           cargo test -p object-storage --test minio_contract --all-features -- --include-ignored --test-threads=1
           cargo test -p business-api --test documents_postgres --all-features -- --include-ignored --test-threads=1
+          cargo test -p business-api --test plan_0008_postgres_minio --all-features -- --include-ignored --test-threads=1
           cargo test -p ai-worker --all-features
           cargo test -p business-worker --all-features
           cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1

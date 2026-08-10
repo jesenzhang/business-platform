@@ -51,6 +51,7 @@ async fn sqlite_rolls_back_the_document_when_atomic_side_effect_fails() {
         idempotency_key: "rollback".to_string(),
         request_fingerprint: "rollback".to_string(),
         fingerprint_version: 1,
+        initial_revision_sha256: None,
     };
     let adapter = document_sqlite::SqliteCreateDocumentUnitOfWork::new(pool.clone());
     let result = document::ports::CreateDocumentUnitOfWork::execute(&adapter, command).await;

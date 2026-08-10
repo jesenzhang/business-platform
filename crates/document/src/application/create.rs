@@ -20,6 +20,7 @@ pub struct CreateDocumentCommand {
     /// Logical object path. The domain adds tenant/document/version segments.
     pub object_key: String,
     pub size_bytes: Option<i64>,
+    pub sha256: Option<String>,
     /// Optional caller-generated revision identity used by streaming upload so
     /// the storage write and metadata transaction share one business ID.
     pub revision_id: Option<Uuid>,
@@ -119,6 +120,7 @@ impl CreateDocumentMetadata {
                 idempotency_key: idempotency_key.to_string(),
                 request_fingerprint: fingerprint,
                 fingerprint_version: REQUEST_FINGERPRINT_VERSION,
+                initial_revision_sha256: command.sha256,
             })
             .await
             .map_err(map_port_error)
@@ -145,6 +147,13 @@ fn request_fingerprint(command: &CreateDocumentCommand) -> String {
         Some(size) => {
             hasher.update([1]);
             hasher.update(size.to_be_bytes());
+        }
+    }
+    match command.sha256.as_deref() {
+        None => {}
+        Some(sha256) => {
+            hasher.update([1]);
+            update_string(&mut hasher, sha256);
         }
     }
     format!("{:x}", hasher.finalize())
@@ -209,6 +218,7 @@ mod tests {
                 content_type: "application/pdf".to_string(),
                 object_key: "report.pdf".to_string(),
                 size_bytes: Some(10),
+                sha256: None,
                 revision_id: None,
                 idempotency_key: "key-1".to_string(),
             })
@@ -236,6 +246,7 @@ mod tests {
                 content_type: "application/pdf".to_string(),
                 object_key: "report.pdf".to_string(),
                 size_bytes: None,
+                sha256: None,
                 revision_id: None,
                 idempotency_key: String::new(),
             })
@@ -256,6 +267,7 @@ mod tests {
             content_type: "application/pdf".to_string(),
             object_key: "report.pdf".to_string(),
             size_bytes: None,
+            sha256: None,
             revision_id: None,
             idempotency_key: "key-1".to_string(),
         };

@@ -52,6 +52,14 @@ pub struct DocumentRevision {
 impl DocumentRevision {
     /// Build the initial revision for a newly created document.
     pub fn initial(document: &DocumentMetadata) -> Result<Self, DocumentRevisionError> {
+        Self::initial_with_sha256(document, None)
+    }
+
+    /// Build the initial revision while retaining a verified source checksum.
+    pub fn initial_with_sha256(
+        document: &DocumentMetadata,
+        sha256: Option<&str>,
+    ) -> Result<Self, DocumentRevisionError> {
         let source_object_ref = document.object_key();
         if Self::validate_source_object_ref(&source_object_ref).is_err() {
             // Existing PLAN-0003 rows retain their legacy vN key until the
@@ -66,7 +74,7 @@ impl DocumentRevision {
                     revision_no: document.content_revision().value(),
                     parent_revision_id: None,
                     source_object_ref,
-                    sha256: None,
+                    sha256: sha256.map(ToOwned::to_owned),
                     content_type: document.content_type().to_string(),
                     size_bytes: document.size_bytes(),
                     original_filename: document.original_filename().to_string(),
@@ -84,7 +92,7 @@ impl DocumentRevision {
             1,
             None,
             source_object_ref,
-            None,
+            sha256.map(ToOwned::to_owned),
             document.content_type().to_string(),
             document.size_bytes(),
             document.original_filename().to_string(),

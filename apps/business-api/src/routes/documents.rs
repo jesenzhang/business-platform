@@ -193,6 +193,7 @@ pub async fn create_document(
         content_type: body.content_type,
         object_key: body.object_key,
         size_bytes: body.size_bytes,
+        sha256: None,
         revision_id: None,
         idempotency_key,
     };

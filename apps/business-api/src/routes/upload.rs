@@ -190,6 +190,7 @@ pub async fn upload_document(
 
     let document_id = deterministic_document_id(tenant_id, idempotency_key);
     let content_sha256 = content_hasher.finalize();
+    let content_sha256_hex = format!("{content_sha256:x}");
     let revision_id = deterministic_revision_id(tenant_id, idempotency_key, &content_sha256);
     let mut name_digest = Sha256::new();
     name_digest.update(tenant_id.as_bytes());
@@ -202,6 +203,7 @@ pub async fn upload_document(
         content_type: content_type.clone(),
         object_key: logical_path,
         size_bytes: Some(i64::try_from(size).unwrap_or(i64::MAX)),
+        sha256: Some(content_sha256_hex.clone()),
         revision_id: Some(revision_id),
         idempotency_key: idempotency_key.to_string(),
     };
@@ -228,6 +230,8 @@ pub async fn upload_document(
     })?;
     let body = ReaderStream::new(input)
         .map(|chunk| chunk.map_err(|error| StorageError::Io(error.to_string())));
+    let mut storage_metadata = BTreeMap::new();
+    storage_metadata.insert("sha256".to_string(), content_sha256_hex);
     if let Err(error) = storage
         .objects
         .put_stream(
@@ -235,7 +239,7 @@ pub async fn upload_document(
             Box::pin(body),
             size,
             &content_type,
-            &BTreeMap::new(),
+            &storage_metadata,
         )
         .await
     {

@@ -272,6 +272,14 @@ impl DocumentMetadata {
         super::revision::DocumentRevision::initial(self)
     }
 
+    /// Materialize the immutable R1 record with a verified source checksum.
+    pub fn initial_revision_with_sha256(
+        &self,
+        sha256: Option<&str>,
+    ) -> Result<super::revision::DocumentRevision, super::revision::DocumentRevisionError> {
+        super::revision::DocumentRevision::initial_with_sha256(self, sha256)
+    }
+
     pub fn assert_expected_revision(
         &self,
         expected: Uuid,
@@ -609,8 +617,19 @@ impl DocumentMetadata {
     /// Create and select a new immutable content revision.
     pub fn replace_content_revision(
         &mut self,
+        logical_path: String,
+        change_reason: Option<String>,
+    ) -> Result<super::revision::DocumentRevision, DocumentDomainError> {
+        self.replace_content_revision_with_sha256(logical_path, change_reason, None)
+    }
+
+    /// Create and select a new immutable content revision with a verified
+    /// source checksum.
+    pub fn replace_content_revision_with_sha256(
+        &mut self,
         _logical_path: String,
         change_reason: Option<String>,
+        sha256: Option<String>,
     ) -> Result<super::revision::DocumentRevision, DocumentDomainError> {
         if !matches!(self.deletion_state, DocumentDeletionState::Present) {
             return Err(DocumentDomainError::InvalidStatusTransition {
@@ -638,7 +657,7 @@ impl DocumentMetadata {
             content_revision.value(),
             Some(previous_revision_id),
             content_reference.as_storage_key(),
-            None,
+            sha256,
             self.content_type.clone(),
             self.size_bytes,
             self.original_filename.clone(),

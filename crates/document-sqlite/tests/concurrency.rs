@@ -60,6 +60,7 @@ fn command(
         idempotency_key: idempotency_key.to_string(),
         request_fingerprint: fingerprint.to_string(),
         fingerprint_version: 1,
+        initial_revision_sha256: None,
     }
 }
 

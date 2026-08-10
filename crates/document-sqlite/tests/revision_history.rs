@@ -32,6 +32,7 @@ async fn saving_a_new_revision_keeps_r1_and_updates_current_revision_atomically(
             idempotency_key: "revision-history-create".to_string(),
             request_fingerprint: "revision-history-fingerprint".to_string(),
             fingerprint_version: 1,
+            initial_revision_sha256: None,
         })
         .await;
     assert!(created.is_ok());

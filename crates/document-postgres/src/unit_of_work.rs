@@ -79,7 +79,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
         insert_document(&mut transaction, &command.document).await?;
         let initial_revision = command
             .document
-            .initial_revision()
+            .initial_revision_with_sha256(command.initial_revision_sha256.as_deref())
             .map_err(|_| ApplicationPortError::Failed)?;
         insert_revision(&mut transaction, &initial_revision).await?;
         insert_audit(&mut transaction, &command.document).await?;
