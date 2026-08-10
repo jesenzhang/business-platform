@@ -35,6 +35,146 @@ impl SqliteCreateDocumentUnitOfWork {
             deterministic_event_time: Some(event_time),
         }
     }
+
+    /// Verify every deterministic audit/outbox value emitted by a rehearsal
+    /// create. This is intentionally adapter-owned because those records are
+    /// persistence facts, not Document domain state.
+    pub async fn verify_rehearsal_events(
+        &self,
+        document: &DocumentMetadata,
+    ) -> Result<(), ApplicationPortError> {
+        let event_time = self
+            .deterministic_event_time
+            .ok_or(ApplicationPortError::Failed)?;
+        let audit = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+                Option<String>,
+                String,
+            ),
+        >(
+            "SELECT tenant_id, user_id, action, resource_type, resource_id,
+                    details, created_at, occurred_at, operation_id, actor_type,
+                    actor_id, result, changed_fields, schema_version,
+                    previous_hash, record_hash
+             FROM audit_events WHERE id = ?1",
+        )
+        .bind(document.id().to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_error)?
+        .ok_or(ApplicationPortError::Failed)?;
+        let action =
+            AuditAction::new("document.created").map_err(|_| ApplicationPortError::Failed)?;
+        let resource = AuditResource::new("document", document.id().to_string())
+            .map_err(|_| ApplicationPortError::Failed)?;
+        let expected = AuditEvent::new(
+            document.id(),
+            document.tenant_id(),
+            AuditActor {
+                actor_type: AuditActorType::User,
+                actor_id: document.created_by(),
+            },
+            action,
+            resource,
+            document.current_revision_id(),
+            None,
+            None,
+            None,
+            None,
+            AuditResult::Succeeded,
+            None,
+            None,
+            None,
+            vec!["content_type".to_string(), "original_filename".to_string()],
+            serde_json::json!({
+                "original_filename": document.original_filename(),
+                "content_type": document.content_type(),
+                "content_revision": document.content_revision().value(),
+            }),
+            "audit.v1",
+            event_time,
+        )
+        .map_err(|_| ApplicationPortError::Failed)?
+        .with_chain(audit.14.clone())
+        .map_err(|_| ApplicationPortError::Failed)?;
+        if audit.0 != expected.tenant_id().to_string()
+            || audit.1 != document.created_by().to_string()
+            || audit.2 != expected.action().as_str()
+            || audit.3 != expected.resource().resource_type
+            || audit.4 != expected.resource().resource_id
+            || audit.5 != expected.details().to_string()
+            || audit.6 != expected.occurred_at().to_rfc3339()
+            || audit.7 != expected.occurred_at().to_rfc3339()
+            || audit.8 != expected.operation_id().to_string()
+            || audit.9 != "user"
+            || audit.10 != expected.actor().actor_id.to_string()
+            || audit.11 != "succeeded"
+            || audit.12
+                != serde_json::to_string(expected.changed_fields())
+                    .map_err(|_| ApplicationPortError::Failed)?
+            || audit.13 != expected.schema_version()
+            || audit.14 != expected.previous_hash().map(ToOwned::to_owned)
+            || audit.15.as_str() != expected.record_hash().unwrap_or_default()
+        {
+            return Err(ApplicationPortError::Failed);
+        }
+        if let Some(previous_hash) = audit.14.as_deref() {
+            let previous_exists = sqlx::query_scalar::<_, i64>(
+                "SELECT 1 FROM audit_events WHERE tenant_id = ?1 AND record_hash = ?2 LIMIT 1",
+            )
+            .bind(document.tenant_id().to_string())
+            .bind(previous_hash)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_error)?
+            .is_some();
+            if !previous_exists {
+                return Err(ApplicationPortError::Failed);
+            }
+        }
+
+        let outbox = sqlx::query_as::<_, (String, String, String, String, String, String, String)>(
+            "SELECT event_type, tenant_id, aggregate_id, aggregate_type,
+                    payload, schema_version, occurred_at
+             FROM outbox_events WHERE event_id = ?1",
+        )
+        .bind(document.id().to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_error)?
+        .ok_or(ApplicationPortError::Failed)?;
+        let payload = serde_json::json!({
+            "document_id": document.id(),
+            "original_filename": document.original_filename(),
+        })
+        .to_string();
+        if outbox.0 != "document.created"
+            || outbox.1 != document.tenant_id().to_string()
+            || outbox.2 != document.id().to_string()
+            || outbox.3 != "document"
+            || outbox.4 != payload
+            || outbox.5 != "v1"
+            || outbox.6 != event_time.to_rfc3339()
+        {
+            return Err(ApplicationPortError::Failed);
+        }
+        Ok(())
+    }
 }
 
 #[derive(sqlx::FromRow)]
