@@ -37,6 +37,10 @@ pub enum BoundaryError {
     TargetOutsideIsolation,
     #[error("source and target roots must be disjoint")]
     SourceTargetOverlap,
+    #[error("at least one source root is required")]
+    SourceRootsEmpty,
+    #[error("source roots must not overlap")]
+    SourceRootsOverlap,
     #[error("isolation root must not be inside the source root")]
     IsolationInsideSource,
     #[error("source path escapes the read-only source root")]
@@ -52,7 +56,7 @@ pub enum BoundaryError {
 /// Validated source/target boundary for one rehearsal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RehearsalBoundary {
-    source_root: PathBuf,
+    source_roots: Vec<PathBuf>,
     isolation_root: PathBuf,
     target_root: PathBuf,
 }
@@ -65,26 +69,56 @@ impl RehearsalBoundary {
         target_root: impl AsRef<Path>,
         mode: ExecutionMode,
     ) -> Result<Self, BoundaryError> {
+        Self::validate_sources([source_root.as_ref()], isolation_root, target_root, mode)
+    }
+
+    /// Validate multiple source roots, such as a legacy repository and a
+    /// separately configured DATA_ROOT, against one isolated target.
+    pub fn validate_sources<I, P>(
+        source_roots: I,
+        isolation_root: impl AsRef<Path>,
+        target_root: impl AsRef<Path>,
+        mode: ExecutionMode,
+    ) -> Result<Self, BoundaryError>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
         if mode == ExecutionMode::Production {
             return Err(BoundaryError::ProductionMode);
         }
 
-        let source_root = existing_directory(source_root.as_ref(), RootKind::Source)?;
+        let source_roots = source_roots
+            .into_iter()
+            .map(|source| existing_directory(source.as_ref(), RootKind::Source))
+            .collect::<Result<Vec<_>, _>>()?;
+        if source_roots.is_empty() {
+            return Err(BoundaryError::SourceRootsEmpty);
+        }
         let isolation_root = existing_directory(isolation_root.as_ref(), RootKind::Isolation)?;
         let target_root = existing_directory(target_root.as_ref(), RootKind::Target)?;
 
-        if isolation_root.starts_with(&source_root) {
-            return Err(BoundaryError::IsolationInsideSource);
-        }
-        if target_root.starts_with(&source_root) || source_root.starts_with(&target_root) {
-            return Err(BoundaryError::SourceTargetOverlap);
+        for (index, source_root) in source_roots.iter().enumerate() {
+            if isolation_root.starts_with(source_root) {
+                return Err(BoundaryError::IsolationInsideSource);
+            }
+            if target_root.starts_with(source_root) || source_root.starts_with(&target_root) {
+                return Err(BoundaryError::SourceTargetOverlap);
+            }
+            if source_roots
+                .iter()
+                .skip(index + 1)
+                .any(|other| other.starts_with(source_root) || source_root.starts_with(other))
+            {
+                return Err(BoundaryError::SourceRootsOverlap);
+            }
         }
         if !target_root.starts_with(&isolation_root) {
             return Err(BoundaryError::TargetOutsideIsolation);
         }
 
         Ok(Self {
-            source_root,
+            source_roots,
             isolation_root,
             target_root,
         })
@@ -93,7 +127,13 @@ impl RehearsalBoundary {
     /// Absolute, canonical source root.
     #[must_use]
     pub fn source_root(&self) -> &Path {
-        &self.source_root
+        &self.source_roots[0]
+    }
+
+    /// All canonical source roots protected by this boundary.
+    #[must_use]
+    pub fn source_roots(&self) -> &[PathBuf] {
+        &self.source_roots
     }
 
     /// Absolute, canonical isolation root.
@@ -112,8 +152,17 @@ impl RehearsalBoundary {
     #[must_use]
     pub fn read_only_source(&self) -> ReadOnlySource {
         ReadOnlySource {
-            root: self.source_root.clone(),
+            root: self.source_roots[0].clone(),
         }
+    }
+
+    /// Create a read-only source handle for a protected source root.
+    #[must_use]
+    pub fn read_only_source_at(&self, index: usize) -> Option<ReadOnlySource> {
+        self.source_roots
+            .get(index)
+            .cloned()
+            .map(|root| ReadOnlySource { root })
     }
 }
 
@@ -302,6 +351,22 @@ mod tests {
         )
         .expect_err("target must remain isolated");
         assert!(matches!(error, BoundaryError::TargetOutsideIsolation));
+    }
+
+    #[test]
+    fn protects_multiple_disjoint_source_roots() {
+        let fixture = Fixture::new();
+        let secondary = fixture.root.join("data-root");
+        fs::create_dir_all(&secondary).expect("secondary source root");
+        let boundary = RehearsalBoundary::validate_sources(
+            [fixture.source.as_path(), secondary.as_path()],
+            &fixture.isolation,
+            &fixture.target,
+            ExecutionMode::Rehearsal,
+        )
+        .expect("multiple source roots are protected");
+        assert_eq!(boundary.source_roots().len(), 2);
+        assert!(boundary.read_only_source_at(1).is_some());
     }
 
     #[test]

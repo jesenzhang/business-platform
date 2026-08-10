@@ -26,21 +26,27 @@ deliverables). That dirty state is a baseline fact, not a migration change. The
 rehearsal must never clean, checkout, commit, migrate, upload, delete, rename, or
 rewrite anything below this path.
 
-The source database and storage observations were read-only:
+The authoritative local-test configuration is the read-only file
+`F:\Workspace\git_repo\contract_management\backend\.env.local-test`. It sets
+`DATA_ROOT=D:\contract_data_test`; therefore the source database is the derived
+path `$DATA_ROOT/db/contract_management.db`, and the primary physical dataset is
+`$DATA_ROOT/datasets`. The source database and storage observations were
+read-only:
 
 | Source | Observation |
 |---|---|
-| `contract_management.db` | 4 KiB SQLite file with no user tables |
-| `backend/contract_management.db` | SQLite schema at Alembic `0044`; 674 contracts and no contract versions/artifacts |
-| `contract_management1.db` | SQLite schema at Alembic `0044`; 1,364 contracts, 755 versions, 4,459 artifacts, 87 attachments, 300 parse jobs and 300 extraction results |
-| `backend/contract_datasets` | Existing physical source tree; 414 files, about 2.89 GB by read-only enumeration |
-| `backend/contract_data` | Existing auxiliary source tree; 43 files, about 60 KiB by read-only enumeration |
-| `contract_importer/output`, `output` | Existing manifest/import evidence; treated as read-only source material |
-| `downloaded_yongyou_exports` and `backend/downloaded_yongyou_exports` | Existing export inputs; treated as read-only source material |
+| `DATA_ROOT` | `D:\contract_data_test` from `.env.local-test` |
+| `$DATA_ROOT/db/contract_management.db` | 194,637,824-byte SQLite source; Alembic `0057`; 1,492 contracts, 960 versions, 3,687 artifacts, 111 attachments, 835 ingestions, 627 ingestion tasks, 3,418 task files, 612 task results, 505 parse jobs and 505 extraction results |
+| `$DATA_ROOT/datasets` | Primary physical source tree; 12,407 files, about 31.56 GB by read-only enumeration |
+| `$DATA_ROOT/2026年合同1` | Configured external source root; 3,569 files, about 31.72 GB by read-only enumeration |
+| `$DATA_ROOT/2026年合同` | Configured repair-candidate root; 3,241 files, about 31.11 GB; read-only evidence only |
+| C repository manifests/exports | `contract_importer/output`, `output`, and Yongyou exports are secondary source evidence; never written by the analyzer |
 
-The full source database candidate passed SQLite `integrity_check` and
-`foreign_key_check` during observation. The row/object count difference is an
-unresolved data-quality signal, not evidence that missing objects may be guessed.
+The authoritative source database passed SQLite `integrity_check` (`ok`) during
+observation. `foreign_key_check` returned 32 violations; these are a known
+integrity anomaly and must be retained as source evidence and classified rather
+than repaired. The row/object and database/filesystem count differences are
+unresolved data-quality signals, not evidence that missing objects may be guessed.
 Stage 1 must classify every reference using physical SHA-256 and preserve the
 original source record evidence.
 
@@ -85,11 +91,12 @@ All generated target state must be below:
 `F:\Workspace\plan-0009-c-project-migration-rehearsal-20260810`
 
 The target consists only of an isolated SQLite database, isolated LocalStorage
-objects, manifests, quarantine evidence and reports. The safety boundary rejects
-production mode, source/target overlap, isolation roots under the source, and
-targets outside the configured isolation root. Source file handles are read-only
-and cannot create or open a write path. The guard is covered by focused unit
-tests and must be called before inventory or mapping work.
+objects, manifests, quarantine evidence and reports. The safety boundary protects
+both the C repository and the configured `DATA_ROOT`, rejects production mode,
+source/target overlap, isolation roots under any source, and targets outside the
+configured isolation root. Source file handles are read-only and cannot create or
+open a write path. The guard is covered by focused unit tests and must be called
+before inventory or mapping work.
 
 ## Frozen validation rules
 
