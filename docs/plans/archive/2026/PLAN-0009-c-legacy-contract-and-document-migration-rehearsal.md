@@ -1,8 +1,8 @@
 # PLAN-0009：C Legacy Contract & Document Migration Rehearsal
 
 文档 ID：PLAN-0009  
-版本：0.1  
-状态：Active / Rehearsal Only  
+版本：0.2  
+状态：Completed / Rehearsal Closed  
 日期：2026-08-10  
 Owner：Platform Foundation / Document Management / Document Intelligence  
 前置集成：PLAN-0008 `Integrated`，执行基线为真实 main
@@ -124,3 +124,29 @@ source fingerprint、目标边界、清理方式和真实 C 项目盘点见：
   workspace gates 均为完成条件。
 - 文档同步：Stage 0 activation evidence；后续实现、verification report、review
   ledger 与 closeout 必须在同一计划变更中更新。
+
+## 10. Closeout record
+
+PLAN-0009 was completed and archived on 2026-08-10 after all five stages and
+their independent review loops closed:
+
+- Stage 0: PASS; Stage 1: PASS; Stage 2: PASS; Stage 3: PASS; Stage 4: PASS;
+- Stage 5 formal verification report: PASS;
+- final readiness decision:
+  REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED;
+- real sample: 120 contracts; selected Exact=0, Probable=1, Ambiguous=89,
+  Conflict=0, Orphan=29, Missing=0, Rejected=1;
+- target result: 1 manual-review proposal, 119 quarantined, zero formal
+  business facts and zero object writes;
+- final Rust and Architecture Fitness gates: PASS;
+- specialized secret/vulnerability/license/image scanners: NOT RUN because no
+  repository-provided or installed scanner entrypoint was available;
+- PLAN-0006: Proposed / NOT ACTIVE;
+- production migration: not run.
+
+Authoritative closeout report:
+docs/reports/C-LEGACY-MIGRATION-REHEARSAL-VERIFICATION-REPORT.md.
+
+The next separately approved plan may design controlled migration and manual
+reconciliation. It must not infer production authorization from this
+rehearsal, and must retain the quarantine/manual-review boundary.

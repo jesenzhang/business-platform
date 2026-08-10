@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 5 — C legacy migration rehearsal verification report
 
-Status: **Stage 5 evidence assembled — independent Reviewer pending**
+Status: **Stage 5 PASS — independent Reviewer accepted**
 Recorded: 2026-08-10 (Asia/Shanghai)
 Scope: real C-project read-only migration rehearsal only
 Base SHA: `5de6a995b874c93bdc97486391aed8c2d5920462` (`5de6a99`)
@@ -16,8 +16,8 @@ provide real, isolated evidence for inventory, deterministic mapping, dual
 replay, integrity handling, interrupted recovery, and partial-target rejection.
 The real selected sample contains no `Exact` record, so no formal target fact
 was materialized. One `Probable` record requires human review and 119 records
-are quarantined. PLAN-0009 remains **Active / Rehearsal Only** and PLAN-0006
-remains **Proposed / NOT ACTIVE**.
+are quarantined. PLAN-0009 is **Completed / Rehearsal Closed** and archived;
+PLAN-0006 remains **Proposed / NOT ACTIVE**.
 
 No command in the Stage 0–4 evidence wrote the C repository, the C source
 database, `D:\contract_data_test`, or a production system. All generated target
@@ -416,7 +416,7 @@ real artifacts:
 | Final workspace gates after Stage 4/Stage 5 candidate | **PASS** — fmt check; workspace check; workspace Clippy with -D warnings; workspace tests 150 passed, 34 ignored |
 | Architecture fitness check | **PASS** — Cargo metadata, OpenAPI contract, and architecture fitness |
 | Secret/vulnerability/license/image scans | **NOT RUN** — no repository-provided or installed cargo-audit/cargo-deny/gitleaks/trivy/syft/grype/osv-scanner entrypoint was available |
-| Stage 5 independent Reviewer | **PENDING** |
+| Stage 5 independent Reviewer | **PASS** — Aristotle, exact range 5de6a99..a8004e1 |
 | Production migration authorization | **NOT GRANTED** |
 
 The final Rust gates were rerun against this Stage 5 candidate with the
@@ -432,16 +432,16 @@ Review ledger:
 - Stage 5 base is `5de6a995b874c93bdc97486391aed8c2d5920462`.
 - The final candidate before independent review is
   eb9c25be27b905ad4913f37f4c88fd393d18c19d.
-- Stage 5 independent Reviewer remains **PENDING** and must review the exact
-  candidate range.
+- Stage 5 independent Reviewer: Aristotle (gpt-5.4-mini, high), exact range
+  5de6a99..a8004e1, **PASS**. The Reviewer reconciled the report to all real
+  Stage 0–4 artifacts, final gates, readiness decision, and scan limitations.
 - No source C file, `D:\contract_data_test` file, production system, or
   unrelated repository area is owned by this report.
 
 ## 12. Completion limitations
 
-This report is complete only as a Stage 5 rehearsal verification record. It
-does not close the final workspace or architecture gates, does not replace
-the independent Stage 5 Reviewer, does not prove source-side immutability by
+This report is complete as the Stage 5 rehearsal verification record. It does
+not replace the final independent review, does not prove source-side immutability by
 cryptographic pre/post snapshot, does not prove production-scale throughput,
 and does not authorize production migration. The zero-Exact/zero-conflict/
 zero-missing source distribution is reported as observed; it is not a reason
