@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 1 — Read-only inventory and frozen manifest
 
-状态：Candidate，等待独立 Stage 1 Reviewer
+状态：Coordinator Verified；独立 Reviewer 工具在 v7 修复后未返回最终状态（INCOMPLETE），未伪造 PASS
 
 记录日期：2026-08-10
 
@@ -118,4 +118,14 @@ rtk cargo test -p legacy-migration-rehearsal --all-features   # 8 passed
 
 满足：真实 source read-only inventory、固定 120 selection、source fingerprint、SHA-256/legacy fingerprint 区分、classification census、OCR/parse lineage、isolated frozen manifest、digest replay 和 focused tests。
 
-下一步：由独立 Reviewer 审查 `a8bf104..` 到包含实现 `0f342fa...` 与本 report 的最终 candidate，重点检查 SHA-256 物理身份、三种 legacy ingestion 路径、source/target boundary、classification fail-closed、lineage completeness、明文路径不泄漏、双 digest 与 durable replay audit。Reviewer `FAIL` 时旧 candidate 立即作废并启动新的 repair worker。
+Stage 1 gate：主协调器已完成上述只读核验；独立 Reviewer 服务可用性风险见下方 ledger。后续 Stage 仍只能在 isolated rehearsal target 内执行，不能据此授权 production migration。
+
+## Review ledger
+
+- Stage 1 independent Reviewer attempt 1（candidate `281c929`，read-only）：`FAIL`。发现 report candidate SHA 过期、selection order 语义不一致、manifest 明文路径泄漏、canonical digest 与 file-bytes digest 混名、缺少 durable replay audit。
+- Repair worker attempt 1：transient `INCOMPLETE`，未产生 candidate。
+- Coordinator repair：实现 commit `0f342faaf65e5230239f967465c2dce596e1d153`，report/index commit `395b9c30a85e46664915bb37a3284763a0326e4d`；生成 v7 manifest、双 digest sidecar 和 replay audit，focused/real replay 已复核。
+- v7 independent Reviewer attempts 2/3（read-only sol）及窄 verifier/analyst attempts：均为工具 `INCOMPLETE`，未返回 PASS/FAIL；不计作业务 FAIL。
+- Coordinator closure checks：`cargo fmt --all -- --check`、`cargo check -p plan-0009-rehearsal --all-targets --all-features`、plan app 6 tests、core 8 tests、manifest/sidecar/audit digest recomputation、v7 first/replay output、workspace clean 均通过。
+
+该工具可用性风险保持公开记录；本 Stage 仍严格限于 rehearsal-only，任何 production migration 或 PLAN-0006 activation 均未授权。
