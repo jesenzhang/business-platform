@@ -20,14 +20,16 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{FromRow, SqlitePool};
 use thiserror::Error;
 
-const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v6";
+const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v7";
 const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024;
 const ENV_DATA_ROOT: &str = "DATA_ROOT";
 const ENV_EXTERNAL_ROOT: &str = "CONTRACT_EXTERNAL_ROOT";
 const ENV_REPAIR_ROOTS: &str = "CONTRACT_REPAIR_CANDIDATE_ROOTS";
 const DATABASE_RELATIVE_PATH: &str = "db/contract_management.db";
 const MANIFEST_FILE_NAME: &str = "manifest-v1.json";
-const DIGEST_FILE_NAME: &str = "manifest-v1.sha256";
+const DIGEST_FILE_NAME: &str = "manifest-v1-digests.json";
+const AUDIT_FILE_NAME: &str = "replay-audit-v1.json";
+const AUDIT_SCHEMA: &str = "plan-0009.stage-1.replay-audit.v1";
 
 const INVENTORY_TABLES: &[(&str, &str)] = &[
     ("contracts", "SELECT COUNT(*) FROM contracts"),
@@ -204,7 +206,8 @@ impl InventoryConfig {
 pub struct InventorySummary {
     pub selected_contracts: usize,
     pub classification_counts: Vec<ClassificationCount>,
-    pub manifest_sha256: String,
+    pub canonical_manifest_sha256: String,
+    pub file_bytes_sha256: String,
     pub replayed: bool,
 }
 
@@ -224,7 +227,33 @@ struct FrozenManifest {
     classification_counts: Vec<ClassificationCount>,
     source_classification_counts: Vec<ClassificationCount>,
     records: Vec<InventoryRecord>,
-    manifest_sha256: String,
+    canonical_manifest_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ManifestDigestSidecar {
+    manifest_schema: String,
+    canonical_manifest_sha256: String,
+    file_bytes_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ReplayAudit {
+    audit_schema: String,
+    canonical_manifest_sha256: String,
+    file_bytes_sha256: String,
+    selected_contracts: usize,
+    classification_counts: Vec<ClassificationCount>,
+    first_run: AuditRun,
+    replay_count: u64,
+    last_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AuditRun {
+    status: String,
+    selected_contracts: usize,
+    classification_counts: Vec<ClassificationCount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -294,7 +323,9 @@ struct LineageCount {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EvidenceReference {
     root: String,
-    relative_path: String,
+    relative_path_sha256: String,
+    path_depth: usize,
+    extension: Option<String>,
     source_kind: String,
     size_bytes: u64,
     expected_sha256: Option<String>,
@@ -491,19 +522,27 @@ pub async fn run_inventory(config: &InventoryConfig) -> Result<InventorySummary,
     let result = inventory_from_source(&pool, &env_file, &database_path, &scanned_roots).await;
     pool.close().await;
     let mut manifest = result?;
-    let digest = manifest_digest(&manifest)?;
-    manifest.manifest_sha256 = digest.clone();
-    let (replayed, _) = write_or_verify_manifest(&config.target_root, &manifest)?;
+    let canonical_digest = manifest_digest(&manifest)?;
+    manifest.canonical_manifest_sha256 = canonical_digest.clone();
+    let (replayed, file_bytes_digest) = write_or_verify_manifest(&config.target_root, &manifest)?;
+    write_or_verify_audit(
+        &config.target_root,
+        &manifest,
+        &canonical_digest,
+        &file_bytes_digest,
+        replayed,
+    )?;
     Ok(InventorySummary {
         selected_contracts: manifest.records.len(),
         classification_counts: manifest.classification_counts,
-        manifest_sha256: digest,
+        canonical_manifest_sha256: canonical_digest,
+        file_bytes_sha256: file_bytes_digest,
         replayed,
     })
 }
 
 fn validate_target_shape(config: &InventoryConfig) -> Result<(), InventoryError> {
-    if config.target_root != config.isolation_root.join("stage-1-inventory-v6") {
+    if config.target_root != config.isolation_root.join("stage-1-inventory-v7") {
         return Err(InventoryError::InvalidConfiguration);
     }
     if !config.isolation_root.is_dir() || !config.target_root.is_dir() {
@@ -839,7 +878,7 @@ async fn inventory_from_source(
     let source_classification_counts =
         classification_counts(&all_records.values().cloned().collect::<Vec<_>>());
     let selected_ids = select_representative_contract_ids(&all_records)?;
-    let mut records = selected_ids
+    let records = selected_ids
         .iter()
         .enumerate()
         .map(|(index, contract_id)| {
@@ -851,18 +890,17 @@ async fn inventory_from_source(
             Ok(record)
         })
         .collect::<Result<Vec<_>, InventoryError>>()?;
-    records.sort_by_key(|record| record.source_contract_id);
     let classification_counts = classification_counts(&records);
     Ok(FrozenManifest {
         manifest_schema: MANIFEST_SCHEMA.to_string(),
-        selection_rule: "classification and lineage coverage first, then positive source contract flag, then contracts.id ASC".to_string(),
+        selection_rule: "classification and lineage coverage first in fixed order, then positive source contract flag, then contracts.id ASC; manifest order preserves selection rank".to_string(),
         selection_limit: REHEARSAL_SELECTION_LIMIT,
         source,
         physical_roots: physical_fingerprints,
         classification_counts,
         source_classification_counts,
         records,
-        manifest_sha256: String::new(),
+        canonical_manifest_sha256: String::new(),
     })
 }
 
@@ -1285,6 +1323,8 @@ fn resolve_record(
     let mut evidence = matches
         .into_values()
         .map(|resolved| {
+            let relative_path = resolved.observation.relative_path;
+            let (path_sha256, path_depth, extension) = evidence_path_metadata(&relative_path);
             let observed_sha256 =
                 if match_count == 1 && resolved.observation.size_bytes <= MAX_HASH_BYTES {
                     Some(sha256_file(&resolved.observation.absolute_path)?)
@@ -1293,7 +1333,9 @@ fn resolve_record(
                 };
             Ok(EvidenceReference {
                 root: resolved.observation.root,
-                relative_path: resolved.observation.relative_path,
+                relative_path_sha256: path_sha256,
+                path_depth,
+                extension,
                 source_kind: if resolved.source_kinds.len() == 1 {
                     resolved
                         .source_kinds
@@ -1312,7 +1354,7 @@ fn resolve_record(
     evidence.sort_by(|left, right| {
         left.root
             .cmp(&right.root)
-            .then_with(|| left.relative_path.cmp(&right.relative_path))
+            .then_with(|| left.relative_path_sha256.cmp(&right.relative_path_sha256))
     });
     let source_tables = source_tables_for_lineage(&lineage_count);
     let artifact_kinds = lineage.artifact_kinds.into_iter().collect();
@@ -1356,6 +1398,16 @@ fn normalize_candidate(value: &str) -> Result<Option<String>, ()> {
     Ok(Some(parts.join("/")))
 }
 
+fn evidence_path_metadata(relative_path: &str) -> (String, usize, Option<String>) {
+    let path = Path::new(relative_path);
+    (
+        hash_text(relative_path),
+        path.components().count(),
+        path.extension()
+            .map(|value| value.to_string_lossy().to_ascii_lowercase()),
+    )
+}
+
 fn source_tables_for_lineage(lineage: &LineageCount) -> Vec<String> {
     let mut tables = vec!["contracts".to_string()];
     if lineage.versions > 0 {
@@ -1395,12 +1447,13 @@ fn select_representative_contract_ids(
         return Err(SelectionError::TooFewContracts);
     }
     let mut selected = BTreeSet::new();
+    let mut order = Vec::new();
     for classification in InventoryClassification::ALL {
         if let Some(record) = records
             .values()
             .find(|record| record.classification == classification.as_str())
         {
-            selected.insert(record.source_contract_id);
+            add_selected(&mut selected, &mut order, record.source_contract_id);
         }
     }
     let feature_matches: [fn(&InventoryRecord) -> bool; 8] = [
@@ -1420,25 +1473,31 @@ fn select_representative_contract_ids(
     ];
     for predicate in feature_matches {
         if let Some(record) = records.values().find(|record| predicate(record)) {
-            selected.insert(record.source_contract_id);
+            add_selected(&mut selected, &mut order, record.source_contract_id);
         }
     }
     for record in records
         .values()
         .filter(|record| record.positive_source_contract_flag)
     {
-        if selected.len() == REHEARSAL_SELECTION_LIMIT {
+        if order.len() == REHEARSAL_SELECTION_LIMIT {
             break;
         }
-        selected.insert(record.source_contract_id);
+        add_selected(&mut selected, &mut order, record.source_contract_id);
     }
     for source_contract_id in records.keys() {
-        if selected.len() == REHEARSAL_SELECTION_LIMIT {
+        if order.len() == REHEARSAL_SELECTION_LIMIT {
             break;
         }
-        selected.insert(*source_contract_id);
+        add_selected(&mut selected, &mut order, *source_contract_id);
     }
-    Ok(selected.into_iter().collect())
+    Ok(order)
+}
+
+fn add_selected(selected: &mut BTreeSet<i64>, order: &mut Vec<i64>, source_contract_id: i64) {
+    if selected.insert(source_contract_id) {
+        order.push(source_contract_id);
+    }
 }
 
 fn sha256_file(path: &Path) -> Result<String, InventoryError> {
@@ -1460,33 +1519,41 @@ fn classification_counts(records: &[InventoryRecord]) -> Vec<ClassificationCount
 
 fn manifest_digest(manifest: &FrozenManifest) -> Result<String, InventoryError> {
     let mut unsigned = manifest.clone();
-    unsigned.manifest_sha256.clear();
+    unsigned.canonical_manifest_sha256.clear();
     let bytes = serde_json::to_vec(&unsigned).map_err(InventoryError::Serialization)?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    Ok(sha256_bytes(&bytes))
 }
 
 fn write_or_verify_manifest(
     target_root: &Path,
     manifest: &FrozenManifest,
-) -> Result<(bool, PathBuf), InventoryError> {
+) -> Result<(bool, String), InventoryError> {
     let manifest_path = target_root.join(MANIFEST_FILE_NAME);
     let digest_path = target_root.join(DIGEST_FILE_NAME);
     let bytes = serde_json::to_vec_pretty(manifest).map_err(InventoryError::Serialization)?;
+    let generated_file_digest = sha256_bytes(&bytes);
     if manifest_path.exists() {
         let existing_bytes = fs::read(&manifest_path).map_err(|_| InventoryError::TargetWrite)?;
         let existing: FrozenManifest =
             serde_json::from_slice(&existing_bytes).map_err(InventoryError::Serialization)?;
         let existing_digest = manifest_digest(&existing)?;
-        if existing.manifest_sha256 != existing_digest {
+        if existing.canonical_manifest_sha256 != existing_digest {
             return Err(InventoryError::ManifestDigestMismatch);
         }
-        if existing.manifest_sha256 != manifest.manifest_sha256 {
+        if existing.canonical_manifest_sha256 != manifest.canonical_manifest_sha256 {
             return Err(InventoryError::ManifestConflict);
         }
-        if !digest_path.exists() {
-            return Err(InventoryError::ManifestConflict);
+        let sidecar_bytes = fs::read(&digest_path).map_err(|_| InventoryError::ManifestConflict)?;
+        let sidecar: ManifestDigestSidecar =
+            serde_json::from_slice(&sidecar_bytes).map_err(InventoryError::Serialization)?;
+        let existing_file_digest = sha256_bytes(&existing_bytes);
+        if sidecar.manifest_schema != MANIFEST_SCHEMA
+            || sidecar.canonical_manifest_sha256 != existing.canonical_manifest_sha256
+            || sidecar.file_bytes_sha256 != existing_file_digest
+        {
+            return Err(InventoryError::ManifestDigestMismatch);
         }
-        return Ok((true, manifest_path));
+        return Ok((true, existing_file_digest));
     }
     let mut file = OpenOptions::new()
         .write(true)
@@ -1496,26 +1563,112 @@ fn write_or_verify_manifest(
     file.write_all(&bytes)
         .map_err(|_| InventoryError::TargetWrite)?;
     file.flush().map_err(|_| InventoryError::TargetWrite)?;
+    let sidecar = ManifestDigestSidecar {
+        manifest_schema: MANIFEST_SCHEMA.to_string(),
+        canonical_manifest_sha256: manifest.canonical_manifest_sha256.clone(),
+        file_bytes_sha256: generated_file_digest.clone(),
+    };
+    let sidecar_bytes =
+        serde_json::to_vec_pretty(&sidecar).map_err(InventoryError::Serialization)?;
     let mut digest_file = OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&digest_path)
         .map_err(|_| InventoryError::TargetWrite)?;
     digest_file
-        .write_all(manifest.manifest_sha256.as_bytes())
-        .map_err(|_| InventoryError::TargetWrite)?;
-    digest_file
-        .write_all(b"\n")
+        .write_all(&sidecar_bytes)
         .map_err(|_| InventoryError::TargetWrite)?;
     digest_file
         .flush()
         .map_err(|_| InventoryError::TargetWrite)?;
-    Ok((false, manifest_path))
+    Ok((false, generated_file_digest))
+}
+
+fn write_or_verify_audit(
+    target_root: &Path,
+    manifest: &FrozenManifest,
+    canonical_digest: &str,
+    file_bytes_digest: &str,
+    replayed: bool,
+) -> Result<(), InventoryError> {
+    let audit_path = target_root.join(AUDIT_FILE_NAME);
+    let counts = manifest.classification_counts.clone();
+    let selected_contracts = manifest.records.len();
+    if audit_path.exists() {
+        if !replayed {
+            return Err(InventoryError::ManifestConflict);
+        }
+        let bytes = fs::read(&audit_path).map_err(|_| InventoryError::TargetWrite)?;
+        let mut audit: ReplayAudit =
+            serde_json::from_slice(&bytes).map_err(InventoryError::Serialization)?;
+        if audit.audit_schema != AUDIT_SCHEMA
+            || audit.canonical_manifest_sha256 != canonical_digest
+            || audit.file_bytes_sha256 != file_bytes_digest
+            || audit.selected_contracts != selected_contracts
+            || audit.classification_counts != counts
+            || audit.first_run.status != "frozen"
+            || audit.first_run.selected_contracts != selected_contracts
+            || audit.first_run.classification_counts != counts
+        {
+            return Err(InventoryError::ManifestDigestMismatch);
+        }
+        audit.replay_count = audit.replay_count.saturating_add(1);
+        audit.last_status = "replayed".to_string();
+        write_audit_file(&audit_path, &audit, false)
+    } else {
+        if replayed {
+            return Err(InventoryError::ManifestConflict);
+        }
+        let audit = ReplayAudit {
+            audit_schema: AUDIT_SCHEMA.to_string(),
+            canonical_manifest_sha256: canonical_digest.to_string(),
+            file_bytes_sha256: file_bytes_digest.to_string(),
+            selected_contracts,
+            classification_counts: counts.clone(),
+            first_run: AuditRun {
+                status: "frozen".to_string(),
+                selected_contracts,
+                classification_counts: counts,
+            },
+            replay_count: 0,
+            last_status: "frozen".to_string(),
+        };
+        write_audit_file(&audit_path, &audit, true)
+    }
+}
+
+fn write_audit_file(
+    path: &Path,
+    audit: &ReplayAudit,
+    create_new: bool,
+) -> Result<(), InventoryError> {
+    let bytes = serde_json::to_vec_pretty(audit).map_err(InventoryError::Serialization)?;
+    let mut options = OpenOptions::new();
+    options.write(true);
+    if create_new {
+        options.create_new(true);
+    } else {
+        options.truncate(true);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|_| InventoryError::TargetWrite)?;
+    file.write_all(&bytes)
+        .map_err(|_| InventoryError::TargetWrite)?;
+    file.flush().map_err(|_| InventoryError::TargetWrite)
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{classification_counts, normalize_candidate, parse_env};
+    use super::{
+        classification_counts, evidence_path_metadata, manifest_digest, normalize_candidate,
+        parse_env, write_or_verify_audit, write_or_verify_manifest, DatabaseFingerprint,
+        FrozenManifest, SourceFingerprint, AUDIT_FILE_NAME, MANIFEST_SCHEMA,
+    };
     use legacy_migration_rehearsal::{InventoryClassification, REHEARSAL_SELECTION_LIMIT};
 
     #[test]
@@ -1542,6 +1695,79 @@ mod tests {
         assert_eq!(counts.len(), InventoryClassification::ALL.len());
         assert_eq!(counts[0].classification, "Exact");
         assert_eq!(REHEARSAL_SELECTION_LIMIT, 120);
+    }
+
+    #[test]
+    fn evidence_path_metadata_does_not_return_raw_path() {
+        let (digest, depth, extension) = evidence_path_metadata("root/Company Name/contract.doc");
+        assert_eq!(digest.len(), 64);
+        assert_eq!(depth, 3);
+        assert_eq!(extension.as_deref(), Some("doc"));
+        assert!(!digest.contains("Company"));
+    }
+
+    #[test]
+    fn manifest_and_replay_audit_fail_closed_on_corruption() {
+        let target =
+            std::env::temp_dir().join(format!("plan-0009-stage1-audit-{}", std::process::id()));
+        std::fs::create_dir_all(&target).expect("create audit target");
+        let mut manifest = FrozenManifest {
+            manifest_schema: MANIFEST_SCHEMA.to_string(),
+            selection_rule: "test".to_string(),
+            selection_limit: 120,
+            source: SourceFingerprint {
+                env_file_sha256: "0".repeat(64),
+                database: DatabaseFingerprint {
+                    bytes: 0,
+                    sha256: "0".repeat(64),
+                    alembic_revision: "test".to_string(),
+                    journal_mode: "wal".to_string(),
+                    integrity_check: "ok".to_string(),
+                    foreign_key_violation_count: 0,
+                },
+                table_counts: Vec::new(),
+            },
+            physical_roots: Vec::new(),
+            classification_counts: Vec::new(),
+            source_classification_counts: Vec::new(),
+            records: Vec::new(),
+            canonical_manifest_sha256: String::new(),
+        };
+        manifest.canonical_manifest_sha256 = manifest_digest(&manifest).expect("digest");
+        let (replayed, file_digest) =
+            write_or_verify_manifest(&target, &manifest).expect("freeze manifest");
+        assert!(!replayed);
+        write_or_verify_audit(
+            &target,
+            &manifest,
+            &manifest.canonical_manifest_sha256,
+            &file_digest,
+            false,
+        )
+        .expect("freeze audit");
+        let (replayed, replay_file_digest) =
+            write_or_verify_manifest(&target, &manifest).expect("replay manifest");
+        assert!(replayed);
+        assert_eq!(file_digest, replay_file_digest);
+        write_or_verify_audit(
+            &target,
+            &manifest,
+            &manifest.canonical_manifest_sha256,
+            &replay_file_digest,
+            true,
+        )
+        .expect("replay audit");
+        let audit_path = target.join(AUDIT_FILE_NAME);
+        std::fs::write(&audit_path, b"corrupt").expect("corrupt test audit");
+        assert!(write_or_verify_audit(
+            &target,
+            &manifest,
+            &manifest.canonical_manifest_sha256,
+            &replay_file_digest,
+            true,
+        )
+        .is_err());
+        std::fs::remove_dir_all(target).expect("remove audit target");
     }
 
     #[test]

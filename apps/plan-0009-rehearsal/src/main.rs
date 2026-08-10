@@ -33,7 +33,7 @@ async fn run() -> Result<(), &'static str> {
     }
 
     let isolation_root = PathBuf::from(ISOLATION_ROOT);
-    let target_root = isolation_root.join("stage-1-inventory-v6");
+    let target_root = isolation_root.join("stage-1-inventory-v7");
     std::fs::create_dir_all(&target_root).map_err(|_| "target_write_failed")?;
     let config =
         InventoryConfig::from_env_file(LEGACY_ROOT, ENV_FILE, &isolation_root, &target_root)
@@ -46,7 +46,7 @@ async fn run() -> Result<(), &'static str> {
         .collect::<Vec<_>>()
         .join(",");
     println!(
-        "stage=1 status={} selected={} replayed={} manifest_sha256={} classifications={counts}",
+        "stage=1 status={} selected={} replayed={} canonical_manifest_sha256={} file_bytes_sha256={} classifications={counts}",
         if summary.replayed {
             "replayed"
         } else {
@@ -54,7 +54,8 @@ async fn run() -> Result<(), &'static str> {
         },
         summary.selected_contracts,
         summary.replayed,
-        summary.manifest_sha256,
+        summary.canonical_manifest_sha256,
+        summary.file_bytes_sha256,
     );
     Ok(())
 }
