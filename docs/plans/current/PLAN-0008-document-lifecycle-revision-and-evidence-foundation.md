@@ -127,6 +127,9 @@ SQLite 使用显式 single-writer/`BEGIN IMMEDIATE`、单进程限制和连接�
 
 ## 10. Local Candidate evidence
 
+- GitHub Actions real PostgreSQL + MinIO contract and multi-process E2E：run `31350822824` at commit `414c88a4a77e0594358c98f95c70651362f37c3f` PASS；Architecture Fitness、Format、Check、Clippy、Unit、Frontend、Playwright、CLI/MCP contracts 同 run PASS。详细证据见 `docs/reports/PLAN-0008-CI-EVIDENCE-AND-C-MIGRATION-REHEARSAL.md`。
+- 本机 PostgreSQL/MinIO 仍保持 NOT RUN；本地安装的工具不作为验收证据。
+
 - `cargo fmt --all -- --check`：PASS。
 - `cargo check --workspace --all-targets --all-features`：PASS（仓库既有/环境 warning，无 error）。
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`：PASS（0 error）。

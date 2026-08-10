@@ -3,6 +3,15 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use business_api::auth::AuthMiddlewareConfig;
+use business_api::config::{
+    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
+    ServerConfig, StorageConfig,
+};
+use business_api::routes;
+use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe, StorageServices};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use document::application::{CreateDocumentCommand, CreateDocumentMetadata};
@@ -18,10 +27,13 @@ use document_processing::{
 };
 use document_processing_postgres::PostgresProcessingStore;
 use futures_util::stream;
+use http_body_util::BodyExt;
 use object_storage::{ObjectKey, ObjectStorageClient, S3Client};
+use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use sha2::{Digest, Sha256};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 
 fn env_or(name: &str, fallback: &str) -> String {
@@ -76,6 +88,219 @@ fn storage() -> S3Client {
         &env_or("MINIO_BUCKET", "contract-test-bucket"),
         "us-east-1",
     )
+}
+
+fn upload_router(
+    pool: PgPool,
+    objects: Arc<dyn ObjectStorageClient>,
+    tenant: Uuid,
+    user: Uuid,
+) -> axum::Router {
+    let config = BusinessApiConfig {
+        env: RuntimeEnvironment::Development,
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 3000,
+            request_timeout_secs: 30,
+            cors_origins: Vec::new(),
+            body_limit_bytes: 1024 * 1024,
+        },
+        database: DatabaseConfig {
+            backend: DatabaseBackend::Postgres,
+            url: SecretUrl::parse("postgres://localhost/test").expect("test URL must parse"),
+            max_connections: 20,
+            min_connections: 0,
+            acquire_timeout_secs: 2,
+        },
+        observability: ObservabilityConfig {
+            service_name: "plan-0008-postgres-minio-upload".to_string(),
+            otlp_endpoint: None,
+            log_level: "info".to_string(),
+        },
+        storage: StorageConfig::default(),
+        auth: AuthConfig {
+            issuer_url: String::new(),
+            audience: None,
+            dev_secret: Some(Secret::new("local-pg-e2e-only".to_string())),
+            dev_auth_enabled: true,
+            dev_permissions: Default::default(),
+            dev_tenant_id: Some(tenant),
+            dev_user_id: Some(user),
+            dev_subject: Some("plan-0008-upload-test".to_string()),
+            dev_roles: Default::default(),
+        },
+    };
+    let document_store = Arc::new(PostgresCreateDocumentUnitOfWork::new(pool.clone()));
+    let state = Arc::new(AppState {
+        documents: DocumentServices {
+            create: Arc::new(CreateDocumentMetadata::new(document_store)),
+            detail: Arc::new(document_postgres::PostgresDocumentDetailQuery::new(
+                pool.clone(),
+            )),
+            list: Arc::new(document_postgres::PostgresDocumentListQuery::new(
+                pool.clone(),
+            )),
+        },
+        processing: None,
+        governance: None,
+        readiness: Arc::new(PostgresReadinessProbe::new(pool)),
+        storage: Some(StorageServices { objects }),
+    });
+    routes::create_router(
+        state,
+        AuthMiddlewareConfig {
+            dev_auth_enabled: true,
+            dev_secret: Some("local-pg-e2e-only".to_string()),
+            dev_permissions: Default::default(),
+            dev_tenant_id: Some(tenant),
+            dev_user_id: Some(user),
+            dev_subject: Some("plan-0008-upload-test".to_string()),
+            dev_roles: Default::default(),
+        },
+        &config.server,
+    )
+}
+
+fn multipart_upload_request(
+    idempotency_key: &str,
+    tenant: Uuid,
+    user: Uuid,
+    content: &[u8],
+) -> Request<Body> {
+    let boundary = "plan-0008-upload-boundary";
+    let mut body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"plan-0008.txt\"\r\nContent-Type: text/plain\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(content);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    Request::builder()
+        .method("POST")
+        .uri("/api/v1/documents/upload")
+        .header("authorization", "Bearer local-pg-e2e-only")
+        .header("x-tenant-id", tenant.to_string())
+        .header("x-user-id", user.to_string())
+        .header("x-request-id", "plan-0008-upload-request")
+        .header("idempotency-key", idempotency_key)
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(Body::from(body))
+        .expect("multipart upload request must build")
+}
+
+async fn response_json(response: axum::response::Response) -> serde_json::Value {
+    serde_json::from_slice(
+        &response
+            .into_body()
+            .collect()
+            .await
+            .expect("response body must collect")
+            .to_bytes(),
+    )
+    .expect("response must be JSON")
+}
+
+#[tokio::test]
+#[ignore = "requires real PostgreSQL, PLAN-0008 migrations, and MinIO"]
+async fn plan_0008_postgres_minio_multipart_upload_is_idempotent() {
+    let pool = pool().await;
+    let storage: Arc<dyn ObjectStorageClient> = Arc::new(storage());
+    let tenant = Uuid::now_v7();
+    let user = Uuid::now_v7();
+    let idempotency_key = format!("plan-0008-multipart-upload-{tenant}");
+    let content = b"PLAN-0008 real multipart upload\n";
+    let router = upload_router(pool.clone(), Arc::clone(&storage), tenant, user);
+
+    let created = router
+        .clone()
+        .oneshot(multipart_upload_request(
+            &idempotency_key,
+            tenant,
+            user,
+            content,
+        ))
+        .await
+        .expect("multipart upload must respond");
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let created_json = response_json(created).await;
+    let document_id = Uuid::parse_str(
+        created_json["data"]["id"]
+            .as_str()
+            .expect("created document id"),
+    )
+    .expect("created document id must be UUID");
+    let revision_id = Uuid::parse_str(
+        created_json["data"]["revision_id"]
+            .as_str()
+            .expect("created revision id"),
+    )
+    .expect("created revision id must be UUID");
+
+    let replayed = router
+        .oneshot(multipart_upload_request(
+            &idempotency_key,
+            tenant,
+            user,
+            content,
+        ))
+        .await
+        .expect("multipart replay must respond");
+    assert_eq!(replayed.status(), StatusCode::OK);
+    let replayed_json = response_json(replayed).await;
+    assert_eq!(replayed_json["data"]["id"], created_json["data"]["id"]);
+    assert_eq!(
+        replayed_json["data"]["revision_id"],
+        created_json["data"]["revision_id"]
+    );
+
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM documents WHERE tenant_id = $1 AND id = $2), (SELECT COUNT(*) FROM document_revisions WHERE tenant_id = $1 AND document_id = $2)",
+    )
+    .bind(tenant)
+    .bind(document_id)
+    .fetch_one(&pool)
+    .await
+    .expect("upload counts must be queryable");
+    assert_eq!(counts, (1, 1));
+
+    let expected_sha256 = format!("{:x}", Sha256::digest(content));
+    let source_object_ref: String = sqlx::query_scalar(
+        "SELECT source_object_ref FROM document_revisions WHERE tenant_id = $1 AND id = $2",
+    )
+    .bind(tenant)
+    .bind(revision_id)
+    .fetch_one(&pool)
+    .await
+    .expect("uploaded revision must be queryable");
+    let object_key = ObjectKey::new(source_object_ref).expect("uploaded object key");
+    let metadata: (String, i64, String, String) = sqlx::query_as(
+        "SELECT sha256, size_bytes, content_type, source_object_ref FROM document_revisions WHERE tenant_id = $1 AND id = $2",
+    )
+    .bind(tenant)
+    .bind(revision_id)
+    .fetch_one(&pool)
+    .await
+    .expect("uploaded metadata must be queryable");
+    assert_eq!(metadata.0, expected_sha256);
+    assert_eq!(metadata.1, content.len() as i64);
+    assert_eq!(metadata.2, "text/plain");
+    assert_eq!(metadata.3, object_key.as_str());
+
+    let head = storage
+        .head(&object_key)
+        .await
+        .expect("uploaded object head");
+    assert_eq!(head.content_length, content.len() as u64);
+    assert_eq!(head.content_type.as_deref(), Some("text/plain"));
+    assert_eq!(head.metadata.get("sha256"), Some(&expected_sha256));
+    let fetched = storage
+        .get_object(&object_key)
+        .await
+        .expect("uploaded object");
+    assert_eq!(fetched.as_ref(), content);
+    storage.delete(&object_key).await.expect("upload cleanup");
 }
 
 #[tokio::test]
