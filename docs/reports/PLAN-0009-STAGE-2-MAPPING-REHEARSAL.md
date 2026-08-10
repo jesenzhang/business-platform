@@ -2,7 +2,7 @@
 
 状态：Coordinator Verified；独立 Reviewer attempt 1 = FAIL；repair candidate pending independent re-review  
 日期：2026-08-10  
-原始实现候选：`dc4c492`；repair candidates：`4a6ef75`、`8c9967f`  
+原始实现候选：`dc4c492`；repair candidates：`4a6ef75`、`8c9967f`、`8255813`  
 范围：Stage 1 frozen manifest → isolated target only；不执行 production migration，不激活 PLAN-0006
 
 ## 1. 结论
@@ -71,6 +71,11 @@ required.
 Repair 2 also routes the isolated Document SQLite adapter through deterministic
 audit/outbox event identities and timestamps, so a clean Exact run has no
 wall-clock event drift outside the six mapped entities.
+
+Repair 3 removes the materialized-row early return. Replays now verify the
+object bytes, Document, DocumentRevision, DocumentLink, ProcessingRun,
+ProcessingArtifact, Evidence, and deterministic audit/outbox rows field by
+field, failing closed on any missing or divergent row.
 
 ## 4. 真实运行证据
 
@@ -156,6 +161,9 @@ fabricated success claim.
 - Coordinator repair candidate 2: `8c9967f`; deterministic audit/outbox
   behavior is covered by focused compilation/tests. The final independent
   re-review must use the post-report candidate HEAD.
+- Coordinator repair candidate 3: `8255813`; materialized Exact rows now have
+  a complete read-only equivalence check instead of an early return. Focused
+  tests pass; independent re-review is required again.
 
 ## 7. 进入 Stage 3 的条件
 
