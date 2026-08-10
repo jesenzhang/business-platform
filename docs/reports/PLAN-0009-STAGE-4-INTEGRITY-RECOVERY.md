@@ -144,7 +144,7 @@ snapshots.
 - Stage 4 Luna implementation sessions were interrupted before producing a
   committed candidate; the coordinator completed and verified the bounded
   module and report from the preserved Stage 4 working-tree state.
-- Coordinator candidate: pending commit.
+- Coordinator candidate: 005024d.
 - Independent Reviewer: pending. Stage 4 remains open until a new Reviewer
   directly verifies the audit artifact, clean replay, interrupted recovery,
   partial-target rejection, matrix derivation, source isolation, and focused
