@@ -792,8 +792,9 @@ async fn materialize_exact(
     let filename = format!("legacy-contract-{}.{extension}", record.source_contract_id);
     let content_type = content_type_for_extension(extension);
     let created_at = deterministic_rehearsal_time(record.source_contract_id);
-    let document_app =
-        CreateDocumentMetadata::new(Arc::new(SqliteCreateDocumentUnitOfWork::new(pool.clone())));
+    let document_app = CreateDocumentMetadata::new(Arc::new(
+        SqliteCreateDocumentUnitOfWork::new_for_rehearsal(pool.clone(), created_at),
+    ));
     let document_result = document_app
         .execute_with_id_at(
             Some(document_id),

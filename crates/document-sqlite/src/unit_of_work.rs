@@ -14,12 +14,26 @@ use uuid::Uuid;
 
 pub struct SqliteCreateDocumentUnitOfWork {
     pool: SqlitePool,
+    deterministic_event_time: Option<DateTime<Utc>>,
 }
 
 impl SqliteCreateDocumentUnitOfWork {
     #[must_use]
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            deterministic_event_time: None,
+        }
+    }
+
+    /// Build a create adapter whose audit/outbox timestamps and identities are
+    /// derived from the caller's deterministic document identity.
+    #[must_use]
+    pub fn new_for_rehearsal(pool: SqlitePool, event_time: DateTime<Utc>) -> Self {
+        Self {
+            pool,
+            deterministic_event_time: Some(event_time),
+        }
     }
 }
 
@@ -58,7 +72,8 @@ impl CreateDocumentUnitOfWork for SqliteCreateDocumentUnitOfWork {
             .execute(&mut *connection)
             .await
             .map_err(map_error)?;
-        let result = execute_in_transaction(&mut connection, command).await;
+        let result =
+            execute_in_transaction(&mut connection, command, self.deterministic_event_time).await;
         match result {
             Ok(result) => {
                 sqlx::query("COMMIT")
@@ -224,6 +239,7 @@ impl DocumentRepository for SqliteCreateDocumentUnitOfWork {
 async fn execute_in_transaction(
     connection: &mut SqliteConnection,
     command: PersistNewDocument,
+    deterministic_event_time: Option<DateTime<Utc>>,
 ) -> Result<CreateDocumentResult, ApplicationPortError> {
     let existing = sqlx::query_as::<_, ExistingCreateRow>(
             "SELECT i.request_fingerprint, i.fingerprint_version, d.id, d.tenant_id, d.original_filename, d.content_type, d.object_key, d.status, d.version, d.content_revision, d.current_revision_id, d.deletion_state, d.pre_trash_lifecycle, d.size_bytes, d.created_by, d.created_at, d.updated_at FROM document_idempotency i JOIN documents d ON d.id = i.document_id WHERE i.tenant_id = ?1 AND i.idempotency_key = ?2",
@@ -293,8 +309,8 @@ async fn execute_in_transaction(
         .map_err(|_| ApplicationPortError::Failed)?;
     insert_revision(connection, &initial_revision).await?;
     set_current_revision(connection, &command.document).await?;
-    insert_audit(connection, &command).await?;
-    insert_outbox(connection, &command).await?;
+    insert_audit(connection, &command, deterministic_event_time).await?;
+    insert_outbox(connection, &command, deterministic_event_time).await?;
     sqlx::query("INSERT INTO document_idempotency (tenant_id, idempotency_key, request_fingerprint, fingerprint_version, document_id) VALUES (?1, ?2, ?3, ?4, ?5)")
             .bind(command.document.tenant_id().to_string()).bind(&command.idempotency_key)
             .bind(&command.request_fingerprint).bind(command.fingerprint_version)
@@ -392,14 +408,18 @@ fn map_revision_repository_error(error: ApplicationPortError) -> RepositoryError
 async fn insert_audit(
     tx: &mut SqliteConnection,
     command: &PersistNewDocument,
+    deterministic_event_time: Option<DateTime<Utc>>,
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
-    let occurred_at = Utc::now();
+    let (event_id, operation_id, occurred_at) = match deterministic_event_time {
+        Some(event_time) => (document.id(), document.current_revision_id(), event_time),
+        None => (Uuid::now_v7(), Uuid::now_v7(), Utc::now()),
+    };
     let action = AuditAction::new("document.created").map_err(|_| ApplicationPortError::Failed)?;
     let resource = AuditResource::new("document", document.id().to_string())
         .map_err(|_| ApplicationPortError::Failed)?;
     let event = AuditEvent::new(
-        Uuid::now_v7(),
+        event_id,
         document.tenant_id(),
         AuditActor {
             actor_type: AuditActorType::User,
@@ -407,7 +427,7 @@ async fn insert_audit(
         },
         action,
         resource,
-        Uuid::now_v7(),
+        operation_id,
         None,
         None,
         None,
@@ -463,12 +483,17 @@ async fn insert_audit(
 async fn insert_outbox(
     tx: &mut SqliteConnection,
     command: &PersistNewDocument,
+    deterministic_event_time: Option<DateTime<Utc>>,
 ) -> Result<(), ApplicationPortError> {
     let document = &command.document;
     let payload = serde_json::json!({"document_id": document.id(), "original_filename": document.original_filename()});
+    let (event_id, occurred_at) = match deterministic_event_time {
+        Some(event_time) => (document.id(), event_time),
+        None => (Uuid::now_v7(), Utc::now()),
+    };
     sqlx::query("INSERT INTO outbox_events (event_id, event_type, tenant_id, aggregate_id, aggregate_type, payload, schema_version, occurred_at) VALUES (?1, 'document.created', ?2, ?3, 'document', ?4, 'v1', ?5)")
-        .bind(Uuid::now_v7().to_string()).bind(document.tenant_id().to_string())
-        .bind(document.id().to_string()).bind(payload.to_string()).bind(Utc::now().to_rfc3339())
+        .bind(event_id.to_string()).bind(document.tenant_id().to_string())
+        .bind(document.id().to_string()).bind(payload.to_string()).bind(occurred_at.to_rfc3339())
         .execute(&mut *tx).await.map_err(map_error)?;
     Ok(())
 }
