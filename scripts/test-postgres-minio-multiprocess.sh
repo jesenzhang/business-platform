@@ -120,7 +120,11 @@ doc_key="document-$RANDOM-$(date +%s)"
 doc_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$logical_key\",\"size_bytes\":$source_size}")"
 document_id="$(jq -r '.data.id' <<<"$doc_json")"
 [[ "$document_id" != "null" && -n "$document_id" ]]
-key="tenants/$tenant/documents/$document_id/v1/$logical_key"
+revision_id="$(jq -r '.data.revision_id' <<<"$doc_json")"
+[[ "$revision_id" != "null" && -n "$revision_id" ]]
+# PLAN-0008 stores the immutable revision source under the revision UUID;
+# the request's logical filename is metadata and is not the object identity.
+key="tenants/$tenant/documents/$document_id/revisions/$revision_id/source"
 docker run --network host --rm -v "$work:/work:ro" --entrypoint /bin/sh \
   minio/mc:RELEASE.2024-06-12T14-34-03Z -c \
   "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc cp /work/source.txt local/$MINIO_BUCKET/$key >/dev/null"
