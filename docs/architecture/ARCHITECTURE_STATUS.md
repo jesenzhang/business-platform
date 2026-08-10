@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-07
+> 最后更新：2026-08-10
 > 当前阶段：Phase 5 Enterprise AI Workspace Architecture — Proposed
-> 当前计划：PLAN-0007 Active；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 当前计划：PLAN-0007 Active；PLAN-0009 Proposed；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -81,13 +81,14 @@
 
 > 2026-08-07: PLAN-0007 is Active for the external Business API surface, independent React console, remote CLI, and read-only MCP adapter. PLAN-0006 remains Proposed / NOT ACTIVE; no Workspace or Capability runtime is introduced.
 
-> 2026-08-09: PLAN-0008 reached Accepted Candidate on branch
-> `codex/plan-0008-document-lifecycle-revision-and-evidence-foundation`, with
-> implementation checkpoint `bfc5f2c` based on `35d1d01`. Document Management now
-> owns immutable DocumentRevision and typed links; Document Intelligence binds
-> ProcessingJob/Run/Artifact/Evidence to an exact revision. Local format, check,
-> Clippy, workspace tests, OpenAPI, and Architecture Fitness are green. PostgreSQL,
-> MinIO, and real-infrastructure E2E remain NOT RUN locally.
+> 2026-08-10: PLAN-0008 Final Candidate HEAD
+> `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b` was integrated by local solo
+> fast-forward from Base `35d1d01fd49a70ee996fbb5fb72818a632989efe`. Feature CI
+> `31353149398` and Main CI `31353409550` passed all jobs, including GitHub
+> PostgreSQL/MinIO, migration, revision/evidence, concurrency, retry, crash
+> recovery, multi-process E2E, and Architecture Fitness. Local PostgreSQL/MinIO
+> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Proposed / NOT
+> ACTIVE and PLAN-0006 remains Proposed / NOT ACTIVE.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
@@ -315,10 +316,12 @@ PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
 PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc0981a`；Feature CI `30833916455`；Main CI `30868701290` 全绿；Windows PostgreSQL/MinIO NOT RUN）
 PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Implementation `24e70f4182ca3315d94033178952113c4faba717`；Candidate `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Main CI `31026047403`；Windows PostgreSQL/MinIO NOT RUN）
+PLAN-0008：Integrated / Archived（Base `35d1d01fd49a70ee996fbb5fb72818a632989efe`；Implementation/runtime `70469be26cb009c23f1a77c1553947522ba82aed`；Final Candidate/Integration `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`；Feature CI `31353149398`；Main CI `31353409550`；本机 PostgreSQL/MinIO NOT RUN）
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
+PLAN-0009：Proposed / NOT ACTIVE（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
 ```
 
 ## 8. PLAN-0006 采用前动作

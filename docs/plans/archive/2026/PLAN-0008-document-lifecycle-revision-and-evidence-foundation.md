@@ -2,10 +2,11 @@
 
 文档 ID：PLAN-0008  
 版本：0.1  
-状态：Accepted Candidate / local solo fast-forward  
+状态：Integrated / Archived / local solo fast-forward  
 日期：2026-08-08  
-基线：`35d1d01`  
-目标 Candidate：`Accepted Candidate`（不自动合并到 `main`）
+基线：`35d1d01fd49a70ee996fbb5fb72818a632989efe`  
+Final Candidate HEAD：`7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`  
+Integration SHA：`7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`
 
 ## 1. 目标和边界
 
@@ -123,19 +124,27 @@ SQLite 使用显式 single-writer/`BEGIN IMMEDIATE`、单进程限制和连接�
 
 先提交失败测试，再实现：Document R1/R2 immutable/current/stale conflict；archive/trash/restore 不改变内容 revision；purge 的 retention/reference/hold 拒绝；exact revision processing、multi-run、immutable artifact/evidence、stale result rejection；tenant isolation；PG concurrency；SQLite parity；migration backfill/reconciliation；REST/CLI/MCP DTO 不泄漏 storage details。
 
-完成定义：领域和 adapter contract 全绿；PG/SQLite migration 可在现有数据执行且 manifest 更新；公开 API 兼容测试、OpenAPI、CLI、MCP 和架构 Fitness 全绿；完整门禁真实执行并记录；Candidate 有 commit SHA、状态为 `Accepted Candidate`，不自动 fast-forward 到 main。
+完成定义：领域和 adapter contract 全绿；PG/SQLite migration 可在现有数据执行且 manifest 更新；公开 API 兼容测试、OpenAPI、CLI、MCP 和架构 Fitness 全绿；完整门禁真实执行并记录；Candidate 有 commit SHA，且通过 local solo fast-forward 与 main CI 后转为 `Integrated`。
 
 ## 10. Local Candidate evidence
 
-- GitHub Actions real PostgreSQL + MinIO contract and multi-process E2E：implementation/runtime evidence SHA `70469be26cb009c23f1a77c1553947522ba82aed` 的 run `31352005264` PASS；exact Final Candidate HEAD `7966d03587df4908229e3c30737d8e333183fb20` 的 final evidence run `31352272475` PASS；Architecture Fitness、Format、Check、Clippy、Unit、Frontend、Playwright、CLI/MCP contracts 同 run PASS。详细证据见 `docs/reports/PLAN-0008-CI-EVIDENCE-AND-C-MIGRATION-REHEARSAL.md`。
+- GitHub Actions real PostgreSQL + MinIO contract and multi-process E2E：implementation/runtime evidence SHA `70469be26cb009c23f1a77c1553947522ba82aed` 的 run `31352005264` PASS；exact Final Candidate HEAD `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b` 的 final evidence run `31353149398` PASS；Architecture Fitness、Format、Check、Clippy、Unit、Frontend、Playwright、CLI/MCP contracts 同 run PASS。详细证据见 `docs/reports/PLAN-0008-CI-EVIDENCE-AND-C-MIGRATION-REHEARSAL.md`。
 - 本机 PostgreSQL/MinIO 仍保持 NOT RUN；本地安装的工具不作为验收证据。
 
 - `cargo fmt --all -- --check`：PASS。
 - `cargo check --workspace --all-targets --all-features`：PASS（仓库既有/环境 warning，无 error）。
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`：PASS（0 error）。
-- `cargo test --workspace --all-features`：126 passed，32 ignored。
+- `cargo test --workspace --all-features`：126 passed，34 ignored。
 - `pwsh ./scripts/check-architecture.ps1`：PASS；`scripts/check-openapi.ps1`：PASS；`git diff --check`：PASS。
 - 本机 PostgreSQL/MinIO：NOT RUN；GitHub Actions PostgreSQL + MinIO、migration、multipart、revision/evidence、concurrency、retry、crash recovery、multi-process E2E：PASS。C 项目正式迁移仍未开始，保持 read-only rehearsal 边界。
+
+## 12. Integration closeout（2026-08-10）
+
+- Feature CI `31353149398`：Final Candidate HEAD `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b` 全部 jobs PASS。
+- Main 已从 Base `35d1d01fd49a70ee996fbb5fb72818a632989efe` 以 local solo fast-forward 集成到 `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`；Main CI `31353409550` 全部 jobs PASS。
+- 本机 PostgreSQL/MinIO：NOT RUN。GitHub Actions 的 PostgreSQL + MinIO 证据只证明 best-effort immediate orphan compensation；不宣称 PostgreSQL + MinIO atomicity，也不宣称 automatic object-store reconciliation/GC 已实现。
+- C 项目未修改、未迁移；`.scratch/c-project-migration-rehearsal/` 研究成果保留并由本地 `.git/info/exclude` 排除，完整副本位于 `F:\Workspace\plan-0008-c-project-migration-rehearsal-20260810`。
+- PLAN-0006 保持 Proposed / NOT ACTIVE；后续只建立 PLAN-0009 的 Proposed 文档，不开始正式迁移。
 
 ## 11. 后续建议（本轮不执行）
 
