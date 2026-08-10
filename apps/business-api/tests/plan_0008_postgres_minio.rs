@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::too_many_lines, clippy::unwrap_used)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -123,11 +123,11 @@ fn upload_router(
             audience: None,
             dev_secret: Some(Secret::new("local-pg-e2e-only".to_string())),
             dev_auth_enabled: true,
-            dev_permissions: Default::default(),
+            dev_permissions: BTreeSet::new(),
             dev_tenant_id: Some(tenant),
             dev_user_id: Some(user),
             dev_subject: Some("plan-0008-upload-test".to_string()),
-            dev_roles: Default::default(),
+            dev_roles: BTreeSet::new(),
         },
     };
     let document_store = Arc::new(PostgresCreateDocumentUnitOfWork::new(pool.clone()));
@@ -151,11 +151,11 @@ fn upload_router(
         AuthMiddlewareConfig {
             dev_auth_enabled: true,
             dev_secret: Some("local-pg-e2e-only".to_string()),
-            dev_permissions: Default::default(),
+            dev_permissions: BTreeSet::new(),
             dev_tenant_id: Some(tenant),
             dev_user_id: Some(user),
             dev_subject: Some("plan-0008-upload-test".to_string()),
-            dev_roles: Default::default(),
+            dev_roles: BTreeSet::new(),
         },
         &config.server,
     )
@@ -284,7 +284,7 @@ async fn plan_0008_postgres_minio_multipart_upload_is_idempotent() {
     .await
     .expect("uploaded metadata must be queryable");
     assert_eq!(metadata.0, expected_sha256);
-    assert_eq!(metadata.1, content.len() as i64);
+    assert_eq!(metadata.1, i64::try_from(content.len()).unwrap_or(i64::MAX));
     assert_eq!(metadata.2, "text/plain");
     assert_eq!(metadata.3, object_key.as_str());
 
