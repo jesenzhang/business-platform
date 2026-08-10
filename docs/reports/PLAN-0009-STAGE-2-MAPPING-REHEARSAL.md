@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 2 — Deterministic Mapping and Isolated Target Rehearsal
 
-状态：**PASS**；Coordinator Verified；独立 Reviewer attempt 2 = PASS  
+状态：**PASS**；Coordinator Verified；独立 Reviewer closure attempt = PASS  
 日期：2026-08-10  
 原始实现候选：`dc4c492`；repair candidates：`4a6ef75`、`8c9967f`、`8255813`  
 范围：Stage 1 frozen manifest → isolated target only；不执行 production migration，不激活 PLAN-0006
@@ -146,8 +146,9 @@ fabricated success claim.
 - full workspace `cargo clippy --workspace --all-targets --all-features -- -D warnings`：
   NOT RUN；本次用户明确允许 focused/small tests，且当前 Stage 1 app 仍有既有
   clippy baseline warnings（长函数、测试 expect 等），未将其伪称为通过。
-- Stage 2 repair candidate is awaiting independent re-review; it is not yet
-  approved.
+- The implementation candidate `dadf4c2` has an independent Stage 2 PASS;
+  this report-only commit records the closure ledger and does not alter the
+  reviewed implementation.
 
 ## Review ledger
 
@@ -164,13 +165,15 @@ fabricated success claim.
 - Coordinator repair candidate 3: `8255813`; materialized Exact rows now have
   a complete read-only equivalence check instead of an early return. Focused
   tests pass.
-- Independent Reviewer attempt 2, exact range `3ab1bb9..eb5462d`, model
-  `gpt-5.4` / code-reviewer: `PASS`; no findings.
+- Independent Reviewer closure attempt, exact implementation range
+  `3ab1bb9..dadf4c2`, model `gpt-5.4` / code-reviewer: `PASS`; no findings.
+- The closure commit only reconciles this ledger with that PASS; no code or
+  rehearsal output changed after the reviewed implementation candidate.
 
 ## 7. 进入 Stage 3 的条件
 
-Stage 3 may start after independent Reviewer PASS on exact range
-`3ab1bb9..eb5462d`. The following remain prohibited:
+Stage 3 may start after this Stage 2 PASS closure ledger. The following remain
+prohibited:
 
 - production migration；
 - 任何 C source write；
