@@ -25,7 +25,7 @@ mod stage2;
 
 pub use stage2::{run_stage2, Stage2Summary};
 
-const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v8";
+const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v9";
 const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024;
 const ENV_DATA_ROOT: &str = "DATA_ROOT";
 const ENV_EXTERNAL_ROOT: &str = "CONTRACT_EXTERNAL_ROOT";
@@ -332,6 +332,7 @@ struct EvidenceReference {
     root: String,
     source_table: String,
     source_record_id: i64,
+    source_records: Vec<SourceRecordReference>,
     relative_path_sha256: String,
     path_depth: usize,
     extension: Option<String>,
@@ -339,6 +340,12 @@ struct EvidenceReference {
     size_bytes: u64,
     expected_sha256: Option<String>,
     observed_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SourceRecordReference {
+    source_table: String,
+    source_record_id: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -558,7 +565,7 @@ pub async fn run_inventory(config: &InventoryConfig) -> Result<InventorySummary,
 }
 
 fn validate_target_shape(config: &InventoryConfig) -> Result<(), InventoryError> {
-    if config.target_root != config.isolation_root.join("stage-1-inventory-v8") {
+    if config.target_root != config.isolation_root.join("stage-1-inventory-v9") {
         return Err(InventoryError::InvalidConfiguration);
     }
     if !config.isolation_root.is_dir() || !config.target_root.is_dir() {
@@ -1383,11 +1390,15 @@ fn resolve_record(
         .map(|resolved| {
             let relative_path = resolved.observation.relative_path;
             let (path_sha256, path_depth, extension) = evidence_path_metadata(&relative_path);
-            let (source_table, source_record_id) = resolved
+            let source_records = resolved
                 .source_records
                 .into_iter()
-                .next()
-                .ok_or(InventoryError::PhysicalScan)?;
+                .map(|(source_table, source_record_id)| SourceRecordReference {
+                    source_table,
+                    source_record_id,
+                })
+                .collect::<Vec<_>>();
+            let primary_source = source_records.first().ok_or(InventoryError::PhysicalScan)?;
             let observed_sha256 =
                 if match_count == 1 && resolved.observation.size_bytes <= MAX_HASH_BYTES {
                     Some(sha256_file(&resolved.observation.absolute_path)?)
@@ -1396,8 +1407,9 @@ fn resolve_record(
                 };
             Ok(EvidenceReference {
                 root: resolved.observation.root,
-                source_table,
-                source_record_id,
+                source_table: primary_source.source_table.clone(),
+                source_record_id: primary_source.source_record_id,
+                source_records,
                 relative_path_sha256: path_sha256,
                 path_depth,
                 extension,
@@ -1737,7 +1749,8 @@ mod tests {
         classification_counts, evidence_path_metadata, manifest_digest, normalize_candidate,
         parse_env, select_representative_contract_ids, write_or_verify_audit,
         write_or_verify_manifest, DatabaseFingerprint, EvidenceReference, FrozenManifest,
-        InventoryRecord, LineageCount, SourceFingerprint, AUDIT_FILE_NAME, MANIFEST_SCHEMA,
+        InventoryRecord, LineageCount, SourceFingerprint, SourceRecordReference, AUDIT_FILE_NAME,
+        MANIFEST_SCHEMA,
     };
     use legacy_migration_rehearsal::{InventoryClassification, REHEARSAL_SELECTION_LIMIT};
 
@@ -1878,6 +1891,10 @@ mod tests {
             root: "datasets".to_string(),
             source_table: "contract_attachments".to_string(),
             source_record_id: 1,
+            source_records: vec![SourceRecordReference {
+                source_table: "contract_attachments".to_string(),
+                source_record_id: 1,
+            }],
             relative_path_sha256: "a".repeat(64),
             path_depth: 1,
             extension: Some("pdf".to_string()),

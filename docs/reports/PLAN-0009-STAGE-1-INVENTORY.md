@@ -13,7 +13,7 @@ The run used only the user-provided local-test tuple:
 - `DATA_ROOT`: `D:\contract_data_test`
 - authoritative SQLite: `$DATA_ROOT/db/contract_management.db`
 - physical roots: `$DATA_ROOT/datasets`, `$DATA_ROOT/2026年合同1`, `$DATA_ROOT/2026年合同`
-- isolated output: `F:\Workspace\plan-0009-c-project-migration-rehearsal-20260810\stage-1-inventory-v8`
+- isolated output: `F:\Workspace\plan-0009-c-project-migration-rehearsal-20260810\stage-1-inventory-v9`
 
 The SQLite adapter uses one read-only connection. The application rejects a
 production argument and rejects targets outside the fixed isolated root. No C
@@ -26,7 +26,7 @@ manifest; the retained foreign-key anomaly is not repaired by rehearsal code.
 There is no independent cryptographic pre/post source snapshot in this stage,
 so this report does not claim one.
 
-## Deterministic implementation
+## Deterministic inventory
 
 The adapter reads fixed, ordered queries for contracts, versions, attachments,
 ingestions, ingestion tasks/files/results, artifacts, parse jobs, and extraction
@@ -40,13 +40,17 @@ lineage coverage, then the positive source flag, then `contracts.id ASC` as a
 tie-break. Legacy non-SHA-256 fingerprints remain classified as legacy data;
 they are never treated as SHA-256.
 
-Manifest records preserve `source_table` and `source_record_id` for the owning
-contract, and every physical `evidence` entry preserves a deterministic source
-table/row reference plus only safe path metadata (root label, relative-path
-SHA-256, depth, extension, size, and optional content fingerprints). Raw source
-names, text, absolute paths, URLs, credentials, and signed URLs are not written
-to the manifest. Orphan records have no physical evidence by definition, but
-remain traceable to their exact `contracts` row through record-level provenance.
+Each manifest record preserves the owning `contracts` table and row ID. Each
+physical `evidence` entry preserves a deterministic primary source table/row
+and the complete ordered `source_records` list of every contributing source
+table/row pair. The primary pair is retained for simple consumers; the list is
+the authoritative complete provenance. Orphan records have no physical
+evidence by definition, but remain traceable to their exact `contracts` row.
+
+Manifest evidence contains only safe metadata: root label, relative-path
+SHA-256, depth, extension, size, content fingerprints, and source provenance.
+Raw source names, text, absolute paths, URLs, credentials, and signed URLs are
+not written.
 
 ## Real source evidence
 
@@ -84,12 +88,14 @@ fabricated. The source data therefore yields no auto-materialization-eligible
 
 Authoritative frozen artifact:
 
-`F:\Workspace\plan-0009-c-project-migration-rehearsal-20260810\stage-1-inventory-v8\manifest-v1.json`
+`F:\Workspace\plan-0009-c-project-migration-rehearsal-20260810\stage-1-inventory-v9\manifest-v1.json`
 
-- schema: `plan-0009.stage-1.inventory.v8`
-- canonical manifest SHA-256: `00d9c3a3b74fbf27b3ba97e82a5331d62c73bd9b5fff7b7f8a280ac6c4a7d5d6`
-- written manifest file-bytes SHA-256: `e76477660c29cca2e53c7a6a1fd2a3302153c7fd73e20193176c06e4b018a6af`
-- evidence references: `22,121`; missing source-table/row provenance: `0`
+- schema: `plan-0009.stage-1.inventory.v9`
+- canonical manifest SHA-256: `8376eac8c5aa2447077048f3a50d68c3584e3df929d3473a865f995f5319cb43`
+- written manifest file-bytes SHA-256: `759e8f96b9555b697a83798ace0d3a888fb8010bb816113bcddd05d517ab13aa`
+- evidence references: `22,121`
+- evidence entries with complete source provenance: `22,121`
+- evidence entries with multiple source rows: `21,570`
 - digest sidecar: `manifest-v1-digests.json`
 - replay audit: `replay-audit-v1.json`
 
@@ -97,7 +103,7 @@ First real run:
 
 ```text
 stage=1 status=frozen selected=120 replayed=false
-canonical_manifest_sha256=00d9c3a3b74fbf27b3ba97e82a5331d62c73bd9b5fff7b7f8a280ac6c4a7d5d6 file_bytes_sha256=e76477660c29cca2e53c7a6a1fd2a3302153c7fd73e20193176c06e4b018a6af
+canonical_manifest_sha256=8376eac8c5aa2447077048f3a50d68c3584e3df929d3473a865f995f5319cb43 file_bytes_sha256=759e8f96b9555b697a83798ace0d3a888fb8010bb816113bcddd05d517ab13aa
 classifications=Exact=0,Probable=1,Ambiguous=89,Conflict=0,Orphan=29,Missing=0,Rejected=1
 ```
 
@@ -105,7 +111,7 @@ Second run against the same source tuple and frozen target:
 
 ```text
 stage=1 status=replayed selected=120 replayed=true
-canonical_manifest_sha256=00d9c3a3b74fbf27b3ba97e82a5331d62c73bd9b5fff7b7f8a280ac6c4a7d5d6 file_bytes_sha256=e76477660c29cca2e53c7a6a1fd2a3302153c7fd73e20193176c06e4b018a6af
+canonical_manifest_sha256=8376eac8c5aa2447077048f3a50d68c3584e3df929d3473a865f995f5319cb43 file_bytes_sha256=759e8f96b9555b697a83798ace0d3a888fb8010bb816113bcddd05d517ab13aa
 classifications=Exact=0,Probable=1,Ambiguous=89,Conflict=0,Orphan=29,Missing=0,Rejected=1
 ```
 
@@ -122,22 +128,23 @@ rtk cargo check -p plan-0009-rehearsal --all-targets --all-features
 rtk cargo test -p plan-0009-rehearsal --all-features   # 9 passed
 ```
 
-The full workspace gates were not run in this focused Stage 1 loop (`NOT RUN`);
-they remain required before final Goal closeout. Stage 2 must be regenerated
-from this v8 manifest rather than reusing the superseded v7 artifact.
+The full workspace gates were not run in this focused loop (`NOT RUN`);
+they remain required before final Goal closeout. Stage 2 must consume this v9
+manifest and must not reuse the superseded v8 artifact.
 
 ## Review ledger
 
 - Initial independent review: `FAIL`; it identified missing source-table/row
-  provenance in physical evidence and a report mismatch about selector ownership.
-- Repair: upgraded the manifest to v8, added record-level and evidence-level
-  provenance, corrected selector ownership documentation, added the focused
-  selector test, and reran the real freeze/replay.
-- Current independent review: pending for the complete Stage 1 repair
-  candidate. No PASS is claimed here.
+  provenance and a report mismatch about selector ownership.
+- v8 repair review: `FAIL`; the reviewer found that the first source pair was
+  retained while the real multi-source evidence lost the remaining pairs.
+- v9 repair: upgraded the manifest schema, preserved the complete ordered
+  provenance list per evidence entry, retained record-level orphan provenance,
+  and reran the real freeze/replay.
+- Current independent review: pending for the complete v9 repair candidate.
 
 ## Exit decision
 
-Coordinator evidence is complete for the v8 candidate. Stage 1 remains open
+Coordinator evidence is complete for the v9 candidate. Stage 1 remains open
 until an independent Reviewer verifies the implementation, report, and real
 frozen artifacts and returns `PASS`.
