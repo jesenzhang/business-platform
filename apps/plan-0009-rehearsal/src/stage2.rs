@@ -30,7 +30,7 @@ use super::{
     ScannedRoot,
 };
 
-const STAGE1_DIRECTORY: &str = "stage-1-inventory-v7";
+const STAGE1_DIRECTORY: &str = "stage-1-inventory-v8";
 const STAGE2_DIRECTORY: &str = "stage-2-rehearsal-v1";
 const MANIFEST_FILE_NAME: &str = "manifest-v1.json";
 const MANIFEST_DIGEST_FILE_NAME: &str = "manifest-v1-digests.json";
@@ -112,6 +112,7 @@ pub struct Stage2Summary {
     pub review_count: usize,
     pub quarantine_count: usize,
     pub mapping_plan_sha256: String,
+    pub mapping_file_bytes_sha256: String,
     pub replayed: bool,
 }
 
@@ -187,14 +188,26 @@ struct ExistingMappingRow {
 
 /// Run Stage 2 against the existing frozen Stage 1 manifest.
 pub async fn run_stage2(config: &InventoryConfig) -> Result<Stage2Summary, Stage2Error> {
-    validate_target_shape(config)?;
+    run_stage2_at(config, STAGE2_DIRECTORY).await
+}
+
+/// Run the reviewed Stage 2 mapping engine against a bounded target directory.
+///
+/// Stage 3 uses this seam to preserve the exact mapping/materialization rules
+/// while keeping its target isolated from the original Stage 2 rehearsal.
+pub(crate) async fn run_stage2_at(
+    config: &InventoryConfig,
+    target_directory: &str,
+) -> Result<Stage2Summary, Stage2Error> {
+    validate_target_shape(config, target_directory)?;
     let stage1_root = config.isolation_root.join(STAGE1_DIRECTORY);
     let manifest = load_frozen_manifest(&stage1_root)?;
     let (boundary, scanned_roots) = verify_source_snapshot(config, &manifest).await?;
     let mut plan = build_mapping_plan(&manifest)?;
     let mapping_digest = mapping_plan_digest(&plan)?;
     plan.mapping_plan_sha256.clone_from(&mapping_digest);
-    let (replayed, _) = write_or_verify_mapping_plan(config.target_root.as_path(), &plan)?;
+    let (replayed, mapping_file_bytes_sha256) =
+        write_or_verify_mapping_plan(config.target_root.as_path(), &plan)?;
 
     let target_objects = config.target_root.join(TARGET_OBJECT_DIRECTORY);
     fs::create_dir_all(&target_objects).map_err(|_| Stage2Error::TargetWrite)?;
@@ -253,12 +266,16 @@ pub async fn run_stage2(config: &InventoryConfig) -> Result<Stage2Summary, Stage
         review_count,
         quarantine_count,
         mapping_plan_sha256: mapping_digest,
+        mapping_file_bytes_sha256,
         replayed,
     })
 }
 
-fn validate_target_shape(config: &InventoryConfig) -> Result<(), Stage2Error> {
-    if config.target_root != config.isolation_root.join(STAGE2_DIRECTORY)
+fn validate_target_shape(
+    config: &InventoryConfig,
+    target_directory: &str,
+) -> Result<(), Stage2Error> {
+    if config.target_root != config.isolation_root.join(target_directory)
         || !config.isolation_root.is_dir()
         || !config.target_root.is_dir()
     {
@@ -1720,6 +1737,8 @@ mod tests {
         InventoryRecord {
             selection_rank: 1,
             source_contract_id: 7,
+            source_table: "contracts".to_string(),
+            source_record_id: 7,
             source_business_key_sha256: Some("a".repeat(64)),
             positive_source_contract_flag: true,
             source_tables: vec!["contracts".to_string()],
@@ -1745,6 +1764,8 @@ mod tests {
             },
             evidence: vec![EvidenceReference {
                 root: "datasets".to_string(),
+                source_table: "contract_versions".to_string(),
+                source_record_id: 11,
                 relative_path_sha256: "b".repeat(64),
                 path_depth: 2,
                 extension: Some("pdf".to_string()),
@@ -1758,7 +1779,7 @@ mod tests {
 
     fn manifest() -> FrozenManifest {
         FrozenManifest {
-            manifest_schema: "plan-0009.stage-1.inventory.v7".to_string(),
+            manifest_schema: "plan-0009.stage-1.inventory.v8".to_string(),
             selection_rule: "test".to_string(),
             selection_limit: 120,
             source: serde_json::from_value(serde_json::json!({
