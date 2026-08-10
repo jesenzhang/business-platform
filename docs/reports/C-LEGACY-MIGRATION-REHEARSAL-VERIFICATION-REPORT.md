@@ -4,8 +4,7 @@ Status: **Stage 5 evidence assembled — independent Reviewer pending**
 Recorded: 2026-08-10 (Asia/Shanghai)
 Scope: real C-project read-only migration rehearsal only
 Base SHA: `5de6a995b874c93bdc97486391aed8c2d5920462` (`5de6a99`)
-Candidate SHA: the report commit created from the base above; the exact
-post-commit candidate is reported in the coordinator handoff.
+Candidate SHA: 97336d220d87cdbd730f35950ce60b723707aa2f
 Independent Reviewer: **PENDING**
 
 ## 1. Decision
@@ -414,21 +413,24 @@ real artifacts:
 | Stage 3 dual replay | Real two-target replay and semantic comparison; focused checks, prior workspace checks, and independent Reviewer `PASS` recorded in the Stage 3 report |
 | Stage 4 integrity/recovery | Real clean/recovery/partial-target evidence; format, package check/test/Clippy and independent Reviewer `PASS` recorded in the Stage 4 report |
 | Stage 5 artifact/hash/report checks | **PASS for the read-only checks performed for this report** |
-| Final workspace gates after Stage 4/Stage 5 candidate | **NOT RUN — coordinator responsibility** |
-| Architecture fitness check | **NOT RUN — coordinator responsibility** |
-| Secret/vulnerability/license/image scans | **NOT RUN — coordinator responsibility** |
+| Final workspace gates after Stage 4/Stage 5 candidate | **PASS** — fmt check; workspace check; workspace Clippy with -D warnings; workspace tests 150 passed, 34 ignored |
+| Architecture fitness check | **PASS** — Cargo metadata, OpenAPI contract, and architecture fitness |
+| Secret/vulnerability/license/image scans | **NOT RUN** — no repository-provided or installed cargo-audit/cargo-deny/gitleaks/trivy/syft/grype/osv-scanner entrypoint was available |
 | Stage 5 independent Reviewer | **PENDING** |
 | Production migration authorization | **NOT GRANTED** |
 
-The prior Stage 3 report’s workspace checks were evidence for its earlier
-candidate, not a substitute for the final gates on this Stage 5 candidate.
-No final gate is claimed from that prior result.
+The final Rust gates were rerun against this Stage 5 candidate with the
+temporary G:\codex-build\business-platform-target Cargo target directory and
+incremental compilation disabled because the repository volume had exhausted
+free space during the initial cold build. This changes only generated build
+output. The architecture check was run with scripts/check-architecture.ps1 and
+returned PASS. The prior Stage 3 report’s workspace checks were not used as a
+substitute for these final gates.
 
 Review ledger:
 
 - Stage 5 base is `5de6a995b874c93bdc97486391aed8c2d5920462`.
-- The candidate is the single report commit made from that base; its exact
-  SHA is supplied after commit by the coordinator.
+- The candidate is 97336d220d87cdbd730f35950ce60b723707aa2f.
 - Stage 5 independent Reviewer remains **PENDING** and must review the exact
   candidate range.
 - No source C file, `D:\contract_data_test` file, production system, or
