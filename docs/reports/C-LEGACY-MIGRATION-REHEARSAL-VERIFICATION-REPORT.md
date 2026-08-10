@@ -4,7 +4,7 @@ Status: **Stage 5 evidence assembled — independent Reviewer pending**
 Recorded: 2026-08-10 (Asia/Shanghai)
 Scope: real C-project read-only migration rehearsal only
 Base SHA: `5de6a995b874c93bdc97486391aed8c2d5920462` (`5de6a99`)
-Candidate SHA: 97336d220d87cdbd730f35950ce60b723707aa2f
+Candidate SHA: eb9c25be27b905ad4913f37f4c88fd393d18c19d
 Independent Reviewer: **PENDING**
 
 ## 1. Decision
@@ -430,7 +430,8 @@ substitute for these final gates.
 Review ledger:
 
 - Stage 5 base is `5de6a995b874c93bdc97486391aed8c2d5920462`.
-- The candidate is 97336d220d87cdbd730f35950ce60b723707aa2f.
+- The final candidate before independent review is
+  eb9c25be27b905ad4913f37f4c88fd393d18c19d.
 - Stage 5 independent Reviewer remains **PENDING** and must review the exact
   candidate range.
 - No source C file, `D:\contract_data_test` file, production system, or
