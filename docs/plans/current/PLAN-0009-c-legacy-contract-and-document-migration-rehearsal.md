@@ -2,10 +2,11 @@
 
 文档 ID：PLAN-0009  
 版本：0.1  
-状态：Proposed / NOT ACTIVE  
+状态：Active / Rehearsal Only  
 日期：2026-08-10  
 Owner：Platform Foundation / Document Management / Document Intelligence  
-前置集成：PLAN-0008 `Integrated`，main `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`
+前置集成：PLAN-0008 `Integrated`，执行基线为真实 main
+`654fe83d82107d899079d20e5fef8aaf4d5431b8`（旧 SHA 仅作历史参考）
 
 ## 1. 目标
 
@@ -95,4 +96,31 @@ OCR 无法解析 revision、LLM 无法解析 processing lineage、错误关联�
 只有在单独接受本计划、冻结 source manifest 和目标隔离边界后，才可建立独立
 feature branch。Activation 前必须复核 source connection/storage 位置、schema、
 三种导入路径、OCR/LLM lineage、样本覆盖、quarantine 策略、回滚方案和完整
-verification report。当前不开始正式迁移。
+ verification report。当前不开始正式迁移。
+
+## 8. Activation record
+
+本计划已于 2026-08-10 激活，但仅授权隔离的 read-only rehearsal。激活证据、
+source fingerprint、目标边界、清理方式和真实 C 项目盘点见：
+[`docs/reports/PLAN-0009-STAGE-0-ACTIVATION.md`](../../reports/PLAN-0009-STAGE-0-ACTIVATION.md)。
+
+激活不改变 C 项目、不授予 production migration 权限、不改变 PLAN-0008 的已集成
+边界，也不激活 PLAN-0006。后续阶段仍必须以独立 candidate 和 reviewer PASS 为
+进入条件。
+
+## 9. 架构符合性
+
+- Bounded Context：Document Management 与 Document Intelligence；本计划是
+  read-only Anti-Corruption Layer/rehearsal，不新增业务上下文。
+- 权威数据所有者：Document Management 拥有 Document/Revision/Link；Document
+  Intelligence 拥有 ProcessingRun/Artifact/Evidence 及候选处理状态；C 项目只作为
+  不可信历史 source，绝不成为 target 写入者。
+- 一致性：source 只读；target 仅为隔离 SQLite/LocalStorage；相同 frozen manifest
+  必须确定性重放；不确定映射 fail-closed 进入 quarantine。
+- 安全：source/target 路径 guard、生产模式拒绝、敏感原文/内部 key/凭证不进入公开
+  DTO 或日志；C 项目既有 dirty working tree 作为外部基线保留。
+- 质量与门禁：focused domain/application tests、replay/integrity tests、真实
+  120-contract rehearsal、source read-only proof、Architecture Fitness 和完整
+  workspace gates 均为完成条件。
+- 文档同步：Stage 0 activation evidence；后续实现、verification report、review
+  ledger 与 closeout 必须在同一计划变更中更新。

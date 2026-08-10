@@ -45,6 +45,7 @@ members = [
     "crates/object-storage",
     "crates/messaging",
     "crates/observability",
+    "crates/legacy-migration-rehearsal",
 ]
 
 [workspace.package]

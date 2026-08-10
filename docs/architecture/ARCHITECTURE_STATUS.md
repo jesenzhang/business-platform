@@ -3,7 +3,7 @@
 > 文档类型：Living Document
 > 最后更新：2026-08-10
 > 当前阶段：Phase 5 Enterprise AI Workspace Architecture — Proposed
-> 当前计划：PLAN-0007 Active；PLAN-0009 Proposed；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 当前计划：PLAN-0007 Active；PLAN-0009 Active / Rehearsal Only；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -87,8 +87,14 @@
 > `31353149398` and Main CI `31353409550` passed all jobs, including GitHub
 > PostgreSQL/MinIO, migration, revision/evidence, concurrency, retry, crash
 > recovery, multi-process E2E, and Architecture Fitness. Local PostgreSQL/MinIO
-> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Proposed / NOT
+> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Active / Rehearsal Only / NOT
 > ACTIVE and PLAN-0006 remains Proposed / NOT ACTIVE.
+
+> 2026-08-10: PLAN-0009 was activated from the real main HEAD
+> `654fe83d82107d899079d20e5fef8aaf4d5431b8` for read-only, isolated rehearsal only.
+> The C legacy project remains an external read-only source; no production migration
+> is authorized and PLAN-0006 remains Proposed / NOT ACTIVE. Activation evidence is
+> recorded in `docs/reports/PLAN-0009-STAGE-0-ACTIVATION.md`.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
@@ -321,7 +327,7 @@ Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
-PLAN-0009：Proposed / NOT ACTIVE（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
+PLAN-0009：Active / Rehearsal Only（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
 ```
 
 ## 8. PLAN-0006 采用前动作
