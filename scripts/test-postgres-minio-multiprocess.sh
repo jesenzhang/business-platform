@@ -11,6 +11,7 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$(mktemp -d "${TMPDIR:-/tmp}/business-platform-pg-e2e.XXXXXX")"
 log_dir="$work/logs"
 mkdir -p "$log_dir"
+phase_name="initialization"
 api_pid=""
 business_pid=""
 ai_pid=""
@@ -22,6 +23,9 @@ cleanup() {
   exit_code=$?
   set +e
   if [[ "$exit_code" != "0" ]]; then
+    echo "PostgreSQL + MinIO process E2E failed during phase: $phase_name" >&2
+    echo "Last observed job status: ${status:-unset}" >&2
+    echo "Last observed AI task status: ${task_status:-unset}" >&2
     echo "PostgreSQL + MinIO process E2E diagnostics:" >&2
     for log in "$log_dir"/*.log; do
       [[ -f "$log" ]] || continue
@@ -40,8 +44,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+phase() {
+  phase_name="$1"
+  echo "PostgreSQL + MinIO process E2E phase: $phase_name"
+}
+
 cd "$repo"
+phase "build and MinIO setup"
 cargo build --quiet -p business-api -p business-worker -p ai-worker
+export RUST_LOG=info
 
 printf 'MinIO process E2E source\n' > "$work/source.txt"
 for _ in $(seq 1 250000); do
@@ -76,6 +87,7 @@ export BUSINESS_WORKER__AI_MODE=separate
 export BUSINESS_WORKER__CONCURRENCY=4
 export BUSINESS_WORKER__WORKER_ID=business-e2e
 export BUSINESS_WORKER__TEST_STEP_DELAY_MILLIS=1000
+export BUSINESS_WORKER__OBSERVABILITY__LOG_LEVEL=info
 
 export AI_WORKER__ENV=development
 export AI_WORKER__DATABASE__BACKEND=postgres
@@ -88,7 +100,9 @@ export AI_WORKER__STORAGE__SECRET_KEY="$MINIO_SECRET_KEY"
 export AI_WORKER__WORKER_ID=ai-e2e
 export AI_WORKER__CONCURRENCY=2
 export AI_WORKER__TEST_TASK_DELAY_MILLIS=1000
+export AI_WORKER__OBSERVABILITY__LOG_LEVEL=info
 
+phase "start API and workers"
 "$repo/target/debug/business-api" > "$log_dir/api.log" 2>&1 & api_pid=$!
 "$repo/target/debug/business-worker" > "$log_dir/business-worker.log" 2>&1 & business_pid=$!
 "$repo/target/debug/ai-worker" > "$log_dir/ai-worker.log" 2>&1 & ai_pid=$!
@@ -100,6 +114,7 @@ for _ in $(seq 1 120); do
 done
 curl --fail-with-body -sS "$base/health/ready" >/dev/null
 
+phase "create document and enqueue processing job"
 auth=(-H "Authorization: Bearer local-pg-e2e-only" -H "X-Tenant-Id: $tenant" -H "X-User-Id: $user")
 doc_key="document-$RANDOM-$(date +%s)"
 doc_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents" "${auth[@]}" -H "Idempotency-Key: $doc_key" -H 'Content-Type: application/json' -d "{\"original_filename\":\"source.txt\",\"content_type\":\"text/plain\",\"object_key\":\"$logical_key\",\"size_bytes\":$source_size}")"
@@ -115,6 +130,7 @@ job_id="$(jq -r '.data.job_id' <<<"$job_json")"
 
 # Kill the business worker while its first leased step is running, then let a
 # fresh process reclaim the expired lease and resume from current_step.
+phase "business-worker crash recovery"
 business_crash=0
 for _ in $(seq 1 120); do
   status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
@@ -134,6 +150,7 @@ done
 
 # Wait until the AI task has its own lease, kill that process, and verify AI
 # reclaim resumes without creating a second task or candidate.
+phase "ai-worker crash recovery"
 ai_crash=0
 for _ in $(seq 1 600); do
   status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
@@ -154,6 +171,7 @@ for _ in $(seq 1 600); do
 done
 [[ "$ai_crash" == 1 ]]
 
+phase "complete review and verify replay"
 status=""
 for _ in $(seq 1 120); do
   status_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
@@ -179,6 +197,7 @@ final_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "
 [[ "$(jq -r '.data.status' <<<"$final_json")" == succeeded ]]
 
 job_ids=()
+phase "20-job concurrency and convergence"
 for _ in $(seq 1 20); do
   key_suffix="job-$RANDOM-$(date +%s%N)"
   queued_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: $key_suffix" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
@@ -203,6 +222,7 @@ for queued_id in "${job_ids[@]}"; do
   [[ "$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$queued_id" "${auth[@]}" | jq -r '.data.status')" == succeeded ]]
 done
 
+phase "verify durable side-effect cardinality"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM document_extraction_candidates WHERE tenant_id = '$tenant' AND job_id = '$job_id'" | grep -qx '1'
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM document_extraction_reviews WHERE tenant_id = '$tenant' AND candidate_id IN (SELECT id FROM document_extraction_candidates WHERE tenant_id = '$tenant' AND job_id = '$job_id')" | grep -qx '1'
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM document_ai_tasks WHERE tenant_id = '$tenant' AND job_id = '$job_id' AND status = 'succeeded'" | grep -qx '1'
