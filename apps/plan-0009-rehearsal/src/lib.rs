@@ -22,8 +22,10 @@ use sqlx::{FromRow, SqlitePool};
 use thiserror::Error;
 
 mod stage2;
+mod stage3;
 
 pub use stage2::{run_stage2, Stage2Summary};
+pub use stage3::{run_stage3, Stage3Summary};
 
 const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v9";
 const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024;
