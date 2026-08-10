@@ -1,9 +1,10 @@
 //! Read-only Stage 1 inventory for PLAN-0009.
 //!
-//! This crate is intentionally an infrastructure-facing adapter. The core
-//! rehearsal crate owns the production rejection and isolation boundary plus
-//! the pure deterministic selection rule; this crate owns only the explicit
-//! SQLite/filesystem reads needed to freeze an inventory artifact.
+//! This crate is intentionally an infrastructure-facing adapter. The shared
+//! rehearsal crate owns the production rejection, isolation boundary, and
+//! stable classification vocabulary; this crate owns the coverage-first
+//! selector and the explicit SQLite/filesystem reads needed to freeze an
+//! inventory artifact.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
@@ -24,7 +25,7 @@ mod stage2;
 
 pub use stage2::{run_stage2, Stage2Summary};
 
-const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v7";
+const MANIFEST_SCHEMA: &str = "plan-0009.stage-1.inventory.v8";
 const MAX_HASH_BYTES: u64 = 128 * 1024 * 1024;
 const ENV_DATA_ROOT: &str = "DATA_ROOT";
 const ENV_EXTERNAL_ROOT: &str = "CONTRACT_EXTERNAL_ROOT";
@@ -295,6 +296,8 @@ struct PhysicalRootFingerprint {
 struct InventoryRecord {
     selection_rank: usize,
     source_contract_id: i64,
+    source_table: String,
+    source_record_id: i64,
     source_business_key_sha256: Option<String>,
     positive_source_contract_flag: bool,
     source_tables: Vec<String>,
@@ -327,6 +330,8 @@ struct LineageCount {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EvidenceReference {
     root: String,
+    source_table: String,
+    source_record_id: i64,
     relative_path_sha256: String,
     path_depth: usize,
     extension: Option<String>,
@@ -346,6 +351,7 @@ struct ContractRow {
 
 #[derive(Debug, Clone, FromRow)]
 struct AttachmentRow {
+    id: i64,
     contract_id: i64,
     relative_path: Option<String>,
     file_name: Option<String>,
@@ -356,6 +362,7 @@ struct AttachmentRow {
 
 #[derive(Debug, Clone, FromRow)]
 struct ArtifactRow {
+    id: i64,
     contract_id: Option<i64>,
     artifact_kind: Option<String>,
     relative_path: Option<String>,
@@ -368,6 +375,7 @@ struct ArtifactRow {
 
 #[derive(Debug, Clone, FromRow)]
 struct IngestionRow {
+    id: i64,
     contract_id: i64,
     storage_key: Option<String>,
 }
@@ -383,6 +391,7 @@ struct TaskRow {
 
 #[derive(Debug, Clone, FromRow)]
 struct TaskFileRow {
+    id: i64,
     task_id: i64,
     relative_path: Option<String>,
     object_key: Option<String>,
@@ -402,6 +411,7 @@ struct TaskResultRow {
 
 #[derive(Debug, Clone, FromRow)]
 struct VersionRow {
+    id: i64,
     contract_id: i64,
     original_filename: Option<String>,
     file_size: Option<i64>,
@@ -424,6 +434,8 @@ struct RawCandidate {
     expected_size: Option<i64>,
     expected_sha256: Option<String>,
     source_kind: &'static str,
+    source_table: &'static str,
+    source_record_id: i64,
 }
 
 #[derive(Debug, Default)]
@@ -546,7 +558,7 @@ pub async fn run_inventory(config: &InventoryConfig) -> Result<InventorySummary,
 }
 
 fn validate_target_shape(config: &InventoryConfig) -> Result<(), InventoryError> {
-    if config.target_root != config.isolation_root.join("stage-1-inventory-v7") {
+    if config.target_root != config.isolation_root.join("stage-1-inventory-v8") {
         return Err(InventoryError::InvalidConfiguration);
     }
     if !config.isolation_root.is_dir() || !config.target_root.is_dir() {
@@ -606,6 +618,8 @@ async fn inventory_from_source(
             if let Some(value) = &row.file_name {
                 add_candidate(
                     lineage,
+                    "contracts",
+                    row.id,
                     Some(value.as_str()),
                     None,
                     None,
@@ -616,7 +630,7 @@ async fn inventory_from_source(
     }
 
     let versions = sqlx::query_as::<_, VersionRow>(
-        "SELECT contract_id, original_filename, file_size FROM contract_versions ORDER BY id ASC",
+        "SELECT id, contract_id, original_filename, file_size FROM contract_versions ORDER BY id ASC",
     )
     .fetch_all(pool)
     .await
@@ -627,6 +641,8 @@ async fn inventory_from_source(
             if let Some(value) = row.original_filename {
                 add_candidate(
                     lineage,
+                    "contract_versions",
+                    row.id,
                     Some(value.as_str()),
                     row.file_size,
                     None,
@@ -637,7 +653,7 @@ async fn inventory_from_source(
     }
 
     let attachments = sqlx::query_as::<_, AttachmentRow>(
-        "SELECT contract_id, relative_path, file_name, file_size, sha256, storage_location FROM contract_attachments ORDER BY id ASC",
+        "SELECT id, contract_id, relative_path, file_name, file_size, sha256, storage_location FROM contract_attachments ORDER BY id ASC",
     )
     .fetch_all(pool)
     .await
@@ -647,6 +663,8 @@ async fn inventory_from_source(
             lineage.attachments += 1;
             add_candidate(
                 lineage,
+                "contract_attachments",
+                row.id,
                 row.relative_path.as_deref(),
                 row.file_size,
                 row.sha256.as_deref(),
@@ -654,6 +672,8 @@ async fn inventory_from_source(
             );
             add_candidate(
                 lineage,
+                "contract_attachments",
+                row.id,
                 row.file_name.as_deref(),
                 row.file_size,
                 row.sha256.as_deref(),
@@ -661,6 +681,8 @@ async fn inventory_from_source(
             );
             add_candidate(
                 lineage,
+                "contract_attachments",
+                row.id,
                 row.storage_location.as_deref(),
                 row.file_size,
                 row.sha256.as_deref(),
@@ -670,7 +692,7 @@ async fn inventory_from_source(
     }
 
     let artifacts = sqlx::query_as::<_, ArtifactRow>(
-        "SELECT contract_id, artifact_kind, relative_path, file_name, file_size, sha256, object_key, storage_location FROM contract_artifacts ORDER BY id ASC",
+        "SELECT id, contract_id, artifact_kind, relative_path, file_name, file_size, sha256, object_key, storage_location FROM contract_artifacts ORDER BY id ASC",
     )
     .fetch_all(pool)
     .await
@@ -690,6 +712,8 @@ async fn inventory_from_source(
                 }
                 add_candidate(
                     lineage,
+                    "contract_artifacts",
+                    row.id,
                     row.relative_path.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -697,6 +721,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_artifacts",
+                    row.id,
                     row.file_name.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -704,6 +730,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_artifacts",
+                    row.id,
                     row.object_key.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -711,6 +739,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_artifacts",
+                    row.id,
                     row.storage_location.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -721,7 +751,7 @@ async fn inventory_from_source(
     }
 
     let ingestions = sqlx::query_as::<_, IngestionRow>(
-        "SELECT contract_id, storage_key FROM contract_ingestions ORDER BY id ASC",
+        "SELECT id, contract_id, storage_key FROM contract_ingestions ORDER BY id ASC",
     )
     .fetch_all(pool)
     .await
@@ -731,6 +761,8 @@ async fn inventory_from_source(
             lineage.ingestions += 1;
             add_candidate(
                 lineage,
+                "contract_ingestions",
+                row.id,
                 row.storage_key.as_deref(),
                 None,
                 None,
@@ -756,6 +788,8 @@ async fn inventory_from_source(
                 lineage.ingestion_tasks += 1;
                 add_candidate(
                     lineage,
+                    "contract_ingestion_tasks",
+                    row.id,
                     row.storage_key.as_deref(),
                     None,
                     None,
@@ -763,6 +797,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_ingestion_tasks",
+                    row.id,
                     row.source_filename.as_deref(),
                     None,
                     None,
@@ -774,7 +810,7 @@ async fn inventory_from_source(
     }
 
     let task_files = sqlx::query_as::<_, TaskFileRow>(
-        "SELECT task_id, relative_path, object_key, file_name, file_size, sha256, storage_location FROM contract_ingestion_task_files ORDER BY id ASC",
+        "SELECT id, task_id, relative_path, object_key, file_name, file_size, sha256, storage_location FROM contract_ingestion_task_files ORDER BY id ASC",
     )
     .fetch_all(pool)
     .await
@@ -785,6 +821,8 @@ async fn inventory_from_source(
                 lineage.task_files += 1;
                 add_candidate(
                     lineage,
+                    "contract_ingestion_task_files",
+                    row.id,
                     row.relative_path.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -792,6 +830,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_ingestion_task_files",
+                    row.id,
                     row.object_key.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -799,6 +839,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_ingestion_task_files",
+                    row.id,
                     row.file_name.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -806,6 +848,8 @@ async fn inventory_from_source(
                 );
                 add_candidate(
                     lineage,
+                    "contract_ingestion_task_files",
+                    row.id,
                     row.storage_location.as_deref(),
                     row.file_size,
                     row.sha256.as_deref(),
@@ -1083,6 +1127,8 @@ fn parse_has_contract(value: Option<&str>) -> Option<bool> {
 
 fn add_candidate(
     lineage: &mut Lineage,
+    source_table: &'static str,
+    source_record_id: i64,
     value: Option<&str>,
     expected_size: Option<i64>,
     expected_sha256: Option<&str>,
@@ -1109,6 +1155,8 @@ fn add_candidate(
         expected_size,
         expected_sha256,
         source_kind,
+        source_table,
+        source_record_id,
     });
 }
 
@@ -1190,6 +1238,7 @@ fn scan_root(root: &PhysicalRootConfig) -> Result<ScannedRoot, InventoryError> {
 struct ResolvedMatch {
     observation: PhysicalFile,
     source_kinds: BTreeSet<String>,
+    source_records: BTreeSet<(String, i64)>,
     expected_sizes: BTreeSet<i64>,
     expected_hashes: BTreeSet<String>,
 }
@@ -1228,12 +1277,17 @@ fn resolve_record(
                 let resolved = matches.entry(match_key).or_insert_with(|| ResolvedMatch {
                     observation: observation.clone(),
                     source_kinds: BTreeSet::new(),
+                    source_records: BTreeSet::new(),
                     expected_sizes: BTreeSet::new(),
                     expected_hashes: BTreeSet::new(),
                 });
                 resolved
                     .source_kinds
                     .insert(candidate.source_kind.to_string());
+                resolved.source_records.insert((
+                    candidate.source_table.to_string(),
+                    candidate.source_record_id,
+                ));
                 if let Some(size) = candidate.expected_size {
                     resolved.expected_sizes.insert(size);
                 }
@@ -1329,6 +1383,11 @@ fn resolve_record(
         .map(|resolved| {
             let relative_path = resolved.observation.relative_path;
             let (path_sha256, path_depth, extension) = evidence_path_metadata(&relative_path);
+            let (source_table, source_record_id) = resolved
+                .source_records
+                .into_iter()
+                .next()
+                .ok_or(InventoryError::PhysicalScan)?;
             let observed_sha256 =
                 if match_count == 1 && resolved.observation.size_bytes <= MAX_HASH_BYTES {
                     Some(sha256_file(&resolved.observation.absolute_path)?)
@@ -1337,6 +1396,8 @@ fn resolve_record(
                 };
             Ok(EvidenceReference {
                 root: resolved.observation.root,
+                source_table,
+                source_record_id,
                 relative_path_sha256: path_sha256,
                 path_depth,
                 extension,
@@ -1365,6 +1426,8 @@ fn resolve_record(
     Ok(InventoryRecord {
         selection_rank,
         source_contract_id,
+        source_table: "contracts".to_string(),
+        source_record_id: source_contract_id,
         source_business_key_sha256: lineage.business_key_sha256,
         positive_source_contract_flag: lineage.has_contract == Some(true),
         source_tables,
@@ -1668,10 +1731,13 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::{
         classification_counts, evidence_path_metadata, manifest_digest, normalize_candidate,
-        parse_env, write_or_verify_audit, write_or_verify_manifest, DatabaseFingerprint,
-        FrozenManifest, SourceFingerprint, AUDIT_FILE_NAME, MANIFEST_SCHEMA,
+        parse_env, select_representative_contract_ids, write_or_verify_audit,
+        write_or_verify_manifest, DatabaseFingerprint, EvidenceReference, FrozenManifest,
+        InventoryRecord, LineageCount, SourceFingerprint, AUDIT_FILE_NAME, MANIFEST_SCHEMA,
     };
     use legacy_migration_rehearsal::{InventoryClassification, REHEARSAL_SELECTION_LIMIT};
 
@@ -1702,12 +1768,124 @@ mod tests {
     }
 
     #[test]
+    fn app_selector_prioritizes_coverage_before_id_order() {
+        let mut records = BTreeMap::new();
+        for id in 1_i64..=120 {
+            records.insert(id, test_record(id, "Ambiguous"));
+        }
+        for (id, classification) in [(200, "Exact"), (201, "Rejected")] {
+            records.insert(id, test_record(id, classification));
+        }
+        for id in 202_i64..=210 {
+            records.insert(id, test_record(id, "Ambiguous"));
+        }
+        records
+            .get_mut(&202)
+            .expect("versions fixture")
+            .lineage
+            .versions = 2;
+        records
+            .get_mut(&203)
+            .expect("attachments fixture")
+            .lineage
+            .attachments = 2;
+        records
+            .get_mut(&204)
+            .expect("parse fixture")
+            .lineage
+            .parse_jobs = 1;
+        records
+            .get_mut(&205)
+            .expect("extraction fixture")
+            .lineage
+            .extraction_results = 1;
+        records
+            .get_mut(&206)
+            .expect("task file fixture")
+            .lineage
+            .task_files = 1;
+        records.get_mut(&207).expect("evidence fixture").evidence =
+            vec![test_evidence(), test_evidence()];
+        records
+            .get_mut(&208)
+            .expect("ocr fixture")
+            .lineage
+            .ocr_artifacts = 1;
+        records
+            .get_mut(&209)
+            .expect("structured fixture")
+            .artifact_kinds
+            .push("EXTRACTED_JSON".to_string());
+        records
+            .get_mut(&210)
+            .expect("positive flag fixture")
+            .positive_source_contract_flag = true;
+
+        let selected = select_representative_contract_ids(&records).expect("120 records");
+
+        assert_eq!(selected.len(), REHEARSAL_SELECTION_LIMIT);
+        assert_eq!(
+            &selected[..12],
+            &[200, 1, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210]
+        );
+        assert_ne!(selected, (1_i64..=120).collect::<Vec<_>>());
+    }
+
+    #[test]
     fn evidence_path_metadata_does_not_return_raw_path() {
         let (digest, depth, extension) = evidence_path_metadata("root/Company Name/contract.doc");
         assert_eq!(digest.len(), 64);
         assert_eq!(depth, 3);
         assert_eq!(extension.as_deref(), Some("doc"));
         assert!(!digest.contains("Company"));
+    }
+
+    fn test_record(id: i64, classification: &str) -> InventoryRecord {
+        InventoryRecord {
+            selection_rank: 0,
+            source_contract_id: id,
+            source_table: "contracts".to_string(),
+            source_record_id: id,
+            source_business_key_sha256: None,
+            positive_source_contract_flag: false,
+            source_tables: vec!["contracts".to_string()],
+            artifact_kinds: Vec::new(),
+            classification: classification.to_string(),
+            reason_code: "test".to_string(),
+            lineage: LineageCount {
+                versions: 0,
+                attachments: 0,
+                artifacts: 0,
+                ingestions: 0,
+                ingestion_tasks: 0,
+                task_files: 0,
+                parse_jobs: 0,
+                extraction_results: 0,
+                legacy_fingerprint_count: 0,
+                ingestion_task_results: 0,
+                raw_result_links: 0,
+                parsed_result_links: 0,
+                extracted_result_links: 0,
+                ocr_artifacts: 0,
+                structured_artifacts: 0,
+            },
+            evidence: Vec::new(),
+        }
+    }
+
+    fn test_evidence() -> EvidenceReference {
+        EvidenceReference {
+            root: "datasets".to_string(),
+            source_table: "contract_attachments".to_string(),
+            source_record_id: 1,
+            relative_path_sha256: "a".repeat(64),
+            path_depth: 1,
+            extension: Some("pdf".to_string()),
+            source_kind: "test".to_string(),
+            size_bytes: 1,
+            expected_sha256: None,
+            observed_sha256: None,
+        }
     }
 
     #[test]

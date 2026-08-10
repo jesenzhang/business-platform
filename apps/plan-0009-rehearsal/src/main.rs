@@ -34,7 +34,7 @@ async fn run() -> Result<(), &'static str> {
 
     let isolation_root = PathBuf::from(ISOLATION_ROOT);
     let target_root = match command.as_str() {
-        "inventory" => isolation_root.join("stage-1-inventory-v7"),
+        "inventory" => isolation_root.join("stage-1-inventory-v8"),
         "stage2" => isolation_root.join("stage-2-rehearsal-v1"),
         _ => return Err("usage: plan-0009-rehearsal inventory|stage2"),
     };
