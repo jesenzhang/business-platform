@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 4 — adversarial integrity and recovery validation
 
-Status: **candidate — independent Reviewer pending**.
+Status: **PASS — independent Reviewer accepted**.
 
 Stage 4 is a rehearsal-only integrity and recovery validation. It does not
 authorize production migration and it does not activate PLAN-0006.
@@ -141,11 +141,13 @@ snapshots.
 ## Review ledger
 
 - Stage 4 base: 3c09837 (Stage 3 accepted candidate).
-- Stage 4 Luna implementation sessions were interrupted before producing a
-  committed candidate; the coordinator completed and verified the bounded
-  module and report from the preserved Stage 4 working-tree state.
-- Coordinator candidate: 005024d.
-- Independent Reviewer: pending. Stage 4 remains open until a new Reviewer
-  directly verifies the audit artifact, clean replay, interrupted recovery,
-  partial-target rejection, matrix derivation, source isolation, and focused
-  tests, then returns PASS.
+- Stage 4 Luna implementation sessions were interrupted after preserving the
+  bounded module; the coordinator completed the report and candidate closure
+  from that working-tree state.
+- Implementation candidate: 005024d.
+- Final evidence candidate: de612c7 (report-only closure on top of 005024d).
+- Independent Reviewer attempt 1: Carson (gpt-5.4-mini, high), exact range
+  3c09837..de612c7, PASS. The Reviewer directly checked the audit hash and
+  matrix, clean and interrupted SQLite targets, partial-target rejection,
+  focused gates, source isolation, and absence of PLAN-0006/production code.
+- Stage 4 is closed. Full workspace gates remain a Stage 5 responsibility.
