@@ -30,8 +30,8 @@ use super::{
     ScannedRoot,
 };
 
-const STAGE1_DIRECTORY: &str = "stage-1-inventory-v8";
-const STAGE2_DIRECTORY: &str = "stage-2-rehearsal-v1";
+const STAGE1_DIRECTORY: &str = "stage-1-inventory-v9";
+const STAGE2_DIRECTORY: &str = "stage-2-rehearsal-v2";
 const MANIFEST_FILE_NAME: &str = "manifest-v1.json";
 const MANIFEST_DIGEST_FILE_NAME: &str = "manifest-v1-digests.json";
 const MAPPING_PLAN_FILE_NAME: &str = "mapping-plan-v1.json";
@@ -1766,6 +1766,10 @@ mod tests {
                 root: "datasets".to_string(),
                 source_table: "contract_versions".to_string(),
                 source_record_id: 11,
+                source_records: vec![crate::SourceRecordReference {
+                    source_table: "contract_versions".to_string(),
+                    source_record_id: 11,
+                }],
                 relative_path_sha256: "b".repeat(64),
                 path_depth: 2,
                 extension: Some("pdf".to_string()),
@@ -1779,7 +1783,7 @@ mod tests {
 
     fn manifest() -> FrozenManifest {
         FrozenManifest {
-            manifest_schema: "plan-0009.stage-1.inventory.v8".to_string(),
+            manifest_schema: "plan-0009.stage-1.inventory.v9".to_string(),
             selection_rule: "test".to_string(),
             selection_limit: 120,
             source: serde_json::from_value(serde_json::json!({
