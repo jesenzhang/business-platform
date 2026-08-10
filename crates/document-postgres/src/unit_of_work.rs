@@ -181,6 +181,11 @@ impl DocumentRepository for PostgresCreateDocumentUnitOfWork {
             .begin()
             .await
             .map_err(|_| RepositoryError::Unavailable)?;
+        let persisted_current_revision_id = if new_revision.is_some() {
+            None
+        } else {
+            Some(document.current_revision_id())
+        };
         let result = sqlx::query(
             "UPDATE documents SET original_filename = $1, content_type = $2, object_key = $3, status = $4, version = $5, content_revision = $6, current_revision_id = $7, deletion_state = $8, pre_trash_lifecycle = $9, size_bytes = $10, updated_at = $11 WHERE tenant_id = $12 AND id = $13 AND version = $14",
         )
@@ -190,7 +195,7 @@ impl DocumentRepository for PostgresCreateDocumentUnitOfWork {
         .bind(document.status().as_str())
         .bind(document.aggregate_version().value())
         .bind(document.content_revision().value())
-        .bind(document.current_revision_id())
+        .bind(persisted_current_revision_id)
         .bind(document.deletion_state().as_str())
         .bind(document.lifecycle_state().as_str())
         .bind(document.size_bytes())
@@ -208,6 +213,9 @@ impl DocumentRepository for PostgresCreateDocumentUnitOfWork {
             insert_revision(&mut transaction, revision)
                 .await
                 .map_err(map_revision_repository_error)?;
+            set_current_revision(&mut transaction, document)
+                .await
+                .map_err(|_| RepositoryError::Unavailable)?;
         }
         transaction
             .commit()
@@ -347,7 +355,7 @@ async fn set_current_revision(
     document: &DocumentMetadata,
 ) -> Result<(), ApplicationPortError> {
     let result = sqlx::query(
-        "UPDATE documents SET current_revision_id = $1 WHERE tenant_id = $2 AND id = $3 AND current_revision_id IS NULL",
+        "UPDATE documents SET current_revision_id = $1 WHERE tenant_id = $2 AND id = $3",
     )
     .bind(document.current_revision_id())
     .bind(document.tenant_id())
