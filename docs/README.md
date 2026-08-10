@@ -134,7 +134,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 ## 8. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
-- 下一计划：plans/current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（Proposed / NOT ACTIVE）
+- 下一计划：plans/current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（Active / Rehearsal Only）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）

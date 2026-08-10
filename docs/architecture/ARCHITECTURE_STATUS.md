@@ -87,8 +87,8 @@
 > `31353149398` and Main CI `31353409550` passed all jobs, including GitHub
 > PostgreSQL/MinIO, migration, revision/evidence, concurrency, retry, crash
 > recovery, multi-process E2E, and Architecture Fitness. Local PostgreSQL/MinIO
-> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Active / Rehearsal Only / NOT
-> ACTIVE and PLAN-0006 remains Proposed / NOT ACTIVE.
+> remains NOT RUN. PLAN-0008 is Integrated / Archived. PLAN-0009 is Active /
+> Rehearsal Only; PLAN-0006 remains Proposed / NOT ACTIVE.
 
 > 2026-08-10: PLAN-0009 was activated from the real main HEAD
 > `654fe83d82107d899079d20e5fef8aaf4d5431b8` for read-only, isolated rehearsal only.
