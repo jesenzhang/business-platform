@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 2 — deterministic mapping and isolated write rehearsal
 
-Status: **candidate — independent Reviewer pending for the v9-input rerun**.
+Status: **PASS — coordinator verified and independent Reviewer passed**.
 
 Stage 2 is rehearsal-only. It never writes the C source database or source
 roots, never calls the C application, and never activates PLAN-0006.
@@ -91,6 +91,10 @@ required before final Goal closeout.
 - This v9-input rerun changes the frozen input and mapping digest and includes
   the bounded target-directory seam; it therefore requires a fresh independent
   review.
-- Current status: coordinator evidence complete; independent Reviewer pending.
+- Independent Reviewer (clean HEAD `afc136c`, v9-input scope): `PASS`; no
+  remaining Stage 2 findings. The review verified the real mapping artifact,
+  target database integrity, replay idempotency, and report/digest accuracy.
 
-Stage 2 remains rehearsal-only until that fresh review returns `PASS`.
+Stage 2 is closed for this rehearsal and authorizes only the next isolated
+rehearsal stage. It does not authorize production migration or PLAN-0006
+activation.
