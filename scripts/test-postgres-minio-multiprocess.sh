@@ -193,10 +193,10 @@ candidate_version="$(jq -r '.data.version' <<<"$candidate_json")"
 review_key="review-$RANDOM-$(date +%s)"
 review_body="{\"decision\":\"accepted\",\"candidate_version\":$candidate_version}"
 review_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
-[[ "$(jq -r '.data.candidate_id' <<<"$review_json")" != "null" ]]
+[[ "$(jq -r '.data.review.candidate_id' <<<"$review_json")" != "null" ]]
 # A lost HTTP response must be replayable after the job is terminal.
 replay_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/processing-jobs/$job_id/review" "${auth[@]}" -H "Idempotency-Key: $review_key" -H 'Content-Type: application/json' -d "$review_body")"
-[[ "$(jq -r '.data.candidate_id' <<<"$replay_json")" != "null" ]]
+[[ "$(jq -r '.data.review.candidate_id' <<<"$replay_json")" != "null" ]]
 final_json="$(curl --fail-with-body -sS "$base/api/v1/processing-jobs/$job_id" "${auth[@]}")"
 [[ "$(jq -r '.data.status' <<<"$final_json")" == succeeded ]]
 
