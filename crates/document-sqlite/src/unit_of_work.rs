@@ -39,6 +39,7 @@ impl SqliteCreateDocumentUnitOfWork {
     /// Verify every deterministic audit/outbox value emitted by a rehearsal
     /// create. This is intentionally adapter-owned because those records are
     /// persistence facts, not Document domain state.
+    #[allow(clippy::cmp_owned, clippy::too_many_lines)]
     pub async fn verify_rehearsal_events(
         &self,
         document: &DocumentMetadata,

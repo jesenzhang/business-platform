@@ -977,6 +977,7 @@ fn build_processing_entities(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 async fn verify_exact_materialization(
     pool: &SqlitePool,
     target_objects: &Path,

@@ -274,7 +274,7 @@ async fn run_replay(
     let replay_run = stage2::run_stage2_at(&replay_config, target_directory)
         .await
         .map_err(|_| Stage3Error::Stage2Failed)?;
-    if replay_run.replayed != true {
+    if !replay_run.replayed {
         return Err(Stage3Error::ReplayMismatch);
     }
     let stage2_audit = read_stage2_audit(&target_root)?;
@@ -392,7 +392,7 @@ fn scan_object_root(root: &Path) -> Result<(usize, u64, String), Stage3Error> {
             .map_err(|_| Stage3Error::TargetRead("object_directory_read"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| Stage3Error::TargetRead("object_entry_read"))?;
-        entries.sort_by_key(|entry| entry.file_name());
+        entries.sort_by_key(std::fs::DirEntry::file_name);
         for entry in entries {
             let path = entry.path();
             let file_type = entry
@@ -433,6 +433,10 @@ fn scan_object_root(root: &Path) -> Result<(usize, u64, String), Stage3Error> {
 }
 
 fn coverage_matrix(manifest: &FrozenManifest) -> CoverageMatrix {
+    coverage_matrix_records(&manifest.records)
+}
+
+fn coverage_matrix_records(records: &[super::InventoryRecord]) -> CoverageMatrix {
     let is_structured = |record: &super::InventoryRecord| {
         record
             .artifact_kinds
@@ -440,8 +444,7 @@ fn coverage_matrix(manifest: &FrozenManifest) -> CoverageMatrix {
             .any(|kind| matches!(kind.as_str(), "RAW_JSON" | "PARSED_JSON" | "EXTRACTED_JSON"))
     };
     CoverageMatrix {
-        ordinary_single_file: manifest
-            .records
+        ordinary_single_file: records
             .iter()
             .filter(|record| {
                 record.classification == "Probable"
@@ -452,55 +455,50 @@ fn coverage_matrix(manifest: &FrozenManifest) -> CoverageMatrix {
                     && record.lineage.ingestions == 0
                     && record.lineage.ingestion_tasks == 0
                     && record.lineage.task_files == 0
+                    && record.lineage.parse_jobs == 0
+                    && record.lineage.extraction_results == 0
+                    && record.lineage.ocr_artifacts == 0
+                    && record.lineage.structured_artifacts == 0
+                    && record.artifact_kinds.is_empty()
             })
             .count(),
-        multi_version: manifest
-            .records
+        multi_version: records
             .iter()
             .filter(|record| record.lineage.versions > 1)
             .count(),
-        scanned_or_ocr: manifest
-            .records
+        scanned_or_ocr: records
             .iter()
             .filter(|record| record.lineage.ocr_artifacts > 0)
             .count(),
-        attachments: manifest
-            .records
+        attachments: records
             .iter()
             .filter(|record| record.lineage.attachments > 0)
             .count(),
-        llm_or_structured: manifest
-            .records
+        llm_or_structured: records
             .iter()
             .filter(|record| is_structured(record))
             .count(),
-        known_bad_relationship: manifest
-            .records
+        known_bad_relationship: records
             .iter()
             .filter(|record| record.classification == "Rejected")
             .count(),
-        duplicate_or_multiple_physical_matches: manifest
-            .records
+        duplicate_or_multiple_physical_matches: records
             .iter()
             .filter(|record| record.classification == "Ambiguous")
             .count(),
-        missing_evidence: manifest
-            .records
+        missing_evidence: records
             .iter()
             .filter(|record| matches!(record.classification.as_str(), "Ambiguous" | "Rejected"))
             .count(),
-        orphan: manifest
-            .records
+        orphan: records
             .iter()
             .filter(|record| record.classification == "Orphan")
             .count(),
-        ambiguous: manifest
-            .records
+        ambiguous: records
             .iter()
             .filter(|record| record.classification == "Ambiguous")
             .count(),
-        conflict: manifest
-            .records
+        conflict: records
             .iter()
             .filter(|record| record.classification == "Conflict")
             .count(),
@@ -571,31 +569,95 @@ fn map_inventory_error(_error: InventoryError) -> Stage3Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{coverage_matrix, CoverageMatrix};
+    use super::{coverage_matrix_records, CoverageMatrix};
+    use crate::{EvidenceReference, InventoryRecord, LineageCount, SourceRecordReference};
 
     #[test]
     fn requested_real_sample_coverage_is_explicit_and_stable() {
         let expected = CoverageMatrix {
             ordinary_single_file: 0,
-            multi_version: 2,
+            multi_version: 1,
             scanned_or_ocr: 1,
-            attachments: 10,
-            llm_or_structured: 5,
+            attachments: 1,
+            llm_or_structured: 1,
             known_bad_relationship: 1,
-            duplicate_or_multiple_physical_matches: 89,
-            missing_evidence: 90,
-            orphan: 29,
-            ambiguous: 89,
-            conflict: 0,
+            duplicate_or_multiple_physical_matches: 1,
+            missing_evidence: 2,
+            orphan: 1,
+            ambiguous: 1,
+            conflict: 1,
         };
-        let _ = coverage_matrix;
-        assert_eq!(
-            expected.ambiguous,
-            expected.duplicate_or_multiple_physical_matches
-        );
-        assert_eq!(
-            expected.missing_evidence,
-            expected.ambiguous + expected.known_bad_relationship
-        );
+        let mut multi_version = record("Probable");
+        multi_version.lineage.versions = 2;
+        let mut ocr = record("Probable");
+        ocr.lineage.ocr_artifacts = 1;
+        let mut attachment = record("Probable");
+        attachment.lineage.attachments = 1;
+        let mut structured = record("Probable");
+        structured.artifact_kinds.push("EXTRACTED_JSON".to_string());
+        let rejected = record("Rejected");
+        let ambiguous = record("Ambiguous");
+        let orphan = record("Orphan");
+        let conflict = record("Conflict");
+
+        let actual = coverage_matrix_records(&[
+            multi_version,
+            ocr,
+            attachment,
+            structured,
+            rejected,
+            ambiguous,
+            orphan,
+            conflict,
+        ]);
+        assert_eq!(actual, expected);
+    }
+
+    fn record(classification: &str) -> InventoryRecord {
+        InventoryRecord {
+            selection_rank: 1,
+            source_contract_id: 1,
+            source_table: "contracts".to_string(),
+            source_record_id: 1,
+            source_business_key_sha256: None,
+            positive_source_contract_flag: false,
+            source_tables: vec!["contracts".to_string()],
+            artifact_kinds: Vec::new(),
+            classification: classification.to_string(),
+            reason_code: "test".to_string(),
+            lineage: LineageCount {
+                versions: 0,
+                attachments: 0,
+                artifacts: 0,
+                ingestions: 0,
+                ingestion_tasks: 0,
+                task_files: 0,
+                parse_jobs: 0,
+                extraction_results: 0,
+                legacy_fingerprint_count: 0,
+                ingestion_task_results: 0,
+                raw_result_links: 0,
+                parsed_result_links: 0,
+                extracted_result_links: 0,
+                ocr_artifacts: 0,
+                structured_artifacts: 0,
+            },
+            evidence: vec![EvidenceReference {
+                root: "datasets".to_string(),
+                source_table: "contracts".to_string(),
+                source_record_id: 1,
+                source_records: vec![SourceRecordReference {
+                    source_table: "contracts".to_string(),
+                    source_record_id: 1,
+                }],
+                relative_path_sha256: "a".repeat(64),
+                path_depth: 1,
+                extension: Some("pdf".to_string()),
+                source_kind: "test".to_string(),
+                size_bytes: 1,
+                expected_sha256: None,
+                observed_sha256: None,
+            }],
+        }
     }
 }

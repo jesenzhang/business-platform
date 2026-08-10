@@ -411,6 +411,7 @@ struct TaskFileRow {
 }
 
 #[derive(Debug, Clone, FromRow)]
+#[allow(clippy::struct_field_names)]
 struct TaskResultRow {
     task_id: i64,
     raw_result_file_id: Option<i64>,
@@ -548,7 +549,9 @@ pub async fn run_inventory(config: &InventoryConfig) -> Result<InventorySummary,
     pool.close().await;
     let mut manifest = result?;
     let canonical_digest = manifest_digest(&manifest)?;
-    manifest.canonical_manifest_sha256 = canonical_digest.clone();
+    manifest
+        .canonical_manifest_sha256
+        .clone_from(&canonical_digest);
     let (replayed, file_bytes_digest) = write_or_verify_manifest(&config.target_root, &manifest)?;
     write_or_verify_audit(
         &config.target_root,
@@ -589,6 +592,7 @@ async fn connect_read_only(path: &Path) -> Result<SqlitePool, InventoryError> {
         .map_err(InventoryError::Database)
 }
 
+#[allow(clippy::too_many_lines)]
 async fn inventory_from_source(
     pool: &SqlitePool,
     env_file: &Path,
@@ -1181,7 +1185,7 @@ fn scan_root(root: &PhysicalRootConfig) -> Result<ScannedRoot, InventoryError> {
             .map_err(|_| InventoryError::PhysicalScan)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| InventoryError::PhysicalScan)?;
-        entries.sort_by_key(|entry| entry.file_name());
+        entries.sort_by_key(std::fs::DirEntry::file_name);
         for entry in entries {
             let entry_path = entry.path();
             let file_type = entry
@@ -1252,6 +1256,7 @@ struct ResolvedMatch {
     expected_hashes: BTreeSet<String>,
 }
 
+#[allow(clippy::cast_sign_loss, clippy::too_many_lines)]
 fn resolve_record(
     selection_rank: usize,
     source_contract_id: i64,
@@ -1261,12 +1266,9 @@ fn resolve_record(
     let mut matches = BTreeMap::<String, ResolvedMatch>::new();
     let mut unsafe_value = lineage.unsafe_value;
     for candidate in &lineage.candidates {
-        let normalized = match normalize_candidate(&candidate.value) {
-            Ok(value) => value,
-            Err(()) => {
-                unsafe_value = true;
-                continue;
-            }
+        let Ok(normalized) = normalize_candidate(&candidate.value) else {
+            unsafe_value = true;
+            continue;
         };
         let Some(normalized) = normalized else {
             continue;
@@ -1359,11 +1361,9 @@ fn resolve_record(
                 InventoryClassification::Conflict,
                 "conflicting_source_fingerprints",
             )
-        } else if resolved
-            .expected_sizes
-            .first()
-            .is_some_and(|size| *size < 0 || *size as u64 != resolved.observation.size_bytes)
-        {
+        } else if resolved.expected_sizes.first().is_some_and(|size| {
+            *size < 0 || size.cast_unsigned() != resolved.observation.size_bytes
+        }) {
             (InventoryClassification::Conflict, "source_size_mismatch")
         } else if let Some(expected_hash) = resolved.expected_hashes.first() {
             if resolved.observation.size_bytes > MAX_HASH_BYTES {
@@ -1744,6 +1744,7 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use std::collections::BTreeMap;
 
