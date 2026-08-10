@@ -99,24 +99,39 @@ Authoritative Stage 3 audit artifact:
 
 `stage3-replay-audit-v1.json`
 
+Audit artifact SHA-256:
+`fb312b732b9879df1471dab22fda9b22848fdeb44b8cd269102c14f07f16fd6c`
+
 It contains only manifest/classification/lineage counts, safe SHA-256 values,
 target semantic snapshots, replay status, and failure codes. It contains no
 raw source names, text, absolute source paths, URLs, credentials, or signed
 URLs.
 
-## Focused verification
+## Verification gates
 
 Executed:
 
 ```text
 rtk cargo fmt --all -- --check
-rtk cargo check -p plan-0009-rehearsal --all-targets --all-features
+rtk cargo check --workspace --all-targets --all-features
+rtk cargo clippy --workspace --all-targets --all-features -- -D warnings
+rtk cargo test --workspace --all-features
 rtk cargo test -p plan-0009-rehearsal --all-features   # 10 passed
 ```
 
-The full workspace gates remain `NOT RUN` in this Stage 3 loop and are
-required before final Goal closeout. Existing workspace Clippy findings are
-tracked for the final gate; they do not authorize stopping the rehearsal.
+Results:
+
+- format check: pass;
+- workspace check: pass (`377` crates compiled);
+- workspace Clippy: pass (`No issues found`);
+- workspace tests: `147 passed, 34 ignored` across `113` suites;
+- focused Stage 3 tests: `10 passed` across `3` suites.
+
+The workspace check, Clippy, and test commands used the temporary
+`G:\codex-build\business-platform-target` Cargo target directory with
+incremental compilation disabled because the repository volume had exhausted
+its free space during the first full test attempt. This changes only generated
+build output, not source or rehearsal data.
 
 ## Review ledger
 
@@ -124,6 +139,9 @@ tracked for the final gate; they do not authorize stopping the rehearsal.
   it stalled before producing a change, so the coordinator completed the
   scoped implementation and verification without changing the accepted
   Stage 0–2 semantics.
+- A follow-up Stage 3 Luna verification worker independently checked the real
+  audit and target snapshots and returned coordinator evidence; it did not
+  replace the required independent Reviewer verdict.
 - Coordinator real run: complete; first/replay output and both target snapshots
   match.
 - Independent Reviewer: pending. Stage 3 remains open until the Reviewer
