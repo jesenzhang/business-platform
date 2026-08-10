@@ -127,7 +127,7 @@ SQLite 使用显式 single-writer/`BEGIN IMMEDIATE`、单进程限制和连接�
 
 ## 10. Local Candidate evidence
 
-- GitHub Actions real PostgreSQL + MinIO contract and multi-process E2E：final run `31352005264` at commit `70469be26cb009c23f1a77c1553947522ba82aed` PASS；Architecture Fitness、Format、Check、Clippy、Unit、Frontend、Playwright、CLI/MCP contracts 同 run PASS。详细证据见 `docs/reports/PLAN-0008-CI-EVIDENCE-AND-C-MIGRATION-REHEARSAL.md`。
+- GitHub Actions real PostgreSQL + MinIO contract and multi-process E2E：implementation/runtime evidence SHA `70469be26cb009c23f1a77c1553947522ba82aed` 的 run `31352005264` PASS；exact Final Candidate HEAD `7966d03587df4908229e3c30737d8e333183fb20` 的 final evidence run `31352272475` PASS；Architecture Fitness、Format、Check、Clippy、Unit、Frontend、Playwright、CLI/MCP contracts 同 run PASS。详细证据见 `docs/reports/PLAN-0008-CI-EVIDENCE-AND-C-MIGRATION-REHEARSAL.md`。
 - 本机 PostgreSQL/MinIO 仍保持 NOT RUN；本地安装的工具不作为验收证据。
 
 - `cargo fmt --all -- --check`：PASS。
@@ -135,7 +135,7 @@ SQLite 使用显式 single-writer/`BEGIN IMMEDIATE`、单进程限制和连接�
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`：PASS（0 error）。
 - `cargo test --workspace --all-features`：126 passed，32 ignored。
 - `pwsh ./scripts/check-architecture.ps1`：PASS；`scripts/check-openapi.ps1`：PASS；`git diff --check`：PASS。
-- PostgreSQL、MinIO、真实迁移升级和跨进程 E2E：NOT RUN；对应测试因缺少真实设施保持 `#[ignore]`，不得推断为 PASS。
+- 本机 PostgreSQL/MinIO：NOT RUN；GitHub Actions PostgreSQL + MinIO、migration、multipart、revision/evidence、concurrency、retry、crash recovery、multi-process E2E：PASS。C 项目正式迁移仍未开始，保持 read-only rehearsal 边界。
 
 ## 11. 后续建议（本轮不执行）
 

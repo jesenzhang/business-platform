@@ -3,7 +3,10 @@
 Date: 2026-08-10  
 Branch: `codex/plan-0008-document-lifecycle-revision-and-evidence-foundation`  
 Base: `35d1d01`  
-Final candidate commit: `70469be26cb009c23f1a77c1553947522ba82aed`  
+Base SHA: `35d1d01fd49a70ee996fbb5fb72818a632989efe`  
+Final Candidate HEAD: `7966d03587df4908229e3c30737d8e333183fb20`  
+Implementation/runtime evidence SHA: `70469be26cb009c23f1a77c1553947522ba82aed`  
+Final evidence CI run: `31352272475`  
 Scope: Accepted Candidate closeout evidence and read-only migration design. No
 PLAN-0008 product capability was added by this report.
 
@@ -20,13 +23,15 @@ and then runs Architecture Fitness and OpenAPI checks:
 - Multi-process API/worker contract:
   `scripts/test-postgres-minio-multiprocess.sh`.
 
-The final follow-up run `31352005264` was green for commit
+Implementation/runtime evidence run `31352005264` was green for
 `70469be26cb009c23f1a77c1553947522ba82aed`:
 [GitHub Actions run 31352005264](https://github.com/jesenzhang/business-platform/actions/runs/31352005264).
-It passed the PostgreSQL + MinIO integration, Architecture Fitness, Format,
-Check, Clippy, Unit tests, Frontend checks, Frontend Playwright smoke, and
-CLI/MCP contracts jobs. The preceding implementation evidence run
-`31350822824` at `414c88a4` was also green.
+The final evidence run `31352272475` was also green for the exact Final
+Candidate HEAD `7966d03587df4908229e3c30737d8e333183fb20`:
+[GitHub Actions run 31352272475](https://github.com/jesenzhang/business-platform/actions/runs/31352272475).
+Both runs passed the PostgreSQL + MinIO integration, Architecture Fitness,
+Format, Check, Clippy, Unit tests, Frontend checks, Frontend Playwright smoke,
+and CLI/MCP contracts jobs.
 
 Local PostgreSQL and MinIO are **NOT RUN**. The local executables are not used
 as acceptance evidence; only the GitHub-hosted service containers count.
@@ -35,16 +40,16 @@ as acceptance evidence; only the GitHub-hosted service containers count.
 
 | Invariant | Real CI assertion | Result / boundary |
 | --- | --- | --- |
-| Stable idempotent upload | Multipart HTTP upload uses the same idempotency key twice; the application contract also checks the same immutable object/revision identity. | PASS in final run `31352005264`. |
-| Revision creation and current switch | R1 is created, R2 is created from the aggregate, and current revision changes to R2. | PASS in final run `31352005264`. |
-| Historical revision immutability | Direct PostgreSQL update of R1 is rejected by the database integrity fence. | PASS in final run `31352005264`. |
-| Exact processing binding | The processing job stores the selected `document_revision_id` and `content_revision`; `ProcessingRun` is started for the same revision. | PASS in final run `31352005264`. |
-| Artifact/evidence binding | Artifact points to the run; evidence points to revision, run, and artifact; a cross-revision evidence insert is rejected. | PASS in final run `31352005264`. This is a database identity/FK replay assertion, not a claim that a full review use-case replay was exercised through every application port. |
-| Object bytes and metadata/hash | MinIO `HEAD` and `GET` are compared with content length, content type, SHA-256 metadata, and PostgreSQL revision/artifact checksum fields. | PASS in final run `31352005264`. |
-| Replay cardinality | Replayed document creation, processing job, run, artifact, and evidence identities remain single rows. | PASS in final run `31352005264` for the exercised persistence identities; artifact/evidence replay uses explicit idempotent SQL conflict handling in the test fixture. |
-| Concurrent/stale version rejection | Two writers with one aggregate version race; exactly one save succeeds and the loser receives `RepositoryError::Conflict`. | PASS in final run `31352005264`. |
-| Retry convergence | A transient step failure returns the job to `queued`, increments the attempt, and permits a new worker claim. | PASS in final run `31352005264`. |
-| Crash recovery and process convergence | Business Worker and AI Worker are killed while leased work is active; fresh processes reclaim the work. Review is replayed and 20 jobs converge to terminal reviewable/succeeded states with one candidate, one review, and one successful AI task for the crash-recovery job. | PASS in final run `31352005264`. |
+| Stable idempotent upload | Multipart HTTP upload uses the same idempotency key twice; the application contract also checks the same immutable object/revision identity. | PASS in final run `31352272475`. |
+| Revision creation and current switch | R1 is created, R2 is created from the aggregate, and current revision changes to R2. | PASS in final run `31352272475`. |
+| Historical revision immutability | Direct PostgreSQL update of R1 is rejected by the database integrity fence. | PASS in final run `31352272475`. |
+| Exact processing binding | The processing job stores the selected `document_revision_id` and `content_revision`; `ProcessingRun` is started for the same revision. | PASS in final run `31352272475`. |
+| Artifact/evidence binding | Artifact points to the run; evidence points to revision, run, and artifact; a cross-revision evidence insert is rejected. | PASS in final run `31352272475`. This is a database identity/FK replay assertion, not a claim that a full review use-case replay was exercised through every application port. |
+| Object bytes and metadata/hash | MinIO `HEAD` and `GET` are compared with content length, content type, SHA-256 metadata, and PostgreSQL revision/artifact checksum fields. | PASS in final run `31352272475`. |
+| Replay cardinality | Replayed document creation, processing job, run, artifact, and evidence identities remain single rows. | PASS in final run `31352272475` for the exercised persistence identities; artifact/evidence replay uses explicit idempotent SQL conflict handling in the test fixture. |
+| Concurrent/stale version rejection | Two writers with one aggregate version race; exactly one save succeeds and the loser receives `RepositoryError::Conflict`. | PASS in final run `31352272475`. |
+| Retry convergence | A transient step failure returns the job to `queued`, increments the attempt, and permits a new worker claim. | PASS in final run `31352272475`. |
+| Crash recovery and process convergence | Business Worker and AI Worker are killed while leased work is active; fresh processes reclaim the work. Review is replayed and 20 jobs converge to terminal reviewable/succeeded states with one candidate, one review, and one successful AI task for the crash-recovery job. | PASS in final run `31352272475`. |
 
 ### PostgreSQL/MinIO consistency boundary
 
