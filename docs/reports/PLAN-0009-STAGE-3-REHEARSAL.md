@@ -1,6 +1,6 @@
 # PLAN-0009 Stage 3 — real 120-contract dual replay
 
-Status: **candidate — independent Reviewer pending**.
+Status: **PASS — independent Reviewer accepted**.
 
 Stage 3 is a rehearsal-only execution and comparison stage. It does not
 authorize production migration and it does not activate PLAN-0006.
@@ -135,15 +135,21 @@ build output, not source or rehearsal data.
 
 ## Review ledger
 
-- A new Stage 3 Luna implementation worker was launched with this ownership;
-  it stalled before producing a change, so the coordinator completed the
-  scoped implementation and verification without changing the accepted
-  Stage 0–2 semantics.
-- A follow-up Stage 3 Luna verification worker independently checked the real
-  audit and target snapshots and returned coordinator evidence; it did not
-  replace the required independent Reviewer verdict.
-- Coordinator real run: complete; first/replay output and both target snapshots
-  match.
-- Independent Reviewer: pending. Stage 3 remains open until the Reviewer
-  directly verifies this report, the real audit artifact, both target trees,
-  coverage derivation, and source-isolation claims and returns `PASS`.
+- Stage base: `60b457e` (accepted Stage 2 closure).
+- Initial implementation candidate: `7b6e765`.
+- Independent Reviewer attempt 1: `Parfit` (`gpt-5.4`, high), `7b6e765`,
+  **FAIL** with two MEDIUM findings: mandatory workspace gates were not run,
+  and the coverage test did not call the real derivation logic.
+- Repair candidate: `4bef477`; it added the real coverage-derivation fixture,
+  closed workspace Clippy findings, and enabled the required full gates.
+- Final evidence candidate: `63f4154` (report-only closure on top of
+  `4bef477`).
+- Independent Reviewer attempt 2: `Poincare` (`gpt-5.4-mini`, high), exact
+  reviewed candidate `63f4154`, **PASS**. The Reviewer independently
+  recomputed the manifest/audit, checked both target SQLite databases and
+  object roots, verified coverage derivation and the report hash, and found no
+  gaps or risks.
+- A follow-up Luna verification worker returned coordinator evidence on the
+  real audit and targets; it did not replace the independent Reviewer.
+- Stage 3 is closed. No production migration was run and PLAN-0006 remains
+  inactive.
