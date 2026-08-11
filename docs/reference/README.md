@@ -15,6 +15,7 @@
 | 项目 | 分类 | 主要参考价值 | 分析文档 |
 |---|---|---|---|
 | Cloudflare OS | 企业 AI Workspace / Agent 应用平台 | Workspace、Gatekeeper、Gadget、Blueprint、Capability-based security、Observation/Observer | [`CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](CLOUDFLARE_OS_REFERENCE_ANALYSIS.md) |
+| Canner/WrenAI | Semantic Contract / GenBI 参考 | MDL、语义建模、source-to-compiled manifest、结构化校验与 dry-plan 思想；不采用其运行时和任意 SQL/MCP 边界 | [`WRENAI_REFERENCE_ANALYSIS.md`](WRENAI_REFERENCE_ANALYSIS.md) |
 | Odoo / ERPNext / Frappe HRMS / Twenty / Bigcapital | 企业业务领域 | ERP 领域组合、财务、HR/绩效、可扩展业务对象 | [`BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](BUSINESS_DOMAIN_REFERENCE_PROJECTS.md) |
 | Plane / Chatwoot / Comp AI CRM | 专业协作与 Agentic Business App | 项目、客户交互、Evidence-first Agent、Durable Agent Task | [`BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](BUSINESS_DOMAIN_REFERENCE_PROJECTS.md) |
 | OpenContracts / Mayan EDMS / Paperless-ngx / Documenso | 合同与企业文档 | Document/File/Version、解析绑定、Evidence、恢复、签署 | [`BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](BUSINESS_DOMAIN_REFERENCE_PROJECTS.md) |

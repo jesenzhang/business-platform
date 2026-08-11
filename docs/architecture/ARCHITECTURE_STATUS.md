@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-10
-> 当前阶段：Phase 5 Enterprise AI Workspace Architecture — Proposed
-> 当前计划：PLAN-0007 Active；PLAN-0009 Proposed；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 最后更新：2026-08-11
+> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Candidate Review
+> 当前计划：PLAN-0007 Active；PLAN-0010 Candidate 重建中；PLAN-0009 Proposed / NOT ACTIVE；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -90,6 +90,16 @@
 > remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Proposed / NOT
 > ACTIVE and PLAN-0006 remains Proposed / NOT ACTIVE.
 
+2026-08-11: Canner/WrenAI was registered as a pinned reference at commit
+`ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`. ADR-0020 accepts Business Module
+Isolation and Semantic Contract as two complementary platform seams. The first
+PLAN-0010 candidate was invalidated during review because PR #7 is based on
+GitHub `origin/main` `654fe83d82107d899079d20e5fef8aaf4d5431b8`, while its
+declared local base `f09d2a5` contains the PLAN-0009 rehearsal history. A clean
+candidate is being reconstructed from the actual GitHub base; no WrenAI runtime,
+Python, database, migration, API, Worker, C ACL or business crate relocation is
+authorized in this plan.
+
 Revision 1 records the Audit history boundary explicitly: migration 013
 backfills deterministic tenant-local sequence values but marks pre-existing
 rows `chain_version=0`; only new sequence-based rows are chain-protected.
@@ -138,6 +148,7 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 - `docs/architecture/CODE_ARCHITECTURE.md`
 - `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md`
 - `docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`
+- `docs/architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`
 - `docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md`
 - `docs/architecture/RUNTIME_AUDIT_ARCHITECTURE.md`
 - `docs/architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md`
@@ -158,10 +169,12 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 - `docs/adr/ADR-0013-unified-runtime-audit-model.md`
 - `docs/adr/ADR-0017-platform-native-analytics-and-visualization.md`
 - `docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`
+- `docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md`
 
 外部参考和审查：
 
 - `docs/reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`
+- `docs/reference/WRENAI_REFERENCE_ANALYSIS.md`
 - `docs/reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`
 
 ## 3. 当前实现状态
@@ -183,6 +196,8 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 - Runtime Audit、Integrity Finding、Controlled Repair 和 Repair Ledger；
 - 真实 PostgreSQL/MinIO E2E 和 Architecture Fitness CI；
 - 完整服务端架构 Baseline 和文档治理。
+- Business Module Isolation 与 Semantic Contract Baseline、ADR-0020、纯 Rust contract/compiler
+  和确定性编译测试；现有业务 crate 尚未迁入 `modules/` 目录。
 
 Enterprise AI Workspace 现状：
 
@@ -293,6 +308,12 @@ Observation、Artifact lineage、Runtime replaceability 和 Prompt Injection 威
 - Capability 使用和 Tool 参数范围可自动验证；
 - Generated App 运行时依赖不会提前进入 PLAN-0006。
 
+PLAN-0010 还必须保持：
+
+20. Module Manifest 不拥有业务事实，Semantic Contract 不成为第二语义权威；
+21. 编译器拒绝重复/冲突/未知引用/循环/私有跨模块引用并生成可重建摘要；
+22. WrenAI、Python、任意 SQL、Schema、凭证、C-specific Platform Core 依赖均保持隔离。
+
 ## 7. 当前判定
 
 ```text
@@ -310,7 +331,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待全面落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；Agent 门禁待 PLAN-0006
+自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；Agent 门禁待 PLAN-0006
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
@@ -322,6 +343,7 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 PLAN-0009：Proposed / NOT ACTIVE（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
+PLAN-0010：Candidate 重建中（Business Module Isolation + Semantic Contract；从真实 `origin/main` 重建；不自动集成 main）
 ```
 
 ## 8. PLAN-0006 采用前动作

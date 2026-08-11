@@ -48,6 +48,7 @@
 | 代码架构 | `CODE_ARCHITECTURE.md` | crate、分层与代码依赖规则 |
 | 持久化、查询与多数据库 | `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md` | Command/Query seam、Projection、跨 Context 读取与数据库适配策略 |
 | 数据治理、分析与可视化 | `DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md` | 可重建分析投影、指标语义、受控查询、Dashboard、报表和 Agent 边界 |
+| Business Module Isolation 与 Semantic Contract | `BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md` | 平台核心/业务模块隔离、Manifest、语义贡献、确定性编译与 legacy ACL 边界 |
 | API 与事件 | `../standards/API_AND_EVENT_CONTRACT_STANDARD.md` | 对外协议和兼容性规则 |
 | 架构门禁 | `../standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` | 如何自动证明架构符合性 |
 | Rust 编码 | `../standards/RUST_CODING_STANDARD.md` | 具体编码和测试规范 |
@@ -63,6 +64,17 @@ BOUNDED_CONTEXT_MAP.md
 DATA_OWNERSHIP_AND_CONSISTENCY.md
 DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
 ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
+```
+
+涉及 Business Module、Semantic Contract、Metric/Dimension/Lineage 注册、模块依赖或
+legacy ACL 的任务，必须同时遵守：
+
+```text
+BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md
+DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
+DATA_OWNERSHIP_AND_CONSISTENCY.md
+ADR-0017-platform-native-analytics-and-visualization.md
+ADR-0020-business-module-isolation-and-semantic-contract.md
 ```
 
 涉及 AI Workspace、Agent、Skill、Context、Tool、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 的任务，必须同时遵守：
@@ -332,3 +344,13 @@ docs/adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assu
 ## 12. 最终原则
 
 > 后续任务不是“参考”本架构，而是必须证明符合本架构。
+
+## 13. Business Module 与 Semantic Contract 约束
+
+- Platform Core 只依赖稳定的通用 contract/capability，不依赖 Contract、Finance、Customer 等具体业务模块；
+- Business Module Manifest 声明边界、平台能力、公开契约、资源、分类、迁移命名空间、语义贡献和依赖；
+- Semantic Contract 复用 ADR-0017 术语，compiled manifest 可重建且不拥有业务事实；
+- 跨模块只使用发布的 Application API、事件、ResourceRef、Public Projection 或 Reference + Snapshot；
+- 语义编译拒绝重复 ID、Metric ownership 冲突、版本不兼容、未知端点、循环依赖、非法平台依赖和私有跨模块引用；
+- WrenAI 作为参考项目，不成为运行时、Python、数据库、任意 SQL、MCP 或 Agent 权限依赖；
+- PLAN-0009 C rehearsal 仍是只读、隔离、无生产迁移；C-specific 名称只能在 ACL/rehearsal/documentation 例外边界内出现。

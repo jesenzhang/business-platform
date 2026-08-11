@@ -154,3 +154,27 @@ OLAP 迁移必须具备双写/回填期间的成本和权限审计，以及可�
 可观测性和质量属性文档，并通过 Domain/Application + Fake Port、投影/查询契约、真实
 PostgreSQL、故障恢复、架构 Fitness Function、Secret/许可证扫描和文档链接检查。本 PR
 只建立文档，不启动 PLAN-0006，不新增运行时代码、迁移、API、Worker、依赖或 ClickHouse。
+
+## 13. Business Module Semantic Contract
+
+业务模块是语义含义和正式业务事实的来源；Analytics 负责注册、校验、编译、授权、查询
+计划、预算和可重建投影。模块通过 `BusinessModuleManifest` 声明 module/version、拥有的
+Bounded Context、平台能力、公开契约、资源类型、数据分类、迁移命名空间和
+`SemanticContribution`，而不是把数据库表或 SQL 暴露给 Agent。
+
+Semantic Contract 继续使用本 Baseline 的 Dataset、Metric、Measure、Dimension、Time
+Dimension、Metric Version、Filter Policy 和 Lineage。编译器把语义 ID 归一化为
+`<module-id>.<semantic-id>`，解析公开语义引用，拒绝重复/冲突/版本不兼容/未知端点/循环
+依赖/跨模块 private 引用，并生成可重建的 canonical manifest + digest。它不实现
+Text-to-SQL、WrenAI runtime、任意 SQL、Schema browsing、Database Credentials 或
+ClickHouse/通用 OLAP。
+
+未来 Agent 链路仍为：
+
+```text
+User → Agent → Typed Semantic Query Request → Analytics Query Service
+→ Semantic Resolver/Policy → Query Plan → Controlled Projection Execution
+```
+
+返回值只含 Read DTO、指标口径版本、时间范围、新鲜度和截断状态；模块之间通过公开
+Application API、事件、ResourceRef、Public Projection 或 Reference + Snapshot 协作。

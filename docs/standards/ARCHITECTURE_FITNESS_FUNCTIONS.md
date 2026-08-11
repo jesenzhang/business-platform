@@ -398,3 +398,26 @@ PLAN-0007 additionally requires:
 - the local Demo compose topology and seed script to remain outside the production
   configuration path. Docker/PostgreSQL/MinIO execution is evidence-required when
   the local host does not provide those runtimes and must be reported as `NOT RUN`.
+
+## 26. Business Module Isolation 与 Semantic Contract gates
+
+PLAN-0010 additionally requires：
+
+- `business-module-contracts` and `semantic-contract` remain pure Rust and do not
+  depend on WrenAI, Python, LanceDB, DataFusion, SQLGlot, ClickHouse, SQLx,
+  Axum, Reqwest, Messaging, object storage, AI providers, or concrete business
+  modules;
+- manifests contain the generic module contract fields and do not hard-code
+  Contract, Finance, C-specific, Wren-specific, table, schema, SQL, credential,
+  or provider DTO names in the platform compiler;
+- semantic IDs are namespaced, compiled output is deterministic, and tests cover
+  duplicate IDs, metric ownership conflicts, incompatible versions, unknown
+  dependencies/endpoints, cycles, illegal platform dependencies, undeclared
+  contributions, and cross-module private references;
+- source scans reject C-specific names under Platform Core/generic crates except
+  the explicit PLAN-0009 rehearsal, migration-report, reference and
+  `integrations/legacy-c-contract-management` ACL exception paths;
+- no public/API/Agent/MCP/logging path introduces arbitrary SQL, schema
+  browsing, database URLs, credentials, storage keys or internal object paths;
+- the C project remains read-only rehearsal evidence, PLAN-0006 remains Proposed
+  / NOT ACTIVE, and PLAN-0009 remains Completed / Rehearsal Closed.

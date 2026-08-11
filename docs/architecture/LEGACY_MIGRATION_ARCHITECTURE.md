@@ -290,3 +290,24 @@ Shadow 模式比较：
 7. Finance 等高风险能力。
 
 最终顺序以业务依赖和风险评估为准。
+
+## 20. C legacy 与 Business Module ACL
+
+PLAN-0009 的 C Project 只读 rehearsal 不改变本迁移 Baseline，也不授权生产迁移。后续
+Contract 切片必须保持：
+
+```text
+C Project (external read-only source)
+  → integrations/legacy-c-contract-management ACL
+  → Contract Management Application API
+  → published business/semantic contracts
+```
+
+ACL 负责外部字段、状态、错误和身份翻译；Contract Management 负责正式业务不变量和
+数据所有权；Analytics 只消费已发布语义对象。C-specific 表名、状态码、SDK DTO、路径和
+数据库模型不得进入 Platform Core、通用 `semantic-contract` crate 或 Contract module
+内部。`apps/plan-0009-rehearsal` 与 `crates/legacy-migration-rehearsal` 仍是明确的
+rehearsal/documentation 例外。
+
+本轮只建立隔离契约、semantic compiler 和 Fitness Functions，不创建 ACL 代码、迁移、
+双写、切流、生产连接或 C 数据副本。

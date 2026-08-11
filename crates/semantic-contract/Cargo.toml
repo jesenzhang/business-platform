@@ -1,0 +1,23 @@
+[package]
+name = "semantic-contract"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[package.metadata.architecture]
+context = "analytics-visualization"
+bounded_context = "analytics-visualization"
+layer = "domain-and-application"
+role = "semantic-compiler"
+data_owner = "analytics"
+
+[dependencies]
+business-module-contracts = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

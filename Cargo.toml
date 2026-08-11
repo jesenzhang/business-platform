@@ -10,6 +10,8 @@ members = [
     "apps/migration",
     "crates/runtime-migration",
     "crates/architecture-check",
+    "crates/business-module-contracts",
+    "crates/semantic-contract",
     "crates/runtime-config",
     "crates/shared-kernel",
     "crates/identity",
@@ -153,3 +155,5 @@ ai-application = { path = "crates/ai-application" }
 agent-integration = { path = "crates/agent-integration" }
 public-api-contracts = { path = "crates/public-api-contracts" }
 business-api-client = { path = "crates/business-api-client" }
+business-module-contracts = { path = "crates/business-module-contracts" }
+semantic-contract = { path = "crates/semantic-contract" }

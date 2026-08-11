@@ -754,3 +754,18 @@ Reports
 - [ ] 长时流程具备业务 Case 和可靠执行状态的双层模型；
 - [ ] 新上下文没有被自动映射成微服务；
 - [ ] 实施计划有真实跨部门垂直切片验收。
+
+## 23. Business Module 与语义发布
+
+Contract、Finance、Customer、Project、Approval、Document Management 和 Document
+Intelligence 等仍是各自业务能力/Bounded Context 的候选 Business Module；模块 manifest
+不能改变它们的正式事实所有权。模块可以向 Analytics 发布 Dataset、Projection、Field、
+Relationship、Measure、Metric、Dimension、Time Dimension、Filter Policy 和 Lineage，但
+这些是受版本和权限治理的语义贡献，不是第二份业务状态。
+
+跨模块分析必须使用已发布语义对象、ResourceRef、Public Projection 或
+Reference + Snapshot。不得用 Analytics registry、Wren-style model、私有表 FK 或任意
+JOIN 代替 Contract/Finance/Legal/People 的 Application API、事件和业务协作边界。
+
+现有业务 crate 在正式模块化迁移前保持 transitional；目录移动、manifest registry、
+安装生命周期和真实跨部门语义切片必须由独立 Plan/ADR 进入，不在本轮自动激活。

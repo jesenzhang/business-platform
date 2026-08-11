@@ -35,6 +35,7 @@
 | Integrity and Repair | [`architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md`](architecture/DATA_INTEGRITY_AND_REPAIR_ARCHITECTURE.md) | Baseline profile | Finding、受控修复和恢复边界 |
 | Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
 | 数据治理、分析与可视化 | [`architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md) | Baseline | 可重建分析投影、指标语义、受控查询、Dashboard 与报表边界 |
+| Business Module Isolation 与 Semantic Contract | [`architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md) | Baseline | 平台核心/业务模块隔离、模块 manifest、语义贡献、确定性编译和 legacy ACL 边界 |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -71,6 +72,7 @@
 - [`adr/ADR-0017-platform-native-analytics-and-visualization.md`](adr/ADR-0017-platform-native-analytics-and-visualization.md)：平台原生分析与可视化，建立在 ADR-0008 与 ADR-0013～0016 之上。
 - [`adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`](adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)：接受 Enterprise AI Workspace、任务级 Capability、Observation 血缘与 Artifact 非权威边界；Cloudflare OS 仅作为参考项目。
 - [`adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)：接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标领域边界和跨部门 Reference + Snapshot 协作模式。
+- [`adr/ADR-0020-business-module-isolation-and-semantic-contract.md`](adr/ADR-0020-business-module-isolation-and-semantic-contract.md)：接受 Business Module Isolation、Semantic Contract、确定性 compiler 和 C legacy ACL 预留。
 
 ## 5. 文档目录
 
@@ -134,6 +136,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 ## 8. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
+- PLAN-0010 Candidate：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（从真实 `origin/main` 重建；不自动集成 main）
 - 下一计划：plans/current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（Proposed / NOT ACTIVE）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
@@ -147,6 +150,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
 - AI Workspace 差距审查：[`reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`](reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md)
 - Cloudflare OS 参考分析：[`reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md)
+- Canner/WrenAI 参考分析：[`reference/WRENAI_REFERENCE_ANALYSIS.md`](reference/WRENAI_REFERENCE_ANALYSIS.md)
 - 企业业务领域 Baseline：[`architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
 - 企业业务领域参考项目：[`reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md)
 
@@ -165,6 +169,11 @@ Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已�
 后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式
 Dashboard/Report 和受控 Agent 分析技能；本入口仍保持总体架构文件的稳定 `_v2.md` 路径，
 其内部版本已更新为 v2.2。
+
+Business Module Isolation 与 Semantic Contract 已由 ADR-0020 和独立专题 Baseline 建立。
+本轮只交付纯 Rust manifest/semantic compiler 基础、冲突校验和架构 Fitness Functions；不
+引入 WrenAI/Python/数据库/任意 SQL，不移动现有 business crates，不实现 Registry、Query
+Service、模块安装或 C legacy 生产 ACL。
 
 ADR-0019 已接受目标业务领域组合和跨部门协作边界，但不自动激活新业务实现。Party、
 Document Revision、Legal、Finance、Business Assurance、People & Performance 应分别通过
@@ -194,6 +203,15 @@ docs/adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assu
 ```text
 docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
 docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
+```
+
+涉及 Business Module、Semantic Contract、Metric/Dimension/Lineage 注册、模块依赖或
+legacy ACL 时，必须同时引用：
+
+```text
+docs/architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md
+docs/architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
+docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md
 ```
 
 涉及安全、长时任务、部署、可观测性或迁移时，同时引用对应专题 Baseline。

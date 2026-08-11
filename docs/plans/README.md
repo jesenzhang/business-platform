@@ -25,6 +25,7 @@ plans/
 
 - [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
 - [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP。
+- [`current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：Candidate 重建中，模块隔离、语义契约和纯 Rust 确定性 compiler；不激活 PLAN-0006/PLAN-0009。
 - [`current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Proposed / NOT ACTIVE`，只做 C 项目 read-only migration rehearsal 设计与隔离验证。
 
 ## 已归档计划

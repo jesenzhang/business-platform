@@ -253,3 +253,24 @@ PLAN-0003 Revision 1 的 Document Management 参考切片必须遵循以下额�
 - PostgreSQL 测试在本地无数据库时使用带原因的 `#[ignore]`，CI 必须
   `--include-ignored`；迁移 status 只可忽略明确的 migration table 缺失，其他
   权限、连接和数据库错误必须失败。
+
+## 16. Business Module Isolation 与 Semantic Contract rules
+
+- `business-module-contracts` 和 `semantic-contract` 是纯 Rust、平台通用的 contract/compiler
+  crate；不得依赖 WrenAI、Python、LanceDB、DataFusion、SQLGlot、ClickHouse、SQLx、Axum、
+  Reqwest、对象存储、Messaging、AI Provider 或具体业务 crate。
+- Business Module Manifest 只声明 module/version、owned contexts、平台能力、公开契约、
+  Resource Kind、分类、迁移命名空间、semantic/UI/Agent contributions、依赖和兼容性；它
+  不是业务事实存储、插件热加载协议或微服务部署协议。
+- Semantic Contract 复用 ADR-0017 术语；compiled manifest 可从声明重建，Analytics 不拥有
+  业务事实。跨模块只允许 published semantic object、ResourceRef、Public Projection 或
+  Reference + Snapshot，不允许 private table FK、裸表名、任意 JOIN、SQL、Schema 或凭证。
+- Compiler 必须拒绝重复 module/semantic ID、Metric ownership 冲突、版本不兼容、未知依赖/
+  关系端点、循环依赖、非法 platform dependency、未声明 contribution 和跨模块 private ref；
+  输出必须稳定排序并带 canonical digest。
+- C 项目仍是 PLAN-0009 的只读 rehearsal；未来只允许通过
+  `integrations/legacy-c-contract-management` ACL 进入 Contract Application API。C-specific
+  名称不得进入 Platform Core、通用 semantic compiler 或正式业务模块，除非后续独立迁移
+  Plan/ADR 明确授权。
+- PLAN-0010 只建立文档、纯 contract/compiler、测试和 Fitness Functions；不得激活 PLAN-0006、
+  重开 PLAN-0009、引入 Wren runtime、创建数据库/API/Worker/迁移或自动集成 main。

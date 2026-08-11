@@ -97,6 +97,8 @@ src/
 - `object-storage`：对象存储端口及 S3 适配；
 - `messaging`：领域事件、Outbox 和消息适配；
 - `observability`：tracing、metrics 和 telemetry 初始化。
+- `business-module-contracts`：平台无关的 Business Module Manifest、模块依赖、公开契约、分类和生命周期值；
+- `semantic-contract`：ADR-0017 语义对象与纯 Rust deterministic compiler；不执行查询、不访问数据库、不拥有业务事实。
 
 ### 3.4 `shared-kernel`
 
@@ -481,3 +483,21 @@ may compose small runtime value types, but `shared-kernel`, Domain, and
 Application do not load environment variables, configuration files, or
 infrastructure topology. `AppState` contains no full configuration object,
 database pool, or secret connection URL.
+
+## 17. Business Module Isolation 与 Semantic Contract
+
+业务模块按业务能力、统一语言、不变量和数据所有权划分；Platform Core 不依赖具体
+Contract、Finance、Customer 或其他业务 crate。未来模块通过平台无关的
+`BusinessModuleManifest` 声明 bounded contexts、平台能力、公开 Commands/Queries/Events、
+Resource Kinds、数据分类、迁移命名空间、Semantic Contributions、UI/Agent 声明和依赖。
+
+Semantic Contract 是 Analytics 的受控语义输入，不是第二业务内核。它复用 ADR-0017 的
+Dataset、Metric、Measure、Dimension、Time Dimension、Filter Policy、Lineage 等术语；纯
+compiler 负责校验、命名空间、公开引用解析、稳定排序和 canonical digest。它不得依赖
+Axum、SQLx、Reqwest、对象存储、Messaging、AI Provider 或具体业务模块，也不得携带 SQL、
+物理 Schema、数据库 URL、凭证或内部路径。
+
+跨模块语义关系只能通过已发布语义对象、ResourceRef、Public Projection 或
+Reference + Snapshot；不能通过私有表外键或任意 JOIN。C legacy 只能从外部只读源进入
+`integrations/legacy-c-contract-management` ACL（未来），再调用 Contract Application
+API；PLAN-0009 rehearsal 不是生产迁移实现。

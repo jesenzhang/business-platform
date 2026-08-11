@@ -96,6 +96,82 @@ Assert-NotContains "apps/business-cli/src" @(
 Assert-NotContains "apps/business-console/src" @(
     "postgres", "sqlx", "object_key", "storage_key", "internal_path"
 ) "business console must remain a replaceable REST client"
+
+# PLAN-0010 Business Module Isolation and Semantic Contract boundaries.
+foreach ($contractCrate in @(
+    "crates/business-module-contracts",
+    "crates/semantic-contract"
+)) {
+    Assert-NotContains (Join-Path $contractCrate "Cargo.toml") @(
+        "wren", "python", "lancedb", "datafusion", "sqlglot", "clickhouse",
+        "text-to-sql", "axum", "sqlx", "reqwest", "aws", "aws-sdk", "aws-config", "object-storage",
+        "messaging", "ai-application", "customer = ", "contract = ",
+        "finance = ", "project = "
+    ) "PLAN-0010 pure contract/compiler dependency violation"
+    Assert-NotContains (Join-Path $contractCrate "src") @(
+        "WrenAI", "wren-ai", "lancedb", "DataFusion", "SQLGlot", "ClickHouse",
+        "text-to-sql", "run_sql", "execute_sql", "AWS", "aws_sdk", "contract_management",
+        "legacy-contract", "C Project", "plan-0009", "DATABASE_URL",
+        "storage_key", "signed_url", "credential"
+    ) "PLAN-0010 generic platform/C-specific boundary violation"
+}
+
+$semanticCompilerCargo = Get-Content -Raw (Join-Path $root "crates/semantic-contract/Cargo.toml")
+if ($semanticCompilerCargo -notmatch 'business-module-contracts\s*=\s*\{\s*workspace\s*=\s*true\s*\}') {
+    throw "semantic-contract must depend on the generic business-module-contracts seam"
+}
+$moduleContractCargo = Get-Content -Raw (Join-Path $root "crates/business-module-contracts/Cargo.toml")
+if ($moduleContractCargo -match 'path\s*=\s*"\.\./\.\./(crates|apps)/') {
+    throw "business-module-contracts must not depend on workspace implementation crates"
+}
+
+$requiredManifestFields = @(
+    "module_id", "module_version", "manifest_schema_version",
+    "owned_bounded_contexts", "required_platform_capabilities",
+    "optional_platform_capabilities", "published_commands",
+    "published_queries", "published_events", "resource_kinds",
+    "data_classification", "migration_namespace", "semantic_contributions",
+    "ui_contributions", "agent_tool_contributions", "dependencies",
+    "compatibility"
+)
+$moduleManifestSource = @(Get-ChildItem (Join-Path $root "crates/business-module-contracts/src") -Recurse -File | ForEach-Object {
+    Get-Content -Raw $_.FullName
+}) -join [Environment]::NewLine
+foreach ($field in $requiredManifestFields) {
+    if ($moduleManifestSource -notmatch [regex]::Escape($field)) {
+        throw "Business Module Manifest field is missing: $field"
+    }
+}
+
+$semanticSource = @(Get-ChildItem (Join-Path $root "crates/semantic-contract/src") -Recurse -File | ForEach-Object {
+    Get-Content -Raw $_.FullName
+}) -join [Environment]::NewLine
+foreach ($semanticKind in @(
+    "DatasetDefinition", "ProjectionDefinition", "FieldDefinition",
+    "RelationshipDefinition", "MeasureDefinition", "MetricDefinition",
+    "DimensionDefinition", "TimeDimensionDefinition",
+    "FilterPolicyDefinition", "LineageDefinition", "SemanticCompiler"
+)) {
+    if ($semanticSource -notmatch [regex]::Escape($semanticKind)) {
+        throw "Semantic Contract type or compiler is missing: $semanticKind"
+    }
+}
+if ($semanticSource -notmatch "canonical_json" -or $semanticSource -notmatch "Sha256") {
+    throw "Semantic compiler must produce canonical JSON and a SHA-256 digest"
+}
+
+$platformCoreFiles = Get-ChildItem (Join-Path $root "crates") -Recurse -File |
+    Where-Object { $_.FullName -notmatch "legacy-migration-rehearsal" }
+foreach ($file in $platformCoreFiles) {
+    $content = Get-Content -Raw $file.FullName
+    foreach ($pattern in @(
+        "contract_management", "legacy-contract", "C Project", "plan-0009"
+    )) {
+        if ($content -match [regex]::Escape($pattern)) {
+            throw "C-specific Platform Core symbol '$pattern' found in $($file.FullName)"
+        }
+    }
+}
 if (-not (Test-Path (Join-Path $root "openapi.json"))) {
     throw "PLAN-0007 public OpenAPI contract is missing"
 }
