@@ -136,7 +136,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 ## 8. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
-- PLAN-0010 Candidate：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（从真实 `origin/main` 重建；不自动集成 main）
+- PLAN-0010 Accepted Candidate：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；不自动集成 main）
 - 下一计划：plans/current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（Proposed / NOT ACTIVE）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）

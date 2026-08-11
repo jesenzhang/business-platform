@@ -1,26 +1,29 @@
 # PLAN-0010 Candidate Reconstruction Evidence
 
 > Review date: 2026-08-11
-> Status: Candidate reconstruction in progress
-> Branch: `codex/plan-0010-clean-candidate`
-> Clean Base SHA: `654fe83d82107d899079d20e5fef8aaf4d5431b8`
-> Candidate implementation SHA: pending clean implementation commit
-> Final evidence HEAD: pending close-out commit
+> Status: Accepted Candidate
+> Branch: `codex/business-module-isolation-semantic-contract`
+> Base SHA: `654fe83d82107d899079d20e5fef8aaf4d5431b8`
+> Candidate SHA: `7997a501528bf12ae7846a9dc278fe4fce65a467`
+> Final evidence HEAD: docs-only close-out commit following the Candidate implementation (exact SHA in task handoff)
 
 ## Baseline correction
 
 The previous Candidate was invalidated. PR #7's actual GitHub base is
 `origin/main@654fe83d82107d899079d20e5fef8aaf4d5431b8`, but the previous
 candidate declared `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4` as its base.
+Previous invalid Candidate SHA: `d4033e5b31dd3ec96b951d76b6e221a6862929b6`.
 That local-only commit is the PLAN-0009 rehearsal close-out and is not the
 GitHub `main` tip. Consequently, the old `Base..HEAD` included PLAN-0009
 runtime and rehearsal files even though its two PLAN-0010 commits were pure.
 The old CI PASS does not make that scope invalidity acceptable.
 
-The clean candidate is reconstructed from the actual GitHub base by applying
-only the proven PLAN-0010 implementation/evidence file differences. No main
-merge, PLAN-0009 activation, PLAN-0006 activation, or history rewrite of the
-old branch occurs before the clean candidate is validated.
+The clean candidate was reconstructed from the actual GitHub base by applying
+only the proven PLAN-0010 implementation/evidence file differences. The old PR
+branch was updated only after its remote ref was confirmed as the expected
+`d4033e5b31dd3ec96b951d76b6e221a6862929b6`; the update used
+`--force-with-lease`. No main merge, PLAN-0009 activation, or PLAN-0006
+activation occurred.
 
 ## Scope decision
 
@@ -38,7 +41,7 @@ runtime-environment evidence.
 
 ## Changed files
 
-The clean `Base..HEAD` must contain only the following PLAN-0010 files:
+The clean `Base..HEAD` contains only the following 28 PLAN-0010 files:
 
 - `AGENTS.md`
 - `Cargo.lock`
@@ -116,7 +119,7 @@ The architecture Fitness Function scans Platform Core and the changed runtime
 surface for C-specific names, migrations, ACLs, and production write paths.
 The clean branch contains no PLAN-0009 rehearsal runtime files and no
 C-specific runtime code. Guard/document mentions remain negative checks or
-scope statements only.
+scope statements only. Result: PASS.
 
 ## Verification matrix
 
@@ -131,12 +134,13 @@ scope statements only.
 | `pwsh ./scripts/check-openapi.ps1` | PASS |
 | `git diff --check` | PASS |
 | cargo-deny / cargo-audit / secret scan | NOT RUN - no formal repository configuration or entrypoint exists |
-| exact clean Base..HEAD scope audit | pending final commit |
-| remote CI on exact final HEAD | pending clean branch publication |
+| exact clean Base..HEAD scope audit | PASS - 28 files; no PLAN-0009 runtime paths |
+| remote CI on exact Candidate implementation SHA | PASS - run [31478430670](https://github.com/jesenzhang/business-platform/actions/runs/31478430670) |
 
 ## Final disposition
 
-PLAN-0010 remains a Candidate until the exact clean Base..HEAD audit, final
-evidence commit, branch update, and exact final-head GitHub CI all pass. It must
-then be marked `Accepted Candidate`. PLAN-0009 remains `Proposed / NOT ACTIVE`;
-PLAN-0006 remains `Proposed / NOT ACTIVE`. No archive and no main integration.
+PLAN-0010 is `Accepted Candidate` at implementation SHA
+`7997a501528bf12ae7846a9dc278fe4fce65a467`, with the final docs close-out
+commit and its exact-head CI recorded when publication completes. PLAN-0009
+remains `Proposed / NOT ACTIVE`; PLAN-0006 remains `Proposed / NOT ACTIVE`.
+No archive and no main integration.

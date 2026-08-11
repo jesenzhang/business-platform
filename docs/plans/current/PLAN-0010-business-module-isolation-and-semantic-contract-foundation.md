@@ -1,9 +1,9 @@
 # PLAN-0010：Business Module Isolation 与 Semantic Contract Foundation
 
-> 状态：Candidate 重建中（独立分支；不自动集成 main）
+> 状态：Accepted Candidate（独立分支；不自动集成 main）
 > Base：`origin/main` @ `654fe83d82107d899079d20e5fef8aaf4d5431b8`（真实 GitHub main）
-> Candidate implementation：待 clean implementation commit
-> Branch：`codex/plan-0010-clean-candidate`
+> Candidate implementation：`7997a501528bf12ae7846a9dc278fe4fce65a467`
+> Branch：`codex/business-module-isolation-semantic-contract`
 > 目标：正式登记 Canner/WrenAI 参考输入，并建立平台核心与业务模块隔离、语义贡献和确定性编译的最小纯 Rust 基础
 
 ## 1. 目标 Bounded Context 与数据所有者
@@ -121,9 +121,9 @@ canonical JSON 与 digest 对输入顺序不敏感
 - [x] `pwsh ./scripts/check-architecture.ps1`、`pwsh ./scripts/check-openapi.ps1`、`git diff --check` 通过；
 - [x] Wren/Python/DB/SQL/C-specific Platform Core scans PASS；
 - [x] 本地 `cargo test --workspace --all-features -- --ignored` 已执行；因缺少 `DATABASE_URL`，结果为 `NOT RUN / environment unavailable`；本计划无 persistence/runtime storage change，真实 PostgreSQL/MinIO 证据由 workspace CI 提供；
-- [ ] 独立分支 Candidate review 与精确 Candidate SHA 的 GitHub CI 待 clean branch 完成后记录；不自动进入 main；
+- [x] 独立分支 Candidate review 与精确 Candidate SHA 的 GitHub CI 已完成；不自动进入 main；
 - [x] PLAN-0006 仍为 Proposed/NOT ACTIVE，PLAN-0009 仍为 Proposed/NOT ACTIVE。
 
 ## 10. Accepted Candidate 记录
 
-Candidate implementation SHA、完整门禁、模块删除验证、Platform Core 隔离验证、C-specific scan 和远程 CI 将记录在 [`docs/reviews/2026-08-11-plan-0010-accepted-candidate.md`](../../reviews/2026-08-11-plan-0010-accepted-candidate.md)。当前仍处于 clean candidate reconstruction；完成精确 Base..HEAD 审查和最终 GitHub CI 后，才标记为 `Accepted Candidate`。不 archive、不 merge main、不启动 PLAN-0006/PLAN-0009。
+Candidate implementation SHA、完整门禁、模块删除验证、Platform Core 隔离验证、C-specific scan 和远程 CI 详见 [`docs/reviews/2026-08-11-plan-0010-accepted-candidate.md`](../../reviews/2026-08-11-plan-0010-accepted-candidate.md)。本计划已标记为 `Accepted Candidate`；不 archive、不 merge main、不启动 PLAN-0006/PLAN-0009。

@@ -2,8 +2,8 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-08-11
-> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Candidate Review
-> 当前计划：PLAN-0007 Active；PLAN-0010 Candidate 重建中；PLAN-0009 Proposed / NOT ACTIVE；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Candidate Accepted
+> 当前计划：PLAN-0007 Active；PLAN-0010 Accepted Candidate；PLAN-0009 Proposed / NOT ACTIVE；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -96,8 +96,9 @@ Isolation and Semantic Contract as two complementary platform seams. The first
 PLAN-0010 candidate was invalidated during review because PR #7 is based on
 GitHub `origin/main` `654fe83d82107d899079d20e5fef8aaf4d5431b8`, while its
 declared local base `f09d2a5` contains the PLAN-0009 rehearsal history. A clean
-candidate is being reconstructed from the actual GitHub base; no WrenAI runtime,
-Python, database, migration, API, Worker, C ACL or business crate relocation is
+candidate was reconstructed from the actual GitHub base at implementation SHA
+`7997a501528bf12ae7846a9dc278fe4fce65a467`; no WrenAI runtime, Python,
+database, migration, API, Worker, C ACL or business crate relocation is
 authorized in this plan.
 
 Revision 1 records the Audit history boundary explicitly: migration 013
@@ -343,7 +344,7 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 PLAN-0009：Proposed / NOT ACTIVE（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
-PLAN-0010：Candidate 重建中（Business Module Isolation + Semantic Contract；从真实 `origin/main` 重建；不自动集成 main）
+PLAN-0010：Accepted Candidate（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；不自动集成 main）
 ```
 
 ## 8. PLAN-0006 采用前动作
