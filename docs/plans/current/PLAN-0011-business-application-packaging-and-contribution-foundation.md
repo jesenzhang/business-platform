@@ -1,11 +1,11 @@
 # PLAN-0011：Business Application Packaging & Contribution Foundation
 
 文档 ID：PLAN-0011  
-版本：0.1  
+版本：0.2  
 状态：Proposed / NOT ACTIVE  
 日期：2026-08-12  
 Owner：Platform Foundation / Business Module Runtime / Frontend Platform  
-架构前提：ADR-0020 `Accepted`  
+架构前提：ADR-0020 `Accepted`；ADR-0021 `Proposed`，必须先被接受才可激活本计划  
 前置集成：PLAN-0010 必须先 `Integrated`；本计划不得在 PLAN-0010 仍为 Accepted Candidate 时激活实现  
 主要参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；WrenAI `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`
 
@@ -26,6 +26,8 @@ PLAN-0010 已建立 Business Module Isolation 与 Semantic Contract 的最小纯
 - 可验证的模块添加/删除/升级 fixture。
 
 Twenty 当前 Application Platform 已经证明这些机制在真实 Business App 中的价值，但其允许 App 任意扩展其他 Object、形成物理关系以及 uninstall 删除应用数据的语义不符合本项目的严格业务隔离。PLAN-0011 只吸收可安全迁移的机制，不复制 Twenty Runtime。
+
+Published Extension Point、typed Business Application Packaging 和 remove-plan 属于长期架构边界，由 ADR-0021 提案决定；**不得先实现再补 ADR**。
 
 ## 2. 目标
 
@@ -336,7 +338,7 @@ data purge
 
 ### Stage A — Concept Inventory 与兼容扩展
 
-- 读取 ADR-0017/0018/0020、PLAN-0010、现有 `business-module-contracts` / `semantic-contract`；
+- 读取 ADR-0017/0018/0020/0021、PLAN-0010、现有 `business-module-contracts` / `semantic-contract`；
 - 确认 Contribution/Compatibility/Resource/Capability 现有概念；
 - 不重复建立平行类型；
 - 定义新增 ID 与 descriptor 的最小边界；
@@ -483,10 +485,22 @@ git diff --check
 
 如果本计划不修改 persistence/runtime storage，不强制本地 PostgreSQL/MinIO；远程 workspace CI 仍按仓库既有 E2E 执行并记录结果。
 
-## 14. Accepted Candidate Gate
+## 14. Activation Gate
+
+只有同时满足以下条件才可从 `Proposed / NOT ACTIVE` 进入实现：
+
+- ADR-0021 已正式 `Accepted`；
+- PLAN-0010 已 `Integrated` 并成为 main 权威基础；
+- 新实现分支从执行时真实 `origin/main` 创建；
+- Base..HEAD 不包含 PLAN-0009 runtime 或 C-specific runtime；
+- 不引入 Twenty/WrenAI runtime dependency；
+- 本计划 scope 仍限制在纯 contract/compiler/dry-plan/fitness foundation。
+
+## 15. Accepted Candidate Gate
 
 只有同时满足以下条件才能进入 `Accepted Candidate`：
 
+- ADR-0021 已 Accepted；
 - PLAN-0010 已 Integrated；
 - Base..HEAD scope 仅为 PLAN-0011；
 - generic contracts 不包含具体业务概念；
@@ -500,11 +514,12 @@ git diff --check
 - full workspace gates PASS；
 - exact Candidate HEAD remote CI PASS。
 
-## 15. 禁止事项
+## 16. 禁止事项
 
 本计划 Proposed 阶段和实现阶段均禁止：
 
 - merge/修改 PLAN-0010 Candidate；
+- 在 ADR-0021 Accepted 前实现 Published Extension Point runtime contract；
 - 激活 PLAN-0009 production migration；
 - 修改 C 项目；
 - 创建 Contract 特例进入 Platform Core；
@@ -516,7 +531,7 @@ git diff --check
 - generic EAV 平台替代 DDD；
 - uninstall 自动 purge business data。
 
-## 16. 后续路线
+## 17. 后续路线
 
 若 PLAN-0011 Integrated，下一步按价值顺序：
 
@@ -528,7 +543,7 @@ git diff --check
 6. 再决定是否进入生产迁移 Wave 1；
 7. Analytics Query Runtime 与 PLAN-0006 Workspace 按独立 Plan 推进。
 
-## 17. 完成定义
+## 18. 完成定义
 
 PLAN-0011 的成功标准不是“做出 App Store”，而是证明：
 
