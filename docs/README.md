@@ -75,10 +75,13 @@
 - [`adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`](adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)：接受 Enterprise AI Workspace、任务级 Capability、Observation 血缘与 Artifact 非权威边界；Cloudflare OS 仅作为参考项目。
 - [`adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)：接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标领域边界和跨部门 Reference + Snapshot 协作模式。
 - [`adr/ADR-0020-business-module-isolation-and-semantic-contract.md`](adr/ADR-0020-business-module-isolation-and-semantic-contract.md)：接受 Business Module Isolation、Semantic Contract、确定性 compiler 和 C legacy ACL 预留。
+
+## 5. 待审议架构决策
+
 - [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Proposed，Business Application Packaging、Contribution 和 Published Extension Point。
 - [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Proposed，跨模块通信、一致性和 Process Manager/Saga。
 
-## 5. 文档目录
+## 6. 文档目录
 
 ```text
 docs/
@@ -96,7 +99,7 @@ docs/
 
 现有两份中文长文档暂时保留在仓库根目录，属于已登记迁移例外。后续新增长文档不得继续放在根目录。
 
-## 6. 文档状态
+## 7. 文档状态
 
 - `Draft`：讨论中；
 - `Proposed`：等待接受；
@@ -106,7 +109,7 @@ docs/
 - `Superseded`：已被替代；
 - `Archived`：不再参与当前决策。
 
-## 7. 新任务使用方式
+## 8. 新任务使用方式
 
 开始任何服务端任务前：
 
@@ -137,7 +140,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 
 禁止从数据库表、Handler、消息 Topic、Prompt、Skill 文件或 SDK 直接推导业务边界。
 
-## 8. 当前实施
+## 9. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
 - PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
@@ -189,7 +192,7 @@ ADR-0019 已接受目标业务领域组合和跨部门协作边界，但不自�
 Document Revision、Legal、Finance、Business Assurance、People & Performance 应分别通过
 后续 Plan 进入实现，并优先用一个合同 → 法务 → 审批 → 财务核对 → 正式报告的真实垂直切片验证架构。
 
-## 9. 合并后的后续任务规则
+## 10. 合并后的后续任务规则
 
 所有新计划和实施指令必须明确引用：
 
@@ -228,7 +231,7 @@ docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md
 
 功能测试通过但架构门禁失败，任务不得声明完成。
 
-## 10. 后续运行文档
+## 11. 后续运行文档
 
 架构设计已经形成，后续按实施阶段补充具体 Runbook：
 
@@ -244,6 +247,6 @@ docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md
 
 Runbook 是架构的操作实现，不得修改 Baseline 语义。
 
-## 11. 模板
+## 12. 模板
 
 - [`templates/ADR_TEMPLATE.md`](templates/ADR_TEMPLATE.md)
