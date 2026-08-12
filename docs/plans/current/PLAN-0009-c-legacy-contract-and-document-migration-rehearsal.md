@@ -1,11 +1,12 @@
 # PLAN-0009：C Legacy Contract & Document Migration Rehearsal
 
 文档 ID：PLAN-0009  
-版本：0.1  
+版本：0.2  
 状态：Proposed / NOT ACTIVE  
 日期：2026-08-10  
+最后更新：2026-08-12  
 Owner：Platform Foundation / Document Management / Document Intelligence  
-前置集成：PLAN-0008 `Integrated`，main `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`
+前置集成：PLAN-0008 `Integrated`；进入真实 Contract Business Module materialization 前还必须完成 PLAN-0010 与 PLAN-0011 的集成门禁
 
 ## 1. 目标
 
@@ -13,6 +14,21 @@ Owner：Platform Foundation / Document Management / Document Intelligence
 ProcessingArtifact、Evidence 模型能够承载 C 项目的真实历史数据。第一阶段
 只做 read-only inventory/analyzer 驱动的隔离 rehearsal，不做生产迁移，不改变
 C 项目任何状态。
+
+同时，本计划必须成为 Business Module Isolation 的首个真实验证案例：C 项目只能作为外部 Legacy Source，经 C-specific ACL/translator 进入独立 Contract Business Module，再由 Contract Module 使用平台通用能力；不得把 C schema 或 Contract 业务特例放入 Platform Core。
+
+目标链：
+
+```text
+C Legacy System
+  → integrations/legacy-c-contract-management
+  → ACL / translator
+  → Contract Business Module
+      ├── Authoritative Domain
+      ├── UI Contribution
+      └── Semantic Contribution
+  → Platform Capabilities
+```
 
 ## 2. 仅限第一阶段的范围
 
@@ -26,7 +42,8 @@ C 项目任何状态。
 - revision/run/artifact/evidence integrity；
 - stale/conflict assertions；
 - orphan/missing/ambiguous/conflict quarantine；
-- migration verification report。
+- migration verification report；
+- Contract Module / C Integration / Platform Core 三层隔离验证。
 
 样本 manifest 必须覆盖普通单文件、多版本、扫描件、多附件、OCR/LLM 和已知
 错误关联。规模扩大前先冻结样本选择、输入 hash、分类规则和 target UUID map。
@@ -43,6 +60,8 @@ C 项目位于 `F:\Workspace\git_repo\contract_management`，是只读 source：
 - 物理文件身份必须由 SHA-256 建立，不得仅信任旧 `file_id` 或 path；
 - metadata-only contract 不得虚构 DocumentRevision；orphan file 不得自动
   变成业务事实。
+
+C-specific table、path、state、JSON、import mode 只能存在于 rehearsal/integration ACL 和迁移报告中；Contract Business Module 不得依赖 C Schema，Platform Core 不得依赖 Contract Module。
 
 ## 4. Canonical mapping and classification
 
@@ -77,7 +96,10 @@ OCR 无法解析 revision、LLM 无法解析 processing lineage、错误关联�
 - artifact/evidence 精确绑定 revision/run，重放不产生重复事实；
 - stale version、冲突 relation、缺失 object、orphan object 和 ambiguous mapping
   均 fail closed；
-- rehearsal 只能证明隔离 target 的可重放性，不代表生产迁移已获授权。
+- rehearsal 只能证明隔离 target 的可重放性，不代表生产迁移已获授权；
+- 删除 C Integration/ACL 不影响 Contract Business Module 的编译和正式领域模型；
+- 从 composition 移除 Contract Business Module 不要求修改 Platform Core；
+- Contract Module 的 UI/Semantic contribution 必须经公开 manifest/contract 注册，不由 Platform Core 硬编码。
 
 ## 6. 禁止事项
 
@@ -88,6 +110,8 @@ OCR 无法解析 revision、LLM 无法解析 processing lineage、错误关联�
 - Ambiguous/Conflict auto repair；
 - metadata-only contract 虚构 revision；
 - orphan file 自动成为业务事实；
+- 把 C-specific schema/table/path/state 放入 Platform Core 或 Contract Domain；
+- 绕过 Business Module Contract 直接把 C 数据写入通用平台表；
 - 激活 PLAN-0006 或扩大 PLAN-0008 产品范围。
 
 ## 7. Activation gate
@@ -95,4 +119,17 @@ OCR 无法解析 revision、LLM 无法解析 processing lineage、错误关联�
 只有在单独接受本计划、冻结 source manifest 和目标隔离边界后，才可建立独立
 feature branch。Activation 前必须复核 source connection/storage 位置、schema、
 三种导入路径、OCR/LLM lineage、样本覆盖、quarantine 策略、回滚方案和完整
-verification report。当前不开始正式迁移。
+verification report。
+
+新增架构前置门禁：
+
+1. PLAN-0010 必须已 `Integrated`，Business Module Isolation/Semantic Contract 成为 main 权威基础；
+2. PLAN-0011 必须至少完成并集成最小 Business Application Packaging/Contribution Foundation；
+3. Contract 必须能作为独立 Business Module 声明 stable module identity、public resource/contracts、UI/Semantic contribution；
+4. C-specific ACL 必须位于 `integrations/legacy-c-contract-management` 或等价清晰隔离边界；
+5. 任何跨模块扩展只能使用 Published Contract / Published Extension Point / ResourceRef / Public Projection / Reference + Snapshot；
+6. 不得通过 private table FK、裸表 JOIN、动态字段注入或 Platform 特例完成 C → Contract 映射。
+
+PLAN-0011 未完成前，可以继续只读调查、冻结 inventory 和迁移规则文档，但不得把 rehearsal materialization 作为正式 Contract Module 接入实现。
+
+当前不开始正式迁移。
