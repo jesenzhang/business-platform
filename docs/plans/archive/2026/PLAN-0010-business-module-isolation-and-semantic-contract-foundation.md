@@ -21,7 +21,7 @@
 
 ## 2. 架构影响
 
-本计划落实 [`ADR-0020`](../../adr/ADR-0020-business-module-isolation-and-semantic-contract.md) 和专题 Baseline [`BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](../../architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md)。
+本计划落实 [`ADR-0020`](../../../adr/ADR-0020-business-module-isolation-and-semantic-contract.md) 和专题 Baseline [`BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](../../../architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md)。
 
 ### 2.1 Concept Inventory
 
@@ -127,4 +127,4 @@ canonical JSON 与 digest 对输入顺序不敏感
 
 ## 10. Integration 记录
 
-Candidate implementation SHA、完整门禁、模块删除验证、Platform Core 隔离验证、C-specific scan 和远程 CI 详见 [`docs/reviews/2026-08-11-plan-0010-accepted-candidate.md`](../../reviews/2026-08-11-plan-0010-accepted-candidate.md)。PLAN-0010 已集成到 `origin/main` 的 `ad35c3c172cf19c97366c38ae8340852f3b6365c`；本次恢复只在其上叠加 PLAN-0009 的已完成 rehearsal 成果，不激活 PLAN-0006，也不执行 C 项目生产迁移。
+Candidate implementation SHA、完整门禁、模块删除验证、Platform Core 隔离验证、C-specific scan 和远程 CI 详见 [`docs/reviews/2026-08-11-plan-0010-accepted-candidate.md`](../../../reviews/2026-08-11-plan-0010-accepted-candidate.md)。PLAN-0010 已集成到 `origin/main` 的 `ad35c3c172cf19c97366c38ae8340852f3b6365c`；本次恢复只在其上叠加 PLAN-0009 的已完成 rehearsal 成果，不激活 PLAN-0006，也不执行 C 项目生产迁移。

@@ -36,6 +36,7 @@
 | Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
 | 数据治理、分析与可视化 | [`architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md) | Baseline | 可重建分析投影、指标语义、受控查询、Dashboard 与报表边界 |
 | Business Module Isolation 与 Semantic Contract | [`architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md) | Baseline | 平台核心/业务模块隔离、模块 manifest、语义贡献、确定性编译和 legacy ACL 边界 |
+| Business Application Platform | [`architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md) | Proposed input | Platform Core/Business Module 边界、贡献、跨模块协作、生命周期和 synthetic validation |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -51,6 +52,7 @@
 | 架构门禁 | [`standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`](standards/ARCHITECTURE_FITNESS_FUNCTIONS.md) | Baseline | CI 依赖检查、契约测试和发布证据 |
 | Rust 编码 | [`standards/RUST_CODING_STANDARD.md`](standards/RUST_CODING_STANDARD.md) | Baseline | Rust 代码、错误、异步、测试和安全规则 |
 | 查询与数据库适配 | [`standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`](standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md) | Baseline | Query Object、Read DTO、分页、SQL/ORM 与多数据库规则 |
+| 跨模块通信 | [`standards/INTER_MODULE_COMMUNICATION_STANDARD.md`](standards/INTER_MODULE_COMMUNICATION_STANDARD.md) | Proposed input to ADR-0022 | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga 边界 |
 | 基础设施验证 | [`../企业AI业务平台基础设施开发验证与预生产方案_v1.md`](../企业AI业务平台基础设施开发验证与预生产方案_v1.md) | Baseline | 本地、测试、CI、预生产与恢复 |
 | 文档治理 | [`governance/DOCUMENT_MANAGEMENT.md`](governance/DOCUMENT_MANAGEMENT.md) | Baseline | 文档目录、生命周期、变更和归档 |
 
@@ -73,6 +75,8 @@
 - [`adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md`](adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)：接受 Enterprise AI Workspace、任务级 Capability、Observation 血缘与 Artifact 非权威边界；Cloudflare OS 仅作为参考项目。
 - [`adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)：接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标领域边界和跨部门 Reference + Snapshot 协作模式。
 - [`adr/ADR-0020-business-module-isolation-and-semantic-contract.md`](adr/ADR-0020-business-module-isolation-and-semantic-contract.md)：接受 Business Module Isolation、Semantic Contract、确定性 compiler 和 C legacy ACL 预留。
+- [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Proposed，Business Application Packaging、Contribution 和 Published Extension Point。
+- [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Proposed，跨模块通信、一致性和 Process Manager/Saga。
 
 ## 5. 文档目录
 
@@ -136,7 +140,8 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 ## 8. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
-- PLAN-0010 Integrated：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
+- PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
+- PLAN-0011 Proposed / NOT ACTIVE：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（等待 ADR-0021/0022 和 Architecture Foundation Convergence 审阅，不授权 runtime）
 - PLAN-0009 Completed / Rehearsal Closed：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
@@ -152,6 +157,10 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 - AI Workspace 差距审查：[`reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`](reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md)
 - Cloudflare OS 参考分析：[`reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md)
 - Canner/WrenAI 参考分析：[`reference/WRENAI_REFERENCE_ANALYSIS.md`](reference/WRENAI_REFERENCE_ANALYSIS.md)
+- Twenty 参考分析：[`reference/TWENTY_REFERENCE_ANALYSIS.md`](reference/TWENTY_REFERENCE_ANALYSIS.md)
+- Odoo 参考分析：[`reference/ODOO_REFERENCE_ANALYSIS.md`](reference/ODOO_REFERENCE_ANALYSIS.md)
+- Frappe/ERPNext 参考分析：[`reference/FRAPPE_ERPNEXT_REFERENCE_ANALYSIS.md`](reference/FRAPPE_ERPNEXT_REFERENCE_ANALYSIS.md)
+- Business Application Platform 综合参考：[`reference/BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md`](reference/BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md)
 - 企业业务领域 Baseline：[`architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
 - 企业业务领域参考项目：[`reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md)
 

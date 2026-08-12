@@ -421,3 +421,20 @@ PLAN-0010 additionally requires：
   browsing, database URLs, credentials, storage keys or internal object paths;
 - the C project remains read-only rehearsal evidence, PLAN-0006 remains Proposed
   / NOT ACTIVE, and PLAN-0009 remains Completed / Rehearsal Closed.
+
+## 27. Architecture Foundation Convergence gates
+
+Architecture Foundation Convergence 文档阶段新增以下 Required 设计门禁；PLAN-0011 激活前必须把它们转为 pure contract/compiler 或 fixture contract tests：
+
+- Platform Core 不包含具体业务 module、fixture、表、schema、SQL 或 provider 名称；
+- Business Module A/B 不得依赖对方 private Repository、Domain internals、private persistence、FK 或 SQL；
+- 跨模块 Query/Command 有 timeout、tenant、authorization、version、idempotency 和稳定 error mapping；
+- Integration Event 具有 owner→local transaction→Outbox→versioned event 链，消费者支持 duplicate、out-of-order、retry、replay 和 evolution；
+- ResourceRef 不暴露 private storage identity，使用时重新执行 tenant/auth/lifecycle/version 校验；
+- Reference + Snapshot 明确 immutable historical semantics，不能取代 Owner 当前状态；
+- Published Projection 记录 owner、source/version、freshness、watermark、rebuildability 和 non-authority；
+- Process Manager/Saga 是唯一跨模块业务流程模型，且与 Durable Task Job/Step/Lease/Fence/Retry/Recovery 状态分离；
+- Published Extension Point 的 owner、consumer、stable ID、schema/version、classification、authorization、dependency 和 removal semantics 可验证；live consumer 存在时 removal 必须 Blocked；
+- compiled package manifest 和 dry-plan 对输入顺序保持稳定排序、canonical bytes、SHA-256 digest 和诊断顺序；
+- Module removal 不能暗示或自动执行 business data purge；
+- UI、Agent、Semantic contribution 共享 module identity 但有独立 schema/authorization，Agent Tool 只能调用 Application API。

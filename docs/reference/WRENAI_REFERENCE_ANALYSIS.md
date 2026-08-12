@@ -128,4 +128,4 @@ C Project (external read-only source)
 
 ## 7. 结论
 
-WrenAI 被正式登记为参考项目，采用的是“可声明、可校验、可编译、可重建的语义契约”这一设计思想；不采用其 Python/Connector/MCP/任意 SQL/数据库 schema 暴露和商业安全边界。Business Module Isolation 与 Semantic Contract 的实现边界、错误模型和确定性编译由 [`BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](../architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md)、[`ADR-0020`](../adr/ADR-0020-business-module-isolation-and-semantic-contract.md) 和 [`PLAN-0010`](../plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md) 固化。
+WrenAI 被正式登记为参考项目，采用的是“可声明、可校验、可编译、可重建的语义契约”这一设计思想；不采用其 Python/Connector/MCP/任意 SQL/数据库 schema 暴露和商业安全边界。Business Module Isolation 与 Semantic Contract 的实现边界、错误模型和确定性编译由 [`BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](../architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md)、[`ADR-0020`](../adr/ADR-0020-business-module-isolation-and-semantic-contract.md) 和 [`PLAN-0010`](../plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md) 固化。

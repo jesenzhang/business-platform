@@ -103,4 +103,4 @@ C-specific 名称、表、状态码和 SDK 只能在 ACL、rehearsal、迁移报
 - [`ADR-0018`](ADR-0018-enterprise-ai-workspace-and-capability-security.md)
 - [`ADR-0019`](ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)
 - [`WRENAI_REFERENCE_ANALYSIS.md`](../reference/WRENAI_REFERENCE_ANALYSIS.md)
-- [`PLAN-0010`](../plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)
+- [`PLAN-0010`](../plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)

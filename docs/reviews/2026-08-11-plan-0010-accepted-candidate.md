@@ -7,6 +7,14 @@
 > Candidate SHA: `7997a501528bf12ae7846a9dc278fe4fce65a467`
 > Final evidence HEAD: docs-only close-out commit following the Candidate implementation (exact SHA in task handoff)
 
+> **Subsequent status reconciliation (2026-08-12):** The historical candidate review below
+> records the status known at its 2026-08-11 review point. It is retained as evidence and is
+> not the current plan authority. The later PLAN-0009 closeout/recovery evidence is authoritative:
+> PLAN-0009 is `Completed / Rehearsal Closed / Archived` at
+> `docs/plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`.
+> PLAN-0010 is `Integrated / Archived` at
+> `docs/plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`.
+
 ## Baseline correction
 
 The previous Candidate was invalidated. PR #7's actual GitHub base is
@@ -65,7 +73,7 @@ The clean `Base..HEAD` contains only the following 28 PLAN-0010 files:
 - `docs/architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`
 - `docs/architecture/LEGACY_MIGRATION_ARCHITECTURE.md`
 - `docs/plans/README.md`
-- `docs/plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`
+- `docs/plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`
 - `docs/reference/README.md`
 - `docs/reference/WRENAI_REFERENCE_ANALYSIS.md`
 - `docs/reviews/2026-08-11-plan-0010-accepted-candidate.md`
@@ -139,8 +147,10 @@ scope statements only. Result: PASS.
 
 ## Final disposition
 
-PLAN-0010 is `Accepted Candidate` at implementation SHA
+PLAN-0010 was `Accepted Candidate` at implementation SHA
 `7997a501528bf12ae7846a9dc278fe4fce65a467`, with the final docs close-out
 commit and its exact-head CI recorded when publication completes. PLAN-0009
-remains `Proposed / NOT ACTIVE`; PLAN-0006 remains `Proposed / NOT ACTIVE`.
-No archive and no main integration.
+was still `Proposed / NOT ACTIVE` at this historical review point; later closeout
+and recovery records supersede that status. PLAN-0006 remains `Proposed / NOT ACTIVE`.
+The later main integration and archive paths are recorded in the reconciliation note
+above and the current plan indexes.

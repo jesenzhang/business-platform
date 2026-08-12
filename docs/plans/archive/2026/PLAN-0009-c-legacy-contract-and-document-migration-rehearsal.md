@@ -107,7 +107,7 @@ feature branch。Activation 前必须复核 source connection/storage 位置、s
 
 本计划已于 2026-08-10 激活，但仅授权隔离的 read-only rehearsal。激活证据、
 source fingerprint、目标边界、清理方式和真实 C 项目盘点见：
-[`docs/reports/PLAN-0009-STAGE-0-ACTIVATION.md`](../../reports/PLAN-0009-STAGE-0-ACTIVATION.md)。
+[`docs/reports/PLAN-0009-STAGE-0-ACTIVATION.md`](../../../reports/PLAN-0009-STAGE-0-ACTIVATION.md)。
 
 激活不改变 C 项目、不授予 production migration 权限、不改变 PLAN-0008 的已集成
 边界，也不激活 PLAN-0006。后续阶段仍必须以独立 candidate 和 reviewer PASS 为

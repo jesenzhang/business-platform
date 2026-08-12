@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-11
-> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Integrated; PLAN-0009 Rehearsal Closed
-> 当前计划：PLAN-0007 Active；PLAN-0010 Integrated；PLAN-0009 Completed / Rehearsal Closed；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 最后更新：2026-08-12
+> 当前阶段：Architecture Foundation Convergence — document foundation candidate; PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Proposed / NOT ACTIVE；PLAN-0009 Completed / Rehearsal Closed；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -201,6 +201,12 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 - Business Module Isolation 与 Semantic Contract Baseline、ADR-0020、纯 Rust contract/compiler
   和确定性编译测试；现有业务 crate 尚未迁入 `modules/` 目录。
 
+Architecture Foundation Convergence 当前只形成文档候选：Business Application Platform
+边界、Inter-Module Communication、Process Manager/Saga、Published Extension Point、
+Package/Dry Plan、UI/Agent/Semantic contribution 三层边界和 module-a/b/extension
+synthetic validation 已提出；ADR-0021/0022 仍 Proposed，PLAN-0011 仍 Proposed / NOT
+ACTIVE。不得把这些文档描述为已实现 Registry、安装器、卸载器、Saga runtime 或动态插件。
+
 Enterprise AI Workspace 现状：
 
 - 架构 Baseline、ADR-0018、参考分析和 PLAN-0006 Proposed 已形成；
@@ -333,7 +339,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待全面落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；Agent 门禁待 PLAN-0006
+自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；本轮文档新增门禁设计待本次验证；Agent 门禁待 PLAN-0006
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
@@ -345,7 +351,8 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
-PLAN-0010：Integrated（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
+PLAN-0010：Integrated / Archived（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
+PLAN-0011：Proposed / NOT ACTIVE（Business Application Packaging and Contribution；等待 ADR-0021/0022 和 architecture convergence review）
 ```
 
 ## 8. PLAN-0006 采用前动作
@@ -378,6 +385,9 @@ PLAN-0006 进入 Active 前：
 - 平台原生 Analytics/Visualization Baseline 建立；后续投影、指标、查询、Dashboard、报表和 Agent 技能必须由独立 PLAN 推进；
 - 指标语义、投影、Analytics Query Service、Dashboard/Report 或 Agent 分析技能开始实现；
 - 开始第一个遗留业务迁移切片。
+- ADR-0021/0022 被接受或拒绝；
+- PLAN-0011 完成 activation gate、synthetic fixture 和 independent review；
+- Business Application Platform document foundation 进入 Baseline。
 - PLAN-0006 被激活；
 - Workspace/Capability 数据模型形成候选；
 - 第一个 Agent read-only Tool 通过授权和 Adapter 契约测试；

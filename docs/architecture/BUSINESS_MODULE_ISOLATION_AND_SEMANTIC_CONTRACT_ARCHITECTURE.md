@@ -12,7 +12,7 @@
 1. **Business Module Isolation**：隔离平台核心与具体业务模块，并隔离业务模块 A 与业务模块 B 的所有权、依赖、契约和生命周期；
 2. **Semantic Contract**：表达业务模块愿意向 Analytics/查询消费者公开的 Dataset、Projection、Field、Relationship、Measure、Metric、Dimension、Time Dimension、Filter Policy 和 Lineage。
 
-本文不建立新的 Bounded Context，不改变已有业务数据所有者，不实现 WrenAI 运行时、Python、Text-to-SQL、任意 SQL、ClickHouse、OLAP、通用 Workflow、插件热加载或微服务拆分。Analytics 继续遵循 [`ADR-0017`](../adr/ADR-0017-platform-native-analytics-and-visualization.md)，Workspace/Agent 继续遵循 [`ADR-0018`](../adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)。
+本文不建立新的 Bounded Context，不改变已有业务数据所有者，不实现 WrenAI 运行时、Python、Text-to-SQL、任意 SQL、ClickHouse、OLAP、通用 Workflow、插件热加载或微服务拆分。Analytics 继续遵循 [`ADR-0017`](../adr/ADR-0017-platform-native-analytics-and-visualization.md)，Workspace/Agent 继续遵循 [`ADR-0018`](../adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md)。Business Application Packaging、Published Extension Point 和跨模块通信分别由 Proposed [`ADR-0021`](../adr/ADR-0021-business-application-packaging-and-published-extension-points.md) 与 [`ADR-0022`](../adr/ADR-0022-inter-module-communication-and-business-collaboration.md) 继续审阅；它们不得被本 Baseline 解释为已实现 runtime。
 
 ## 2. 两层模型
 
@@ -251,3 +251,17 @@ ACL 负责字段、状态、错误和身份转换；Contract Management 负责�
 ## 10. 后续实现条件
 
 进入真正 Business Module/Analytics runtime 计划前，必须另行明确：租户与授权模型、Manifest Registry 持久化所有者、安装/启用 API、语义注册一致性、版本兼容窗口、Projection 重建、Query Plan/预算、审计、事件、迁移和回滚。该计划不能通过新增 WrenAI 运行时依赖来绕过本架构。
+
+## 11. Architecture Foundation Convergence boundary
+
+本专题的长期不变量收敛为：
+
+```text
+DDD Domain != Extension Metadata != Semantic Contract
+Platform Core != any concrete business module
+Uninstalled != Data Purged
+```
+
+Business Module 的完整边界、Contribution 统一入口、模块生命周期和 synthetic validation 见 [`BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md)。Module A/B 的 Query、Command、Integration Event、ResourceRef、Reference + Snapshot、Published Projection 和 Process Manager/Saga 见 [`INTER_MODULE_COMMUNICATION_STANDARD.md`](../standards/INTER_MODULE_COMMUNICATION_STANDARD.md)。
+
+在 ADR-0021/0022 被审阅和后续 PLAN-0011 通过 activation gate 前，以上规则是设计约束和验收要求，不是已存在的安装/注册/卸载执行器。Platform Core 的架构门禁必须对 fixture-business knowledge、private persistence access、private extension/reference、semantic ownership collision、dependency cycle、compatibility failure 和 non-deterministic output fail closed。

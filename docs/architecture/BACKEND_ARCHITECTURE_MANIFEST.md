@@ -49,6 +49,8 @@
 | 持久化、查询与多数据库 | `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md` | Command/Query seam、Projection、跨 Context 读取与数据库适配策略 |
 | 数据治理、分析与可视化 | `DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md` | 可重建分析投影、指标语义、受控查询、Dashboard、报表和 Agent 边界 |
 | Business Module Isolation 与 Semantic Contract | `BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md` | 平台核心/业务模块隔离、Manifest、语义贡献、确定性编译与 legacy ACL 边界 |
+| Business Application Platform | `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md` | Platform Core/Business Module 边界、DDD/Metadata/Semantic 三层、贡献、生命周期与 synthetic validation |
+| 跨模块通信与业务协作 | `../standards/INTER_MODULE_COMMUNICATION_STANDARD.md` / `../adr/ADR-0022-inter-module-communication-and-business-collaboration.md` | Query、Command、Event、ResourceRef、Snapshot、Projection、Process Manager/Saga |
 | API 与事件 | `../standards/API_AND_EVENT_CONTRACT_STANDARD.md` | 对外协议和兼容性规则 |
 | 架构门禁 | `../standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` | 如何自动证明架构符合性 |
 | Rust 编码 | `../standards/RUST_CODING_STANDARD.md` | 具体编码和测试规范 |
@@ -75,6 +77,15 @@ DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
 DATA_OWNERSHIP_AND_CONSISTENCY.md
 ADR-0017-platform-native-analytics-and-visualization.md
 ADR-0020-business-module-isolation-and-semantic-contract.md
+```
+
+涉及 Business Application Packaging、Published Extension Point、跨模块 Query/Command/Event、ResourceRef、Reference + Snapshot、Published Projection 或 Process Manager/Saga 的任务，必须同时遵守：
+
+```text
+BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md
+../standards/INTER_MODULE_COMMUNICATION_STANDARD.md
+ADR-0021-business-application-packaging-and-published-extension-points.md
+ADR-0022-inter-module-communication-and-business-collaboration.md
 ```
 
 涉及 AI Workspace、Agent、Skill、Context、Tool、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 的任务，必须同时遵守：
