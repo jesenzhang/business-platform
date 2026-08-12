@@ -25,8 +25,25 @@ plans/
 
 - [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
 - [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP。
-- [`current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Accepted Candidate`（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`），模块隔离、语义契约和纯 Rust 确定性 compiler；不激活 PLAN-0006/PLAN-0009。
-- [`current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Proposed / NOT ACTIVE`，只做 C 项目 read-only migration rehearsal 设计与隔离验证。
+- [`current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Accepted Candidate`（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`），模块隔离、语义契约和纯 Rust 确定性 compiler；必须先完成独立 Review 与集成，后续计划不得修改其 Candidate scope。
+- [`current/PLAN-0011-business-application-packaging-and-contribution-foundation.md`](current/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：`Proposed / NOT ACTIVE`，在 PLAN-0010 集成后建立 Business Application Packaging、typed UI/Policy/Agent Contribution、Published Extension Point、SemVer compatibility、compiled package manifest 与 deterministic dry-plan；不实现动态插件/Marketplace。
+- [`current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Proposed / NOT ACTIVE`，只做 C 项目 read-only migration rehearsal；真实 Contract Business Module materialization 前依赖 PLAN-0010 + PLAN-0011 的隔离/Packaging 基础。
+
+## 推荐执行顺序
+
+当前主路径：
+
+```text
+PLAN-0010 independent review
+  → PASS / integrate / archive
+  → PLAN-0011 Business Application Packaging & Contribution Foundation
+  → integrate
+  → activate PLAN-0009 120-contract isolated rehearsal
+  → Contract becomes first real Business Module
+  → C becomes first real Legacy Integration Adapter
+```
+
+PLAN-0006 保持独立 `Proposed / NOT ACTIVE`，不得因 PLAN-0011 的 Agent contribution descriptor 被视为已实现 Workspace/Agent Runtime。
 
 ## 已归档计划
 
