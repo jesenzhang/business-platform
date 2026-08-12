@@ -1,8 +1,8 @@
 # PLAN-0009 Stage 0 — Activation and Isolation Evidence
 
-Status: **Activated — rehearsal only**  
-Recorded: 2026-08-10 (Asia/Shanghai)  
-Real business-platform base: `654fe83d82107d899079d20e5fef8aaf4d5431b8`  
+Status: **Activated — rehearsal only**
+Recorded: 2026-08-10 (Asia/Shanghai)
+Real business-platform base: `654fe83d82107d899079d20e5fef8aaf4d5431b8`
 Feature branch: `codex/plan-0009-c-migration-rehearsal`
 
 ## Decision

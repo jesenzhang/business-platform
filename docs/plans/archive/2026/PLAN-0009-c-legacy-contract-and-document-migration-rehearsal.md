@@ -1,16 +1,16 @@
 # PLAN-0009：C Legacy Contract & Document Migration Rehearsal
 
-文档 ID：PLAN-0009  
-版本：0.3  
-状态：Completed / Rehearsal Closed  
-日期：2026-08-10  
-Owner：Platform Foundation / Document Management / Document Intelligence  
+文档 ID：PLAN-0009
+版本：0.3
+状态：Completed / Rehearsal Closed
+日期：2026-08-10
+Owner：Platform Foundation / Document Management / Document Intelligence
 前置集成：PLAN-0008 `Integrated`，执行基线为真实 main
 `654fe83d82107d899079d20e5fef8aaf4d5431b8`（旧 SHA 仅作历史参考）
 
-原始完成 SHA：`f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`  
-原始 Base SHA：`654fe83d82107d899079d20e5fef8aaf4d5431b8`  
-Readiness：`REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`  
+原始完成 SHA：`f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`
+原始 Base SHA：`654fe83d82107d899079d20e5fef8aaf4d5431b8`
+Readiness：`REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`
 Production migration：`NOT GRANTED`（未授权、未执行）
 
 ## 1. 目标

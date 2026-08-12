@@ -364,9 +364,10 @@ this rehearsal.
 - OCR and structured/LLM lineage counts are real and preserved, but formal
   target revision/run bindings and semantic output correctness were not
   established because no Exact input was materialized.
-- Final workspace, architecture, security, secret, vulnerability, license,
-  and image gates after Stage 4 have not been run; the Stage 5 independent
-  Reviewer has not yet reviewed this candidate.
+- Final workspace and architecture gates were run and recorded below. Secret,
+  vulnerability, license, and image scans remain explicitly NOT RUN because no
+  repository-provided or installed scanner entrypoint was available. The Stage
+  5 independent Reviewer reconciled this report and recorded PASS below.
 
 ### Rollback strategy
 
