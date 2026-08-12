@@ -1,16 +1,19 @@
 # 企业业务领域参考项目分析
 
-> 类型：Reference
-> 检查日期：2026-08-08
-> 适用范围：合同、财务、法务、项目、客户、HR/绩效、文档和跨部门业务建模
-> 决策入口：[`../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)
+> 类型：Reference  
+> 首次检查日期：2026-08-08  
+> Twenty 深度复核：2026-08-12，固定提交 `65616332b452361e639c41d7340d54febf95fae5`  
+> 适用范围：合同、财务、法务、项目、客户、HR/绩效、文档和跨部门业务建模  
+> 决策入口：[`../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](../adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)  
 > Baseline：[`../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](../architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
 
 ## 1. 使用说明
 
-本文只记录外部项目事实和对 `business-platform` 的参考价值，不构成项目架构规则。正式边界以 ADR 和 Architecture Baseline 为准。
+本文记录企业业务领域参考项目的横向定位，不构成项目架构规则。正式边界以 ADR 和 Architecture Baseline 为准。
 
-本轮没有复制外部项目代码，也没有把外部运行时引入依赖。许可证只在上游 README 明示或本轮已确认时记录；其他项目在实际复用代码、Schema 或 UI 资产前必须再次核对当前许可证和版本。
+Twenty 已在 2026-08-12 完成独立源码级专项研究，其 Business App/Module Packaging 结论以 [`TWENTY_REFERENCE_ANALYSIS.md`](TWENTY_REFERENCE_ANALYSIS.md) 为准；本文不再承担 Twenty 的完整架构分析。
+
+本项目不因参考项目而直接引入其运行时。实际复用代码、Schema、SDK 或 UI 资产前必须再次核对当前许可证、版本和依赖边界。
 
 ## 2. 总览
 
@@ -19,7 +22,7 @@
 | Odoo | 集成式开源 Business Apps / ERP | CRM、项目、HR、库存、会计、制造、模块组合 | 领域组合和模块边界参考 |
 | ERPNext | 完整开源 ERP | 财务、采购、销售、项目、资产、制造、HR | 企业业务领域词典和流程参考 |
 | Frappe HRMS | HR + Payroll 垂直应用 | 员工生命周期、请假、考勤、绩效、薪资 | People & Performance 领域参考 |
-| Twenty | 可扩展现代 CRM / Business App 平台 | 对象、字段、View、Workflow、Agent | 可配置业务对象和前端体验参考 |
+| Twenty | Business App Platform / CRM Product | Application Manifest、Object/Field、View/Layout、Role/Permission、Logic/Agent、install/upgrade/uninstall | **Tier-1 Business App Packaging 参考**，详见专项分析 |
 | Bigcapital | 开源会计和库存软件 | 双重记账、财务报表、交易/库存 | Finance 演进参考 |
 | Comp AI CRM | Agentic CRM | Agent Task、Evidence、研究、CRM Activity | Agent 工程参考，业务权威模型不照搬 |
 | Plane | 项目管理 | Work Item、Cycle、Module、View、Analytics | Project/Work Management 参考 |
@@ -73,14 +76,49 @@ Frappe HRMS 是独立的人力资源和 Payroll 应用，覆盖员工生命周�
 
 ## 6. Twenty
 
-Twenty 将自己定位为面向技术团队的可定制 CRM，并允许通过代码定义 Object、Field 和 View，同时提供 Workflow 和 AI Agent 能力。
+Twenty 的参考定位在 2026-08-12 调整：它不再只是“可配置 CRM 与前端体验参考”，而是提升为 **Tier-1 Business App / Module Packaging / Metadata / UI / Lifecycle 架构参考**。
 
-### 对本项目的参考价值
+源码级调查确认当前 Twenty Application Manifest 已覆盖：
 
-- 稳定领域对象与可配置扩展字段分层；
-- 业务 View 不必直接绑定数据库表；
-- 业务应用可以版本化交付；
-- Agent 可以作为业务应用能力之一，但不应绕过正式业务 API。
+```text
+Application
+Objects / Fields / Indexes
+Roles / Permission Flags
+Views / View Fields
+Navigation / Page Layout / Page Layout Tabs / Commands
+Logic Functions / Front Components
+Skills / Agents
+Connection Providers / Assets / Translations
+```
+
+并且具有 source declaration → build manifest、stable universal identifier、required server version range、dry-run manifest sync、install/upgrade/uninstall 等完整 App Platform 机制。
+
+### 对本项目的核心参考价值
+
+- Business Module 应有稳定、版本化、与物理代码路径无关的 Package/Contribution identity；
+- 业务模块应通过 Manifest 声明 UI、Policy、Agent、Semantic 等贡献，而不是由 Platform Core 硬编码；
+- 安装/升级前应先进行 compatibility validation 与 deterministic dry-plan；
+- View、Navigation、Detail Layout、Action 等可以成为 typed UI Contribution；
+- Module 生命周期、Package checksum、版本兼容和 remove plan 应成为正式治理对象；
+- 业务扩展需要显式 Published Extension Point。
+
+### 必须改造或拒绝
+
+Twenty 允许 App 向标准对象或其他 App Object 添加字段/关系，这对 CRM Extension 很灵活，但不满足本项目更严格的“真实业务互不污染、业务可剥离”要求。
+
+本项目禁止：
+
+```text
+Module B → ALTER Module A private schema
+Module B → private FK / private table JOIN
+Module B → 未经 owner 发布直接给 Aggregate 注入字段
+```
+
+Twenty 的 Object Metadata 也不能取代本项目的 Rust DDD Domain、业务不变量、事务、Event、Revision/Evidence/Audit。卸载 Module 与 Purge 历史数据继续严格分离。
+
+专项事实、许可证、Adopt/Adapt/Reject/Defer 与 PLAN-0011 实施映射详见：
+
+[`TWENTY_REFERENCE_ANALYSIS.md`](TWENTY_REFERENCE_ANALYSIS.md)
 
 ## 7. Bigcapital
 
@@ -231,16 +269,19 @@ Documenso 是开源 DocuSign alternative，README 明示 AGPLv3，并支持自�
 本项目不寻找一个“万能 ERP 项目”直接复刻，而采用组合参考：
 
 ```text
-业务领域广度      → Odoo + ERPNext
-可扩展业务平台    → Twenty
-财务演进          → Bigcapital + ERPNext/Odoo
-HR/绩效           → Frappe HRMS
-项目              → Plane
-客户交互          → Chatwoot
-Agent 工程        → Comp AI CRM
-合同/法务文档     → OpenContracts
-企业文档生命周期  → Mayan EDMS + Paperless-ngx
-电子签署          → Documenso
+业务领域广度          → Odoo + ERPNext
+Business App Packaging → Twenty
+Semantic / Analytics    → WrenAI
+财务演进              → Bigcapital + ERPNext/Odoo
+HR/绩效               → Frappe HRMS
+项目                  → Plane
+客户交互              → Chatwoot
+Agent 工程            → Comp AI CRM
+合同/法务文档         → OpenContracts
+企业文档生命周期       → Mayan EDMS + Paperless-ngx
+电子签署              → Documenso
 ```
 
-最终边界仍以 `business-platform` 的 DDD、Data Ownership、Security、Audit、Analytics、Document Processing 和 ADR-0019 为准。
+Twenty 负责回答“业务如何作为独立 App/Module 存在”；WrenAI 负责回答“业务公开的数据语义是什么”；Rust DDD 继续回答“正式业务事实与规则由谁拥有”。
+
+最终边界仍以 `business-platform` 的 DDD、Data Ownership、Security、Audit、Analytics、Business Module Isolation、Document Processing 和 ADR-0019/ADR-0020 为准。
