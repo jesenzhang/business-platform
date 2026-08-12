@@ -2,8 +2,8 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-08-11
-> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Candidate Accepted
-> 当前计划：PLAN-0007 Active；PLAN-0010 Accepted Candidate；PLAN-0009 Proposed / NOT ACTIVE；PLAN-0006 继续 Proposed / NOT ACTIVE
+> 当前阶段：Phase 5 Enterprise AI Workspace + Business Module/Semantic Foundation — Integrated; PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0007 Active；PLAN-0010 Integrated；PLAN-0009 Completed / Rehearsal Closed；PLAN-0006 继续 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -87,8 +87,9 @@
 > `31353149398` and Main CI `31353409550` passed all jobs, including GitHub
 > PostgreSQL/MinIO, migration, revision/evidence, concurrency, retry, crash
 > recovery, multi-process E2E, and Architecture Fitness. Local PostgreSQL/MinIO
-> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Proposed / NOT
-> ACTIVE and PLAN-0006 remains Proposed / NOT ACTIVE.
+> remains NOT RUN. PLAN-0008 is Integrated / Archived; PLAN-0009 is Completed /
+> Rehearsal Closed and archived, with production migration NOT GRANTED; PLAN-0006
+> remains Proposed / NOT ACTIVE.
 
 2026-08-11: Canner/WrenAI was registered as a pinned reference at commit
 `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`. ADR-0020 accepts Business Module
@@ -343,8 +344,8 @@ Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
 
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
-PLAN-0009：Proposed / NOT ACTIVE（C Legacy Contract & Document Migration Rehearsal；只读、隔离、无生产迁移）
-PLAN-0010：Accepted Candidate（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；不自动集成 main）
+PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
+PLAN-0010：Integrated（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
 ```
 
 ## 8. PLAN-0006 采用前动作

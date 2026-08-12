@@ -55,6 +55,10 @@ pub enum ProcessingArtifactError {
     InvalidChecksum,
     #[error("evidence references a different revision, run, or artifact")]
     SourceMismatch,
+    #[error("processing run status transition is invalid")]
+    InvalidStatus,
+    #[error("processing run timestamp is invalid")]
+    InvalidTimestamp,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,7 +92,35 @@ impl ProcessingRun {
         created_by: Uuid,
         now: DateTime<Utc>,
     ) -> Result<Self, ProcessingArtifactError> {
-        if tenant_id.is_nil() || document_revision_id.is_nil() || created_by.is_nil() {
+        Self::start_with_id(
+            Uuid::now_v7(),
+            tenant_id,
+            document_revision_id,
+            pipeline_version,
+            parser_name,
+            parser_version,
+            model_provider,
+            model_name,
+            created_by,
+            now,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_with_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        document_revision_id: Uuid,
+        pipeline_version: String,
+        parser_name: String,
+        parser_version: String,
+        model_provider: Option<String>,
+        model_name: Option<String>,
+        created_by: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<Self, ProcessingArtifactError> {
+        if id.is_nil() || tenant_id.is_nil() || document_revision_id.is_nil() || created_by.is_nil()
+        {
             return Err(ProcessingArtifactError::InvalidIdentity);
         }
         if pipeline_version.trim().is_empty()
@@ -98,7 +130,7 @@ impl ProcessingRun {
             return Err(ProcessingArtifactError::EmptyMetadata);
         }
         Ok(Self {
-            id: Uuid::now_v7(),
+            id,
             tenant_id,
             document_revision_id,
             pipeline_version,
@@ -113,6 +145,19 @@ impl ProcessingRun {
             created_by,
             created_at: now,
         })
+    }
+
+    /// Complete an imported run after its immutable output is validated.
+    pub fn finish_succeeded(&mut self, now: DateTime<Utc>) -> Result<(), ProcessingArtifactError> {
+        if self.status != ProcessingRunStatus::Running {
+            return Err(ProcessingArtifactError::InvalidStatus);
+        }
+        if self.started_at.is_some_and(|started_at| now < started_at) {
+            return Err(ProcessingArtifactError::InvalidTimestamp);
+        }
+        self.status = ProcessingRunStatus::Succeeded;
+        self.finished_at = Some(now);
+        Ok(())
     }
 
     #[must_use]
@@ -195,7 +240,30 @@ impl ProcessingArtifact {
         schema_version: String,
         created_at: DateTime<Utc>,
     ) -> Result<Self, ProcessingArtifactError> {
-        if tenant_id.is_nil() || processing_run_id.is_nil() {
+        Self::new_with_id(
+            Uuid::now_v7(),
+            tenant_id,
+            processing_run_id,
+            kind,
+            storage_ref,
+            checksum,
+            schema_version,
+            created_at,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        processing_run_id: Uuid,
+        kind: ArtifactKind,
+        storage_ref: String,
+        checksum: String,
+        schema_version: String,
+        created_at: DateTime<Utc>,
+    ) -> Result<Self, ProcessingArtifactError> {
+        if id.is_nil() || tenant_id.is_nil() || processing_run_id.is_nil() {
             return Err(ProcessingArtifactError::InvalidIdentity);
         }
         if storage_ref.trim().is_empty() || schema_version.trim().is_empty() {
@@ -205,7 +273,7 @@ impl ProcessingArtifact {
             return Err(ProcessingArtifactError::InvalidChecksum);
         }
         Ok(Self {
-            id: Uuid::now_v7(),
+            id,
             tenant_id,
             processing_run_id,
             kind,
@@ -272,6 +340,32 @@ impl Evidence {
         source_checksum: String,
         created_at: DateTime<Utc>,
     ) -> Result<Self, ProcessingArtifactError> {
+        Self::new_with_id(
+            Uuid::now_v7(),
+            tenant_id,
+            document_revision_id,
+            run,
+            artifact,
+            location,
+            source_checksum,
+            created_at,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_id(
+        id: Uuid,
+        tenant_id: Uuid,
+        document_revision_id: Uuid,
+        run: &ProcessingRun,
+        artifact: &ProcessingArtifact,
+        location: serde_json::Value,
+        source_checksum: String,
+        created_at: DateTime<Utc>,
+    ) -> Result<Self, ProcessingArtifactError> {
+        if id.is_nil() {
+            return Err(ProcessingArtifactError::InvalidIdentity);
+        }
         if tenant_id != run.tenant_id()
             || tenant_id != artifact.tenant_id()
             || document_revision_id != run.document_revision_id()
@@ -287,7 +381,7 @@ impl Evidence {
             return Err(ProcessingArtifactError::InvalidChecksum);
         }
         Ok(Self {
-            id: Uuid::now_v7(),
+            id,
             tenant_id,
             document_revision_id,
             processing_run_id: run.id(),
@@ -382,5 +476,57 @@ mod tests {
             Utc::now(),
         )
         .is_err());
+    }
+
+    #[test]
+    fn deterministic_id_constructors_keep_immutable_lineage() {
+        let tenant = Uuid::now_v7();
+        let revision = Uuid::now_v7();
+        let actor = Uuid::now_v7();
+        let run_id = Uuid::from_u128(0x1000);
+        let artifact_id = Uuid::from_u128(0x2000);
+        let evidence_id = Uuid::from_u128(0x3000);
+        let now = Utc::now();
+        let mut run = ProcessingRun::start_with_id(
+            run_id,
+            tenant,
+            revision,
+            "pipeline.v1".to_string(),
+            "deterministic".to_string(),
+            "1".to_string(),
+            None,
+            None,
+            actor,
+            now,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert_eq!(run.id(), run_id);
+        assert!(run.finish_succeeded(now).is_ok());
+        assert_eq!(run.status(), ProcessingRunStatus::Succeeded);
+        let artifact = ProcessingArtifact::new_with_id(
+            artifact_id,
+            tenant,
+            run_id,
+            ArtifactKind::OcrText,
+            "artifact/ref".to_string(),
+            "a".repeat(64),
+            "text.v1".to_string(),
+            now,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        let evidence = Evidence::new_with_id(
+            evidence_id,
+            tenant,
+            revision,
+            &run,
+            &artifact,
+            serde_json::json!({"page": 1}),
+            "b".repeat(64),
+            now,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert_eq!(artifact.id(), artifact_id);
+        assert_eq!(evidence.id(), evidence_id);
+        assert_eq!(evidence.processing_run_id(), run_id);
     }
 }

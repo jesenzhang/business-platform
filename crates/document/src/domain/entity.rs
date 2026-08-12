@@ -464,11 +464,40 @@ impl DocumentMetadata {
         size_bytes: Option<i64>,
         revision_id: Uuid,
     ) -> Result<Self, DocumentDomainError> {
+        Self::create_with_revision_id_at(
+            id,
+            tenant_id,
+            original_filename,
+            content_type,
+            object_key,
+            created_by,
+            size_bytes,
+            revision_id,
+            Utc::now(),
+        )
+    }
+
+    /// Create a document with a caller-supplied timestamp.
+    ///
+    /// Rehearsal adapters use this entry point when the input manifest is the
+    /// clock authority. Normal application callers should use
+    /// [`Self::create_with_revision_id`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_revision_id_at(
+        id: Uuid,
+        tenant_id: Uuid,
+        original_filename: String,
+        content_type: String,
+        object_key: String,
+        created_by: Uuid,
+        size_bytes: Option<i64>,
+        revision_id: Uuid,
+        created_at: DateTime<Utc>,
+    ) -> Result<Self, DocumentDomainError> {
         if object_key.trim().is_empty() {
             return Err(DocumentDomainError::EmptyObjectKey);
         }
 
-        let now = Utc::now();
         let aggregate_version =
             AggregateVersion::new(1).map_err(|_| DocumentDomainError::InvalidVersion)?;
         let content_revision =
@@ -494,8 +523,8 @@ impl DocumentMetadata {
             pre_trash_lifecycle: DocumentLifecycleState::Active,
             size_bytes,
             created_by,
-            created_at: now,
-            updated_at: now,
+            created_at,
+            updated_at: created_at,
         })
     }
 
@@ -688,6 +717,8 @@ impl DocumentMetadata {
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeZone;
+
     use super::*;
 
     #[test]
@@ -708,6 +739,36 @@ mod tests {
         assert_eq!(doc.status(), DocumentStatus::Active);
         assert_eq!(doc.version(), 1);
         assert_eq!(doc.size_bytes(), Some(1024));
+    }
+
+    #[test]
+    fn deterministic_constructor_preserves_timestamp_and_revision_key() {
+        let tenant_id = Uuid::now_v7();
+        let document_id = Uuid::now_v7();
+        let revision_id = Uuid::now_v7();
+        let created_at = Utc
+            .timestamp_opt(1_735_689_600, 0)
+            .single()
+            .unwrap_or_else(|| unreachable!());
+        let document = DocumentMetadata::create_with_revision_id_at(
+            document_id,
+            tenant_id,
+            "report.pdf".to_string(),
+            "application/pdf".to_string(),
+            "incoming/report.pdf".to_string(),
+            Uuid::now_v7(),
+            Some(12),
+            revision_id,
+            created_at,
+        )
+        .unwrap_or_else(|_| unreachable!());
+
+        assert_eq!(document.created_at(), created_at);
+        assert_eq!(document.updated_at(), created_at);
+        assert_eq!(
+            document.object_key(),
+            format!("tenants/{tenant_id}/documents/{document_id}/revisions/{revision_id}/source")
+        );
     }
 
     #[test]

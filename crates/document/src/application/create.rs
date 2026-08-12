@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
@@ -61,6 +62,21 @@ impl CreateDocumentMetadata {
         document_id: Option<Uuid>,
         command: CreateDocumentCommand,
     ) -> Result<CreateDocumentResult, CreateDocumentError> {
+        self.execute_with_id_at(document_id, command, Utc::now())
+            .await
+    }
+
+    /// Execute a create command with a caller-supplied creation timestamp.
+    ///
+    /// Rehearsal adapters use this when replaying a frozen manifest. Ordinary
+    /// callers should use [`Self::execute_with_id`], which uses the current
+    /// clock.
+    pub async fn execute_with_id_at(
+        &self,
+        document_id: Option<Uuid>,
+        command: CreateDocumentCommand,
+        created_at: DateTime<Utc>,
+    ) -> Result<CreateDocumentResult, CreateDocumentError> {
         let idempotency_key = command.idempotency_key.trim();
         if idempotency_key.is_empty() || idempotency_key.len() > 255 {
             return Err(CreateDocumentError::Validation(
@@ -71,7 +87,7 @@ impl CreateDocumentMetadata {
         let fingerprint = request_fingerprint(&command);
         let document = match document_id {
             Some(document_id) => match command.revision_id {
-                Some(revision_id) => DocumentMetadata::create_with_revision_id(
+                Some(revision_id) => DocumentMetadata::create_with_revision_id_at(
                     document_id,
                     command.tenant_id,
                     command.original_filename.clone(),
@@ -80,6 +96,7 @@ impl CreateDocumentMetadata {
                     command.user_id,
                     command.size_bytes,
                     revision_id,
+                    created_at,
                 ),
                 None => DocumentMetadata::create_with_id(
                     document_id,
@@ -92,7 +109,7 @@ impl CreateDocumentMetadata {
                 ),
             },
             None => match command.revision_id {
-                Some(revision_id) => DocumentMetadata::create_with_revision_id(
+                Some(revision_id) => DocumentMetadata::create_with_revision_id_at(
                     Uuid::now_v7(),
                     command.tenant_id,
                     command.original_filename,
@@ -101,6 +118,7 @@ impl CreateDocumentMetadata {
                     command.user_id,
                     command.size_bytes,
                     revision_id,
+                    created_at,
                 ),
                 None => DocumentMetadata::create(
                     command.tenant_id,

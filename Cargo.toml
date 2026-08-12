@@ -8,6 +8,7 @@ members = [
     "apps/agent-adapter",
     "apps/business-cli",
     "apps/migration",
+    "apps/plan-0009-rehearsal",
     "crates/runtime-migration",
     "crates/architecture-check",
     "crates/business-module-contracts",
@@ -47,6 +48,7 @@ members = [
     "crates/object-storage",
     "crates/messaging",
     "crates/observability",
+    "crates/legacy-migration-rehearsal",
 ]
 
 [workspace.package]

@@ -2433,6 +2433,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "legacy-migration-rehearsal"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3048,6 +3055,25 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
+name = "plan-0009-rehearsal"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "document",
+ "document-processing",
+ "document-processing-sqlite",
+ "document-sqlite",
+ "legacy-migration-rehearsal",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.19",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "policy"

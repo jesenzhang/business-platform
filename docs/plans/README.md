@@ -25,8 +25,7 @@ plans/
 
 - [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
 - [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP。
-- [`current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Accepted Candidate`（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`），模块隔离、语义契约和纯 Rust 确定性 compiler；不激活 PLAN-0006/PLAN-0009。
-- [`current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Proposed / NOT ACTIVE`，只做 C 项目 read-only migration rehearsal 设计与隔离验证。
+- [`current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Integrated`（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`，已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`），模块隔离、语义契约和纯 Rust 确定性 compiler。
 
 ## 已归档计划
 
@@ -36,6 +35,7 @@ plans/
 - [`archive/2026/PLAN-0004-durable-document-processing-mvp.md`](archive/2026/PLAN-0004-durable-document-processing-mvp.md)：`Integrated`，持久化文档处理、Lease/Fence 和恢复。
 - [`archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)：`Integrated`，Runtime Audit、Integrity 和 Controlled Repair。
 - [`archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md`](archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md)：`Integrated`，Document lifecycle、revision、processing binding 和 evidence foundation。
+- [`archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Completed / Rehearsal Closed`，read-only、隔离 rehearsal；production migration `NOT GRANTED`。
 
 ## 归档
 

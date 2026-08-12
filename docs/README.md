@@ -136,8 +136,8 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 ## 8. 当前实施
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
-- PLAN-0010 Accepted Candidate：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；不自动集成 main）
-- 下一计划：plans/current/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（Proposed / NOT ACTIVE）
+- PLAN-0010 Integrated：plans/current/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
+- PLAN-0009 Completed / Rehearsal Closed：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
@@ -145,6 +145,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 - 已归档：[`plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md`](plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md)（`Integrated`，main `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI `30868701290`）
 - 已归档：[`plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)（`Integrated`，main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI `31026047403`，Feature CI `31021778597`）
 - 已归档：[`plans/archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md`](plans/archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md)（`Integrated`，main `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`，Main CI `31353409550`）
+- 已归档：[`plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)（`Completed / Rehearsal Closed`，原始完成 `f09d2a5`，production migration `NOT GRANTED`）
 - 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
 - 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
 - PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
