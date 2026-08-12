@@ -1,8 +1,8 @@
 # ADR-0022：Inter-Module Communication and Business Collaboration
 
-> 状态：Proposed  
-> 日期：2026-08-12  
-> 决策范围：Business Module 间的查询、命令、事件、引用、快照、投影、Saga 与扩展协作  
+> 状态：Proposed
+> 日期：2026-08-12
+> 决策范围：Business Module 间的查询、命令、事件、引用、快照、投影、Saga 与扩展协作
 > 前置：ADR-0003、ADR-0008、ADR-0017、ADR-0018、ADR-0019、ADR-0020
 
 ## 1. 背景

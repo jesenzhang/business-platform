@@ -1,12 +1,12 @@
 # PLAN-0011：Business Application Packaging & Contribution Foundation
 
-文档 ID：PLAN-0011  
-版本：0.2  
-状态：Proposed / NOT ACTIVE  
-日期：2026-08-12  
-Owner：Platform Foundation / Business Module Runtime / Frontend Platform  
-架构前提：ADR-0020 `Accepted`；ADR-0021 `Proposed`，必须先被接受才可激活本计划  
-前置基线：PLAN-0010 已 `Integrated` 并归档；本计划仍受 ADR-0021/ADR-0022 架构审阅和本计划 activation gate 约束，不得直接激活实现  
+文档 ID：PLAN-0011
+版本：0.2
+状态：Proposed / NOT ACTIVE
+日期：2026-08-12
+Owner：Platform Foundation / Business Module Runtime / Frontend Platform
+架构前提：ADR-0020 `Accepted`；ADR-0021 `Proposed`，必须先被接受才可激活本计划
+前置基线：PLAN-0010 已 `Integrated` 并归档；本计划仍受 ADR-0021/ADR-0022 架构审阅和本计划 activation gate 约束，不得直接激活实现
 主要参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；WrenAI `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`
 
 ## 1. 背景

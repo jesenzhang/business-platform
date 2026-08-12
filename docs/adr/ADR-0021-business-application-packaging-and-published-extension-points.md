@@ -1,8 +1,8 @@
 # ADR-0021：Business Application Packaging 与 Published Extension Points
 
-> 状态：Proposed  
-> 日期：2026-08-12  
-> 决策范围：Business Module Packaging、typed contribution、跨模块扩展、版本兼容和 install/upgrade/remove planning  
+> 状态：Proposed
+> 日期：2026-08-12
+> 决策范围：Business Module Packaging、typed contribution、跨模块扩展、版本兼容和 install/upgrade/remove planning
 > 参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；ADR-0020；WrenAI Semantic Contract
 
 ## 1. 背景

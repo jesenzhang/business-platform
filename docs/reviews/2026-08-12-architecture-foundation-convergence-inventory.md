@@ -1,9 +1,9 @@
 # Architecture Foundation Convergence — Inventory and Gap Matrix
 
-> 日期：2026-08-12  
-> REAL_BASE：`c93a1e67547ebe2f3d59bea02ed0928bd84aa722`  
-> OLD_DOC_BRANCH：`a5069a0ca9fe746f0c9f2bb0467e6e899f0fa3dc`  
-> NEW_BRANCH：`docs/business-application-platform-architecture-convergence`  
+> 日期：2026-08-12
+> REAL_BASE：`c93a1e67547ebe2f3d59bea02ed0928bd84aa722`
+> OLD_DOC_BRANCH：`a5069a0ca9fe746f0c9f2bb0467e6e899f0fa3dc`
+> NEW_BRANCH：`docs/business-application-platform-architecture-convergence`
 > 旧文档分支直接合并：REJECTED
 
 ## 1. Stage 0 reconciliation evidence

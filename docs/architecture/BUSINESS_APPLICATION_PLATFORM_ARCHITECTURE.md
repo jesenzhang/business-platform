@@ -1,8 +1,8 @@
 # Business Application Platform 架构
 
-> 文档类型：Baseline proposal  
-> 状态：Proposed input to ADR-0021/ADR-0022  
-> 日期：2026-08-12  
+> 文档类型：Baseline proposal
+> 状态：Proposed input to ADR-0021/ADR-0022
+> 日期：2026-08-12
 > 适用范围：Platform Core、Business Module、Application Packaging、Contribution、跨模块协作与生命周期
 
 ## 1. 目标

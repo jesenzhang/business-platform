@@ -1,10 +1,10 @@
 # Twenty 参考项目深度分析
 
-> 检查日期：2026-08-12  
-> 固定项目：`twentyhq/twenty`  
-> 研究提交：[`65616332b452361e639c41d7340d54febf95fae5`](https://github.com/twentyhq/twenty/tree/65616332b452361e639c41d7340d54febf95fae5)  
-> 默认分支：`main`  
-> 分类：Tier-1 Business App / Module Packaging / Metadata / UI Contribution 参考  
+> 检查日期：2026-08-12
+> 固定项目：`twentyhq/twenty`
+> 研究提交：[`65616332b452361e639c41d7340d54febf95fae5`](https://github.com/twentyhq/twenty/tree/65616332b452361e639c41d7340d54febf95fae5)
+> 默认分支：`main`
+> 分类：Tier-1 Business App / Module Packaging / Metadata / UI Contribution 参考
 > 研究目的：为 `business-platform` 的 Business Module Isolation、Business Application Packaging、UI Contribution、模块生命周期与权限声明提供源码级设计输入；不引入 Twenty 运行时。
 
 ## 1. 结论摘要

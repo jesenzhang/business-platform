@@ -1,8 +1,8 @@
 # Business Application Platform Reference Synthesis
 
-> 文档类型：Reference synthesis / architecture input  
-> 检查日期：2026-08-12  
-> 参考项目：Twenty、Odoo、Frappe Framework/ERPNext、Cloudflare OS、WrenAI  
+> 文档类型：Reference synthesis / architecture input
+> 检查日期：2026-08-12
+> 参考项目：Twenty、Odoo、Frappe Framework/ERPNext、Cloudflare OS、WrenAI
 > 许可证边界：只吸收源码可观察的架构机制；不复制代码、Schema、UI 资产或运行时依赖
 
 ## 1. 证据与方法

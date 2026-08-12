@@ -1,12 +1,12 @@
 # Frappe Framework + ERPNext 源码级架构分析
 
-> 文档类型：Reference Analysis  
-> 状态：Current  
-> 检查日期：2026-08-12  
-> 研究对象：`frappe/frappe`、`frappe/erpnext` 官方 GitHub 源码  
-> 固定提交：`frappe/frappe@21b840572497b02bc42e6bf842cd62e1abca4ddb`、`frappe/erpnext@ca1b03cd4647b1968f74256070c4d3453614d408`  
-> 默认分支：两仓库均为 `develop`  
-> 许可证边界：`frappe/frappe` = MIT，`frappe/erpnext` = GPL-3.0  
+> 文档类型：Reference Analysis
+> 状态：Current
+> 检查日期：2026-08-12
+> 研究对象：`frappe/frappe`、`frappe/erpnext` 官方 GitHub 源码
+> 固定提交：`frappe/frappe@21b840572497b02bc42e6bf842cd62e1abca4ddb`、`frappe/erpnext@ca1b03cd4647b1968f74256070c4d3453614d408`
+> 默认分支：两仓库均为 `develop`
+> 许可证边界：`frappe/frappe` = MIT，`frappe/erpnext` = GPL-3.0
 > 结论用途：作为 metadata-driven 平台设计的反例与参考，不作为本项目直接依赖决策
 
 ## 1. 结论摘要
@@ -24,75 +24,75 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.1 仓库与许可证
 
-**FACT**：`frappe/frappe` 的包元数据声明它是 `metadata driven, full-stack low code web framework`，`app_license` 和 `package.json` 许可证均为 `MIT`。  
+**FACT**：`frappe/frappe` 的包元数据声明它是 `metadata driven, full-stack low code web framework`，`app_license` 和 `package.json` 许可证均为 `MIT`。
 证据：
 - [`frappe/pyproject.toml`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/pyproject.toml)
 - [`frappe/package.json`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/package.json)
 
-**FACT**：`frappe/erpnext` 的包元数据声明 `GPL-3.0`，并在 `pyproject.toml` 中把 `frappe` 作为 bench 依赖，要求 `>=17.0.0-dev,<18.0.0`。  
+**FACT**：`frappe/erpnext` 的包元数据声明 `GPL-3.0`，并在 `pyproject.toml` 中把 `frappe` 作为 bench 依赖，要求 `>=17.0.0-dev,<18.0.0`。
 证据：
 - [`erpnext/pyproject.toml`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/pyproject.toml)
 - [`erpnext/package.json`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/package.json)
 
-**FACT**：Frappe 的 `hooks.py` 显式定义 `app_name = "frappe"`、`app_license = "MIT"`、`before_install`、`after_install`、`doctype_js`、`website_route_rules`、`permission_query_conditions`、`has_permission`、`doc_events`、`scheduler_events`、`before_migrate`、`after_migrate`、`override_whitelisted_methods` 等关键入口。  
+**FACT**：Frappe 的 `hooks.py` 显式定义 `app_name = "frappe"`、`app_license = "MIT"`、`before_install`、`after_install`、`doctype_js`、`website_route_rules`、`permission_query_conditions`、`has_permission`、`doc_events`、`scheduler_events`、`before_migrate`、`after_migrate`、`override_whitelisted_methods` 等关键入口。
 证据：
 - [`frappe/hooks.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/hooks.py)
 
-**FACT**：ERPNext 的 `hooks.py` 定义 `add_to_apps_screen`、`doctype_js`、`doctype_list_js`、`page_js`、`extend_doctype_class`、`override_whitelisted_methods`、`after_install`、`after_app_install`、`after_app_uninstall`、`boot_session`、`filters_config`、`additional_print_settings`、`treeviews`、`website_generators`、`website_route_rules`、`standard_navbar_items`、`standard_portal_menu_items`、`webform_list_context`。  
+**FACT**：ERPNext 的 `hooks.py` 定义 `add_to_apps_screen`、`doctype_js`、`doctype_list_js`、`page_js`、`extend_doctype_class`、`override_whitelisted_methods`、`after_install`、`after_app_install`、`after_app_uninstall`、`boot_session`、`filters_config`、`additional_print_settings`、`treeviews`、`website_generators`、`website_route_rules`、`standard_navbar_items`、`standard_portal_menu_items`、`webform_list_context`。
 证据：
 - [`erpnext/hooks.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/hooks.py)
 
 ### 2.2 metadata 驱动的核心机制
 
-**FACT**：Frappe 的 `get_hooks()` 会加载每个 app 的 `hooks.py`，并对 hook 值做聚合；`append_hook()` 会把 dict/list 结构归一化成可合并的运行时配置。  
+**FACT**：Frappe 的 `get_hooks()` 会加载每个 app 的 `hooks.py`，并对 hook 值做聚合；`append_hook()` 会把 dict/list 结构归一化成可合并的运行时配置。
 证据：
 - [`frappe/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/__init__.py)
 
-**FACT**：`get_doc_hooks()` 会把 `doc_events` 合并并按 doctype 展开；`Document.hook()` 再在运行时把 controller 方法和 hook handlers 组合执行。  
+**FACT**：`get_doc_hooks()` 会把 `doc_events` 合并并按 doctype 展开；`Document.hook()` 再在运行时把 controller 方法和 hook handlers 组合执行。
 证据：
 - [`frappe/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/__init__.py)
 - [`frappe/model/document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/document.py)
 
-**FACT**：`Document.run_method()` 会调用 controller 方法、再调用 `run_webhooks()`、再调用 server script 事件。  
+**FACT**：`Document.run_method()` 会调用 controller 方法、再调用 `run_webhooks()`、再调用 server script 事件。
 证据：
 - [`frappe/model/document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/document.py)
 
-**FACT**：`frappe.whitelist()` 把函数登记到全局白名单集合；`is_whitelisted()` 决定是否允许通过 HTTP/API 暴露。  
+**FACT**：`frappe.whitelist()` 把函数登记到全局白名单集合；`is_whitelisted()` 决定是否允许通过 HTTP/API 暴露。
 证据：
 - [`frappe/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/__init__.py)
 
-**FACT**：`frappe.api.__init__` 明确声明 API 版本化路由，支持 `/api/method/{methodname}`、`/api/resource/{doctype}`、`/api/resource/{doctype}/{name}`，以及 `v1` / `v2` 子路径。  
+**FACT**：`frappe.api.__init__` 明确声明 API 版本化路由，支持 `/api/method/{methodname}`、`/api/resource/{doctype}`、`/api/resource/{doctype}/{name}`，以及 `v1` / `v2` 子路径。
 证据：
 - [`frappe/api/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/__init__.py)
 - [`frappe/api/v1.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/v1.py)
 - [`frappe/api/v2.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/v2.py)
 
-**FACT**：API discovery 会扫描 installed apps 下的 Python 文件、识别 `@frappe.whitelist`，并对 Doctype controller 的 whitelisted methods 生成 discovery 文档；`expose_discovery_source` hook 决定是否公开方法源码。  
+**FACT**：API discovery 会扫描 installed apps 下的 Python 文件、识别 `@frappe.whitelist`，并对 Doctype controller 的 whitelisted methods 生成 discovery 文档；`expose_discovery_source` hook 决定是否公开方法源码。
 证据：
 - [`frappe/api/discovery.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/discovery.py)
 
-**FACT**：`load_doctype_module()` 会按 app/module/doctypes 的 Python 包路径加载 controller；`override_doctype_class` 和 `extend_doctype_class` 允许替换/扩展 controller 类型。  
+**FACT**：`load_doctype_module()` 会按 app/module/doctypes 的 Python 包路径加载 controller；`override_doctype_class` 和 `extend_doctype_class` 允许替换/扩展 controller 类型。
 证据：
 - [`frappe/modules/utils.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/modules/utils.py)
 - [`frappe/model/base_document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/base_document.py)
 
 ### 2.3 DocType、Custom Field、Property Setter
 
-**FACT**：Frappe 的对象模型以 DocType 元数据为核心，`frappe.get_meta()` 决定字段、表字段、权限、title field、workflow 等运行时行为。  
+**FACT**：Frappe 的对象模型以 DocType 元数据为核心，`frappe.get_meta()` 决定字段、表字段、权限、title field、workflow 等运行时行为。
 证据：
 - [`frappe/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/__init__.py)
 - [`frappe/model/document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/document.py)
 
-**FACT**：`Custom Field` 是正式的 DocType 记录，不是临时 UI 状态。它的 `validate()`、`on_update()`、`on_trash()` 会校验字段冲突、触发 `updatedb`、清缓存，并且禁止给 core doctypes 加自定义字段。  
+**FACT**：`Custom Field` 是正式的 DocType 记录，不是临时 UI 状态。它的 `validate()`、`on_update()`、`on_trash()` 会校验字段冲突、触发 `updatedb`、清缓存，并且禁止给 core doctypes 加自定义字段。
 证据：
 - [`frappe/custom/doctype/custom_field/custom_field.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/custom/doctype/custom_field/custom_field.py)
 
-**FACT**：`Property Setter`/`Customize Form` 是对 DocType/DocField 的覆盖层，`Customize Form` 会创建和删除 `Custom Field`、`Property Setter`。  
+**FACT**：`Property Setter`/`Customize Form` 是对 DocType/DocField 的覆盖层，`Customize Form` 会创建和删除 `Custom Field`、`Property Setter`。
 证据：
 - [`frappe/custom/doctype/customize_form/customize_form.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/custom/doctype/customize_form/customize_form.py)
 - [`frappe/custom/doctype/property_setter/property_setter.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/custom/doctype/property_setter/property_setter.py)
 
-**FACT**：`frappe.reload_doc()` / `frappe.reload_doctype()` 都只是把 JSON/文件系统中的模型重新同步到 DB。  
+**FACT**：`frappe.reload_doc()` / `frappe.reload_doctype()` 都只是把 JSON/文件系统中的模型重新同步到 DB。
 证据：
 - [`frappe/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/__init__.py)
 - [`frappe/modules/export_file.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/modules/export_file.py)
@@ -101,20 +101,20 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.4 权限、事件、工作流
 
-**FACT**：权限模型是运行时组合的：`has_permission()` 先看管理员/doctype 元数据/子表/角色权限，再看 `if_owner`、user permissions、share permissions 和 controller hook。  
+**FACT**：权限模型是运行时组合的：`has_permission()` 先看管理员/doctype 元数据/子表/角色权限，再看 `if_owner`、user permissions、share permissions 和 controller hook。
 证据：
 - [`frappe/permissions.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/permissions.py)
 
-**FACT**：`permission_query_conditions` 和 `has_permission` 都可通过 hook 覆盖某些 DocType 的访问逻辑。  
+**FACT**：`permission_query_conditions` 和 `has_permission` 都可通过 hook 覆盖某些 DocType 的访问逻辑。
 证据：
 - [`frappe/hooks.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/hooks.py)
 
-**FACT**：工作流不是纯状态机配置文件，而是 runtime model。`validate_workflow()` 会检查当前状态、下一状态、transition 合法性；`set_workflow_state_on_action()` 会根据 submit/cancel/update-after-submit 回写 workflow state。  
+**FACT**：工作流不是纯状态机配置文件，而是 runtime model。`validate_workflow()` 会检查当前状态、下一状态、transition 合法性；`set_workflow_state_on_action()` 会根据 submit/cancel/update-after-submit 回写 workflow state。
 证据：
 - [`frappe/model/workflow.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/workflow.py)
 - [`frappe/model/document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/document.py)
 
-**FACT**：`doc_events` 会把 `on_update`、`after_insert`、`on_cancel`、`on_trash`、`on_change` 等事件挂到具体 handler 上，包括 workflow action、assignment rule、webhook、search index、Google Calendar/Contacts 等副作用。  
+**FACT**：`doc_events` 会把 `on_update`、`after_insert`、`on_cancel`、`on_trash`、`on_change` 等事件挂到具体 handler 上，包括 workflow action、assignment rule、webhook、search index、Google Calendar/Contacts 等副作用。
 证据：
 - [`frappe/hooks.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/hooks.py)
 - [`frappe/model/document.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/model/document.py)
@@ -123,22 +123,22 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.5 安装、卸载、迁移、fixtures
 
-**FACT**：Frappe 的安装流程显式分为 `before_install`、`after_install`、`after_app_install`、`after_app_uninstall`；`before_install` 会先 reload 核心 DocType，`after_install` 会初始化标准文档、默认角色、语言、通知类型等。  
+**FACT**：Frappe 的安装流程显式分为 `before_install`、`after_install`、`after_app_install`、`after_app_uninstall`；`before_install` 会先 reload 核心 DocType，`after_install` 会初始化标准文档、默认角色、语言、通知类型等。
 证据：
 - [`frappe/utils/install.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/utils/install.py)
 - [`frappe/hooks.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/hooks.py)
 
-**FACT**：`before_migrate` / `after_migrate` 同样通过 hook 运行，且 `after_migrate` 会做主题、搜索索引、通知类型等重建。  
+**FACT**：`before_migrate` / `after_migrate` 同样通过 hook 运行，且 `after_migrate` 会做主题、搜索索引、通知类型等重建。
 证据：
 - [`frappe/hooks.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/hooks.py)
 - [`frappe/core/doctype/patch_log/patch_log.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/core/doctype/patch_log/patch_log.py)
 
-**FACT**：`frappe.utils.fixtures` 将 fixtures 导入/导出绑定为站点级迁移语义；`frappe.flags.in_fixtures` 会被运行时检查，避免在 fixtures 模式下触发不应发生的副作用。  
+**FACT**：`frappe.utils.fixtures` 将 fixtures 导入/导出绑定为站点级迁移语义；`frappe.flags.in_fixtures` 会被运行时检查，避免在 fixtures 模式下触发不应发生的副作用。
 证据：
 - [`frappe/utils/fixtures.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/utils/fixtures.py)
 - [`frappe/desk/doctype/workspace/workspace.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/desk/doctype/workspace/workspace.py)
 
-**FACT**：`export_to_files()` 会把文档导出成模块目录下的 JSON/代码文件；`Workspace.on_update()` 在开发模式下会导出 workspace 到模块文件。  
+**FACT**：`export_to_files()` 会把文档导出成模块目录下的 JSON/代码文件；`Workspace.on_update()` 在开发模式下会导出 workspace 到模块文件。
 证据：
 - [`frappe/modules/export_file.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/modules/export_file.py)
 - [`frappe/desk/doctype/workspace/workspace.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/desk/doctype/workspace/workspace.py)
@@ -147,26 +147,26 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.6 Workspace、Page、View、Desk 贡献
 
-**FACT**：Workspace 是一个正式 DocType，且其 controller 直接控制内容、角色、app mount、导出和删除逻辑。  
+**FACT**：Workspace 是一个正式 DocType，且其 controller 直接控制内容、角色、app mount、导出和删除逻辑。
 证据：
 - [`frappe/desk/doctype/workspace/workspace.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/desk/doctype/workspace/workspace.py)
 
-**FACT**：Desk 的运行时会把 Workspace、Page、Report、Module Def、App hook、权限和模块屏蔽合并成 `bootinfo`。  
+**FACT**：Desk 的运行时会把 Workspace、Page、Report、Module Def、App hook、权限和模块屏蔽合并成 `bootinfo`。
 证据：
 - [`frappe/boot.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/boot.py)
 - [`frappe/desk/desktop.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/desk/desktop.py)
 
-**FACT**：`get_workspaces()` 和 `get_sidebar_items()` 会把 Workspace/Sidebar Item/Module/App/Permission 组合成最终 desk payload；`default_workspace_map` 决定同一个实体路由到哪个 workspace sidebar。  
+**FACT**：`get_workspaces()` 和 `get_sidebar_items()` 会把 Workspace/Sidebar Item/Module/App/Permission 组合成最终 desk payload；`default_workspace_map` 决定同一个实体路由到哪个 workspace sidebar。
 证据：
 - [`frappe/boot.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/boot.py)
 - [`frappe/public/js/frappe/ui/sidebar/sidebar.js`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/public/js/frappe/ui/sidebar/sidebar.js)
 
-**FACT**：`get_mountable_apps()`、`add_to_apps_screen`、`add_to_workspace_dock` 把“哪个 app 拥有哪个 workspace / 该 workspace 进入哪个 dock rail”变成运行时可配置关系。  
+**FACT**：`get_mountable_apps()`、`add_to_apps_screen`、`add_to_workspace_dock` 把“哪个 app 拥有哪个 workspace / 该 workspace 进入哪个 dock rail”变成运行时可配置关系。
 证据：
 - [`frappe/desk/doctype/workspace/workspace.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/desk/doctype/workspace/workspace.py)
 - [`frappe/boot.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/boot.py)
 
-**FACT**：ERPNext 在 `hooks.py` 里通过 `add_to_apps_screen` 把自己挂到 apps screen；通过 `website_route_rules`、`webform_list_context`、`website_generators`、`standard_navbar_items`、`standard_portal_menu_items` 给桌面与网站层注入内容。  
+**FACT**：ERPNext 在 `hooks.py` 里通过 `add_to_apps_screen` 把自己挂到 apps screen；通过 `website_route_rules`、`webform_list_context`、`website_generators`、`standard_navbar_items`、`standard_portal_menu_items` 给桌面与网站层注入内容。
 证据：
 - [`erpnext/hooks.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/hooks.py)
 
@@ -174,17 +174,17 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.7 REST/API 生成与公开契约
 
-**FACT**：Frappe API 的实现分三层：`/api/method` RPC、`/api/resource` REST、`/api/v2/document` 以及 discovery 文档。  
+**FACT**：Frappe API 的实现分三层：`/api/method` RPC、`/api/resource` REST、`/api/v2/document` 以及 discovery 文档。
 证据：
 - [`frappe/api/__init__.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/__init__.py)
 - [`frappe/api/v1.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/v1.py)
 - [`frappe/api/v2.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/v2.py)
 
-**FACT**：`v2` 的 Doctype method route 会把 `GET` 映射成 `read`，`POST` 映射成 `write`，并且只公开 whitelisted 且符合 Doctype 约束的方法。  
+**FACT**：`v2` 的 Doctype method route 会把 `GET` 映射成 `read`，`POST` 映射成 `write`，并且只公开 whitelisted 且符合 Doctype 约束的方法。
 证据：
 - [`frappe/api/v2.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/v2.py)
 
-**FACT**：API discovery 会基于源码和 controller 反射生成 method index，并可在 app 显式 opt-in 时暴露函数源码。  
+**FACT**：API discovery 会基于源码和 controller 反射生成 method index，并可在 app 显式 opt-in 时暴露函数源码。
 证据：
 - [`frappe/api/discovery.py`](https://github.com/frappe/frappe/blob/21b840572497b02bc42e6bf842cd62e1abca4ddb/frappe/api/discovery.py)
 
@@ -192,21 +192,21 @@ Frappe Framework 是一个强 metadata-driven 的应用平台：大量系统行�
 
 ### 2.8 ERPNext 的 app packaging 与跨 app 依赖
 
-**FACT**：ERPNext 的 packaging 入口在 `erpnext/hooks.py`、`pyproject.toml` 和 `package.json`，其中 `hooks.py` 直接声明桌面、网页、安装、卸载、扩展 controller、webform context、nav items、treeviews、routes。  
+**FACT**：ERPNext 的 packaging 入口在 `erpnext/hooks.py`、`pyproject.toml` 和 `package.json`，其中 `hooks.py` 直接声明桌面、网页、安装、卸载、扩展 controller、webform context、nav items、treeviews、routes。
 证据：
 - [`erpnext/hooks.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/hooks.py)
 - [`erpnext/pyproject.toml`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/pyproject.toml)
 - [`erpnext/package.json`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/package.json)
 
-**FACT**：ERPNext 在 Python 侧通过 `allow_regional()`、`check_app_permission()`、`normalize_ctx_input()` 等 helper 进一步把“地区覆盖、应用权限、输入规范化”做成可插拔层。  
+**FACT**：ERPNext 在 Python 侧通过 `allow_regional()`、`check_app_permission()`、`normalize_ctx_input()` 等 helper 进一步把“地区覆盖、应用权限、输入规范化”做成可插拔层。
 证据：
 - [`erpnext/__init__.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/__init__.py)
 
-**FACT**：ERPNext 的 install/uninstall 逻辑会 seed 标准 navbar、安装通知类型、创建/删除 desktop icons，并通过 app title 计算卸载时需要清理的桌面图标。  
+**FACT**：ERPNext 的 install/uninstall 逻辑会 seed 标准 navbar、安装通知类型、创建/删除 desktop icons，并通过 app title 计算卸载时需要清理的桌面图标。
 证据：
 - [`erpnext/setup/install.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/setup/install.py)
 
-**FACT**：ERPNext 的 `boot_session()` 将业务级上下文注入 boot payload。  
+**FACT**：ERPNext 的 `boot_session()` 将业务级上下文注入 boot payload。
 证据：
 - [`erpnext/startup/boot.py`](https://github.com/frappe/erpnext/blob/ca1b03cd4647b1968f74256070c4d3453614d408/erpnext/startup/boot.py)
 

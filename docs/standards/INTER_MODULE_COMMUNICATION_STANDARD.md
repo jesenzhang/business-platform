@@ -1,9 +1,9 @@
 # Inter-Module Communication Standard
 
-> 文档 ID：STD-MODULE-COMM-001  
-> 版本：0.1  
-> 状态：Proposed input to ADR-0022  
-> 日期：2026-08-12  
+> 文档 ID：STD-MODULE-COMM-001
+> 版本：0.1
+> 状态：Proposed input to ADR-0022
+> 日期：2026-08-12
 > 适用范围：Business Module 之间，以及 Business Module 与 Platform Capability 之间的协作
 
 ## 1. 目的与边界
