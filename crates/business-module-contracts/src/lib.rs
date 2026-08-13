@@ -7,7 +7,8 @@
 mod manifest;
 
 pub use manifest::{
-    validate_extension_point_removal, validate_extension_points, ActionContribution,
+    validate_extension_point_removal, validate_extension_points,
+    validate_extension_points_against_catalog, ActionContribution,
     AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId, BusinessModuleManifest,
     BusinessModuleVersion, CapabilityRequirementDescriptor, CapabilityRequirementId,
     CommandContribution, CompatibilityDescriptor, ContractDescriptor, ContributionDescriptor,
@@ -18,7 +19,8 @@ pub use manifest::{
     ModuleContractError, ModuleDataState, ModuleDependency, ModuleInstallationState, NamespacedId,
     NavigationContribution, PackageDigest, PlatformCapabilityRequirement,
     PolicyRequirementDescriptor, PolicyRequirementId, PublicContributionCatalog,
-    PublicContributionTarget, PublicTargetKind, PublishedExtensionPoint, ResourceKindDescriptor,
+    PublicContributionTarget, PublicTargetKind, PublishedDependencyCatalog,
+    PublishedDependencyReference, PublishedExtensionPoint, ResourceKindDescriptor,
     SemanticContributionDescriptor, TypedContributionSet, UiContributionId,
     BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
 };

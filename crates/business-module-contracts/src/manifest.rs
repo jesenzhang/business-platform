@@ -438,6 +438,38 @@ pub enum ExtensionPointRemovalSemantics {
     ConsumerMigrationRequired,
 }
 
+/// A platform-neutral reference to a published public dependency.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+pub enum PublishedDependencyReference {
+    PublicResource {
+        owner_module_id: BusinessModuleId,
+        resource_kind: String,
+        version: String,
+    },
+    PublicQuery {
+        owner_module_id: BusinessModuleId,
+        query_id: String,
+        version: String,
+    },
+    PublicCapability {
+        owner_module_id: BusinessModuleId,
+        capability_id: String,
+        version: String,
+    },
+    Private {
+        owner_module_id: BusinessModuleId,
+        reference_id: NamespacedId,
+        version: String,
+    },
+}
+
+/// Owner-provided catalog of resolvable public dependencies.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PublishedDependencyCatalog {
+    pub public_dependencies: Vec<PublishedDependencyReference>,
+}
+
 /// An owner-published, versioned and explicitly public extension slot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -450,7 +482,7 @@ pub struct PublishedExtensionPoint {
     pub classification: DataClassification,
     pub authorization_requirement: ExtensionAuthorizationRequirement,
     pub lifecycle: ExtensionPointLifecycle,
-    pub dependency_ids: Vec<NamespacedId>,
+    pub dependency_ids: Vec<PublishedDependencyReference>,
     pub removal_semantics: ExtensionPointRemovalSemantics,
     pub visibility: ExtensionPointVisibility,
 }
@@ -470,6 +502,14 @@ pub struct ExtensionContribution {
 impl PublishedExtensionPoint {
     /// Validates that the declaration is an owner-published public point.
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
+        self.validate_against_catalog(&PublishedDependencyCatalog::default())
+    }
+
+    /// Validates the declaration and resolves dependencies in the catalog.
+    pub fn validate_against_catalog(
+        &self,
+        dependency_catalog: &PublishedDependencyCatalog,
+    ) -> Result<(), ManifestValidationError> {
         if self.extension_point_id.module_id() != self.owner_module_id.as_str() {
             return Err(ManifestValidationError::WrongExtensionPointOwner {
                 expected: self.extension_point_id.module_id().to_owned(),
@@ -484,6 +524,16 @@ impl PublishedExtensionPoint {
         if self.lifecycle != ExtensionPointLifecycle::Published {
             return Err(ManifestValidationError::UnpublishedExtensionPoint);
         }
+        for dependency in &self.dependency_ids {
+            if matches!(dependency, PublishedDependencyReference::Private { .. })
+                || !dependency_catalog
+                    .public_dependencies
+                    .iter()
+                    .any(|candidate| candidate == dependency)
+            {
+                return Err(ManifestValidationError::UnknownExtensionPointDependency);
+            }
+        }
         Ok(())
     }
 }
@@ -494,7 +544,15 @@ impl ExtensionContribution {
         &self,
         point: &PublishedExtensionPoint,
     ) -> Result<(), ManifestValidationError> {
-        point.validate()?;
+        self.validate_against_catalog(point, &PublishedDependencyCatalog::default())
+    }
+
+    pub fn validate_against_catalog(
+        &self,
+        point: &PublishedExtensionPoint,
+        dependency_catalog: &PublishedDependencyCatalog,
+    ) -> Result<(), ManifestValidationError> {
+        point.validate_against_catalog(dependency_catalog)?;
         if self.target_extension_point_id != point.extension_point_id {
             return Err(ManifestValidationError::UnknownExtensionPoint {
                 extension_point_id: self.target_extension_point_id.to_string(),
@@ -522,6 +580,21 @@ pub fn validate_extension_points(
     points: &[PublishedExtensionPoint],
     contributions: &[ExtensionContribution],
 ) -> Result<(), ManifestValidationError> {
+    validate_extension_points_against_catalog(
+        owner_module_id,
+        points,
+        contributions,
+        &PublishedDependencyCatalog::default(),
+    )
+}
+
+/// Validates extension points against the owner's public dependency catalog.
+pub fn validate_extension_points_against_catalog(
+    owner_module_id: &BusinessModuleId,
+    points: &[PublishedExtensionPoint],
+    contributions: &[ExtensionContribution],
+    dependency_catalog: &PublishedDependencyCatalog,
+) -> Result<(), ManifestValidationError> {
     let mut point_ids = BTreeSet::new();
     for point in points {
         if point.owner_module_id != *owner_module_id {
@@ -530,7 +603,7 @@ pub fn validate_extension_points(
                 actual: point.owner_module_id.to_string(),
             });
         }
-        point.validate()?;
+        point.validate_against_catalog(dependency_catalog)?;
         if !point_ids.insert(point.extension_point_id.clone()) {
             return Err(ManifestValidationError::DuplicateIdentifier {
                 kind: "extension point",
@@ -554,7 +627,7 @@ pub fn validate_extension_points(
                 extension_point_id: contribution.target_extension_point_id.to_string(),
             });
         };
-        contribution.validate_against(point)?;
+        contribution.validate_against_catalog(point, dependency_catalog)?;
     }
     Ok(())
 }
@@ -1040,6 +1113,9 @@ pub enum ManifestValidationError {
     /// A private point cannot be used as a cross-module extension boundary.
     #[error("extension point is private")]
     PrivateExtensionPoint,
+    /// An extension point dependency is not a resolvable public reference.
+    #[error("extension point dependency is unknown, private, or unresolvable")]
+    UnknownExtensionPointDependency,
     /// Disabled or retired points are not available to new consumers.
     #[error("extension point is not published")]
     UnpublishedExtensionPoint,
@@ -1450,6 +1526,63 @@ mod tests {
         assert!(matches!(
             validate_extension_point_removal(&point, &[contribution]),
             Err(ManifestValidationError::BlockedExtensionPointRemoval { .. })
+        ));
+    }
+
+    #[test]
+    fn extension_point_accepts_resolvable_typed_public_dependency() {
+        let (owner, mut point, contribution) = extension_fixture();
+        let dependency = PublishedDependencyReference::PublicQuery {
+            owner_module_id: owner.clone(),
+            query_id: "detail".to_owned(),
+            version: "1.0.0".to_owned(),
+        };
+        point.dependency_ids.push(dependency.clone());
+        let catalog = PublishedDependencyCatalog {
+            public_dependencies: vec![dependency],
+        };
+        assert!(validate_extension_points_against_catalog(
+            &owner,
+            &[point],
+            &[contribution],
+            &catalog,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn extension_point_rejects_unknown_and_private_dependencies() {
+        let (owner, mut point, contribution) = extension_fixture();
+        point
+            .dependency_ids
+            .push(PublishedDependencyReference::PublicResource {
+                owner_module_id: owner.clone(),
+                resource_kind: "document".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            validate_extension_points_against_catalog(
+                &owner,
+                &[point.clone()],
+                &[contribution.clone()],
+                &PublishedDependencyCatalog::default(),
+            ),
+            Err(ManifestValidationError::UnknownExtensionPointDependency)
+        ));
+
+        point.dependency_ids = vec![PublishedDependencyReference::Private {
+            owner_module_id: owner.clone(),
+            reference_id: NamespacedId::from_parts("module-a", "private-data").unwrap(),
+            version: "1.0.0".to_owned(),
+        }];
+        assert!(matches!(
+            validate_extension_points_against_catalog(
+                &owner,
+                &[point],
+                &[contribution],
+                &PublishedDependencyCatalog::default(),
+            ),
+            Err(ManifestValidationError::UnknownExtensionPointDependency)
         ));
     }
 
