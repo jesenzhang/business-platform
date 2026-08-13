@@ -1,5 +1,7 @@
 #![allow(clippy::default_trait_access, clippy::unwrap_used)]
 
+use std::collections::BTreeMap;
+
 use business_application_compiler::{
     compile, dry_plan, BusinessApplicationCompilerInput, BusinessApplicationPackage,
     CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange, PlanDiagnostic, PlanError,
@@ -48,6 +50,7 @@ fn compiled(
         platform_version: "1.2.0".to_owned(),
         packages,
         installed_versions: Default::default(),
+        desired_installation_states: Default::default(),
     })
     .unwrap()
 }
@@ -114,6 +117,27 @@ fn add_upgrade_remove_and_retention_are_explicit() {
             ..
         }
     )));
+}
+
+#[test]
+fn desired_disabled_state_emits_disable_module() {
+    let module = BusinessModuleId::new("module-a").unwrap();
+    let incoming = compile(BusinessApplicationCompilerInput {
+        platform_version: "1.2.0".to_owned(),
+        packages: vec![package("module-a", "1.0.0")],
+        installed_versions: Default::default(),
+        desired_installation_states: BTreeMap::from([(
+            module.clone(),
+            ModuleInstallationState::Disabled,
+        )]),
+    })
+    .unwrap();
+    let plan = dry_plan(&snapshot(vec![package("module-a", "1.0.0")]), &incoming).unwrap();
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::DisableModule { module_id } if module_id == &module
+    )));
+    assert!(plan.applicable);
 }
 
 #[test]
@@ -199,6 +223,39 @@ fn live_dependency_and_active_extension_consumer_block_removal() {
     )
     .unwrap();
     assert!(blocked.diagnostics.iter().any(|d| matches!(d, PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer"))));
+}
+
+#[test]
+fn owner_removal_with_active_extension_consumer_is_blocked() {
+    let point = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+    let mut owner = package("module-a", "1.0.0");
+    owner.extension_points.push(point_decl(point.clone()));
+    let mut consumer = package("module-extension", "1.0.0");
+    consumer
+        .extension_contributions
+        .push(ExtensionContribution {
+            contribution_id: business_module_contracts::ContributionId::from_parts(
+                "module-extension",
+                "use-slot",
+            )
+            .unwrap(),
+            consumer_module_id: consumer.manifest.module_id.clone(),
+            target_extension_point_id: point,
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+    let plan = dry_plan(
+        &snapshot(vec![owner, consumer]),
+        &compiled(vec![package("module-extension", "1.0.0")]),
+    )
+    .unwrap();
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval { module_id: Some(module_id), reason, .. }
+            if module_id.as_str() == "module-a" && reason.contains("consumer")
+    )));
 }
 
 #[test]

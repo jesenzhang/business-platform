@@ -168,13 +168,20 @@ pub struct BusinessApplicationCompilerInput {
     pub packages: Vec<BusinessApplicationPackage>,
     #[serde(default)]
     pub installed_versions: BTreeMap<BusinessModuleId, BusinessModuleVersion>,
+    /// Desired installation states for incoming modules. An omitted module is
+    /// planned for removal; `Uninstalled` is therefore not a valid incoming
+    /// desired state.
+    #[serde(default)]
+    pub desired_installation_states: BTreeMap<BusinessModuleId, ModuleInstallationState>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompiledBusinessApplicationManifest {
     pub schema_version: String,
     pub platform_version: String,
     pub packages: Vec<BusinessApplicationPackage>,
+    #[serde(default)]
+    pub desired_installation_states: BTreeMap<BusinessModuleId, ModuleInstallationState>,
     /// SHA-256 of `canonical_json`; this field is excluded from that payload.
     pub package_digest: PackageDigest,
     #[serde(skip)]
@@ -191,6 +198,35 @@ impl CompiledBusinessApplicationManifest {
     #[must_use]
     pub fn package_digest(&self) -> &PackageDigest {
         &self.package_digest
+    }
+}
+
+impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct SerializedManifest {
+            schema_version: String,
+            platform_version: String,
+            packages: Vec<BusinessApplicationPackage>,
+            #[serde(default)]
+            desired_installation_states: BTreeMap<BusinessModuleId, ModuleInstallationState>,
+            package_digest: PackageDigest,
+        }
+
+        let serialized = SerializedManifest::deserialize(deserializer)?;
+        let mut manifest = Self {
+            schema_version: serialized.schema_version,
+            platform_version: serialized.platform_version,
+            packages: serialized.packages,
+            desired_installation_states: serialized.desired_installation_states,
+            package_digest: serialized.package_digest,
+            canonical_json: Vec::new(),
+        };
+        manifest.canonical_json = canonical_bytes(&manifest).map_err(serde::de::Error::custom)?;
+        Ok(manifest)
     }
 }
 
@@ -231,6 +267,10 @@ pub enum CompilationError {
     },
     #[error("extension contribution targets unknown extension point '{identifier}'")]
     UnknownExtension { identifier: String },
+    #[error("desired lifecycle state references unknown incoming module '{module_id}'")]
+    UnknownDesiredLifecycleModule { module_id: String },
+    #[error("incoming module '{module_id}' cannot have desired lifecycle state 'uninstalled'")]
+    InvalidDesiredLifecycle { module_id: String },
     #[error("canonical manifest serialization failed: {0}")]
     Serialization(#[from] serde_json::Error),
     #[error("invalid package digest")]
@@ -284,6 +324,7 @@ pub fn compile(
         validate_typed_contributions(&package.contributions)?;
         validate_manifest_versions(&package.manifest)?;
         register_manifest_ids(package, &mut owned_contexts, &mut public_ids)?;
+        register_typed_contribution_ids(package, &mut public_ids)?;
         for point in &package.extension_points {
             if !extension_ids.insert(point.extension_point_id.clone()) {
                 return Err(CompilationError::Duplicate {
@@ -321,6 +362,18 @@ pub fn compile(
                 "extension contribution contract version",
                 contribution.expected_contract_version.as_str(),
             )?;
+        }
+    }
+    for (module_id, state) in &input.desired_installation_states {
+        if !modules.contains_key(module_id.as_str()) {
+            return Err(CompilationError::UnknownDesiredLifecycleModule {
+                module_id: module_id.to_string(),
+            });
+        }
+        if *state == ModuleInstallationState::Uninstalled {
+            return Err(CompilationError::InvalidDesiredLifecycle {
+                module_id: module_id.to_string(),
+            });
         }
     }
     for package in &input.packages {
@@ -367,6 +420,7 @@ pub fn compile(
         schema_version: BUSINESS_APPLICATION_PACKAGE_SCHEMA_VERSION.to_owned(),
         platform_version: platform.to_string(),
         packages: input.packages,
+        desired_installation_states: input.desired_installation_states,
         package_digest: PackageDigest::new("0".repeat(64)).map_err(|_| CompilationError::Digest)?,
         canonical_json: Vec::new(),
     };
@@ -435,10 +489,19 @@ pub fn dry_plan(
                     identifier: id.to_string(),
                 })?;
         match current_modules.get(id) {
-            None => changes.push(PackageChange::AddModule {
-                module_id: id.clone(),
-                digest,
-            }),
+            None => {
+                changes.push(PackageChange::AddModule {
+                    module_id: id.clone(),
+                    digest,
+                });
+                if let Some(state) = incoming.desired_installation_states.get(id) {
+                    if *state == ModuleInstallationState::Disabled {
+                        changes.push(PackageChange::DisableModule {
+                            module_id: id.clone(),
+                        });
+                    }
+                }
+            }
             Some(existing) => {
                 let old_digest = existing.package_digest.clone();
                 if old_digest != digest {
@@ -461,10 +524,26 @@ pub fn dry_plan(
                         });
                     }
                 }
-                if existing.installation_state == ModuleInstallationState::Disabled {
-                    changes.push(PackageChange::EnableModule {
-                        module_id: id.clone(),
-                    });
+                if let Some(desired) = incoming.desired_installation_states.get(id) {
+                    match (*desired, existing.installation_state) {
+                        (
+                            ModuleInstallationState::Disabled,
+                            ModuleInstallationState::Enabled | ModuleInstallationState::Installed,
+                        ) => {
+                            changes.push(PackageChange::DisableModule {
+                                module_id: id.clone(),
+                            });
+                        }
+                        (
+                            ModuleInstallationState::Enabled,
+                            ModuleInstallationState::Disabled | ModuleInstallationState::Installed,
+                        ) => {
+                            changes.push(PackageChange::EnableModule {
+                                module_id: id.clone(),
+                            });
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
@@ -491,6 +570,28 @@ pub fn dry_plan(
                         id.to_string(),
                         reason,
                     );
+                }
+            }
+            if !blocked {
+                let active_consumer = current.modules.iter().any(|module| {
+                    module
+                        .package
+                        .extension_contributions
+                        .iter()
+                        .any(|contribution| {
+                            contribution.target_extension_point_id.module_id() == id.as_str()
+                                && incoming_modules.contains_key(&contribution.consumer_module_id)
+                        })
+                });
+                if active_consumer {
+                    push_blocked(
+                        &mut changes,
+                        &mut diagnostics,
+                        Some(id.clone()),
+                        id.to_string(),
+                        "active extension consumer remains".to_owned(),
+                    );
+                    blocked = true;
                 }
             }
             if !blocked {
@@ -847,11 +948,13 @@ fn canonical_bytes(
         schema_version: &'a str,
         platform_version: &'a str,
         packages: &'a [BusinessApplicationPackage],
+        desired_installation_states: &'a BTreeMap<BusinessModuleId, ModuleInstallationState>,
     }
     serde_json::to_vec(&Canonical {
         schema_version: &compiled.schema_version,
         platform_version: &compiled.platform_version,
         packages: &compiled.packages,
+        desired_installation_states: &compiled.desired_installation_states,
     })
 }
 
@@ -1113,6 +1216,90 @@ fn register_manifest_ids(
                 CompilationError::OwnershipCollision {
                     kind: "public identifier",
                     identifier: id.clone(),
+                }
+            });
+        }
+    }
+    Ok(())
+}
+
+fn register_typed_contribution_ids(
+    package: &BusinessApplicationPackage,
+    public_ids: &mut BTreeMap<String, String>,
+) -> Result<(), CompilationError> {
+    let owner = package.manifest.module_id.to_string();
+    let ids = package
+        .contributions
+        .navigation
+        .iter()
+        .map(|item| item.contribution_id.to_string())
+        .chain(
+            package
+                .contributions
+                .list_views
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .detail_sections
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .detail_tabs
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .actions
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .commands
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .agent_capabilities
+                .iter()
+                .map(|item| item.contribution_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .policy_requirements
+                .iter()
+                .map(|item| item.requirement_id.to_string()),
+        )
+        .chain(
+            package
+                .contributions
+                .capability_requirements
+                .iter()
+                .map(|item| item.requirement_id.to_string()),
+        );
+    for id in ids {
+        if let Some(previous) = public_ids.insert(id.clone(), owner.clone()) {
+            return Err(if previous == owner {
+                CompilationError::Duplicate {
+                    kind: "public identifier",
+                    identifier: id,
+                }
+            } else {
+                CompilationError::OwnershipCollision {
+                    kind: "public identifier",
+                    identifier: id,
                 }
             });
         }

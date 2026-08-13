@@ -48,6 +48,7 @@ mod tests {
             platform_version: "1.2.0".to_owned(),
             packages,
             installed_versions: Default::default(),
+            desired_installation_states: Default::default(),
         }
     }
 
@@ -145,6 +146,54 @@ mod tests {
     }
 
     #[test]
+    fn rejects_legacy_and_typed_contribution_identity_collision() {
+        let mut package = package("module-a", "1.0.0");
+        package
+            .manifest
+            .ui_contributions
+            .push(business_module_contracts::ContributionDescriptor {
+                contribution_id: "module-a.shared".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        package
+            .contributions
+            .navigation
+            .push(business_module_contracts::NavigationContribution {
+                contribution_id: business_module_contracts::UiContributionId::from_parts(
+                    "module-a", "shared",
+                )
+                .unwrap(),
+                owner_module_id: BusinessModuleId::new("module-a").unwrap(),
+                schema_version: "1.0.0".to_owned(),
+                version: "1.0.0".to_owned(),
+                target: PublicContributionTarget {
+                    owner_module_id: BusinessModuleId::new("module-a").unwrap(),
+                    target: PublicTargetKind::Resource {
+                        resource_kind: "record".to_owned(),
+                    },
+                    version: "1.0.0".to_owned(),
+                },
+                label_key: "record".to_owned(),
+                ordering: None,
+                group: None,
+                visibility: "always".to_owned(),
+                required_policy: Vec::new(),
+                required_capability: Vec::new(),
+            });
+        package
+            .manifest
+            .resource_kinds
+            .push(ResourceKindDescriptor {
+                resource_kind: "record".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            compile(input(vec![package])),
+            Err(CompilationError::Duplicate { .. })
+        ));
+    }
+
+    #[test]
     fn permutations_have_identical_model_bytes_and_digest() {
         let mut a = package("module-a", "1.0.0");
         a.manifest
@@ -159,6 +208,24 @@ mod tests {
         assert_eq!(
             first.package_digest().as_str(),
             format!("{:x}", sha2::Sha256::digest(first.canonical_json())).as_str()
+        );
+    }
+
+    #[test]
+    fn serialized_compiled_manifest_rebuilds_canonical_bytes() {
+        let compiled = compile(input(vec![package("module-a", "1.0.0")])).unwrap();
+        let encoded = serde_json::to_vec(&compiled).unwrap();
+        let decoded: business_application_compiler::CompiledBusinessApplicationManifest =
+            serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.canonical_json(), compiled.canonical_json());
+        assert_eq!(decoded.package_digest(), compiled.package_digest());
+        assert!(
+            business_application_compiler::dry_plan(
+                &business_application_compiler::CurrentRegistrySnapshot::default(),
+                &decoded
+            )
+            .unwrap()
+            .applicable
         );
     }
 
