@@ -12,6 +12,7 @@ members = [
     "crates/runtime-migration",
     "crates/architecture-check",
     "crates/business-module-contracts",
+    "crates/business-application-compiler",
     "crates/semantic-contract",
     "crates/runtime-config",
     "crates/shared-kernel",
@@ -115,6 +116,7 @@ async-trait = "0.1"
 config = "0.14"
 validator = { version = "0.19", features = ["derive"] }
 sha2 = "0.10"
+semver = "1"
 base64 = "0.22"
 futures-util = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
@@ -158,4 +160,5 @@ agent-integration = { path = "crates/agent-integration" }
 public-api-contracts = { path = "crates/public-api-contracts" }
 business-api-client = { path = "crates/business-api-client" }
 business-module-contracts = { path = "crates/business-module-contracts" }
+business-application-compiler = { path = "crates/business-application-compiler" }
 semantic-contract = { path = "crates/semantic-contract" }

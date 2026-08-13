@@ -901,6 +901,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "business-application-compiler"
+version = "0.1.0"
+dependencies = [
+ "business-module-contracts",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "business-cli"
 version = "0.1.0"
 dependencies = [

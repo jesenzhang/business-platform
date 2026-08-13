@@ -100,6 +100,7 @@ Assert-NotContains "apps/business-console/src" @(
 # PLAN-0010 Business Module Isolation and Semantic Contract boundaries.
 foreach ($contractCrate in @(
     "crates/business-module-contracts",
+    "crates/business-application-compiler",
     "crates/semantic-contract"
 )) {
     Assert-NotContains (Join-Path $contractCrate "Cargo.toml") @(
