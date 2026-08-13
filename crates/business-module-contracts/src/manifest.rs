@@ -905,6 +905,7 @@ impl TypedContributionSet {
         owner_module_id: &BusinessModuleId,
         catalog: &PublicContributionCatalog,
     ) -> Result<(), ManifestValidationError> {
+        let (policy_requirement_ids, capability_requirement_ids) = self.requirement_catalogs()?;
         let mut ids = BTreeSet::new();
         let mut check = |id: &str, owner: &BusinessModuleId, target: &PublicContributionTarget| {
             if owner != owner_module_id {
@@ -939,6 +940,12 @@ impl TypedContributionSet {
                         &item.owner_module_id,
                         &item.target,
                     )?;
+                    check_required_references(
+                        &item.required_policy,
+                        &item.required_capability,
+                        &policy_requirement_ids,
+                        &capability_requirement_ids,
+                    )?;
                 }
             };
         }
@@ -954,6 +961,12 @@ impl TypedContributionSet {
                 item.contribution_id.as_str(),
                 &item.owner_module_id,
                 &item.target,
+            )?;
+            check_required_references(
+                &item.required_policy,
+                &item.required_capability,
+                &policy_requirement_ids,
+                &capability_requirement_ids,
             )?;
         }
         for item in &self.policy_requirements {
@@ -986,6 +999,83 @@ impl TypedContributionSet {
         }
         Ok(())
     }
+
+    fn requirement_catalogs(
+        &self,
+    ) -> Result<(BTreeSet<&str>, BTreeSet<&str>), ManifestValidationError> {
+        check_duplicate_requirement_ids(
+            self.policy_requirements
+                .iter()
+                .map(|item| item.requirement_id.as_str()),
+            "policy requirement",
+        )?;
+        check_duplicate_requirement_ids(
+            self.capability_requirements
+                .iter()
+                .map(|item| item.requirement_id.as_str()),
+            "capability requirement",
+        )?;
+        Ok((
+            self.policy_requirements
+                .iter()
+                .map(|item| item.requirement_id.as_str())
+                .collect(),
+            self.capability_requirements
+                .iter()
+                .map(|item| item.requirement_id.as_str())
+                .collect(),
+        ))
+    }
+}
+
+fn check_requirement_reference(
+    identifier: &str,
+    declared_ids: &BTreeSet<&str>,
+    kind: &'static str,
+) -> Result<(), ManifestValidationError> {
+    if !declared_ids.contains(identifier) {
+        return Err(ManifestValidationError::UnknownRequirementReference {
+            kind,
+            identifier: identifier.to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn check_required_references(
+    policies: &[PolicyRequirementId],
+    capabilities: &[CapabilityRequirementId],
+    policy_ids: &BTreeSet<&str>,
+    capability_ids: &BTreeSet<&str>,
+) -> Result<(), ManifestValidationError> {
+    for requirement_id in policies {
+        check_requirement_reference(requirement_id.as_str(), policy_ids, "policy requirement")?;
+    }
+    for requirement_id in capabilities {
+        check_requirement_reference(
+            requirement_id.as_str(),
+            capability_ids,
+            "capability requirement",
+        )?;
+    }
+    Ok(())
+}
+
+fn check_duplicate_requirement_ids<'a>(
+    identifiers: impl IntoIterator<Item = &'a str>,
+    kind: &'static str,
+) -> Result<(), ManifestValidationError> {
+    let mut seen = BTreeSet::new();
+    if let Some(identifier) = identifiers
+        .into_iter()
+        .find(|identifier| !seen.insert(*identifier))
+    {
+        return Err(ManifestValidationError::DuplicateIdentifier {
+            kind,
+            identifier: identifier.to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn validate_owned_requirement_reference(
@@ -1181,6 +1271,12 @@ pub enum ManifestValidationError {
     /// A contribution points at an unpublished public target.
     #[error("contribution target is not a published public contract")]
     UnknownPublicTarget,
+    /// A typed contribution references an undeclared policy or capability requirement.
+    #[error("unknown {kind} reference '{identifier}'")]
+    UnknownRequirementReference {
+        kind: &'static str,
+        identifier: String,
+    },
     /// An extension point is not present in the owner's published declarations.
     #[error("unknown extension point '{extension_point_id}'")]
     UnknownExtensionPoint { extension_point_id: String },

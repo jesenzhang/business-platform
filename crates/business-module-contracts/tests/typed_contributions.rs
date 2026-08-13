@@ -48,6 +48,20 @@ fn catalog(owner: &BusinessModuleId) -> PublicContributionCatalog {
     }
 }
 
+fn policy_requirement_id(owner: &BusinessModuleId, id: &str) -> PolicyRequirementId {
+    match PolicyRequirementId::from_parts(owner, id) {
+        Ok(value) => value,
+        Err(error) => panic!("invalid fixture policy requirement: {error}"),
+    }
+}
+
+fn capability_requirement_id(owner: &BusinessModuleId, id: &str) -> CapabilityRequirementId {
+    match CapabilityRequirementId::from_parts(owner, id) {
+        Ok(value) => value,
+        Err(error) => panic!("invalid fixture capability requirement: {error}"),
+    }
+}
+
 #[test]
 fn module_a_and_module_b_can_declare_independent_typed_contributions() {
     let a = module("module-a");
@@ -130,10 +144,87 @@ fn declaration_does_not_grant_authorization() {
             Ok(value) => value,
             Err(error) => panic!("invalid fixture capability: {error}"),
         });
+    set.policy_requirements.push(PolicyRequirementDescriptor {
+        requirement_id: policy_requirement_id(&a, "read"),
+        owner_module_id: a.clone(),
+        schema_version: "policy.v1".into(),
+        policy_id: "module-a.read".into(),
+        version: "1.0.0".into(),
+    });
+    set.capability_requirements
+        .push(CapabilityRequirementDescriptor {
+            requirement_id: capability_requirement_id(&a, "query"),
+            owner_module_id: a.clone(),
+            schema_version: "capability.v1".into(),
+            capability_id: "module-a.query".into(),
+            version: "1.0.0".into(),
+        });
     set.navigation.push(item);
     assert!(set.validate(&a, &catalog(&a)).is_ok());
     assert_eq!(set.navigation[0].required_policy.len(), 1);
     assert_eq!(set.navigation[0].required_capability.len(), 1);
+}
+
+#[test]
+fn duplicate_requirement_descriptors_are_rejected() {
+    let a = module("module-a");
+    let policy = PolicyRequirementDescriptor {
+        requirement_id: policy_requirement_id(&a, "read"),
+        owner_module_id: a.clone(),
+        schema_version: "policy.v1".into(),
+        policy_id: "module-a.read".into(),
+        version: "1.0.0".into(),
+    };
+    let capability = CapabilityRequirementDescriptor {
+        requirement_id: capability_requirement_id(&a, "query"),
+        owner_module_id: a.clone(),
+        schema_version: "capability.v1".into(),
+        capability_id: "module-a.query".into(),
+        version: "1.0.0".into(),
+    };
+    let policies = TypedContributionSet {
+        policy_requirements: vec![policy.clone(), policy],
+        ..TypedContributionSet::default()
+    };
+    assert!(matches!(
+        policies.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::DuplicateIdentifier {
+            kind: "policy requirement",
+            ..
+        })
+    ));
+
+    let capabilities = TypedContributionSet {
+        capability_requirements: vec![capability.clone(), capability],
+        ..TypedContributionSet::default()
+    };
+    assert!(matches!(
+        capabilities.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::DuplicateIdentifier {
+            kind: "capability requirement",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn dangling_requirement_references_are_rejected() {
+    let a = module("module-a");
+    let mut set = TypedContributionSet::default();
+    let mut item = navigation(&a, &a, "home");
+    item.required_policy
+        .push(policy_requirement_id(&a, "missing"));
+    item.required_capability
+        .push(capability_requirement_id(&a, "missing"));
+    set.navigation.push(item);
+
+    assert!(matches!(
+        set.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::UnknownRequirementReference {
+            kind: "policy requirement",
+            identifier
+        }) if identifier == "module-a.missing"
+    ));
 }
 
 #[test]
