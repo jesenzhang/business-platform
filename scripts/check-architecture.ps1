@@ -117,6 +117,32 @@ foreach ($contractCrate in @(
     ) "PLAN-0010 generic platform/C-specific boundary violation"
 }
 
+# PLAN-0011 Business Application Packaging must remain a pure, business-neutral
+# declaration/compiler foundation. Test fixtures are intentionally outside this
+# source scan; production code must not know fixture or concrete module names.
+$businessApplicationCompilerCargo = Get-Content -Raw (Join-Path $root "crates/business-application-compiler/Cargo.toml")
+if ($businessApplicationCompilerCargo -match 'path\s*=\s*"\.\./\.\./(apps|crates)/(?!business-module-contracts)') {
+    throw "business-application-compiler must not depend on implementation crates"
+}
+$businessApplicationCompilerSource = @(Get-ChildItem (Join-Path $root "crates/business-application-compiler/src") -Recurse -File | ForEach-Object {
+    Get-Content -Raw $_.FullName
+}) -join [Environment]::NewLine
+foreach ($forbiddenCompilerToken in @(
+    "axum", "sqlx", "reqwest", "object-storage", "messaging", "ai-provider",
+    "WrenAI", "wren-ai", "Twenty", "Odoo", "Frappe", "ERPNext",
+    "module-a", "module-b", "module-extension",
+    "PurgeBusinessData", "DeleteData", "DropBusinessFacts", "PurgeOperation",
+    "DatasetDefinition", "MetricDefinition", "DimensionDefinition",
+    "RelationshipDefinition", "LineageDefinition"
+)) {
+    if ($businessApplicationCompilerSource -match [regex]::Escape($forbiddenCompilerToken)) {
+        throw "PLAN-0011 generic compiler boundary violation: production source contains '$forbiddenCompilerToken'"
+    }
+}
+if ($businessApplicationCompilerSource -match '(?im)^\s*pub\s+(struct|enum)\s+(Dataset|Metric|Dimension|Relationship|Lineage)') {
+    throw "PLAN-0011 compiler must not define a second semantic authority"
+}
+
 $semanticCompilerCargo = Get-Content -Raw (Join-Path $root "crates/semantic-contract/Cargo.toml")
 if ($semanticCompilerCargo -notmatch 'business-module-contracts\s*=\s*\{\s*workspace\s*=\s*true\s*\}') {
     throw "semantic-contract must depend on the generic business-module-contracts seam"

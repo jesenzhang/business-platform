@@ -422,6 +422,15 @@ PLAN-0010 additionally requires：
 - the C project remains read-only rehearsal evidence, PLAN-0006 remains Proposed
   / NOT ACTIVE, and PLAN-0009 remains Completed / Rehearsal Closed.
 
+PLAN-0011 additionally makes the packaging foundation executable as a fitness
+function. `scripts/check-architecture.ps1` scans the production source of
+`business-application-compiler` and rejects persistence/web/provider/runtime
+dependencies, concrete business or synthetic fixture names, automatic business
+data purge operation tokens, and duplicate semantic-authority type declarations.
+Fixture names are permitted only in integration tests. The compiler remains
+responsible for package/contribution/extension compilation and dry-plan evidence;
+`semantic-contract` remains the sole semantic compiler/authority.
+
 ## 27. Architecture Foundation Convergence gates
 
 Architecture Foundation Convergence 文档阶段新增以下 Required 设计门禁；PLAN-0011 激活前必须把它们转为 pure contract/compiler 或 fixture contract tests：
