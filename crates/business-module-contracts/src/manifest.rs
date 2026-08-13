@@ -524,12 +524,15 @@ impl PublishedExtensionPoint {
         if self.lifecycle != ExtensionPointLifecycle::Published {
             return Err(ManifestValidationError::UnpublishedExtensionPoint);
         }
+        for dependency in &dependency_catalog.public_dependencies {
+            validate_public_dependency_reference(dependency)?;
+        }
         for dependency in &self.dependency_ids {
-            if matches!(dependency, PublishedDependencyReference::Private { .. })
-                || !dependency_catalog
-                    .public_dependencies
-                    .iter()
-                    .any(|candidate| candidate == dependency)
+            validate_public_dependency_reference(dependency)?;
+            if !dependency_catalog
+                .public_dependencies
+                .iter()
+                .any(|candidate| candidate == dependency)
             {
                 return Err(ManifestValidationError::UnknownExtensionPointDependency);
             }
@@ -662,6 +665,35 @@ fn validate_authorization(
         });
     }
     Ok(())
+}
+
+fn validate_public_dependency_reference(
+    reference: &PublishedDependencyReference,
+) -> Result<(), ManifestValidationError> {
+    let (identifier, kind) = match reference {
+        PublishedDependencyReference::PublicResource { resource_kind, .. } => {
+            (resource_kind, "public resource kind")
+        }
+        PublishedDependencyReference::PublicQuery { query_id, .. } => (query_id, "public query ID"),
+        PublishedDependencyReference::PublicCapability { capability_id, .. } => {
+            (capability_id, "public capability ID")
+        }
+        PublishedDependencyReference::Private { .. } => {
+            return Err(ManifestValidationError::UnknownExtensionPointDependency);
+        }
+    };
+    validate_local_id(identifier).map_err(|_| ManifestValidationError::InvalidField { kind })?;
+    let version = match reference {
+        PublishedDependencyReference::PublicResource { version, .. }
+        | PublishedDependencyReference::PublicQuery { version, .. }
+        | PublishedDependencyReference::PublicCapability { version, .. } => version,
+        PublishedDependencyReference::Private { .. } => unreachable!(),
+    };
+    BusinessModuleVersion::new(version.clone())
+        .map(|_| ())
+        .map_err(|_| ManifestValidationError::InvalidField {
+            kind: "public dependency version",
+        })
 }
 
 /// Installation state is intentionally separate from data retention state.
@@ -1583,6 +1615,50 @@ mod tests {
                 &PublishedDependencyCatalog::default(),
             ),
             Err(ManifestValidationError::UnknownExtensionPointDependency)
+        ));
+    }
+
+    #[test]
+    fn extension_point_rejects_malformed_public_dependency_reference() {
+        let (owner, mut point, contribution) = extension_fixture();
+        point.dependency_ids = vec![PublishedDependencyReference::PublicQuery {
+            owner_module_id: owner.clone(),
+            query_id: "detail.query".to_owned(),
+            version: "1.0.0".to_owned(),
+        }];
+        let catalog = PublishedDependencyCatalog {
+            public_dependencies: point.dependency_ids.clone(),
+        };
+
+        assert!(matches!(
+            validate_extension_points_against_catalog(&owner, &[point], &[contribution], &catalog,),
+            Err(ManifestValidationError::InvalidField { .. })
+        ));
+    }
+
+    #[test]
+    fn extension_point_rejects_malformed_catalog_entry_before_matching() {
+        let (owner, mut point, contribution) = extension_fixture();
+        let dependency = PublishedDependencyReference::PublicResource {
+            owner_module_id: owner.clone(),
+            resource_kind: "document".to_owned(),
+            version: "1.0.0".to_owned(),
+        };
+        point.dependency_ids = vec![dependency.clone()];
+        let catalog = PublishedDependencyCatalog {
+            public_dependencies: vec![
+                dependency,
+                PublishedDependencyReference::PublicCapability {
+                    owner_module_id: owner.clone(),
+                    capability_id: String::new(),
+                    version: "1.0.0".to_owned(),
+                },
+            ],
+        };
+
+        assert!(matches!(
+            validate_extension_points_against_catalog(&owner, &[point], &[contribution], &catalog,),
+            Err(ManifestValidationError::InvalidField { .. })
         ));
     }
 
