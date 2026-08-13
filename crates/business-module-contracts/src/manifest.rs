@@ -1098,7 +1098,10 @@ fn validate_public_target(
     target: &PublicContributionTarget,
     catalog: &PublicContributionCatalog,
 ) -> Result<(), ManifestValidationError> {
-    validate_non_empty(&target.version, "public target version")?;
+    validate_public_target_shape(target)?;
+    for candidate in &catalog.public_targets {
+        validate_public_target_shape(candidate)?;
+    }
     let found = catalog
         .public_targets
         .iter()
@@ -1106,6 +1109,36 @@ fn validate_public_target(
     if !found {
         return Err(ManifestValidationError::UnknownPublicTarget);
     }
+    Ok(())
+}
+
+fn validate_public_target_shape(
+    target: &PublicContributionTarget,
+) -> Result<(), ManifestValidationError> {
+    match &target.target {
+        PublicTargetKind::Resource { resource_kind } => {
+            validate_local_id(resource_kind).map_err(|_| {
+                ManifestValidationError::InvalidField {
+                    kind: "public target resource kind",
+                }
+            })?;
+        }
+        PublicTargetKind::Query { query_id } => {
+            validate_local_id(query_id).map_err(|_| ManifestValidationError::InvalidField {
+                kind: "public target query ID",
+            })?;
+        }
+        PublicTargetKind::Command { command_id } => {
+            validate_local_id(command_id).map_err(|_| ManifestValidationError::InvalidField {
+                kind: "public target command ID",
+            })?;
+        }
+    }
+    BusinessModuleVersion::new(target.version.clone()).map_err(|_| {
+        ManifestValidationError::InvalidField {
+            kind: "public target version",
+        }
+    })?;
     Ok(())
 }
 

@@ -130,6 +130,58 @@ fn unknown_public_target_rejected_but_cross_module_public_target_is_allowed() {
 }
 
 #[test]
+fn malformed_catalog_target_is_rejected_before_matching() {
+    let a = module("module-a");
+    let mut malformed_catalog = catalog(&a);
+    malformed_catalog.public_targets[0].target = PublicTargetKind::Query {
+        query_id: "Summary".into(),
+    };
+    let mut set = TypedContributionSet::default();
+    set.navigation.push(navigation(&a, &a, "home"));
+
+    assert!(matches!(
+        set.validate(&a, &malformed_catalog),
+        Err(ManifestValidationError::InvalidField {
+            kind: "public target query ID"
+        })
+    ));
+}
+
+#[test]
+fn malformed_incoming_public_target_is_rejected() {
+    let a = module("module-a");
+    let mut set = TypedContributionSet::default();
+    let mut item = navigation(&a, &a, "home");
+    item.target.target = PublicTargetKind::Command {
+        command_id: "private.command".into(),
+    };
+    set.navigation.push(item);
+
+    assert!(matches!(
+        set.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::InvalidField {
+            kind: "public target command ID"
+        })
+    ));
+}
+
+#[test]
+fn malformed_public_target_version_is_rejected() {
+    let a = module("module-a");
+    let mut set = TypedContributionSet::default();
+    let mut item = navigation(&a, &a, "home");
+    item.target.version = "not a version".into();
+    set.navigation.push(item);
+
+    assert!(matches!(
+        set.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::InvalidField {
+            kind: "public target version"
+        })
+    ));
+}
+
+#[test]
 fn declaration_does_not_grant_authorization() {
     let a = module("module-a");
     let mut set = TypedContributionSet::default();
