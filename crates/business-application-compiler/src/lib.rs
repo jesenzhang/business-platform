@@ -134,6 +134,13 @@ pub enum PlanDiagnostic {
 pub enum PlanError {
     #[error("incoming compiled package set is not canonical: {0}")]
     IncomingNotCanonical(String),
+    #[error("duplicate module in {location}: '{identifier}'")]
+    DuplicateModule {
+        location: &'static str,
+        identifier: String,
+    },
+    #[error("duplicate plan component: '{identifier}'")]
+    DuplicateComponent { identifier: String },
     #[error("failed to fingerprint plan component: {0}")]
     Serialization(#[from] serde_json::Error),
     #[error("invalid package digest")]
@@ -378,15 +385,26 @@ pub fn dry_plan(
     current: &CurrentRegistrySnapshot,
     incoming: &IncomingCompiledPackages,
 ) -> Result<BusinessApplicationPlan, PlanError> {
+    let expected_canonical = canonical_bytes(incoming)?;
+    if expected_canonical != incoming.canonical_json() {
+        return Err(PlanError::IncomingNotCanonical(
+            "canonical bytes do not match compiled fields".to_owned(),
+        ));
+    }
+    let expected_digest = format!("{:x}", Sha256::digest(&expected_canonical));
+    if incoming.package_digest().as_str() != expected_digest {
+        return Err(PlanError::IncomingNotCanonical(
+            "package digest does not match canonical bytes".to_owned(),
+        ));
+    }
+
     let mut current_modules = BTreeMap::new();
-    let mut diagnostics = Vec::new();
     for item in &current.modules {
         let id = item.package.manifest.module_id.clone();
         if current_modules.insert(id.clone(), item).is_some() {
-            diagnostics.push(PlanDiagnostic::Conflict {
-                module_id: Some(id.clone()),
+            return Err(PlanError::DuplicateModule {
+                location: "current registry snapshot",
                 identifier: id.to_string(),
-                reason: "current registry contains duplicate module ownership".to_owned(),
             });
         }
     }
@@ -394,17 +412,28 @@ pub fn dry_plan(
     for package in &incoming.packages {
         let id = package.manifest.module_id.clone();
         if incoming_modules.insert(id.clone(), package).is_some() {
-            diagnostics.push(PlanDiagnostic::Conflict {
-                module_id: Some(id.clone()),
+            return Err(PlanError::DuplicateModule {
+                location: "incoming compiled package set",
                 identifier: id.to_string(),
-                reason: "incoming compiled packages contain duplicate module ownership".to_owned(),
             });
         }
     }
 
+    let mut incoming_digests = BTreeMap::new();
+    for (id, package) in &incoming_modules {
+        incoming_digests.insert(id.clone(), package_digest(package)?);
+    }
+    let mut diagnostics = Vec::new();
     let mut changes = Vec::new();
     for (id, package) in &incoming_modules {
-        let digest = incoming.package_digest.clone();
+        let digest =
+            incoming_digests
+                .get(id)
+                .cloned()
+                .ok_or_else(|| PlanError::DuplicateModule {
+                    location: "incoming compiled package set",
+                    identifier: id.to_string(),
+                })?;
         match current_modules.get(id) {
             None => changes.push(PackageChange::AddModule {
                 module_id: id.clone(),
@@ -473,16 +502,23 @@ pub fn dry_plan(
         }
     }
 
+    let mut incoming_entries = Vec::with_capacity(incoming_modules.len());
+    for (id, package) in &incoming_modules {
+        let digest = incoming_digests
+            .get(id)
+            .ok_or_else(|| PlanError::DuplicateModule {
+                location: "incoming compiled package set",
+                identifier: id.to_string(),
+            })?;
+        incoming_entries.push((id, *package, digest));
+    }
+
     let current_components = all_components(
         current_modules
             .iter()
             .map(|(id, snapshot)| (id, &snapshot.package, &snapshot.package_digest)),
     )?;
-    let incoming_components = all_components(
-        incoming_modules
-            .iter()
-            .map(|(id, package)| (id, *package, &incoming.package_digest)),
-    )?;
+    let incoming_components = all_components(incoming_entries.clone())?;
     for (key, (module_id, digest)) in &incoming_components {
         match current_components.get(key) {
             None => changes.push(PackageChange::AddContribution {
@@ -515,11 +551,7 @@ pub fn dry_plan(
             .iter()
             .map(|(id, snapshot)| (id, &snapshot.package, &snapshot.package_digest)),
     );
-    let incoming_points = extension_points(
-        incoming_modules
-            .iter()
-            .map(|(id, package)| (id, *package, &incoming.package_digest)),
-    );
+    let incoming_points = extension_points(incoming_entries);
     for (id, (owner, digest)) in &incoming_points {
         if !current_points.contains_key(id) {
             changes.push(PackageChange::AddExtensionPoint {
@@ -637,10 +669,24 @@ fn all_components<'a>(
         .into_iter()
         .try_fold(BTreeMap::new(), |mut result, (module_id, item, digest)| {
             for key in component_ids(item) {
-                result.insert(key, (module_id.clone(), digest.clone()));
+                if result
+                    .insert(key.clone(), (module_id.clone(), digest.clone()))
+                    .is_some()
+                {
+                    return Err(PlanError::DuplicateComponent { identifier: key });
+                }
             }
             Ok(result)
         })
+}
+
+fn package_digest(package: &BusinessApplicationPackage) -> Result<PackageDigest, PlanError> {
+    digest_json(package)
+}
+
+fn digest_json<T: Serialize>(value: &T) -> Result<PackageDigest, PlanError> {
+    let bytes = serde_json::to_vec(value)?;
+    PackageDigest::new(format!("{:x}", Sha256::digest(bytes))).map_err(|_| PlanError::Digest)
 }
 #[allow(clippy::too_many_lines)]
 fn component_ids(package: &BusinessApplicationPackage) -> Vec<String> {

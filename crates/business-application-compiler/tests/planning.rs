@@ -2,7 +2,7 @@
 
 use business_application_compiler::{
     compile, dry_plan, BusinessApplicationCompilerInput, BusinessApplicationPackage,
-    CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange, PlanDiagnostic,
+    CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange, PlanDiagnostic, PlanError,
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
@@ -216,6 +216,49 @@ fn permutations_produce_identical_plan_and_diagnostics() {
     )
     .unwrap();
     assert_eq!(first, second);
+}
+
+#[test]
+fn tampered_incoming_manifest_is_rejected_before_planning() {
+    let mut incoming = compiled(vec![package("module-a", "1.0.0")]);
+    incoming.package_digest =
+        business_module_contracts::PackageDigest::new("b".repeat(64)).unwrap();
+    assert!(matches!(
+        dry_plan(&CurrentRegistrySnapshot::default(), &incoming),
+        Err(PlanError::IncomingNotCanonical(_))
+    ));
+}
+
+#[test]
+fn module_adds_use_independent_package_digests() {
+    let plan = dry_plan(
+        &CurrentRegistrySnapshot::default(),
+        &compiled(vec![
+            package("module-a", "1.0.0"),
+            package("module-b", "1.0.0"),
+        ]),
+    )
+    .unwrap();
+    let digests: Vec<_> = plan
+        .changes
+        .iter()
+        .filter_map(|change| match change {
+            PackageChange::AddModule { digest, .. } => Some(digest),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(digests.len(), 2);
+    assert_ne!(digests[0], digests[1]);
+}
+
+#[test]
+fn duplicate_current_module_is_rejected() {
+    let package = package("module-a", "1.0.0");
+    let snapshot = snapshot(vec![package.clone(), package]);
+    assert!(matches!(
+        dry_plan(&snapshot, &compiled(vec![])),
+        Err(PlanError::DuplicateModule { .. })
+    ));
 }
 
 fn point_decl(id: ExtensionPointId) -> business_module_contracts::PublishedExtensionPoint {
