@@ -964,6 +964,11 @@ impl TypedContributionSet {
                     actual: item.owner_module_id.to_string(),
                 });
             }
+            validate_owned_requirement_reference(
+                &item.policy_id,
+                &item.owner_module_id,
+                "policy requirement policy ID",
+            )?;
         }
         for item in &self.capability_requirements {
             check_typed_id(item.requirement_id.module_id(), &item.owner_module_id)?;
@@ -973,9 +978,30 @@ impl TypedContributionSet {
                     actual: item.owner_module_id.to_string(),
                 });
             }
+            validate_owned_requirement_reference(
+                &item.capability_id,
+                &item.owner_module_id,
+                "capability requirement capability ID",
+            )?;
         }
         Ok(())
     }
+}
+
+fn validate_owned_requirement_reference(
+    identifier: &str,
+    owner_module_id: &BusinessModuleId,
+    kind: &'static str,
+) -> Result<(), ManifestValidationError> {
+    let identifier = NamespacedId::new(identifier)
+        .map_err(|_| ManifestValidationError::InvalidField { kind })?;
+    if identifier.module_id() != owner_module_id.as_str() {
+        return Err(ManifestValidationError::WrongContributionOwner {
+            expected: owner_module_id.to_string(),
+            actual: identifier.module_id().to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn validate_public_target(
@@ -1531,6 +1557,74 @@ mod tests {
         assert!(matches!(
             manifest.validate(),
             Err(ManifestValidationError::UnsupportedSchemaVersion { .. })
+        ));
+    }
+
+    #[test]
+    fn requirement_rejects_forged_policy_and_capability_ownership() {
+        let owner = BusinessModuleId::new("module-a").unwrap();
+        let mut contributions = TypedContributionSet {
+            policy_requirements: vec![PolicyRequirementDescriptor {
+                requirement_id: PolicyRequirementId::from_parts("module-a", "read").unwrap(),
+                owner_module_id: owner.clone(),
+                schema_version: "1.0.0".to_owned(),
+                policy_id: "module-b.read".to_owned(),
+                version: "1.0.0".to_owned(),
+            }],
+            ..TypedContributionSet::default()
+        };
+        assert!(matches!(
+            contributions.validate(&owner, &PublicContributionCatalog::default()),
+            Err(ManifestValidationError::WrongContributionOwner { .. })
+        ));
+
+        contributions.policy_requirements.clear();
+        contributions
+            .capability_requirements
+            .push(CapabilityRequirementDescriptor {
+                requirement_id: CapabilityRequirementId::from_parts("module-a", "read").unwrap(),
+                owner_module_id: owner.clone(),
+                schema_version: "1.0.0".to_owned(),
+                capability_id: "module-b.read".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            contributions.validate(&owner, &PublicContributionCatalog::default()),
+            Err(ManifestValidationError::WrongContributionOwner { .. })
+        ));
+    }
+
+    #[test]
+    fn requirement_rejects_malformed_policy_and_capability_ids() {
+        let owner = BusinessModuleId::new("module-a").unwrap();
+        let mut contributions = TypedContributionSet {
+            policy_requirements: vec![PolicyRequirementDescriptor {
+                requirement_id: PolicyRequirementId::from_parts("module-a", "read").unwrap(),
+                owner_module_id: owner.clone(),
+                schema_version: "1.0.0".to_owned(),
+                policy_id: "module-a._private".to_owned(),
+                version: "1.0.0".to_owned(),
+            }],
+            ..TypedContributionSet::default()
+        };
+        assert!(matches!(
+            contributions.validate(&owner, &PublicContributionCatalog::default()),
+            Err(ManifestValidationError::InvalidField { .. })
+        ));
+
+        contributions.policy_requirements.clear();
+        contributions
+            .capability_requirements
+            .push(CapabilityRequirementDescriptor {
+                requirement_id: CapabilityRequirementId::from_parts("module-a", "read").unwrap(),
+                owner_module_id: owner.clone(),
+                schema_version: "1.0.0".to_owned(),
+                capability_id: "module-a.read.extra".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            contributions.validate(&owner, &PublicContributionCatalog::default()),
+            Err(ManifestValidationError::InvalidField { .. })
         ));
     }
 
