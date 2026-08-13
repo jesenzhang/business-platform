@@ -21,7 +21,7 @@ registry or a second business-data authority.
 | Architecture fitness hardening | `308e745` |
 | Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
 | Canonical compiled-manifest deserialization repair | `474285719a066c9810ac1cfed4886cf8bb455d2f` |
-| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
+| Candidate head | `52500e2` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
