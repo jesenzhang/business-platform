@@ -4,10 +4,11 @@
 //! persist, execute, or discover business applications.
 
 use business_module_contracts::{
-    BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, ExtensionContribution,
-    ManifestValidationError, PackageDigest, PublicContributionCatalog, PublicContributionTarget,
-    PublicTargetKind, PublishedDependencyCatalog, PublishedDependencyReference,
-    PublishedExtensionPoint, TypedContributionSet,
+    BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
+    ExtensionContribution, ExtensionPointId, ManifestValidationError, ModuleDataState,
+    ModuleDependency, ModuleInstallationState, PackageDigest, PublicContributionCatalog,
+    PublicContributionTarget, PublicTargetKind, PublishedDependencyCatalog,
+    PublishedDependencyReference, PublishedExtensionPoint, TypedContributionSet,
 };
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,128 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 pub const BUSINESS_APPLICATION_PACKAGE_SCHEMA_VERSION: &str = "business-application.package.v1";
+
+/// A read-only view of the declarations currently known by a registry.
+/// Installation and data retention are deliberately separate state machines.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentRegistrySnapshot {
+    #[serde(default)]
+    pub modules: Vec<CurrentModuleSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentModuleSnapshot {
+    pub package: BusinessApplicationPackage,
+    pub package_digest: PackageDigest,
+    pub installation_state: business_module_contracts::ModuleInstallationState,
+    pub data_state: business_module_contracts::ModuleDataState,
+}
+
+/// The compiled package set supplied to the pure planner.
+pub type IncomingCompiledPackages = CompiledBusinessApplicationManifest;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BusinessApplicationPlan {
+    pub changes: Vec<PackageChange>,
+    pub diagnostics: Vec<PlanDiagnostic>,
+    /// False means an unresolved conflict or blocked removal prevents apply.
+    pub applicable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PackageChange {
+    AddModule {
+        module_id: BusinessModuleId,
+        digest: PackageDigest,
+    },
+    UpgradeModule {
+        module_id: BusinessModuleId,
+        from: PackageDigest,
+        to: PackageDigest,
+    },
+    DisableModule {
+        module_id: BusinessModuleId,
+    },
+    EnableModule {
+        module_id: BusinessModuleId,
+    },
+    RemoveModule {
+        module_id: BusinessModuleId,
+        data_retained: bool,
+    },
+    AddContribution {
+        contribution_id: String,
+        module_id: BusinessModuleId,
+        digest: PackageDigest,
+    },
+    UpdateContribution {
+        contribution_id: String,
+        module_id: BusinessModuleId,
+        from: PackageDigest,
+        to: PackageDigest,
+    },
+    RemoveContribution {
+        contribution_id: String,
+        module_id: BusinessModuleId,
+    },
+    AddExtensionPoint {
+        extension_point_id: ExtensionPointId,
+        owner_module_id: BusinessModuleId,
+        digest: PackageDigest,
+    },
+    RemoveExtensionPoint {
+        extension_point_id: ExtensionPointId,
+        owner_module_id: BusinessModuleId,
+    },
+    DependencyChange {
+        module_id: BusinessModuleId,
+        from: Vec<ModuleDependency>,
+        to: Vec<ModuleDependency>,
+    },
+    CompatibilityChange {
+        module_id: BusinessModuleId,
+        from: CompatibilityDescriptor,
+        to: CompatibilityDescriptor,
+    },
+    Conflict {
+        module_id: Option<BusinessModuleId>,
+        identifier: String,
+    },
+    BlockedRemoval {
+        module_id: Option<BusinessModuleId>,
+        identifier: String,
+        reason: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PlanDiagnostic {
+    Conflict {
+        module_id: Option<BusinessModuleId>,
+        identifier: String,
+        reason: String,
+    },
+    BlockedRemoval {
+        module_id: Option<BusinessModuleId>,
+        identifier: String,
+        reason: String,
+    },
+}
+
+#[derive(Debug, Error)]
+pub enum PlanError {
+    #[error("incoming compiled package set is not canonical: {0}")]
+    IncomingNotCanonical(String),
+    #[error("failed to fingerprint plan component: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("invalid package digest")]
+    Digest,
+}
 
 /// A typed package declaration and its optional published extension contracts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -245,6 +368,415 @@ pub fn compile(
     compiled.package_digest = PackageDigest::new(digest).map_err(|_| CompilationError::Digest)?;
     compiled.canonical_json = bytes;
     Ok(compiled)
+}
+
+/// Builds a deterministic, side-effect-free plan. This function only compares
+/// declarations and registry evidence; it never applies registration changes
+/// and never emits a data purge operation.
+#[allow(clippy::too_many_lines)]
+pub fn dry_plan(
+    current: &CurrentRegistrySnapshot,
+    incoming: &IncomingCompiledPackages,
+) -> Result<BusinessApplicationPlan, PlanError> {
+    let mut current_modules = BTreeMap::new();
+    let mut diagnostics = Vec::new();
+    for item in &current.modules {
+        let id = item.package.manifest.module_id.clone();
+        if current_modules.insert(id.clone(), item).is_some() {
+            diagnostics.push(PlanDiagnostic::Conflict {
+                module_id: Some(id.clone()),
+                identifier: id.to_string(),
+                reason: "current registry contains duplicate module ownership".to_owned(),
+            });
+        }
+    }
+    let mut incoming_modules = BTreeMap::new();
+    for package in &incoming.packages {
+        let id = package.manifest.module_id.clone();
+        if incoming_modules.insert(id.clone(), package).is_some() {
+            diagnostics.push(PlanDiagnostic::Conflict {
+                module_id: Some(id.clone()),
+                identifier: id.to_string(),
+                reason: "incoming compiled packages contain duplicate module ownership".to_owned(),
+            });
+        }
+    }
+
+    let mut changes = Vec::new();
+    for (id, package) in &incoming_modules {
+        let digest = incoming.package_digest.clone();
+        match current_modules.get(id) {
+            None => changes.push(PackageChange::AddModule {
+                module_id: id.clone(),
+                digest,
+            }),
+            Some(existing) => {
+                let old_digest = existing.package_digest.clone();
+                if old_digest != digest {
+                    let old_version =
+                        Version::parse(existing.package.manifest.module_version.as_str());
+                    let new_version = Version::parse(package.manifest.module_version.as_str());
+                    if matches!((old_version, new_version), (Ok(old), Ok(new)) if new < old) {
+                        push_conflict(
+                            &mut changes,
+                            &mut diagnostics,
+                            Some(id.clone()),
+                            id.to_string(),
+                            "module downgrade is not allowed",
+                        );
+                    } else {
+                        changes.push(PackageChange::UpgradeModule {
+                            module_id: id.clone(),
+                            from: old_digest,
+                            to: digest,
+                        });
+                    }
+                }
+                if existing.installation_state == ModuleInstallationState::Disabled {
+                    changes.push(PackageChange::EnableModule {
+                        module_id: id.clone(),
+                    });
+                }
+            }
+        }
+    }
+    for (id, existing) in &current_modules {
+        if !incoming_modules.contains_key(id) {
+            let mut blocked = false;
+            for (dependent_id, dependent) in &current_modules {
+                if dependent_id != id
+                    && incoming_modules.contains_key(dependent_id)
+                    && dependent
+                        .package
+                        .manifest
+                        .dependencies
+                        .iter()
+                        .any(|d| d.module_id == *id)
+                {
+                    blocked = true;
+                    let reason = format!("live dependency from {dependent_id}");
+                    push_blocked(
+                        &mut changes,
+                        &mut diagnostics,
+                        Some(id.clone()),
+                        id.to_string(),
+                        reason,
+                    );
+                }
+            }
+            if !blocked {
+                changes.push(PackageChange::RemoveModule {
+                    module_id: id.clone(),
+                    data_retained: existing.data_state != ModuleDataState::Purged,
+                });
+            }
+        }
+    }
+
+    let current_components = all_components(
+        current_modules
+            .iter()
+            .map(|(id, snapshot)| (id, &snapshot.package, &snapshot.package_digest)),
+    )?;
+    let incoming_components = all_components(
+        incoming_modules
+            .iter()
+            .map(|(id, package)| (id, *package, &incoming.package_digest)),
+    )?;
+    for (key, (module_id, digest)) in &incoming_components {
+        match current_components.get(key) {
+            None => changes.push(PackageChange::AddContribution {
+                contribution_id: key.clone(),
+                module_id: module_id.clone(),
+                digest: digest.clone(),
+            }),
+            Some((_, old_digest)) if old_digest != digest => {
+                changes.push(PackageChange::UpdateContribution {
+                    contribution_id: key.clone(),
+                    module_id: module_id.clone(),
+                    from: old_digest.clone(),
+                    to: digest.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
+    for (key, (module_id, _)) in &current_components {
+        if !incoming_components.contains_key(key) && incoming_modules.contains_key(module_id) {
+            changes.push(PackageChange::RemoveContribution {
+                contribution_id: key.clone(),
+                module_id: module_id.clone(),
+            });
+        }
+    }
+
+    let current_points = extension_points(
+        current_modules
+            .iter()
+            .map(|(id, snapshot)| (id, &snapshot.package, &snapshot.package_digest)),
+    );
+    let incoming_points = extension_points(
+        incoming_modules
+            .iter()
+            .map(|(id, package)| (id, *package, &incoming.package_digest)),
+    );
+    for (id, (owner, digest)) in &incoming_points {
+        if !current_points.contains_key(id) {
+            changes.push(PackageChange::AddExtensionPoint {
+                extension_point_id: id.clone(),
+                owner_module_id: owner.clone(),
+                digest: digest.clone(),
+            });
+        }
+    }
+    for (id, (owner, _)) in &current_points {
+        if !incoming_points.contains_key(id) && incoming_modules.contains_key(owner) {
+            let live = current.modules.iter().any(|m| {
+                m.package.extension_contributions.iter().any(|c| {
+                    &c.target_extension_point_id == id
+                        && incoming_modules.contains_key(&c.consumer_module_id)
+                })
+            });
+            if live {
+                push_blocked(
+                    &mut changes,
+                    &mut diagnostics,
+                    Some(owner.clone()),
+                    id.to_string(),
+                    "active extension consumer remains".to_owned(),
+                );
+            } else {
+                changes.push(PackageChange::RemoveExtensionPoint {
+                    extension_point_id: id.clone(),
+                    owner_module_id: owner.clone(),
+                });
+            }
+        }
+    }
+    for id in incoming_modules
+        .keys()
+        .chain(current_modules.keys())
+        .collect::<BTreeSet<_>>()
+    {
+        if let (Some(before), Some(after)) = (current_modules.get(id), incoming_modules.get(id)) {
+            if before.package.manifest.dependencies != after.manifest.dependencies {
+                changes.push(PackageChange::DependencyChange {
+                    module_id: (*id).clone(),
+                    from: sorted_dependencies(&before.package.manifest.dependencies),
+                    to: sorted_dependencies(&after.manifest.dependencies),
+                });
+            }
+            if before.package.manifest.compatibility != after.manifest.compatibility {
+                changes.push(PackageChange::CompatibilityChange {
+                    module_id: (*id).clone(),
+                    from: before.package.manifest.compatibility.clone(),
+                    to: after.manifest.compatibility.clone(),
+                });
+            }
+        }
+    }
+    changes.sort_by_key(stable_change_key);
+    diagnostics.sort_by_key(stable_diagnostic_key);
+    Ok(BusinessApplicationPlan {
+        applicable: diagnostics.is_empty(),
+        changes,
+        diagnostics,
+    })
+}
+
+fn push_conflict(
+    changes: &mut Vec<PackageChange>,
+    diagnostics: &mut Vec<PlanDiagnostic>,
+    module_id: Option<BusinessModuleId>,
+    identifier: String,
+    reason: &str,
+) {
+    changes.push(PackageChange::Conflict {
+        module_id: module_id.clone(),
+        identifier: identifier.clone(),
+    });
+    diagnostics.push(PlanDiagnostic::Conflict {
+        module_id,
+        identifier,
+        reason: reason.to_owned(),
+    });
+}
+fn push_blocked(
+    changes: &mut Vec<PackageChange>,
+    diagnostics: &mut Vec<PlanDiagnostic>,
+    module_id: Option<BusinessModuleId>,
+    identifier: String,
+    reason: String,
+) {
+    changes.push(PackageChange::BlockedRemoval {
+        module_id: module_id.clone(),
+        identifier: identifier.clone(),
+        reason: reason.clone(),
+    });
+    diagnostics.push(PlanDiagnostic::BlockedRemoval {
+        module_id,
+        identifier,
+        reason,
+    });
+}
+fn sorted_dependencies(items: &[ModuleDependency]) -> Vec<ModuleDependency> {
+    let mut result = items.to_vec();
+    result.sort_by_key(|d| (d.module_id.clone(), d.version_requirement.clone()));
+    result
+}
+fn all_components<'a>(
+    modules: impl IntoIterator<
+        Item = (
+            &'a BusinessModuleId,
+            &'a BusinessApplicationPackage,
+            &'a PackageDigest,
+        ),
+    >,
+) -> Result<BTreeMap<String, (BusinessModuleId, PackageDigest)>, PlanError> {
+    modules
+        .into_iter()
+        .try_fold(BTreeMap::new(), |mut result, (module_id, item, digest)| {
+            for key in component_ids(item) {
+                result.insert(key, (module_id.clone(), digest.clone()));
+            }
+            Ok(result)
+        })
+}
+#[allow(clippy::too_many_lines)]
+fn component_ids(package: &BusinessApplicationPackage) -> Vec<String> {
+    let mut ids = Vec::new();
+    ids.extend(
+        package
+            .manifest
+            .published_commands
+            .iter()
+            .map(|x| x.contract_id.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .published_queries
+            .iter()
+            .map(|x| x.contract_id.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .published_events
+            .iter()
+            .map(|x| x.contract_id.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .resource_kinds
+            .iter()
+            .map(|x| x.resource_kind.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .semantic_contributions
+            .iter()
+            .map(|x| x.semantic_id.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .ui_contributions
+            .iter()
+            .map(|x| x.contribution_id.clone()),
+    );
+    ids.extend(
+        package
+            .manifest
+            .agent_tool_contributions
+            .iter()
+            .map(|x| x.contribution_id.clone()),
+    );
+    ids.extend(
+        package
+            .extension_contributions
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .navigation
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .list_views
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .detail_sections
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .detail_tabs
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .actions
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .commands
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids.extend(
+        package
+            .contributions
+            .agent_capabilities
+            .iter()
+            .map(|x| x.contribution_id.to_string()),
+    );
+    ids
+}
+fn extension_points<'a>(
+    modules: impl IntoIterator<
+        Item = (
+            &'a BusinessModuleId,
+            &'a BusinessApplicationPackage,
+            &'a PackageDigest,
+        ),
+    >,
+) -> BTreeMap<ExtensionPointId, (BusinessModuleId, PackageDigest)> {
+    modules
+        .into_iter()
+        .flat_map(|(_, package, digest)| {
+            package.extension_points.iter().map(move |p| {
+                (
+                    p.extension_point_id.clone(),
+                    (p.owner_module_id.clone(), digest.clone()),
+                )
+            })
+        })
+        .collect()
+}
+fn stable_change_key(change: &PackageChange) -> String {
+    serde_json::to_string(change).unwrap_or_default()
+}
+fn stable_diagnostic_key(diagnostic: &PlanDiagnostic) -> String {
+    serde_json::to_string(diagnostic).unwrap_or_default()
 }
 
 fn parse_version(field: &'static str, value: &str) -> Result<Version, CompilationError> {
