@@ -4,10 +4,11 @@ use business_application_compiler::{
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
-    ContributionId, DataClassification, ExtensionAuthorizationRequirement, ExtensionContribution,
-    ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
+    ContributionDescriptor, ContributionId, DataClassification, ExtensionAuthorizationRequirement,
+    ExtensionContribution, ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
     ExtensionPointRemovalSemantics, ExtensionPointVisibility, ManifestSchemaVersion,
-    PublicContributionTarget, PublicTargetKind, PublishedExtensionPoint, ResourceKindDescriptor,
+    PublicContributionTarget, PublicTargetKind, PublishedDependencyReference,
+    PublishedExtensionPoint, ResourceKindDescriptor,
 };
 use sha2::Digest;
 
@@ -357,6 +358,60 @@ mod tests {
             });
         assert!(compile(input(vec![consumer, owner])).is_ok());
     }
+
+    #[test]
+    fn accepts_public_capability_dependency_and_compiles_deterministically() {
+        let mut provider = package("module-a", "1.0.0");
+        provider.manifest.agent_tool_contributions.extend([
+            ContributionDescriptor {
+                contribution_id: "capability-z".to_owned(),
+                version: "1.0.0".to_owned(),
+            },
+            ContributionDescriptor {
+                contribution_id: "capability-a".to_owned(),
+                version: "1.0.0".to_owned(),
+            },
+        ]);
+
+        let provider_id = provider.manifest.module_id.clone();
+        let mut consumer = package("module-b", "1.0.0");
+        consumer.extension_points.push(PublishedExtensionPoint {
+            extension_point_id: ExtensionPointId::from_parts("module-b", "slot").unwrap(),
+            owner_module_id: consumer.manifest.module_id.clone(),
+            contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            schema_version: "1.0.0".to_owned(),
+            allowed_contribution_kind: ExtensionContributionKind::DetailUi,
+            classification: DataClassification::Internal,
+            authorization_requirement: ExtensionAuthorizationRequirement {
+                policy_id: None,
+                capability_id: None,
+            },
+            lifecycle: ExtensionPointLifecycle::Published,
+            dependency_ids: vec![
+                PublishedDependencyReference::PublicCapability {
+                    owner_module_id: provider_id.clone(),
+                    capability_id: "capability-z".to_owned(),
+                    version: "1.0.0".to_owned(),
+                },
+                PublishedDependencyReference::PublicCapability {
+                    owner_module_id: provider_id,
+                    capability_id: "capability-a".to_owned(),
+                    version: "1.0.0".to_owned(),
+                },
+            ],
+            removal_semantics: ExtensionPointRemovalSemantics::BlockedRemoval,
+            visibility: ExtensionPointVisibility::Public,
+        });
+
+        let first = compile(input(vec![provider.clone(), consumer.clone()])).unwrap();
+        provider.manifest.agent_tool_contributions.reverse();
+        consumer.extension_points[0].dependency_ids.reverse();
+        let second = compile(input(vec![consumer, provider])).unwrap();
+
+        assert_eq!(first.canonical_json(), second.canonical_json());
+        assert_eq!(first.package_digest(), second.package_digest());
+    }
+
     #[test]
     fn all_package_vector_permutations_have_identical_digest() {
         let mut owner = package("module-a", "1.0.0");

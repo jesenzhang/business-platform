@@ -1051,6 +1051,17 @@ fn dependency_catalog(packages: &[BusinessApplicationPackage]) -> PublishedDepen
                 version: item.version.clone(),
             }
         }));
+        public_dependencies.extend(
+            package
+                .manifest
+                .agent_tool_contributions
+                .iter()
+                .map(|item| PublishedDependencyReference::PublicCapability {
+                    owner_module_id: owner.clone(),
+                    capability_id: item.contribution_id.clone(),
+                    version: item.version.clone(),
+                }),
+        );
     }
     public_dependencies.sort_by_key(|dependency| {
         serde_json::to_string(dependency).unwrap_or_else(|_| String::new())
