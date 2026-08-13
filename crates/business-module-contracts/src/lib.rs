@@ -7,15 +7,18 @@
 mod manifest;
 
 pub use manifest::{
-    ActionContribution, AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId,
-    BusinessModuleManifest, BusinessModuleVersion, CapabilityRequirementDescriptor,
-    CapabilityRequirementId, CommandContribution, CompatibilityDescriptor, ContractDescriptor,
-    ContributionDescriptor, ContributionId, DataClassification, DetailSectionContribution,
-    DetailTabContribution, ExtensionPointId, ListViewContribution, ManifestSchemaVersion,
-    ManifestValidationError, ModuleContractError, ModuleDataState, ModuleDependency,
-    ModuleInstallationState, NamespacedId, NavigationContribution, PackageDigest,
-    PlatformCapabilityRequirement, PolicyRequirementDescriptor, PolicyRequirementId,
-    PublicContributionCatalog, PublicContributionTarget, PublicTargetKind, ResourceKindDescriptor,
+    validate_extension_point_removal, validate_extension_points, ActionContribution,
+    AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId, BusinessModuleManifest,
+    BusinessModuleVersion, CapabilityRequirementDescriptor, CapabilityRequirementId,
+    CommandContribution, CompatibilityDescriptor, ContractDescriptor, ContributionDescriptor,
+    ContributionId, DataClassification, DetailSectionContribution, DetailTabContribution,
+    ExtensionAuthorizationRequirement, ExtensionContribution, ExtensionContributionKind,
+    ExtensionPointId, ExtensionPointLifecycle, ExtensionPointRemovalSemantics,
+    ExtensionPointVisibility, ListViewContribution, ManifestSchemaVersion, ManifestValidationError,
+    ModuleContractError, ModuleDataState, ModuleDependency, ModuleInstallationState, NamespacedId,
+    NavigationContribution, PackageDigest, PlatformCapabilityRequirement,
+    PolicyRequirementDescriptor, PolicyRequirementId, PublicContributionCatalog,
+    PublicContributionTarget, PublicTargetKind, PublishedExtensionPoint, ResourceKindDescriptor,
     SemanticContributionDescriptor, TypedContributionSet, UiContributionId,
     BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
 };

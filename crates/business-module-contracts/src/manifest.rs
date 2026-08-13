@@ -394,6 +394,203 @@ pub enum DataClassification {
     Restricted,
 }
 
+/// The public surface that an owner explicitly makes available for extension.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionPointVisibility {
+    Public,
+    Private,
+}
+
+/// Lifecycle of an owner-published extension point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionPointLifecycle {
+    Published,
+    Disabled,
+    Retired,
+}
+
+/// Kinds of contribution supported by a published extension point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionContributionKind {
+    ResourceMetadata,
+    DetailUi,
+    Action,
+    PublicReference,
+    PublicProjection,
+}
+
+/// Authorization requested by an extension point; declaration does not grant it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExtensionAuthorizationRequirement {
+    pub policy_id: Option<String>,
+    pub capability_id: Option<String>,
+}
+
+/// Whether removal is allowed immediately or requires consumers to migrate first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionPointRemovalSemantics {
+    BlockedRemoval,
+    ConsumerMigrationRequired,
+}
+
+/// An owner-published, versioned and explicitly public extension slot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublishedExtensionPoint {
+    pub extension_point_id: ExtensionPointId,
+    pub owner_module_id: BusinessModuleId,
+    pub contract_version: BusinessModuleVersion,
+    pub schema_version: String,
+    pub allowed_contribution_kind: ExtensionContributionKind,
+    pub classification: DataClassification,
+    pub authorization_requirement: ExtensionAuthorizationRequirement,
+    pub lifecycle: ExtensionPointLifecycle,
+    pub dependency_ids: Vec<NamespacedId>,
+    pub removal_semantics: ExtensionPointRemovalSemantics,
+    pub visibility: ExtensionPointVisibility,
+}
+
+/// A consumer declaration against an owner's published extension point.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExtensionContribution {
+    pub contribution_id: ContributionId,
+    pub consumer_module_id: BusinessModuleId,
+    pub target_extension_point_id: ExtensionPointId,
+    pub expected_contract_version: BusinessModuleVersion,
+    pub classification: DataClassification,
+    pub kind: ExtensionContributionKind,
+}
+
+impl PublishedExtensionPoint {
+    /// Validates that the declaration is an owner-published public point.
+    pub fn validate(&self) -> Result<(), ManifestValidationError> {
+        if self.extension_point_id.module_id() != self.owner_module_id.as_str() {
+            return Err(ManifestValidationError::WrongExtensionPointOwner {
+                expected: self.extension_point_id.module_id().to_owned(),
+                actual: self.owner_module_id.to_string(),
+            });
+        }
+        validate_non_empty(&self.schema_version, "extension point schema version")?;
+        validate_authorization(&self.authorization_requirement)?;
+        if self.visibility != ExtensionPointVisibility::Public {
+            return Err(ManifestValidationError::PrivateExtensionPoint);
+        }
+        if self.lifecycle != ExtensionPointLifecycle::Published {
+            return Err(ManifestValidationError::UnpublishedExtensionPoint);
+        }
+        Ok(())
+    }
+}
+
+impl ExtensionContribution {
+    /// Validates this consumer against an explicitly published point.
+    pub fn validate_against(
+        &self,
+        point: &PublishedExtensionPoint,
+    ) -> Result<(), ManifestValidationError> {
+        point.validate()?;
+        if self.target_extension_point_id != point.extension_point_id {
+            return Err(ManifestValidationError::UnknownExtensionPoint {
+                extension_point_id: self.target_extension_point_id.to_string(),
+            });
+        }
+        if self.expected_contract_version != point.contract_version {
+            return Err(ManifestValidationError::ExtensionVersionMismatch {
+                expected: point.contract_version.to_string(),
+                actual: self.expected_contract_version.to_string(),
+            });
+        }
+        if self.classification < point.classification {
+            return Err(ManifestValidationError::ClassificationDowngrade);
+        }
+        if self.kind != point.allowed_contribution_kind {
+            return Err(ManifestValidationError::UnsupportedExtensionContributionKind);
+        }
+        Ok(())
+    }
+}
+
+/// Validates a set of owner points and consumer contributions without registry state.
+pub fn validate_extension_points(
+    owner_module_id: &BusinessModuleId,
+    points: &[PublishedExtensionPoint],
+    contributions: &[ExtensionContribution],
+) -> Result<(), ManifestValidationError> {
+    let mut point_ids = BTreeSet::new();
+    for point in points {
+        if point.owner_module_id != *owner_module_id {
+            return Err(ManifestValidationError::WrongExtensionPointOwner {
+                expected: owner_module_id.to_string(),
+                actual: point.owner_module_id.to_string(),
+            });
+        }
+        point.validate()?;
+        if !point_ids.insert(point.extension_point_id.clone()) {
+            return Err(ManifestValidationError::DuplicateIdentifier {
+                kind: "extension point",
+                identifier: point.extension_point_id.to_string(),
+            });
+        }
+    }
+    let mut contribution_ids = BTreeSet::new();
+    for contribution in contributions {
+        if !contribution_ids.insert(contribution.contribution_id.clone()) {
+            return Err(ManifestValidationError::DuplicateIdentifier {
+                kind: "extension contribution",
+                identifier: contribution.contribution_id.to_string(),
+            });
+        }
+        let Some(point) = points
+            .iter()
+            .find(|point| point.extension_point_id == contribution.target_extension_point_id)
+        else {
+            return Err(ManifestValidationError::UnknownExtensionPoint {
+                extension_point_id: contribution.target_extension_point_id.to_string(),
+            });
+        };
+        contribution.validate_against(point)?;
+    }
+    Ok(())
+}
+
+/// Detects removal that would strand a live consumer.
+pub fn validate_extension_point_removal(
+    point: &PublishedExtensionPoint,
+    live_contributions: &[ExtensionContribution],
+) -> Result<(), ManifestValidationError> {
+    if live_contributions
+        .iter()
+        .any(|contribution| contribution.target_extension_point_id == point.extension_point_id)
+    {
+        return Err(ManifestValidationError::BlockedExtensionPointRemoval {
+            extension_point_id: point.extension_point_id.to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_authorization(
+    requirement: &ExtensionAuthorizationRequirement,
+) -> Result<(), ManifestValidationError> {
+    if requirement.policy_id.as_deref().is_some_and(str::is_empty)
+        || requirement
+            .capability_id
+            .as_deref()
+            .is_some_and(str::is_empty)
+    {
+        return Err(ManifestValidationError::InvalidField {
+            kind: "extension authorization requirement",
+        });
+    }
+    Ok(())
+}
+
 /// Installation state is intentionally separate from data retention state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -834,6 +1031,30 @@ pub enum ManifestValidationError {
     /// A contribution points at an unpublished public target.
     #[error("contribution target is not a published public contract")]
     UnknownPublicTarget,
+    /// An extension point is not present in the owner's published declarations.
+    #[error("unknown extension point '{extension_point_id}'")]
+    UnknownExtensionPoint { extension_point_id: String },
+    /// The point ID namespace does not match its declared owner.
+    #[error("extension point owner '{actual}' does not match ID owner '{expected}'")]
+    WrongExtensionPointOwner { expected: String, actual: String },
+    /// A private point cannot be used as a cross-module extension boundary.
+    #[error("extension point is private")]
+    PrivateExtensionPoint,
+    /// Disabled or retired points are not available to new consumers.
+    #[error("extension point is not published")]
+    UnpublishedExtensionPoint,
+    /// Consumer and owner contract versions are incompatible.
+    #[error("extension contract version mismatch: expected '{expected}', got '{actual}'")]
+    ExtensionVersionMismatch { expected: String, actual: String },
+    /// A consumer may not reduce the owner's classification.
+    #[error("extension contribution classification downgrades the published point")]
+    ClassificationDowngrade,
+    /// The consumer kind is not the kind published by the owner.
+    #[error("unsupported extension contribution kind")]
+    UnsupportedExtensionContributionKind,
+    /// Removing this point would strand an active consumer.
+    #[error("removal of extension point '{extension_point_id}' is blocked by a live consumer")]
+    BlockedExtensionPointRemoval { extension_point_id: String },
     /// A version requirement cannot be interpreted by the compiler.
     #[error("invalid version requirement '{requirement}'")]
     InvalidVersionRequirement { requirement: String },
@@ -1096,6 +1317,7 @@ fn validate_version_requirement(requirement: &str) -> Result<(), ManifestValidat
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::cloned_ref_to_slice_refs)]
 mod tests {
     use super::*;
 
@@ -1183,5 +1405,82 @@ mod tests {
             manifest.validate(),
             Err(ManifestValidationError::UnsupportedSchemaVersion { .. })
         ));
+    }
+
+    fn extension_fixture() -> (
+        BusinessModuleId,
+        PublishedExtensionPoint,
+        ExtensionContribution,
+    ) {
+        let owner = BusinessModuleId::new("module-a").unwrap();
+        let consumer = BusinessModuleId::new("module-extension").unwrap();
+        let point = PublishedExtensionPoint {
+            extension_point_id: ExtensionPointId::from_parts("module-a", "detail-slot").unwrap(),
+            owner_module_id: owner.clone(),
+            contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            schema_version: "1.0.0".to_owned(),
+            allowed_contribution_kind: ExtensionContributionKind::DetailUi,
+            classification: DataClassification::Internal,
+            authorization_requirement: ExtensionAuthorizationRequirement {
+                policy_id: Some("module-a.read".to_owned()),
+                capability_id: None,
+            },
+            lifecycle: ExtensionPointLifecycle::Published,
+            dependency_ids: Vec::new(),
+            removal_semantics: ExtensionPointRemovalSemantics::BlockedRemoval,
+            visibility: ExtensionPointVisibility::Public,
+        };
+        let contribution = ExtensionContribution {
+            contribution_id: ContributionId::from_parts("module-extension", "details").unwrap(),
+            consumer_module_id: consumer,
+            target_extension_point_id: point.extension_point_id.clone(),
+            expected_contract_version: point.contract_version.clone(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        };
+        (owner, point, contribution)
+    }
+
+    #[test]
+    fn published_extension_point_accepts_valid_consumer_and_blocks_live_removal() {
+        let (owner, point, contribution) = extension_fixture();
+        assert!(
+            validate_extension_points(&owner, &[point.clone()], &[contribution.clone()]).is_ok()
+        );
+        assert!(matches!(
+            validate_extension_point_removal(&point, &[contribution]),
+            Err(ManifestValidationError::BlockedExtensionPointRemoval { .. })
+        ));
+    }
+
+    #[test]
+    fn extension_validation_fails_closed_for_private_wrong_version_and_kind() {
+        let (owner, mut point, mut contribution) = extension_fixture();
+        point.visibility = ExtensionPointVisibility::Private;
+        assert!(matches!(
+            validate_extension_points(&owner, &[point.clone()], &[]),
+            Err(ManifestValidationError::PrivateExtensionPoint)
+        ));
+        point.visibility = ExtensionPointVisibility::Public;
+        contribution.expected_contract_version = BusinessModuleVersion::new("2.0.0").unwrap();
+        assert!(matches!(
+            contribution.validate_against(&point),
+            Err(ManifestValidationError::ExtensionVersionMismatch { .. })
+        ));
+        contribution.expected_contract_version = point.contract_version.clone();
+        contribution.kind = ExtensionContributionKind::Action;
+        assert!(matches!(
+            contribution.validate_against(&point),
+            Err(ManifestValidationError::UnsupportedExtensionContributionKind)
+        ));
+    }
+
+    #[test]
+    fn extension_removal_without_consumer_is_allowed_and_owner_is_unchanged() {
+        let (owner, point, _) = extension_fixture();
+        let before = point.clone();
+        assert!(validate_extension_point_removal(&point, &[]).is_ok());
+        assert_eq!(point, before);
+        assert_eq!(point.owner_module_id, owner);
     }
 }
