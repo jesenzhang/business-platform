@@ -19,13 +19,13 @@ registry or a second business-data authority.
 | Deterministic dry-plan | `e61edc5` |
 | Synthetic module isolation | `467a2f0` |
 | Architecture fitness hardening | `308e745` |
-| Candidate head | `308e7452338c608f9017ac146e6c4d3a8eeb08df` |
+| Candidate head | `7567e590137a3417ecd78c003f9a3f13843c3f85` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
 
 ```text
-31b24c6993dbff1f3e88b2476e0c87460400ec31..308e7452338c608f9017ac146e6c4d3a8eeb08df
+31b24c6993dbff1f3e88b2476e0c87460400ec31..7567e590137a3417ecd78c003f9a3f13843c3f85
 ```
 
 ## Scope proof
@@ -62,7 +62,8 @@ existing semantic contract decisions.
 
 ## Validation
 
-Local gates on candidate `308e745`:
+Local gates on implementation checkpoint `308e745` and unchanged by the
+docs-only evidence commit:
 
 - `cargo fmt --all -- --check` — PASS
 - `cargo check --workspace --all-targets --all-features` — PASS
@@ -72,7 +73,10 @@ Local gates on candidate `308e745`:
 - `pwsh ./scripts/check-openapi.ps1` — PASS
 - `git diff --check` — PASS
 
-Remote candidate CI run `31688120911` for HEAD `308e7452338c608f9017ac146e6c4d3a8eeb08df` — PASS. This included the repository's Rust, architecture, OpenAPI, frontend, CLI/MCP, PostgreSQL/MinIO, and E2E jobs.
+Remote implementation CI run `31688120911` for HEAD
+`308e7452338c608f9017ac146e6c4d3a8eeb08df` — PASS. Remote candidate CI for
+the final evidence head `7567e590137a3417ecd78c003f9a3f13843c3f85` is tracked
+separately and must pass before REVIEW-C.
 
 External scanners:
 
