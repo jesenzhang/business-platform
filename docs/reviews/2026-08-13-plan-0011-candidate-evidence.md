@@ -20,7 +20,7 @@ registry or a second business-data authority.
 | Synthetic module isolation | `467a2f0` |
 | Architecture fitness hardening | `308e745` |
 | Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
-| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
+| Candidate head | `4ec0f76` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
@@ -95,7 +95,7 @@ Current repair validation supersedes the historical checkpoint details above:
 - Feature CI for the current implementation repair: `31705147707` for
   `f08ac7dfede130471e4838a20a577aade9475026` — PASS, including PostgreSQL /
   MinIO / E2E contracts
-- This evidence commit is followed by one final head-alignment commit after
+- The evidence commit is followed by one final head-alignment commit after
   the current Feature CI passes; the latter is the exact candidate head for
   REVIEW-C.
 
