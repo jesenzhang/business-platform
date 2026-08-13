@@ -234,6 +234,11 @@ namespaced_identity!(
     AgentCapabilityId,
     "agent capability ID"
 );
+namespaced_identity!(
+    /// A stable identity for a capability requirement.
+    CapabilityRequirementId,
+    "capability requirement ID"
+);
 
 /// A validated lower-case SHA-256 package digest.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -465,6 +470,208 @@ pub struct SemanticContributionDescriptor {
     pub version: String,
 }
 
+/// A public target that a contribution may reference. It deliberately has no
+/// physical persistence or executable representation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublicContributionTarget {
+    pub owner_module_id: BusinessModuleId,
+    pub target: PublicTargetKind,
+    pub version: String,
+}
+
+/// The three public application surfaces available to typed contributions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum PublicTargetKind {
+    Resource { resource_kind: String },
+    Query { query_id: String },
+    Command { command_id: String },
+}
+
+/// A declaration of a policy requirement. Declaration never grants access.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyRequirementDescriptor {
+    pub requirement_id: PolicyRequirementId,
+    pub owner_module_id: BusinessModuleId,
+    pub schema_version: String,
+    pub policy_id: String,
+    pub version: String,
+}
+
+/// A declaration of a platform capability requirement. Declaration never
+/// grants access.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityRequirementDescriptor {
+    pub requirement_id: CapabilityRequirementId,
+    pub owner_module_id: BusinessModuleId,
+    pub schema_version: String,
+    pub capability_id: String,
+    pub version: String,
+}
+
+macro_rules! ui_contribution {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        pub struct $name {
+            pub contribution_id: UiContributionId,
+            pub owner_module_id: BusinessModuleId,
+            pub schema_version: String,
+            pub version: String,
+            pub target: PublicContributionTarget,
+            pub label_key: String,
+            #[serde(default)]
+            pub ordering: Option<i32>,
+            #[serde(default)]
+            pub group: Option<String>,
+            pub visibility: String,
+            #[serde(default)]
+            pub required_policy: Vec<PolicyRequirementId>,
+            #[serde(default)]
+            pub required_capability: Vec<CapabilityRequirementId>,
+        }
+    };
+}
+
+ui_contribution!(NavigationContribution);
+ui_contribution!(ListViewContribution);
+ui_contribution!(DetailSectionContribution);
+ui_contribution!(DetailTabContribution);
+ui_contribution!(ActionContribution);
+ui_contribution!(CommandContribution);
+
+/// A typed, declarative agent capability contribution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentCapabilityContribution {
+    pub contribution_id: AgentCapabilityId,
+    pub owner_module_id: BusinessModuleId,
+    pub schema_version: String,
+    pub version: String,
+    pub target: PublicContributionTarget,
+    pub label_key: String,
+    #[serde(default)]
+    pub required_policy: Vec<PolicyRequirementId>,
+    #[serde(default)]
+    pub required_capability: Vec<CapabilityRequirementId>,
+}
+
+/// The Stage 4 contribution set. This is a pure declaration and validation
+/// seam; it is not a registry and performs no authorization.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TypedContributionSet {
+    #[serde(default)]
+    pub navigation: Vec<NavigationContribution>,
+    #[serde(default)]
+    pub list_views: Vec<ListViewContribution>,
+    #[serde(default)]
+    pub detail_sections: Vec<DetailSectionContribution>,
+    #[serde(default)]
+    pub detail_tabs: Vec<DetailTabContribution>,
+    #[serde(default)]
+    pub actions: Vec<ActionContribution>,
+    #[serde(default)]
+    pub commands: Vec<CommandContribution>,
+    #[serde(default)]
+    pub agent_capabilities: Vec<AgentCapabilityContribution>,
+    #[serde(default)]
+    pub policy_requirements: Vec<PolicyRequirementDescriptor>,
+    #[serde(default)]
+    pub capability_requirements: Vec<CapabilityRequirementDescriptor>,
+}
+
+/// Public catalog used to validate that contribution targets are published.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PublicContributionCatalog {
+    pub public_targets: Vec<PublicContributionTarget>,
+}
+
+impl TypedContributionSet {
+    pub fn validate(
+        &self,
+        owner_module_id: &BusinessModuleId,
+        catalog: &PublicContributionCatalog,
+    ) -> Result<(), ManifestValidationError> {
+        let mut ids = BTreeSet::new();
+        let mut check = |id: &str, owner: &BusinessModuleId, target: &PublicContributionTarget| {
+            if owner != owner_module_id {
+                return Err(ManifestValidationError::WrongContributionOwner {
+                    expected: owner_module_id.to_string(),
+                    actual: owner.to_string(),
+                });
+            }
+            if !ids.insert(id.to_owned()) {
+                return Err(ManifestValidationError::DuplicateIdentifier {
+                    kind: "typed contribution",
+                    identifier: id.to_owned(),
+                });
+            }
+            validate_public_target(target, catalog)
+        };
+        macro_rules! check_ui {
+            ($items:expr) => {
+                for item in &$items {
+                    check(
+                        item.contribution_id.as_str(),
+                        &item.owner_module_id,
+                        &item.target,
+                    )?;
+                }
+            };
+        }
+        check_ui!(self.navigation);
+        check_ui!(self.list_views);
+        check_ui!(self.detail_sections);
+        check_ui!(self.detail_tabs);
+        check_ui!(self.actions);
+        check_ui!(self.commands);
+        for item in &self.agent_capabilities {
+            check(
+                item.contribution_id.as_str(),
+                &item.owner_module_id,
+                &item.target,
+            )?;
+        }
+        for item in &self.policy_requirements {
+            if item.owner_module_id != *owner_module_id {
+                return Err(ManifestValidationError::WrongContributionOwner {
+                    expected: owner_module_id.to_string(),
+                    actual: item.owner_module_id.to_string(),
+                });
+            }
+        }
+        for item in &self.capability_requirements {
+            if item.owner_module_id != *owner_module_id {
+                return Err(ManifestValidationError::WrongContributionOwner {
+                    expected: owner_module_id.to_string(),
+                    actual: item.owner_module_id.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_public_target(
+    target: &PublicContributionTarget,
+    catalog: &PublicContributionCatalog,
+) -> Result<(), ManifestValidationError> {
+    validate_non_empty(&target.version, "public target version")?;
+    let found = catalog
+        .public_targets
+        .iter()
+        .any(|candidate| candidate == target);
+    if !found {
+        return Err(ManifestValidationError::UnknownPublicTarget);
+    }
+    Ok(())
+}
+
 /// A dependency on another published business module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -621,6 +828,12 @@ pub enum ManifestValidationError {
     /// A module depends on itself.
     #[error("module '{module_id}' cannot depend on itself")]
     SelfDependency { module_id: String },
+    /// A contribution is declared by a different module than its manifest.
+    #[error("contribution owner '{actual}' does not match expected module '{expected}'")]
+    WrongContributionOwner { expected: String, actual: String },
+    /// A contribution points at an unpublished public target.
+    #[error("contribution target is not a published public contract")]
+    UnknownPublicTarget,
     /// A version requirement cannot be interpreted by the compiler.
     #[error("invalid version requirement '{requirement}'")]
     InvalidVersionRequirement { requirement: String },

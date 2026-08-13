@@ -7,10 +7,15 @@
 mod manifest;
 
 pub use manifest::{
-    AgentCapabilityId, BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion,
-    CompatibilityDescriptor, ContractDescriptor, ContributionDescriptor, ContributionId,
-    DataClassification, ExtensionPointId, ManifestSchemaVersion, ManifestValidationError,
-    ModuleContractError, ModuleDataState, ModuleDependency, ModuleInstallationState, NamespacedId,
-    PackageDigest, PlatformCapabilityRequirement, PolicyRequirementId, ResourceKindDescriptor,
-    SemanticContributionDescriptor, UiContributionId, BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
+    ActionContribution, AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId,
+    BusinessModuleManifest, BusinessModuleVersion, CapabilityRequirementDescriptor,
+    CapabilityRequirementId, CommandContribution, CompatibilityDescriptor, ContractDescriptor,
+    ContributionDescriptor, ContributionId, DataClassification, DetailSectionContribution,
+    DetailTabContribution, ExtensionPointId, ListViewContribution, ManifestSchemaVersion,
+    ManifestValidationError, ModuleContractError, ModuleDataState, ModuleDependency,
+    ModuleInstallationState, NamespacedId, NavigationContribution, PackageDigest,
+    PlatformCapabilityRequirement, PolicyRequirementDescriptor, PolicyRequirementId,
+    PublicContributionCatalog, PublicContributionTarget, PublicTargetKind, ResourceKindDescriptor,
+    SemanticContributionDescriptor, TypedContributionSet, UiContributionId,
+    BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
 };
