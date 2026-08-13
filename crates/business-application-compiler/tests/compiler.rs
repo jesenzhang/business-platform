@@ -1,5 +1,6 @@
 use business_application_compiler::{
     compile, BusinessApplicationCompilerInput, BusinessApplicationPackage, CompilationError,
+    CompiledBusinessApplicationManifest,
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
@@ -50,6 +51,23 @@ mod tests {
             installed_versions: Default::default(),
             desired_installation_states: Default::default(),
         }
+    }
+
+    fn serialized_value_with_recomputed_digest(
+        compiled: &CompiledBusinessApplicationManifest,
+    ) -> serde_json::Value {
+        let encoded = serde_json::to_vec(compiled).unwrap();
+        let digest_field = b",\"package_digest\":";
+        let digest_offset = encoded
+            .windows(digest_field.len())
+            .position(|window| window == digest_field)
+            .unwrap();
+        let mut canonical = encoded[..digest_offset].to_vec();
+        canonical.push(b'}');
+        let digest = format!("{:x}", sha2::Sha256::digest(canonical));
+        let mut value: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        value["package_digest"] = serde_json::Value::String(digest);
+        value
     }
 
     #[test]
@@ -252,6 +270,56 @@ mod tests {
             error.to_string(),
             "package digest does not match canonical bytes"
         );
+    }
+
+    #[test]
+    fn deserializing_non_canonical_payload_with_recomputed_digest_fails_closed() {
+        let mut source = package("module-a", "1.0.0");
+        source
+            .manifest
+            .owned_bounded_contexts
+            .extend(["z-context".to_owned(), "a-context".to_owned()]);
+        let mut compiled = compile(input(vec![source])).unwrap();
+        compiled.packages[0]
+            .manifest
+            .owned_bounded_contexts
+            .reverse();
+        let encoded = serialized_value_with_recomputed_digest(&compiled);
+
+        let error =
+            serde_json::from_value::<CompiledBusinessApplicationManifest>(encoded).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "compiled manifest is not canonical compiler output"
+        );
+    }
+
+    #[test]
+    fn deserializing_invalid_package_payload_fails_closed() {
+        let mut compiled = compile(input(vec![package("module-a", "1.0.0")])).unwrap();
+        compiled.packages[0].manifest.owned_bounded_contexts.clear();
+        let encoded = serialized_value_with_recomputed_digest(&compiled);
+
+        let error =
+            serde_json::from_value::<CompiledBusinessApplicationManifest>(encoded).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .starts_with("compiled manifest validation failed: manifest validation failed:"));
+    }
+
+    #[test]
+    fn deserializing_unknown_top_level_field_fails_closed() {
+        let compiled = compile(input(vec![package("module-a", "1.0.0")])).unwrap();
+        let mut encoded = serialized_value_with_recomputed_digest(&compiled);
+        encoded["unexpected"] = serde_json::Value::Bool(true);
+
+        let error =
+            serde_json::from_value::<CompiledBusinessApplicationManifest>(encoded).unwrap_err();
+
+        assert!(error.to_string().contains("unknown field"));
+        assert!(error.to_string().contains("unexpected"));
     }
 
     #[test]

@@ -207,6 +207,7 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct SerializedManifest {
             schema_version: String,
             platform_version: String,
@@ -230,6 +231,21 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
         if manifest.package_digest.as_str() != expected_digest {
             return Err(serde::de::Error::custom(
                 "package digest does not match canonical bytes",
+            ));
+        }
+
+        let compiled = compile(BusinessApplicationCompilerInput {
+            platform_version: manifest.platform_version.clone(),
+            packages: manifest.packages.clone(),
+            installed_versions: BTreeMap::new(),
+            desired_installation_states: manifest.desired_installation_states.clone(),
+        })
+        .map_err(|error| {
+            serde::de::Error::custom(format!("compiled manifest validation failed: {error}"))
+        })?;
+        if manifest != compiled {
+            return Err(serde::de::Error::custom(
+                "compiled manifest is not canonical compiler output",
             ));
         }
         Ok(manifest)
