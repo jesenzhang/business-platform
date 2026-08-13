@@ -21,20 +21,37 @@ registry or a second business-data authority.
 | Architecture fitness hardening | `308e745` |
 | Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
 | Canonical compiled-manifest deserialization repair | `474285719a066c9810ac1cfed4886cf8bb455d2f` |
-| Candidate head | `52500e2` |
+| Public capability dependency catalog repair | `014d3a5fbc97e041c557900d7fde825a36d7b754` |
+| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
 
 ```text
-31b24c6993dbff1f3e88b2476e0c87460400ec31..f08ac7dfede130471e4838a20a577aade9475026
+31b24c6993dbff1f3e88b2476e0c87460400ec31..014d3a5fbc97e041c557900d7fde825a36d7b754
 ```
 
-The repair closes four independently identified blockers: compiled-manifest
+The repairs close five independently identified blockers: compiled-manifest
 serde round-trip reconstructs canonical bytes; desired installation state can
 produce `DisableModule` without conflating data retention; removing an owner
-module checks active extension consumers; and legacy/typed contribution IDs are
-validated in one collision domain.
+module checks active extension consumers; legacy/typed contribution IDs are
+validated in one collision domain; and public capability dependencies are
+published into the compiler dependency catalog before resolution.
+
+## Review and repair history
+
+The prior candidate alignment at `96aed3f6a2b4313f08658bbcf4d96c5652782b31`
+was independently reviewed by fresh Sol reviewer
+`019ffb87-1e40-7592-a54a-77c7fcd363ef`. REVIEW-C found one HIGH blocker in
+`crates/business-application-compiler/src/lib.rs`: the compiler accepted the
+`PublicCapability` dependency contract but did not emit corresponding catalog
+entries from provider agent-tool contributions, so valid capability
+dependencies were rejected as unknown. That candidate was invalidated.
+
+Fresh Luna repair commit `014d3a5fbc97e041c557900d7fde825a36d7b754` adds the
+catalog publication and deterministic capability-dependency coverage. A new
+independent REVIEW-C is required for the exact final range after the evidence
+alignment commit.
 
 ## Scope proof
 
@@ -89,20 +106,19 @@ Current repair validation supersedes the historical checkpoint details above:
 
 - Previous repair implementation commit: `21c3420a9791d2d8a236ed01cc06885423a185f0`
 - Previous repair Feature CI `31692592164`: PASS, including PostgreSQL / MinIO / E2E contracts
-- Current implementation repair commit: `f08ac7dfede130471e4838a20a577aade9475026`
-- Current focused compiler tests: PASS (9 tests)
-- Local format, check, clippy, workspace tests, architecture fitness, OpenAPI,
-  and diff checks: PASS
-- Feature CI for the current implementation repair: `31705147707` for
-  `f08ac7dfede130471e4838a20a577aade9475026` — PASS, including PostgreSQL /
-  MinIO / E2E contracts
+- Current implementation repair commit: `014d3a5fbc97e041c557900d7fde825a36d7b754`
+- Current focused compiler tests: PASS (13 tests)
+- Current local format, check, clippy, workspace tests, architecture fitness,
+  OpenAPI, and diff checks: PASS
+- Feature CI for the current implementation repair: `31711682449` for
+  `014d3a5fbc97e041c557900d7fde825a36d7b754` — PASS, including PostgreSQL /
+  MinIO / E2E contracts and Architecture Fitness
 - Canonical deserialization repair commit:
   `474285719a066c9810ac1cfed4886cf8bb455d2f`
 - Feature CI for the canonical deserialization repair: `31709350955` — PASS,
   including PostgreSQL / MinIO / E2E contracts
-- The evidence commit is followed by one final head-alignment commit after
-  the current Feature CI passes; the latter is the exact candidate head for
-  REVIEW-C.
+- The evidence commit will be followed by one final head-alignment commit; the
+  latter is the exact candidate head for REVIEW-C.
 
 External scanners:
 
