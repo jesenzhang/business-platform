@@ -230,6 +230,31 @@ mod tests {
     }
 
     #[test]
+    fn deserializing_tampered_package_digest_fails_closed() {
+        let compiled = compile(input(vec![package("module-a", "1.0.0")])).unwrap();
+        let mut encoded: serde_json::Value =
+            serde_json::from_slice(&serde_json::to_vec(&compiled).unwrap()).unwrap();
+        let mut tampered_digest = compiled.package_digest().as_str().to_owned();
+        let replacement = if tampered_digest.ends_with('0') {
+            '1'
+        } else {
+            '0'
+        };
+        tampered_digest.replace_range(tampered_digest.len() - 1.., &replacement.to_string());
+        encoded["package_digest"] = serde_json::Value::String(tampered_digest);
+
+        let error = serde_json::from_value::<
+            business_application_compiler::CompiledBusinessApplicationManifest,
+        >(encoded)
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "package digest does not match canonical bytes"
+        );
+    }
+
+    #[test]
     fn accepts_cross_package_public_target_from_compiled_catalog() {
         let mut owner = package("module-a", "1.0.0");
         owner.manifest.resource_kinds.push(ResourceKindDescriptor {

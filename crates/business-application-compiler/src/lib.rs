@@ -226,6 +226,12 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
             canonical_json: Vec::new(),
         };
         manifest.canonical_json = canonical_bytes(&manifest).map_err(serde::de::Error::custom)?;
+        let expected_digest = format!("{:x}", Sha256::digest(&manifest.canonical_json));
+        if manifest.package_digest.as_str() != expected_digest {
+            return Err(serde::de::Error::custom(
+                "package digest does not match canonical bytes",
+            ));
+        }
         Ok(manifest)
     }
 }
