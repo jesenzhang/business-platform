@@ -45,8 +45,8 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0018`](ADR-0018-enterprise-ai-workspace-and-capability-security.md) | Enterprise AI Workspace and Agent Capability Security | Accepted | Workspace product layer, task-scoped Capability grants, observation lineage and non-authoritative artifacts |
 | [`ADR-0019`](ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md) | Enterprise Business Domain Portfolio and Cross-Functional Assurance | Accepted | Party/Counterparty、Legal、People & Performance、Business Assurance 和 Reference + Snapshot 边界 |
 | [`ADR-0020`](ADR-0020-business-module-isolation-and-semantic-contract.md) | Business Module Isolation and Semantic Contract | Accepted | 平台核心/业务模块隔离、语义贡献、确定性编译和 C legacy ACL 预留 |
-| [`ADR-0021`](ADR-0021-business-application-packaging-and-published-extension-points.md) | Business Application Packaging and Published Extension Points | Proposed | 稳定 package、贡献、扩展点、兼容性和移除计划 |
-| [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Proposed | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
+| [`ADR-0021`](ADR-0021-business-application-packaging-and-published-extension-points.md) | Business Application Packaging and Published Extension Points | Accepted | 稳定 package、贡献、扩展点、兼容性和移除计划 |
+| [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Accepted | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
 
 ## 4. ADR-0003 的完整 Baseline
 

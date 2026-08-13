@@ -1,6 +1,6 @@
 # ADR-0022：Inter-Module Communication and Business Collaboration
 
-> 状态：Proposed
+> 状态：Accepted
 > 日期：2026-08-12
 > 决策范围：Business Module 间的查询、命令、事件、引用、快照、投影、Saga 与扩展协作
 > 前置：ADR-0003、ADR-0008、ADR-0017、ADR-0018、ADR-0019、ADR-0020
@@ -11,24 +11,28 @@ ADR-0020 已建立 Platform Core、Business Module 和 Semantic Contract 的边�
 
 本 ADR 与 [`INTER_MODULE_COMMUNICATION_STANDARD.md`](../standards/INTER_MODULE_COMMUNICATION_STANDARD.md) 配套，补足六类跨模块机制和唯一的 Process Manager/Saga 模型。它不授权新的 runtime、数据库迁移或具体业务实现。
 
-## 2. 提案决策
+## 2. 决策
 
 ### 2.1 允许的六类公开协作
 
 1. **Synchronous Application Query**：调用 Owner 的版本化只读 Application/Public Contract；必须有 timeout、tenant、authorization、version、分页、新鲜度与稳定错误映射。
 2. **Synchronous Command**：表达对 Owner 的业务意图；事务、授权、幂等和版本由 Owner 拥有；不允许跨上下文共享事务、nested transaction 或 2PC。
 3. **Integration Event**：Owner Domain Event 经本地事务 Outbox 映射为版本化事实；发布者不感知消费者；消费者按至少一次、重复、乱序、重试和演进设计。
-4. **ResourceRef**：用稳定的 `module/resource-kind/resource-id` 引用替代 private FK；引用不授予权限、不保证存在，使用时重新校验租户、授权、生命周期和版本。
+4. **ResourceRef**：用稳定的 `module/resource-kind/resource-id` 引用替代 private FK；目标资源的 `module_id` 始终是资源 Owner Module，引用方只拥有自己的本地关系，不取得目标资源的所有权或写权限；引用不授予权限、不保证存在，使用时重新校验租户、授权、生命周期和版本。
 5. **Reference + Snapshot**：对必须解释的历史事实保存 ResourceRef 与不可变、带来源版本的业务快照；快照不代替当前 Owner 状态，也不复制完整可变领域对象。
 6. **Published Read Projection**：为列表、批量查询、报表、Dashboard 和分析提供明确 owner、版本、新鲜度、权限、重建方式的非权威读模型；禁止跨模块 private SQL JOIN。
 
-### 2.2 Process Manager / Saga 是唯一跨模块业务过程模型
+### 2.2 ResourceRef ownership
+
+`ResourceRef` 指向的资源及其正式状态、版本、不变量和公开解析规则由目标 `module_id` 对应的 Owner Module 单独拥有。保存该引用的消费者只拥有自己的本地关联、业务不变量和（如需历史解释）不可变 Snapshot；消费者不得通过引用修改、删除或重建目标资源。`ResourceRef` 不转移所有权、不授予权限，也不把 private persistence identity 变成跨模块契约。
+
+### 2.3 Process Manager / Saga 是唯一跨模块业务过程模型
 
 需要等待事件、人工审批、超时、重试、补偿或多个 Owner 因果协作时，由明确的 Process Manager/Saga 拥有业务过程状态。它只保存协调所需的引用、步骤、等待条件、期限、补偿和人工状态，不复制参与模块的完整领域状态。
 
 Durable Task Execution 继续只拥有 Job/Step/Attempt/Lease/Fence/Retry/Cancel/Recovery 等技术执行状态。两者可由同一 worker 驱动，但不允许建设第二套 Durable Task/Workflow Runtime。补偿是新的 Owner Command，不是数据库回滚；人工审批进入 Owner Application Use Case；消息只负责唤醒，不是权威状态。
 
-### 2.3 跨模块失败默认 fail closed
+### 2.4 跨模块失败默认 fail closed
 
 Query 超时、Command 授权失败、未知 event version、失效 ResourceRef、projection lag、consumer duplicate/乱序和 stale worker 不得被当成成功。系统必须选择显式失败、等待、有限降级读模型或人工介入，并留下可审计的 correlation/causation 证据。
 
@@ -78,11 +82,11 @@ Owner 的本地事务同时提交正式状态、Audit 和 Outbox。消费者的 
 - 本提案接受最终一致性和更多补偿建模成本，换取明确所有权和故障隔离。
 - ResourceRef 的具体公开序列化格式、Projection Registry 持久化和 Saga storage adapter 留待后续实现计划；本 ADR 不预先选择数据库/消息产品。
 - 是否允许同一模块化单体内的同步 in-process adapter，需在实现计划中证明其仍只依赖 Published Port，且可替换为 remote adapter。
-- 本 ADR 仍为 Proposed；在接受前不得实现跨模块 runtime。
+- 本 ADR 只建立跨模块协作约束；在 PLAN-0011 或其他后续计划通过各自 activation gate 前，不得实现跨模块 runtime。
 
 ## 8. 验收门禁
 
-接受本 ADR 前必须形成 synthetic `module-a/module-b/module-extension` fixture 设计，并证明：发布 query/command/event/ref/projection/extension point 的合法路径通过，private repository/schema/FK/SQL 路径失败，live dependency 的 module removal 为 Blocked，Saga 与 Durable Task 状态分离，注册顺序 deterministic，Platform Core 不含 fixture-business knowledge。
+PLAN-0011 activation/implementation 必须形成 synthetic `module-a/module-b/module-extension` fixture，并证明：发布 query/command/event/ref/projection/extension point 的合法路径通过，private repository/schema/FK/SQL 路径失败，live dependency 的 module removal 为 Blocked，Saga 与 Durable Task 状态分离，注册顺序 deterministic，Platform Core 不含 fixture-business knowledge。
 
 ## 9. 关联文档
 

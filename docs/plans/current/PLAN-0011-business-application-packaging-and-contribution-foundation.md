@@ -5,7 +5,7 @@
 状态：Proposed / NOT ACTIVE
 日期：2026-08-12
 Owner：Platform Foundation / Business Module Runtime / Frontend Platform
-架构前提：ADR-0020 `Accepted`；ADR-0021 `Proposed`，必须先被接受才可激活本计划
+架构前提：ADR-0020、ADR-0021、ADR-0022 均为 `Accepted`；本计划仍必须通过自身 activation gate 才可激活
 前置基线：PLAN-0010 已 `Integrated` 并归档；本计划仍受 ADR-0021/ADR-0022 架构审阅和本计划 activation gate 约束，不得直接激活实现
 主要参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；WrenAI `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`
 
@@ -433,7 +433,7 @@ fixture 不能命名为 Contract/C/Finance 以避免 generic tests 固化业务�
 
 PLAN-0009 保持 `Completed / Rehearsal Closed / Archived`，其 closeout evidence 保留，不重开、不扩展、不设计 production migration。
 
-未来如需让 Contract Module/C Integration 消费本计划产物，必须提交独立计划并重新定义其 scope、数据所有权、ACL、回滚和 reviewer gate；不能把 PLAN-0009 的已完成 rehearsal 自动升级为新的执行授权。
+未来如需让任何具体业务模块消费本计划产物，必须提交独立计划并重新定义其 scope、数据所有权、ACL、回滚和 reviewer gate；不能把 PLAN-0009 的已完成 rehearsal 自动升级为新的执行授权。
 
 验证链：
 
@@ -489,7 +489,7 @@ git diff --check
 
 只有同时满足以下条件才可从 `Proposed / NOT ACTIVE` 进入实现：
 
-- ADR-0021 已正式 `Accepted`；
+- ADR-0021 与 ADR-0022 均已正式 `Accepted`；
 - PLAN-0010 已 `Integrated` 并成为 main 权威基础；
 - 新实现分支从执行时真实 `origin/main` 创建；
 - Base..HEAD 不包含 PLAN-0009 runtime 或 C-specific runtime；
@@ -500,7 +500,7 @@ git diff --check
 
 只有同时满足以下条件才能进入 `Accepted Candidate`：
 
-- ADR-0021 已 Accepted；
+- ADR-0021 与 ADR-0022 均已 Accepted；
 - PLAN-0010 已 Integrated；
 - Base..HEAD scope 仅为 PLAN-0011；
 - generic contracts 不包含具体业务概念；
@@ -535,12 +535,10 @@ git diff --check
 
 若 PLAN-0011 Integrated，下一步按价值顺序：
 
-1. 用 Contract 作为第一个真实 Business Module fixture/迁移目标；
-2. 由独立计划设计 C-specific `integrations/legacy-c-contract-management` ACL（不属于本计划）；
-3. 由独立计划决定 Contract Module 的 UI/Semantic contribution；
-4. 验证 C Integration 可移除、Contract Module 可独立、Platform Core 零 Contract 知识；
-5. 另行决定是否有资格提出生产迁移 Wave 1；
-6. Analytics Query Runtime 与 PLAN-0006 Workspace 按独立 Plan 推进。
+1. 由独立计划决定具体业务模块是否消费本计划产物；
+2. 任何 C-specific ACL、Contract Module、生产迁移或业务迁移都必须由另行批准的计划定义；
+3. 由独立计划决定具体业务模块的 UI/Semantic contribution；
+4. Analytics Query Runtime 与 PLAN-0006 Workspace 按独立 Plan 推进。
 
 ## 18. 完成定义
 

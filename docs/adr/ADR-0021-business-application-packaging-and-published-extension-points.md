@@ -1,6 +1,6 @@
 # ADR-0021：Business Application Packaging 与 Published Extension Points
 
-> 状态：Proposed
+> 状态：Accepted
 > 日期：2026-08-12
 > 决策范围：Business Module Packaging、typed contribution、跨模块扩展、版本兼容和 install/upgrade/remove planning
 > 参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；ADR-0020；WrenAI Semantic Contract
@@ -26,7 +26,7 @@ Twenty 的 Application Manifest、stable universal identifier、required server 
 
 因此需要定义受控中间层：**Published Extension Point**。
 
-## 2. 决策提案
+## 2. 决策
 
 ### 2.1 Business Module 以稳定 Package Manifest 对外
 
@@ -229,7 +229,7 @@ Wren-inspired layer
 
 ## 5. 对 C Legacy / PLAN-0009 的影响
 
-如果本 ADR 被接受并由 PLAN-0011 实现，未来经单独批准的 C Integration/Contract Module 计划可以把 C 项目作为真实验证案例：
+PLAN-0009 已完成并归档；其 read-only rehearsal 输出仅作为历史证据保留，不属于 PLAN-0011 的当前路线，也不因本 ADR 的接受重新激活或获得 production migration 权限。PLAN-0011 的验证只使用通用 `module-a/module-b/module-extension` fixture。
 
 ```text
 C Legacy
@@ -263,7 +263,7 @@ C-specific schema/path/state 不能进入 Contract Domain 或 Platform Core。
 - 业务模块可以贡献 UI/Extension/Agent/Policy 信息而不污染 Platform Core；
 - 跨模块扩展从“隐式 schema coupling”转为 owner-published contract；
 - package/version/digest/dry-plan 提供可审计的安装升级证据；
-- Contract/C legacy 可以成为真实模块隔离验证，而不是把 legacy 规则塞入平台。
+- 通用 fixture 可以验证真实模块隔离，而不把 legacy 规则塞入平台；任何 C/Contract 后续工作都必须由独立、另行批准的计划定义，且不属于本 ADR 或 PLAN-0011 的当前 scope。
 
 ### 成本与限制
 
@@ -278,7 +278,7 @@ C-specific schema/path/state 不能进入 Contract Domain 或 Platform Core。
 
 PLAN-0011 必须优先实现纯 contract/compiler/dry-plan/fixture 和 Architecture Fitness，不得把本 ADR 扩展为动态插件、Marketplace 或数据库迁移平台。
 
-在 ADR-0021 未被接受前，PLAN-0011 保持 `Proposed / NOT ACTIVE`。
+即使本 ADR 已被接受，PLAN-0011 仍保持 `Proposed / NOT ACTIVE`，直到其 activation gate（包括 ADR-0021 与 ADR-0022 均为 `Accepted`）全部满足；本 ADR 不授权任何 runtime 实现。
 
 ## 9. 关联文档
 

@@ -205,6 +205,6 @@ module-extension  consumes A's published extension point
 - ADR-0017 继续拥有唯一 Semantic Contract/Analytics 语义权威；
 - ADR-0018 继续拥有 Agent Capability/Workspace 安全；
 - ADR-0020 继续拥有 Business Module Isolation 与纯 Rust compiler 基础；
-- ADR-0021 负责 Business Application Packaging/Published Extension Point（Proposed）；
-- ADR-0022 负责 Inter-Module Communication/Saga（Proposed）；
+- ADR-0021 负责 Business Application Packaging/Published Extension Point（Accepted）；
+- ADR-0022 负责 Inter-Module Communication/Saga（Accepted）；
 - 不引入第二 Durable Task Runtime，不修改 PLAN-0009 已完成归档状态，不激活 PLAN-0006。

@@ -78,8 +78,8 @@
 
 ## 5. 待审议架构决策
 
-- [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Proposed，Business Application Packaging、Contribution 和 Published Extension Point。
-- [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Proposed，跨模块通信、一致性和 Process Manager/Saga。
+- [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Accepted，Business Application Packaging、Contribution 和 Published Extension Point。
+- [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Accepted，跨模块通信、一致性和 Process Manager/Saga。
 
 ## 6. 文档目录
 
@@ -144,7 +144,7 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 
 - 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
 - PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-- PLAN-0011 Proposed / NOT ACTIVE：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（等待 ADR-0021/0022 和 Architecture Foundation Convergence 审阅，不授权 runtime）
+- PLAN-0011 Proposed / NOT ACTIVE：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted，仍等待本计划 activation gate，不授权 runtime）
 - PLAN-0009 Completed / Rehearsal Closed：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）

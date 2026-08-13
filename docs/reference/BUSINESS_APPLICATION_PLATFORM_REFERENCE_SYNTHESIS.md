@@ -139,4 +139,4 @@ Cross-module collaboration = Published Contract/Event/Ref/Projection/Extension P
 Module removal != data purge
 ```
 
-正式决策进入 `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`、ADR-0021（Proposed）和 ADR-0022（Proposed）；外部 reference 只作为可追溯事实输入。
+正式决策进入 `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`、Accepted ADR-0021 和 Accepted ADR-0022；外部 reference 只作为可追溯事实输入。

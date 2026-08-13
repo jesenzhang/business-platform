@@ -54,7 +54,7 @@ PLAN-0009 仍是 `docs/plans/archive/2026/` 下的 `Completed / Rehearsal Closed
 | References | Resource kinds and Reference+Snapshot exist | lifecycle/authorization/stale behavior | single cross-module reference profile | private FK temptation | ResourceRef + Snapshot profile |
 | Projections | CQRS/Analytics baseline | cross-module freshness and rebuild evidence | synthetic projection acceptance | projection could be mistaken for authority | explicit non-authority contract |
 | Saga | named in workflow/data architecture | state ownership and durable execution seam | consistent cross-module process model | risk of second workflow runtime | Proposed ADR-0022 |
-| Extensions | ADR-0021 Proposed | typed descriptors not implemented | owner/consumer/removal semantics | Twenty/Frappe permit shared mutable extension | PublishedExtensionPoint + BlockedRemoval |
+| Extensions | ADR-0021 Accepted | typed descriptors not implemented | owner/consumer/removal semantics | Twenty/Frappe permit shared mutable extension | PublishedExtensionPoint + BlockedRemoval |
 | Packaging | module manifest/compiler exists | dependency/compatibility descriptors | package digest and dry-plan | old branch gated PLAN-0009 incorrectly | keep PLAN-0011 Proposed/NOT ACTIVE |
 | UI/Agent/Semantic | manifest fields, ADR-0017/0018 | typed UI/Agent details | unified contribution validation | metadata vs DDD vs semantic confusion | three-layer boundary and same module identity |
 | Lifecycle/removal | Installed/Enabled/Disabled/Uninstalled vocabulary | execution and data retention split | removal dependency plan | old Twenty uninstall semantics too destructive | `Uninstalled != Data Purged` |
