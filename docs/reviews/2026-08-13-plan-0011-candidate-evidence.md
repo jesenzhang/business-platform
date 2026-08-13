@@ -22,7 +22,7 @@ registry or a second business-data authority.
 | Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
 | Canonical compiled-manifest deserialization repair | `474285719a066c9810ac1cfed4886cf8bb455d2f` |
 | Public capability dependency catalog repair | `014d3a5fbc97e041c557900d7fde825a36d7b754` |
-| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
+| Candidate head | `b3ab20e949001874c2edc3cc42f5eb8a32507613` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
