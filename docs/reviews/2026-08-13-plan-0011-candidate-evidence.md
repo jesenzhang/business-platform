@@ -19,14 +19,14 @@ registry or a second business-data authority.
 | Deterministic dry-plan | `e61edc5` |
 | Synthetic module isolation | `467a2f0` |
 | Architecture fitness hardening | `308e745` |
-| Bounded compiler/dry-plan repair | `21c3420a9791d2d8a236ed01cc06885423a185f0` |
-| Candidate head | `eed1df121979b4be136628afa09eecbf76075af1` |
+| Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
+| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
 
 ```text
-31b24c6993dbff1f3e88b2476e0c87460400ec31..21c3420a9791d2d8a236ed01cc06885423a185f0
+31b24c6993dbff1f3e88b2476e0c87460400ec31..f08ac7dfede130471e4838a20a577aade9475026
 ```
 
 The repair closes four independently identified blockers: compiled-manifest
@@ -86,14 +86,18 @@ separately and must pass before REVIEW-C.
 
 Current repair validation supersedes the historical checkpoint details above:
 
-- Implementation commit: `21c3420a9791d2d8a236ed01cc06885423a185f0`
-- Local focused compiler/planner tests: PASS (23 tests)
+- Previous repair implementation commit: `21c3420a9791d2d8a236ed01cc06885423a185f0`
+- Previous repair Feature CI `31692592164`: PASS, including PostgreSQL / MinIO / E2E contracts
+- Current implementation repair commit: `f08ac7dfede130471e4838a20a577aade9475026`
+- Current focused compiler tests: PASS (9 tests)
 - Local format, check, clippy, workspace tests, architecture fitness, OpenAPI,
   and diff checks: PASS
-- Remote CI `31692592164` for `21c3420a9791d2d8a236ed01cc06885423a185f0`:
-  PASS, including PostgreSQL / MinIO / E2E contracts
-- This evidence commit is followed by one final head-alignment commit; the
-  latter is the exact candidate head for REVIEW-C.
+- Feature CI for the current implementation repair: `31705147707` for
+  `f08ac7dfede130471e4838a20a577aade9475026` — PASS, including PostgreSQL /
+  MinIO / E2E contracts
+- This evidence commit is followed by one final head-alignment commit after
+  the current Feature CI passes; the latter is the exact candidate head for
+  REVIEW-C.
 
 External scanners:
 
