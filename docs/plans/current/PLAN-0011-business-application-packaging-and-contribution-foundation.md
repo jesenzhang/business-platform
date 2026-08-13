@@ -2,11 +2,11 @@
 
 文档 ID：PLAN-0011
 版本：0.2
-状态：Proposed / NOT ACTIVE
+状态：Active
 日期：2026-08-12
 Owner：Platform Foundation / Business Module Runtime / Frontend Platform
-架构前提：ADR-0020、ADR-0021、ADR-0022 均为 `Accepted`；本计划仍必须通过自身 activation gate 才可激活
-前置基线：PLAN-0010 已 `Integrated` 并归档；本计划仍受 ADR-0021/ADR-0022 架构审阅和本计划 activation gate 约束，不得直接激活实现
+架构前提：ADR-0020、ADR-0021、ADR-0022 均为 `Accepted`；本计划 activation gate 已满足，现进入 `Active`
+前置基线：PLAN-0010 已 `Integrated` 并归档；本次激活仅更新文档状态，不包含 Rust、代码或运行时实现
 主要参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；WrenAI `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`
 
 ## 1. 背景
@@ -487,7 +487,7 @@ git diff --check
 
 ## 14. Activation Gate
 
-只有同时满足以下条件才可从 `Proposed / NOT ACTIVE` 进入实现：
+以下条件是从 `Proposed / NOT ACTIVE` 进入 `Active` 的必要条件：
 
 - ADR-0021 与 ADR-0022 均已正式 `Accepted`；
 - PLAN-0010 已 `Integrated` 并成为 main 权威基础；
@@ -495,6 +495,10 @@ git diff --check
 - Base..HEAD 不包含 PLAN-0009 runtime 或 C-specific runtime；
 - 不引入 Twenty/WrenAI runtime dependency；
 - 本计划 scope 仍限制在纯 contract/compiler/dry-plan/fitness foundation。
+
+以上条件已于 2026-08-13 满足。Stage 2 Luna worker 基于精确基线
+`be7524974d70c4eef58111106c79f68e94f2cd3b` 完成本计划的文档-only activation；本次提交
+只更新计划激活状态及其文档索引，不包含实现变更。
 
 ## 15. Accepted Candidate Gate
 
@@ -516,7 +520,7 @@ git diff --check
 
 ## 16. 禁止事项
 
-本计划 Proposed 阶段和实现阶段均禁止：
+本计划激活前和实现阶段均禁止：
 
 - merge/修改 PLAN-0010 Candidate；
 - 在 ADR-0021 Accepted 前实现 Published Extension Point runtime contract；
@@ -542,7 +546,7 @@ git diff --check
 
 ## 18. 完成定义
 
-本计划当前仍为 `Proposed / NOT ACTIVE`。以下是未来 activation 后的完成定义，不是本次 Architecture Foundation Convergence 已完成的 runtime 证据。
+本计划当前为 `Active`。以下是 Active 阶段的完成定义，不是本次文档-only activation 已完成的 runtime 证据。
 
 PLAN-0011 的成功标准不是“做出 App Store”，而是证明：
 

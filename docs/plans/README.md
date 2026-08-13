@@ -23,9 +23,9 @@ plans/
 
 ## 当前计划
 
-- [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
+- [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed / NOT ACTIVE`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
 - [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP。
-- [`current/PLAN-0011-business-application-packaging-and-contribution-foundation.md`](current/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：`Proposed / NOT ACTIVE`，ADR-0021/0022 已 Accepted，但仍等待本计划 activation gate；只设计未来纯 contract/compiler/dry-plan/fixture foundation。
+- [`current/PLAN-0011-business-application-packaging-and-contribution-foundation.md`](current/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：`Active`，已满足 ADR-0021/0022 和 PLAN-0010 前置条件；本次仅完成文档 activation，后续实现仍限于纯 contract/compiler/dry-plan/fixture foundation。
 
 ## 已归档计划
 
@@ -35,7 +35,7 @@ plans/
 - [`archive/2026/PLAN-0004-durable-document-processing-mvp.md`](archive/2026/PLAN-0004-durable-document-processing-mvp.md)：`Integrated`，持久化文档处理、Lease/Fence 和恢复。
 - [`archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)：`Integrated`，Runtime Audit、Integrity 和 Controlled Repair。
 - [`archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md`](archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md)：`Integrated`，Document lifecycle、revision、processing binding 和 evidence foundation。
-- [`archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Completed / Rehearsal Closed`，read-only、隔离 rehearsal；production migration `NOT GRANTED`。
+- [`archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Completed / Rehearsal Closed / Archived`，read-only、隔离 rehearsal；production migration `NOT GRANTED`。
 - [`archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Integrated`，模块隔离、语义契约和纯 Rust 确定性 compiler。
 
 ## 归档

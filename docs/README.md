@@ -76,7 +76,7 @@
 - [`adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md`](adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md)：接受 Party/Counterparty、Legal、People & Performance、Business Assurance & Reconciliation 的目标领域边界和跨部门 Reference + Snapshot 协作模式。
 - [`adr/ADR-0020-business-module-isolation-and-semantic-contract.md`](adr/ADR-0020-business-module-isolation-and-semantic-contract.md)：接受 Business Module Isolation、Semantic Contract、确定性 compiler 和 C legacy ACL 预留。
 
-## 5. 待审议架构决策
+## 5. 新近接受架构决策
 
 - [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Accepted，Business Application Packaging、Contribution 和 Published Extension Point。
 - [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Accepted，跨模块通信、一致性和 Process Manager/Saga。
@@ -142,11 +142,11 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 
 ## 9. 当前实施
 
-- 当前执行计划：plans/current/PLAN-0007-business-console-and-external-access-demo.md（Active，local solo fast-forward）
+- 当前执行计划：PLAN-0007（Active，local solo fast-forward）；PLAN-0011（Active，Stage 2 documentation-only activation）
 - PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-- PLAN-0011 Proposed / NOT ACTIVE：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted，仍等待本计划 activation gate，不授权 runtime）
-- PLAN-0009 Completed / Rehearsal Closed：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
-- 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed，NOT ACTIVE）
+- PLAN-0011 Active：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted；本次仅激活文档状态，不授权超出计划范围的 runtime）
+- PLAN-0009 Completed / Rehearsal Closed / Archived：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
+- 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed / NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
 - 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
@@ -176,7 +176,7 @@ Integrity Finding、Controlled Repair、Repair Ledger 与 Lease/Fence Recovery
 已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。
 
 Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已形成 Baseline，
-但对应运行代码尚未实现。PLAN-0006 为 `Proposed`，不得被表述为 Active 或已开始编码。
+但对应运行代码尚未实现。PLAN-0006 为 `Proposed / NOT ACTIVE`，不得被表述为 Active 或已开始编码。
 
 平台原生 Analytics/Visualization Baseline 已由 ADR-0017 建立，但运行时实现尚未开始。
 后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式

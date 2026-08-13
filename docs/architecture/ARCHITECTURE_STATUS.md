@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-12
-> 当前阶段：Architecture Foundation Convergence — document foundation integrated; PLAN-0009 Rehearsal Closed
-> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Proposed / NOT ACTIVE；PLAN-0009 Completed / Rehearsal Closed；PLAN-0006 Proposed / NOT ACTIVE
+> 最后更新：2026-08-13
+> 当前阶段：Architecture Foundation Convergence — document foundation integrated; PLAN-0011 Active; PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Active / Stage 2 documentation activation；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -109,6 +109,13 @@ The processing state matrix is now the owner rule for PROC-INT-006, while
 PROC-INT-008 remains PARTIAL (metadata/checkpoint only; object-store probing
 is deferred). Resolved findings reopen as explicit recurrence episodes.
 
+> 2026-08-13: ADR-0021 and ADR-0022 are Accepted, PLAN-0010 is Integrated / Archived,
+> PLAN-0009 is Completed / Rehearsal Closed / Archived, and PLAN-0006 remains
+> Proposed / NOT ACTIVE. PLAN-0011's activation gate is satisfied and PLAN-0011 is
+> now Active. Stage 2 Luna activation is documentation-only at exact base
+> `be7524974d70c4eef58111106c79f68e94f2cd3b`; no Rust, code, runtime, migration,
+> API, Worker, or dependency implementation is included.
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
@@ -204,8 +211,9 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 Architecture Foundation Convergence 已集成文档基础：Business Application Platform
 边界、Inter-Module Communication、Process Manager/Saga、Published Extension Point、
 Package/Dry Plan、UI/Agent/Semantic contribution 三层边界和 module-a/b/extension
-synthetic validation 已提出；ADR-0021/0022 已 Accepted，PLAN-0011 仍 Proposed / NOT
-ACTIVE。不得把这些文档描述为已实现 Registry、安装器、卸载器、Saga runtime 或动态插件。
+synthetic validation 已提出；ADR-0021/0022 已 Accepted，PLAN-0011 已进入 Active。
+本次仅完成文档 activation；不得把这些文档描述为已实现 Registry、安装器、卸载器、
+Saga runtime 或动态插件。
 
 Enterprise AI Workspace 现状：
 
@@ -352,7 +360,7 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
 PLAN-0010：Integrated / Archived（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-PLAN-0011：Proposed / NOT ACTIVE（Business Application Packaging and Contribution；ADR-0021/0022 已 Accepted，等待本计划 activation gate）
+PLAN-0011：Active（Business Application Packaging and Contribution；ADR-0021/0022 已 Accepted；本次为 Stage 2 documentation-only activation）
 ```
 
 ## 8. PLAN-0006 采用前动作
@@ -386,7 +394,7 @@ PLAN-0006 进入 Active 前：
 - 指标语义、投影、Analytics Query Service、Dashboard/Report 或 Agent 分析技能开始实现；
 - 开始第一个遗留业务迁移切片。
 - ADR-0021/0022 被接受或拒绝；
-- PLAN-0011 完成 activation gate、synthetic fixture 和 independent review；
+- PLAN-0011 完成 synthetic fixture 和 independent review；
 - Business Application Platform document foundation 进入 Baseline。
 - PLAN-0006 被激活；
 - Workspace/Capability 数据模型形成候选；
