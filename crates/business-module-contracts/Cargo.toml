@@ -16,5 +16,8 @@ data_owner = "platform-foundation"
 serde = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [lints]
 workspace = true

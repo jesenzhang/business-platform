@@ -55,6 +55,246 @@ impl From<BusinessModuleId> for String {
     }
 }
 
+/// A stable identity scoped to a business module.
+///
+/// The canonical representation is `<module-id>.<local-id>`. Both segments
+/// are contract identifiers; labels, paths, routes and storage names are not
+/// part of this value.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct NamespacedId(String);
+
+impl NamespacedId {
+    /// Creates a namespaced identity from its canonical representation.
+    pub fn new(value: impl Into<String>) -> Result<Self, ModuleContractError> {
+        let value = value.into();
+        validate_namespaced_id(&value)?;
+        Ok(Self(value))
+    }
+
+    /// Creates a namespaced identity from a module and module-local ID.
+    pub fn from_parts(
+        module_id: impl AsRef<str>,
+        local_id: impl Into<String>,
+    ) -> Result<Self, ModuleContractError> {
+        let module_id = module_id.as_ref();
+        let local_id = local_id.into();
+        validate_module_id(module_id)?;
+        validate_local_id(&local_id)?;
+        Self::new(format!("{module_id}.{local_id}"))
+    }
+
+    /// Returns the canonical string representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Returns the owning module segment.
+    #[must_use]
+    pub fn module_id(&self) -> &str {
+        self.0
+            .split_once('.')
+            .map_or("", |(module_id, _)| module_id)
+    }
+
+    /// Returns the module-local segment.
+    #[must_use]
+    pub fn local_id(&self) -> &str {
+        self.0.split_once('.').map_or("", |(_, local_id)| local_id)
+    }
+}
+
+impl AsRef<str> for NamespacedId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for NamespacedId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<String> for NamespacedId {
+    type Error = ModuleContractError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<NamespacedId> for String {
+    fn from(value: NamespacedId) -> Self {
+        value.0
+    }
+}
+
+macro_rules! namespaced_identity {
+    ($(#[$meta:meta])* $name:ident, $kind:literal) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+        #[serde(try_from = "String", into = "String")]
+        pub struct $name(NamespacedId);
+
+        impl $name {
+            /// Creates an identity from its canonical representation.
+            pub fn new(value: impl Into<String>) -> Result<Self, ModuleContractError> {
+                NamespacedId::new(value)
+                    .map(Self)
+                    .map_err(|error| with_identity_kind(error, $kind))
+            }
+
+            /// Creates an identity from a module and module-local ID.
+            pub fn from_parts(
+                module_id: impl AsRef<str>,
+                local_id: impl Into<String>,
+            ) -> Result<Self, ModuleContractError> {
+                NamespacedId::from_parts(module_id, local_id)
+                    .map(Self)
+                    .map_err(|error| with_identity_kind(error, $kind))
+            }
+
+            /// Returns the canonical string representation.
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                self.0.as_str()
+            }
+
+            /// Returns the owning module segment.
+            #[must_use]
+            pub fn module_id(&self) -> &str {
+                self.0.module_id()
+            }
+
+            /// Returns the module-local segment.
+            #[must_use]
+            pub fn local_id(&self) -> &str {
+                self.0.local_id()
+            }
+
+            /// Returns the validated generic namespaced identity seam.
+            #[must_use]
+            pub fn as_namespaced_id(&self) -> &NamespacedId {
+                &self.0
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+
+        impl TryFrom<String> for $name {
+            type Error = ModuleContractError;
+
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                Self::new(value)
+            }
+        }
+
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                value.0.into()
+            }
+        }
+    };
+}
+
+namespaced_identity!(
+    /// A stable identity for a published contribution.
+    ContributionId,
+    "contribution ID"
+);
+namespaced_identity!(
+    /// A stable identity for a published extension point.
+    ExtensionPointId,
+    "extension point ID"
+);
+namespaced_identity!(
+    /// A stable identity for a UI contribution.
+    UiContributionId,
+    "UI contribution ID"
+);
+namespaced_identity!(
+    /// A stable identity for a policy requirement.
+    PolicyRequirementId,
+    "policy requirement ID"
+);
+namespaced_identity!(
+    /// A stable identity for an agent capability contribution.
+    AgentCapabilityId,
+    "agent capability ID"
+);
+
+/// A validated lower-case SHA-256 package digest.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct PackageDigest(String);
+
+impl PackageDigest {
+    /// Creates a package digest from 64 lower-case hexadecimal characters.
+    pub fn new(value: impl Into<String>) -> Result<Self, ModuleContractError> {
+        let value = value.into();
+        if value.is_empty() {
+            return Err(ModuleContractError::EmptyValue {
+                kind: "package digest",
+            });
+        }
+        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(ModuleContractError::InvalidCharacters {
+                kind: "package digest",
+            });
+        }
+        if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            return Err(ModuleContractError::InvalidCharacters {
+                kind: "package digest",
+            });
+        }
+        Ok(Self(value))
+    }
+
+    /// Returns the canonical digest string.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for PackageDigest {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for PackageDigest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<String> for PackageDigest {
+    type Error = ModuleContractError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<PackageDigest> for String {
+    fn from(value: PackageDigest) -> Self {
+        value.0
+    }
+}
+
 /// A version attached to a module.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
@@ -341,7 +581,7 @@ impl BusinessModuleManifest {
 }
 
 /// Errors raised while constructing strongly typed module contract values.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum ModuleContractError {
     /// A required value was empty.
     #[error("{kind} must not be empty")]
@@ -387,7 +627,15 @@ pub enum ManifestValidationError {
 }
 
 fn validate_module_id(value: &str) -> Result<(), ModuleContractError> {
-    validate_length_and_non_empty(value, "module ID")?;
+    validate_lower_kebab_id(value, "module ID")
+}
+
+fn validate_local_id(value: &str) -> Result<(), ModuleContractError> {
+    validate_lower_kebab_id(value, "local ID")
+}
+
+fn validate_lower_kebab_id(value: &str, kind: &'static str) -> Result<(), ModuleContractError> {
+    validate_length_and_non_empty(value, kind)?;
     let mut previous_separator = false;
     for (index, character) in value.chars().enumerate() {
         let is_separator = character == '-';
@@ -395,14 +643,46 @@ fn validate_module_id(value: &str) -> Result<(), ModuleContractError> {
             || (index == 0 && is_separator)
             || previous_separator && is_separator
         {
-            return Err(ModuleContractError::InvalidCharacters { kind: "module ID" });
+            return Err(ModuleContractError::InvalidCharacters { kind });
         }
         previous_separator = is_separator;
     }
     if value.ends_with('-') {
-        return Err(ModuleContractError::InvalidCharacters { kind: "module ID" });
+        return Err(ModuleContractError::InvalidCharacters { kind });
     }
     Ok(())
+}
+
+fn validate_namespaced_id(value: &str) -> Result<(), ModuleContractError> {
+    validate_length_and_non_empty(value, "namespaced identity")?;
+    let mut segments = value.split('.');
+    let Some(module_id) = segments.next() else {
+        return Err(ModuleContractError::InvalidCharacters {
+            kind: "namespaced identity",
+        });
+    };
+    let Some(local_id) = segments.next() else {
+        return Err(ModuleContractError::InvalidCharacters {
+            kind: "namespaced identity",
+        });
+    };
+    if segments.next().is_some() {
+        return Err(ModuleContractError::InvalidCharacters {
+            kind: "namespaced identity",
+        });
+    }
+    validate_module_id(module_id)?;
+    validate_local_id(local_id)
+}
+
+fn with_identity_kind(error: ModuleContractError, kind: &'static str) -> ModuleContractError {
+    match error {
+        ModuleContractError::EmptyValue { .. } => ModuleContractError::EmptyValue { kind },
+        ModuleContractError::InvalidCharacters { .. } => {
+            ModuleContractError::InvalidCharacters { kind }
+        }
+        ModuleContractError::TooLong { max, .. } => ModuleContractError::TooLong { kind, max },
+    }
 }
 
 fn validate_version_token(value: &str, kind: &'static str) -> Result<(), ModuleContractError> {
