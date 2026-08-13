@@ -616,6 +616,12 @@ pub fn validate_extension_points_against_catalog(
     }
     let mut contribution_ids = BTreeSet::new();
     for contribution in contributions {
+        if contribution.contribution_id.module_id() != contribution.consumer_module_id.as_str() {
+            return Err(ManifestValidationError::WrongContributionOwner {
+                expected: contribution.consumer_module_id.to_string(),
+                actual: contribution.contribution_id.module_id().to_owned(),
+            });
+        }
         if !contribution_ids.insert(contribution.contribution_id.clone()) {
             return Err(ManifestValidationError::DuplicateIdentifier {
                 kind: "extension contribution",
