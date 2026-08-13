@@ -81,6 +81,25 @@ fn duplicate_and_wrong_owner_are_rejected() {
 }
 
 #[test]
+fn forged_typed_contribution_namespace_is_rejected() {
+    let a = module("module-a");
+    let b = module("module-b");
+    let mut set = TypedContributionSet::default();
+    let mut item = navigation(&a, &a, "home");
+    item.contribution_id = match UiContributionId::from_parts(&b, "home") {
+        Ok(value) => value,
+        Err(error) => panic!("invalid fixture contribution: {error}"),
+    };
+    set.navigation.push(item);
+
+    assert!(matches!(
+        set.validate(&a, &catalog(&a)),
+        Err(ManifestValidationError::WrongContributionOwner { expected, actual })
+            if expected == "module-a" && actual == "module-b"
+    ));
+}
+
+#[test]
 fn unknown_public_target_rejected_but_cross_module_public_target_is_allowed() {
     let a = module("module-a");
     let b = module("module-b");

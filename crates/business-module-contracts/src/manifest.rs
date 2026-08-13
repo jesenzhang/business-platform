@@ -921,9 +921,19 @@ impl TypedContributionSet {
             }
             validate_public_target(target, catalog)
         };
+        let check_typed_id = |id_owner: &str, owner: &BusinessModuleId| {
+            if id_owner != owner.as_str() {
+                return Err(ManifestValidationError::WrongContributionOwner {
+                    expected: owner.to_string(),
+                    actual: id_owner.to_owned(),
+                });
+            }
+            Ok(())
+        };
         macro_rules! check_ui {
             ($items:expr) => {
                 for item in &$items {
+                    check_typed_id(item.contribution_id.module_id(), &item.owner_module_id)?;
                     check(
                         item.contribution_id.as_str(),
                         &item.owner_module_id,
@@ -939,6 +949,7 @@ impl TypedContributionSet {
         check_ui!(self.actions);
         check_ui!(self.commands);
         for item in &self.agent_capabilities {
+            check_typed_id(item.contribution_id.module_id(), &item.owner_module_id)?;
             check(
                 item.contribution_id.as_str(),
                 &item.owner_module_id,
@@ -946,6 +957,7 @@ impl TypedContributionSet {
             )?;
         }
         for item in &self.policy_requirements {
+            check_typed_id(item.requirement_id.module_id(), &item.owner_module_id)?;
             if item.owner_module_id != *owner_module_id {
                 return Err(ManifestValidationError::WrongContributionOwner {
                     expected: owner_module_id.to_string(),
@@ -954,6 +966,7 @@ impl TypedContributionSet {
             }
         }
         for item in &self.capability_requirements {
+            check_typed_id(item.requirement_id.module_id(), &item.owner_module_id)?;
             if item.owner_module_id != *owner_module_id {
                 return Err(ManifestValidationError::WrongContributionOwner {
                     expected: owner_module_id.to_string(),
