@@ -1,0 +1,90 @@
+# PLAN-0011 Accepted Candidate Evidence
+
+Date: 2026-08-13
+
+This document freezes the exact PLAN-0011 candidate scope and records the
+evidence available before independent REVIEW-C. It is evidence, not a runtime
+registry or a second business-data authority.
+
+## Immutable checkpoints
+
+| Evidence | SHA |
+| --- | --- |
+| Architecture foundation integrated on `main` | `be75249` |
+| PLAN-0011 activation | `31b24c6` |
+| Stable identities | `bd58f9c` |
+| Typed contributions | `6c84094` |
+| Published extension points | `22b274f` |
+| Package compiler | `1324cdf` |
+| Deterministic dry-plan | `e61edc5` |
+| Synthetic module isolation | `467a2f0` |
+| Architecture fitness hardening | `308e745` |
+| Candidate head | `308e7452338c608f9017ac146e6c4d3a8eeb08df` |
+
+`PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
+The exact implementation range is:
+
+```text
+31b24c6993dbff1f3e88b2476e0c87460400ec31..308e7452338c608f9017ac146e6c4d3a8eeb08df
+```
+
+## Scope proof
+
+The range contains only generic `business-module-contracts` and
+`business-application-compiler` Rust contracts/compiler, their focused tests,
+the architecture fitness script, and the architecture fitness standard.
+It contains no database migration, application runtime, worker, object storage,
+network/provider integration, dynamic plugin, WASM/Node/Python runtime,
+Marketplace, concrete business module, PLAN-0006 implementation, PLAN-0009
+runtime/migration change, or arbitrary SQL capability.
+
+Synthetic business validation uses only `module-a`, `module-b`, and
+`module-extension`, and those names occur only in tests. The packaging compiler
+does not define semantic Dataset/Metric/Dimension/Relationship/Lineage
+authority; semantic compilation remains owned by `semantic-contract` under the
+existing semantic contract decisions.
+
+## Evidence matrix
+
+| Invariant | Evidence |
+| --- | --- |
+| Stable namespaced module/contribution/extension identities | `business-module-contracts` stable identity and typed contract tests |
+| Typed UI, policy/capability and agent contributions | typed contribution tests; ownership/catalog validation |
+| Published extension points only | extension point tests; private/unknown/wrong-owner/version/classification rejection |
+| SemVer and dependency safety | compiler tests for invalid versions, unknown/incompatible dependencies, cycles and downgrade |
+| Deterministic compiler/canonical JSON/SHA-256 | compiler permutation tests |
+| Deterministic dry-plan | planning permutation tests and canonical-input integrity checks |
+| Live dependency removal | planning and synthetic fixture blocked-removal tests |
+| Active extension consumer removal | planning and synthetic fixture blocked-removal tests |
+| Uninstalled is not data purge | retained-data plan tests; no purge/delete/drop change type |
+| Platform Core neutrality | architecture fitness source/dependency scan |
+| Synthetic module isolation | `synthetic_fixtures.rs` |
+
+## Validation
+
+Local gates on candidate `308e745`:
+
+- `cargo fmt --all -- --check` — PASS
+- `cargo check --workspace --all-targets --all-features` — PASS
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` — PASS
+- `cargo test --workspace --all-features` — PASS (217 passed, 34 ignored)
+- `pwsh ./scripts/check-architecture.ps1` — PASS
+- `pwsh ./scripts/check-openapi.ps1` — PASS
+- `git diff --check` — PASS
+
+Remote candidate CI run `31688120911` for HEAD `308e7452338c608f9017ac146e6c4d3a8eeb08df` — PASS. This included the repository's Rust, architecture, OpenAPI, frontend, CLI/MCP, PostgreSQL/MinIO, and E2E jobs.
+
+External scanners:
+
+- `cargo-audit`, `cargo-deny`, `gitleaks`, `trivy`, `syft`, `grype`, and
+  `osv-scanner` — NOT RUN: no repository-provided entrypoint and no installed
+  executable was available in this environment.
+
+## Accepted limitations and deferred work
+
+This candidate provides declarations, pure validation/compilation, deterministic
+manifest evidence, synthetic planning, and fitness checks only. It does not
+provide a production registry, persistence, installer/updater, runtime loader,
+worker, Marketplace, dynamic plugin execution, or business-module implementation.
+Cross-module collaboration runtime remains deferred to PLAN-0012. Contract/C
+migration and PLAN-0006 remain outside this candidate.
