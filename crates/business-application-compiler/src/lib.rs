@@ -151,6 +151,7 @@ pub fn compile(
         package
             .contributions
             .validate(&package.manifest.module_id, &public_catalog)?;
+        validate_typed_contributions(&package.contributions)?;
         validate_manifest_versions(&package.manifest)?;
         register_manifest_ids(package, &mut owned_contexts, &mut public_ids)?;
         for point in &package.extension_points {
@@ -167,6 +168,11 @@ pub fn compile(
                 });
             }
             point.validate_against_catalog(&dependency_catalog)?;
+            parse_version(
+                "extension point contract version",
+                point.contract_version.as_str(),
+            )?;
+            parse_version("extension point schema version", &point.schema_version)?;
         }
         for contribution in &package.extension_contributions {
             if contribution.consumer_module_id != package.manifest.module_id {
@@ -181,6 +187,10 @@ pub fn compile(
                     identifier: contribution.contribution_id.to_string(),
                 });
             }
+            parse_version(
+                "extension contribution contract version",
+                contribution.expected_contract_version.as_str(),
+            )?;
         }
     }
     for package in &input.packages {
@@ -332,9 +342,9 @@ fn dependency_catalog(packages: &[BusinessApplicationPackage]) -> PublishedDepen
             }
         }));
         public_dependencies.extend(package.manifest.published_commands.iter().map(|item| {
-            PublishedDependencyReference::PublicCapability {
+            PublishedDependencyReference::PublicCommand {
                 owner_module_id: owner.clone(),
-                capability_id: item.contract_id.clone(),
+                command_id: item.contract_id.clone(),
                 version: item.version.clone(),
             }
         }));
@@ -405,6 +415,43 @@ fn validate_manifest_versions(manifest: &BusinessModuleManifest) -> Result<(), C
         )
     {
         parse_version("contract version", version)?;
+    }
+    Ok(())
+}
+
+fn validate_typed_contributions(
+    contributions: &TypedContributionSet,
+) -> Result<(), CompilationError> {
+    macro_rules! validate_items {
+        ($items:expr) => {
+            for item in $items {
+                parse_version("typed contribution schema version", &item.schema_version)?;
+                parse_version("typed contribution version", &item.version)?;
+                parse_version("public contribution target version", &item.target.version)?;
+            }
+        };
+    }
+    validate_items!(&contributions.navigation);
+    validate_items!(&contributions.list_views);
+    validate_items!(&contributions.detail_sections);
+    validate_items!(&contributions.detail_tabs);
+    validate_items!(&contributions.actions);
+    validate_items!(&contributions.commands);
+    for item in &contributions.agent_capabilities {
+        parse_version("agent contribution schema version", &item.schema_version)?;
+        parse_version("agent contribution version", &item.version)?;
+        parse_version("public contribution target version", &item.target.version)?;
+    }
+    for item in &contributions.policy_requirements {
+        parse_version("policy requirement schema version", &item.schema_version)?;
+        parse_version("policy requirement version", &item.version)?;
+    }
+    for item in &contributions.capability_requirements {
+        parse_version(
+            "capability requirement schema version",
+            &item.schema_version,
+        )?;
+        parse_version("capability requirement version", &item.version)?;
     }
     Ok(())
 }
@@ -569,8 +616,47 @@ fn normalize(packages: &mut [BusinessApplicationPackage]) {
         package
             .extension_points
             .sort_by_key(|x| x.extension_point_id.clone());
+        for point in &mut package.extension_points {
+            point.dependency_ids.sort_by_key(stable_json_key);
+        }
         package
             .extension_contributions
             .sort_by_key(|x| x.contribution_id.clone());
+        normalize_typed_contributions(&mut package.contributions);
     }
+}
+
+fn stable_json_key<T: Serialize>(value: &T) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| String::new())
+}
+
+fn normalize_typed_contributions(contributions: &mut TypedContributionSet) {
+    macro_rules! normalize_items {
+        ($items:expr) => {
+            for item in $items {
+                item.required_policy.sort();
+                item.required_capability.sort();
+            }
+            $items.sort_by_key(|item| item.contribution_id.clone());
+        };
+    }
+    normalize_items!(&mut contributions.navigation);
+    normalize_items!(&mut contributions.list_views);
+    normalize_items!(&mut contributions.detail_sections);
+    normalize_items!(&mut contributions.detail_tabs);
+    normalize_items!(&mut contributions.actions);
+    normalize_items!(&mut contributions.commands);
+    for item in &mut contributions.agent_capabilities {
+        item.required_policy.sort();
+        item.required_capability.sort();
+    }
+    contributions
+        .agent_capabilities
+        .sort_by_key(|item| item.contribution_id.clone());
+    contributions
+        .policy_requirements
+        .sort_by_key(|item| item.requirement_id.clone());
+    contributions
+        .capability_requirements
+        .sort_by_key(|item| item.requirement_id.clone());
 }

@@ -452,6 +452,11 @@ pub enum PublishedDependencyReference {
         query_id: String,
         version: String,
     },
+    PublicCommand {
+        owner_module_id: BusinessModuleId,
+        command_id: String,
+        version: String,
+    },
     PublicCapability {
         owner_module_id: BusinessModuleId,
         capability_id: String,
@@ -681,6 +686,9 @@ fn validate_public_dependency_reference(
             (resource_kind, "public resource kind")
         }
         PublishedDependencyReference::PublicQuery { query_id, .. } => (query_id, "public query ID"),
+        PublishedDependencyReference::PublicCommand { command_id, .. } => {
+            (command_id, "public command ID")
+        }
         PublishedDependencyReference::PublicCapability { capability_id, .. } => {
             (capability_id, "public capability ID")
         }
@@ -692,6 +700,7 @@ fn validate_public_dependency_reference(
     let version = match reference {
         PublishedDependencyReference::PublicResource { version, .. }
         | PublishedDependencyReference::PublicQuery { version, .. }
+        | PublishedDependencyReference::PublicCommand { version, .. }
         | PublishedDependencyReference::PublicCapability { version, .. } => version,
         PublishedDependencyReference::Private { .. } => unreachable!(),
     };

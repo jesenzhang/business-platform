@@ -3,8 +3,10 @@ use business_application_compiler::{
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
-    DataClassification, ManifestSchemaVersion, PublicContributionTarget, PublicTargetKind,
-    ResourceKindDescriptor,
+    ContributionId, DataClassification, ExtensionAuthorizationRequirement, ExtensionContribution,
+    ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
+    ExtensionPointRemovalSemantics, ExtensionPointVisibility, ManifestSchemaVersion,
+    PublicContributionTarget, PublicTargetKind, PublishedExtensionPoint, ResourceKindDescriptor,
 };
 use sha2::Digest;
 
@@ -194,5 +196,60 @@ mod tests {
                 required_capability: Vec::new(),
             });
         assert!(compile(input(vec![consumer, owner])).is_ok());
+    }
+    #[test]
+    fn all_package_vector_permutations_have_identical_digest() {
+        let mut owner = package("module-a", "1.0.0");
+        owner.manifest.resource_kinds.extend([
+            ResourceKindDescriptor {
+                resource_kind: "zeta".to_owned(),
+                version: "1.0.0".to_owned(),
+            },
+            ResourceKindDescriptor {
+                resource_kind: "alpha".to_owned(),
+                version: "1.0.0".to_owned(),
+            },
+        ]);
+        owner
+            .manifest
+            .dependencies
+            .push(business_module_contracts::ModuleDependency {
+                module_id: BusinessModuleId::new("module-b").unwrap(),
+                version_requirement: "^1.0.0".to_owned(),
+            });
+        let point_id = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+        owner.extension_points.push(PublishedExtensionPoint {
+            extension_point_id: point_id.clone(),
+            owner_module_id: BusinessModuleId::new("module-a").unwrap(),
+            contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            schema_version: "1.0.0".to_owned(),
+            allowed_contribution_kind: ExtensionContributionKind::DetailUi,
+            classification: DataClassification::Internal,
+            authorization_requirement: ExtensionAuthorizationRequirement {
+                policy_id: None,
+                capability_id: None,
+            },
+            lifecycle: ExtensionPointLifecycle::Published,
+            dependency_ids: Vec::new(),
+            removal_semantics: ExtensionPointRemovalSemantics::BlockedRemoval,
+            visibility: ExtensionPointVisibility::Public,
+        });
+        let mut consumer = package("module-b", "1.0.0");
+        consumer
+            .extension_contributions
+            .push(ExtensionContribution {
+                contribution_id: ContributionId::from_parts("module-b", "use-slot").unwrap(),
+                consumer_module_id: BusinessModuleId::new("module-b").unwrap(),
+                target_extension_point_id: point_id,
+                expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+                classification: DataClassification::Internal,
+                kind: ExtensionContributionKind::DetailUi,
+            });
+        let first = compile(input(vec![owner.clone(), consumer.clone()])).unwrap();
+        owner.manifest.resource_kinds.reverse();
+        owner.manifest.dependencies.reverse();
+        let second = compile(input(vec![consumer, owner])).unwrap();
+        assert_eq!(first.canonical_json(), second.canonical_json());
+        assert_eq!(first.package_digest(), second.package_digest());
     }
 }
