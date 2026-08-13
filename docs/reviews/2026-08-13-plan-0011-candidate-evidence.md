@@ -19,14 +19,21 @@ registry or a second business-data authority.
 | Deterministic dry-plan | `e61edc5` |
 | Synthetic module isolation | `467a2f0` |
 | Architecture fitness hardening | `308e745` |
-| Candidate head | `7567e590137a3417ecd78c003f9a3f13843c3f85` |
+| Bounded compiler/dry-plan repair | `21c3420a9791d2d8a236ed01cc06885423a185f0` |
+| Candidate head | `PENDING_FINAL_EVIDENCE_ALIGNMENT` |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
 The exact implementation range is:
 
 ```text
-31b24c6993dbff1f3e88b2476e0c87460400ec31..7567e590137a3417ecd78c003f9a3f13843c3f85
+31b24c6993dbff1f3e88b2476e0c87460400ec31..21c3420a9791d2d8a236ed01cc06885423a185f0
 ```
+
+The repair closes four independently identified blockers: compiled-manifest
+serde round-trip reconstructs canonical bytes; desired installation state can
+produce `DisableModule` without conflating data retention; removing an owner
+module checks active extension consumers; and legacy/typed contribution IDs are
+validated in one collision domain.
 
 ## Scope proof
 
@@ -55,15 +62,14 @@ existing semantic contract decisions.
 | Deterministic compiler/canonical JSON/SHA-256 | compiler permutation tests |
 | Deterministic dry-plan | planning permutation tests and canonical-input integrity checks |
 | Live dependency removal | planning and synthetic fixture blocked-removal tests |
-| Active extension consumer removal | planning and synthetic fixture blocked-removal tests |
+| Active extension consumer removal | planning and synthetic fixture blocked-removal tests, including owner-module removal |
 | Uninstalled is not data purge | retained-data plan tests; no purge/delete/drop change type |
 | Platform Core neutrality | architecture fitness source/dependency scan |
 | Synthetic module isolation | `synthetic_fixtures.rs` |
 
 ## Validation
 
-Local gates on implementation checkpoint `308e745` and unchanged by the
-docs-only evidence commit:
+Historical local gates on implementation checkpoint `308e745`:
 
 - `cargo fmt --all -- --check` — PASS
 - `cargo check --workspace --all-targets --all-features` — PASS
@@ -77,6 +83,17 @@ Remote implementation CI run `31688120911` for HEAD
 `308e7452338c608f9017ac146e6c4d3a8eeb08df` — PASS. Remote candidate CI for
 the final evidence head `7567e590137a3417ecd78c003f9a3f13843c3f85` is tracked
 separately and must pass before REVIEW-C.
+
+Current repair validation supersedes the historical checkpoint details above:
+
+- Implementation commit: `21c3420a9791d2d8a236ed01cc06885423a185f0`
+- Local focused compiler/planner tests: PASS (23 tests)
+- Local format, check, clippy, workspace tests, architecture fitness, OpenAPI,
+  and diff checks: PASS
+- Remote CI `31692592164` for `21c3420a9791d2d8a236ed01cc06885423a185f0`:
+  PASS, including PostgreSQL / MinIO / E2E contracts
+- The candidate head is the final evidence-alignment commit that updates this
+  document after the implementation repair.
 
 External scanners:
 
