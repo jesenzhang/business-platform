@@ -14,8 +14,8 @@ use business_module_contracts::{
     ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
     ExtensionPointRemovalSemantics, ExtensionPointVisibility, ManifestSchemaVersion,
     ModuleDataState, ModuleDependency, ModuleInstallationState, NavigationContribution,
-    PublicContributionTarget, PublicTargetKind, PublishedDependencyReference,
-    ResourceKindDescriptor, UiContributionId,
+    PolicyRequirementDescriptor, PolicyRequirementId, PublicContributionTarget, PublicTargetKind,
+    PublishedDependencyReference, ResourceKindDescriptor, UiContributionId,
 };
 
 fn package(id: &str, version: &str) -> BusinessApplicationPackage {
@@ -431,6 +431,84 @@ fn contribution_and_extension_point_changes_are_diffed() {
     assert!(has_change(&with_point, |c| matches!(
         c,
         PackageChange::AddExtensionPoint { .. }
+    )));
+}
+
+#[test]
+fn package_metadata_changes_do_not_update_untouched_contributions() {
+    let mut current = package("module-a", "1.0.0");
+    current.manifest.published_queries.push(ContractDescriptor {
+        contract_id: "read".to_owned(),
+        version: "1.0.0".to_owned(),
+    });
+    let mut incoming = current.clone();
+    incoming.manifest.compatibility = CompatibilityDescriptor {
+        minimum_platform_version: Some("1.0.0".to_owned()),
+        maximum_platform_version: None,
+    };
+
+    let plan = dry_plan(&snapshot(vec![current]), &compiled(vec![incoming])).unwrap();
+
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::CompatibilityChange { module_id, .. } if module_id.as_str() == "module-a"
+    )));
+    assert!(!has_change(&plan, |change| matches!(
+        change,
+        PackageChange::UpdateContribution { contribution_id, .. } if contribution_id == "read"
+    )));
+}
+
+#[test]
+fn only_changed_contribution_gets_an_update_digest() {
+    let mut current = package("module-a", "1.0.0");
+    current.manifest.published_queries = vec![
+        ContractDescriptor {
+            contract_id: "changed".to_owned(),
+            version: "1.0.0".to_owned(),
+        },
+        ContractDescriptor {
+            contract_id: "untouched".to_owned(),
+            version: "1.0.0".to_owned(),
+        },
+    ];
+    let mut incoming = current.clone();
+    incoming.manifest.published_queries[0].version = "2.0.0".to_owned();
+
+    let plan = dry_plan(&snapshot(vec![current]), &compiled(vec![incoming])).unwrap();
+    let updates: Vec<_> = plan
+        .changes
+        .iter()
+        .filter_map(|change| match change {
+            PackageChange::UpdateContribution {
+                contribution_id, ..
+            } => Some(contribution_id.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(updates, vec!["changed"]);
+}
+
+#[test]
+fn typed_requirement_changes_are_planned_as_contribution_updates() {
+    let mut current = package("module-a", "1.0.0");
+    current.contributions.policy_requirements = vec![PolicyRequirementDescriptor {
+        requirement_id: PolicyRequirementId::from_parts("module-a", "policy").unwrap(),
+        owner_module_id: BusinessModuleId::new("module-a").unwrap(),
+        schema_version: "1.0.0".to_owned(),
+        policy_id: "module-a.read".to_owned(),
+        version: "1.0.0".to_owned(),
+    }];
+    let mut incoming = current.clone();
+    incoming.contributions.policy_requirements[0].version = "2.0.0".to_owned();
+
+    let plan = dry_plan(&snapshot(vec![current]), &compiled(vec![incoming])).unwrap();
+
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::UpdateContribution { contribution_id, .. }
+            if contribution_id == "module-a.policy"
     )));
 }
 

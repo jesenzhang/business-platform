@@ -800,9 +800,10 @@ pub fn dry_plan(
     let current_components = all_components(
         current_modules
             .iter()
-            .map(|(id, snapshot)| (id, &snapshot.package, &snapshot.package_digest)),
+            .map(|(id, snapshot)| (id, &snapshot.package)),
     )?;
-    let incoming_components = all_components(incoming_entries.clone())?;
+    let incoming_components =
+        all_components(incoming_modules.iter().map(|(id, package)| (id, *package)))?;
     for (key, (module_id, digest)) in &incoming_components {
         match current_components.get(key) {
             None => changes.push(PackageChange::AddContribution {
@@ -1145,20 +1146,16 @@ fn sorted_dependencies(items: &[ModuleDependency]) -> Vec<ModuleDependency> {
     result
 }
 fn all_components<'a>(
-    modules: impl IntoIterator<
-        Item = (
-            &'a BusinessModuleId,
-            &'a BusinessApplicationPackage,
-            &'a PackageDigest,
-        ),
-    >,
+    modules: impl IntoIterator<Item = (&'a BusinessModuleId, &'a BusinessApplicationPackage)>,
 ) -> Result<BTreeMap<String, (BusinessModuleId, PackageDigest)>, PlanError> {
     modules
         .into_iter()
-        .try_fold(BTreeMap::new(), |mut result, (module_id, item, digest)| {
-            for key in component_ids(item) {
+        .try_fold(BTreeMap::new(), |mut result, (module_id, item)| {
+            let mut normalized = item.clone();
+            normalize(std::slice::from_mut(&mut normalized));
+            for (key, digest) in component_fingerprints(&normalized)? {
                 if result
-                    .insert(key.clone(), (module_id.clone(), digest.clone()))
+                    .insert(key.clone(), (module_id.clone(), digest))
                     .is_some()
                 {
                     return Err(PlanError::DuplicateComponent { identifier: key });
@@ -1176,114 +1173,58 @@ fn digest_json<T: Serialize>(value: &T) -> Result<PackageDigest, PlanError> {
     let bytes = serde_json::to_vec(value)?;
     PackageDigest::new(format!("{:x}", Sha256::digest(bytes))).map_err(|_| PlanError::Digest)
 }
-#[allow(clippy::too_many_lines)]
-fn component_ids(package: &BusinessApplicationPackage) -> Vec<String> {
-    let mut ids = Vec::new();
-    ids.extend(
-        package
-            .manifest
-            .published_commands
-            .iter()
-            .map(|x| x.contract_id.clone()),
+fn component_fingerprints(
+    package: &BusinessApplicationPackage,
+) -> Result<Vec<(String, PackageDigest)>, PlanError> {
+    let mut fingerprints = Vec::new();
+    macro_rules! add_string_components {
+        ($items:expr, $field:ident) => {
+            for item in $items {
+                fingerprints.push((item.$field.clone(), digest_json(item)?));
+            }
+        };
+    }
+    macro_rules! add_display_components {
+        ($items:expr, $field:ident) => {
+            for item in $items {
+                fingerprints.push((item.$field.to_string(), digest_json(item)?));
+            }
+        };
+    }
+
+    add_string_components!(package.manifest.published_commands.iter(), contract_id);
+    add_string_components!(package.manifest.published_queries.iter(), contract_id);
+    add_string_components!(package.manifest.published_events.iter(), contract_id);
+    add_string_components!(package.manifest.resource_kinds.iter(), resource_kind);
+    add_string_components!(package.manifest.semantic_contributions.iter(), semantic_id);
+    add_string_components!(package.manifest.ui_contributions.iter(), contribution_id);
+    add_string_components!(
+        package.manifest.agent_tool_contributions.iter(),
+        contribution_id
     );
-    ids.extend(
-        package
-            .manifest
-            .published_queries
-            .iter()
-            .map(|x| x.contract_id.clone()),
+    add_display_components!(package.extension_contributions.iter(), contribution_id);
+    add_display_components!(package.contributions.navigation.iter(), contribution_id);
+    add_display_components!(package.contributions.list_views.iter(), contribution_id);
+    add_display_components!(
+        package.contributions.detail_sections.iter(),
+        contribution_id
     );
-    ids.extend(
-        package
-            .manifest
-            .published_events
-            .iter()
-            .map(|x| x.contract_id.clone()),
+    add_display_components!(package.contributions.detail_tabs.iter(), contribution_id);
+    add_display_components!(package.contributions.actions.iter(), contribution_id);
+    add_display_components!(package.contributions.commands.iter(), contribution_id);
+    add_display_components!(
+        package.contributions.agent_capabilities.iter(),
+        contribution_id
     );
-    ids.extend(
-        package
-            .manifest
-            .resource_kinds
-            .iter()
-            .map(|x| x.resource_kind.clone()),
+    add_display_components!(
+        package.contributions.policy_requirements.iter(),
+        requirement_id
     );
-    ids.extend(
-        package
-            .manifest
-            .semantic_contributions
-            .iter()
-            .map(|x| x.semantic_id.clone()),
+    add_display_components!(
+        package.contributions.capability_requirements.iter(),
+        requirement_id
     );
-    ids.extend(
-        package
-            .manifest
-            .ui_contributions
-            .iter()
-            .map(|x| x.contribution_id.clone()),
-    );
-    ids.extend(
-        package
-            .manifest
-            .agent_tool_contributions
-            .iter()
-            .map(|x| x.contribution_id.clone()),
-    );
-    ids.extend(
-        package
-            .extension_contributions
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .navigation
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .list_views
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .detail_sections
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .detail_tabs
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .actions
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .commands
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids.extend(
-        package
-            .contributions
-            .agent_capabilities
-            .iter()
-            .map(|x| x.contribution_id.to_string()),
-    );
-    ids
+    Ok(fingerprints)
 }
 fn extension_points<'a>(
     modules: impl IntoIterator<
