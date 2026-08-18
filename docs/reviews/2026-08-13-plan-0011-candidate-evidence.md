@@ -1,10 +1,10 @@
-# PLAN-0011 Accepted Candidate Evidence
+# PLAN-0011 Candidate Evidence
 
-Date: 2026-08-13
+Date: 2026-08-18 (repair checkpoint)
 
 This document freezes the exact PLAN-0011 candidate scope and records the
-evidence available before independent REVIEW-C. It is evidence, not a runtime
-registry or a second business-data authority.
+evidence available before the next independent REVIEW-C. It is evidence, not a
+runtime registry or a second business-data authority.
 
 ## Immutable checkpoints
 
@@ -22,13 +22,15 @@ registry or a second business-data authority.
 | Bounded compiler/dry-plan repair | `f08ac7dfede130471e4838a20a577aade9475026` |
 | Canonical compiled-manifest deserialization repair | `474285719a066c9810ac1cfed4886cf8bb455d2f` |
 | Public capability dependency catalog repair | `014d3a5fbc97e041c557900d7fde825a36d7b754` |
-| Candidate head | `b3ab20e949001874c2edc3cc42f5eb8a32507613` |
+| Rejected candidate under repair | `40c40784c8ae286d003ffaa2c5f702ab0768c749` |
+| Repair implementation | `f64e767` |
+| Exact REVIEW-C head | Supplied by the review request; intentionally not self-recorded |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
-The exact implementation range is:
+The exact implementation range through the current repair checkpoint is:
 
 ```text
-31b24c6993dbff1f3e88b2476e0c87460400ec31..014d3a5fbc97e041c557900d7fde825a36d7b754
+31b24c6993dbff1f3e88b2476e0c87460400ec31..f64e767
 ```
 
 The repairs close five independently identified blockers: compiled-manifest
@@ -53,11 +55,21 @@ catalog publication and deterministic capability-dependency coverage. A new
 independent REVIEW-C is required for the exact final range after the evidence
 alignment commit.
 
+Candidate `40c40784c8ae286d003ffaa2c5f702ab0768c749` was then rejected by
+REVIEW-C for an incorrect live-consumer predicate and stale candidate evidence.
+Fresh repair commit `f64e767` adds the transition-planning seam
+`dry_plan_from_declarations`, keeps standalone compilation fail-closed, and
+adds regression coverage for live dependency/extension blocking and valid
+contribution removal. The candidate head is deliberately an external review
+input rather than a value written into the commit that contains this document;
+this avoids impossible Git SHA self-reference.
+
 ## Scope proof
 
 The range contains only generic `business-module-contracts` and
 `business-application-compiler` Rust contracts/compiler, their focused tests,
-the architecture fitness script, and the architecture fitness standard.
+the architecture fitness script, the architecture fitness standard, and the
+minimal ADR/PLAN seam clarification for transition planning.
 It contains no database migration, application runtime, worker, object storage,
 network/provider integration, dynamic plugin, WASM/Node/Python runtime,
 Marketplace, concrete business module, PLAN-0006 implementation, PLAN-0009
@@ -79,6 +91,7 @@ existing semantic contract decisions.
 | SemVer and dependency safety | compiler tests for invalid versions, unknown/incompatible dependencies, cycles and downgrade |
 | Deterministic compiler/canonical JSON/SHA-256 | compiler permutation tests |
 | Deterministic dry-plan | planning permutation tests and canonical-input integrity checks |
+| Transition planning seam | raw-declaration planning tests resolve only current live refs and reject unknown external targets |
 | Live dependency removal | planning and synthetic fixture blocked-removal tests |
 | Active extension consumer removal | planning and synthetic fixture blocked-removal tests, including owner-module removal |
 | Uninstalled is not data purge | retained-data plan tests; no purge/delete/drop change type |
@@ -106,19 +119,17 @@ Current repair validation supersedes the historical checkpoint details above:
 
 - Previous repair implementation commit: `21c3420a9791d2d8a236ed01cc06885423a185f0`
 - Previous repair Feature CI `31692592164`: PASS, including PostgreSQL / MinIO / E2E contracts
-- Current implementation repair commit: `014d3a5fbc97e041c557900d7fde825a36d7b754`
-- Current focused compiler tests: PASS (13 tests)
+- Current implementation repair commit: `f64e767`
+- Focused planning/compiler/synthetic tests: PASS (13 + 13 + 6 tests)
 - Current local format, check, clippy, workspace tests, architecture fitness,
-  OpenAPI, and diff checks: PASS
-- Feature CI for the current implementation repair: `31711682449` for
-  `014d3a5fbc97e041c557900d7fde825a36d7b754` — PASS, including PostgreSQL /
-  MinIO / E2E contracts and Architecture Fitness
+  OpenAPI, and diff checks: PASS (`230 passed, 34 ignored` in workspace tests)
+- Feature CI for the exact post-evidence head: PENDING PUSH
 - Canonical deserialization repair commit:
   `474285719a066c9810ac1cfed4886cf8bb455d2f`
 - Feature CI for the canonical deserialization repair: `31709350955` — PASS,
   including PostgreSQL / MinIO / E2E contracts
-- The evidence commit will be followed by one final head-alignment commit; the
-  latter is the exact candidate head for REVIEW-C.
+- REVIEW-C must be requested against the exact remote HEAD after this evidence
+  update. No same-file alignment commit is required or valid as a self-reference.
 
 External scanners:
 
