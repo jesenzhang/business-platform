@@ -123,13 +123,16 @@ Current repair validation supersedes the historical checkpoint details above:
 - Focused planning/compiler/synthetic tests: PASS (13 + 13 + 6 tests)
 - Current local format, check, clippy, workspace tests, architecture fitness,
   OpenAPI, and diff checks: PASS (`230 passed, 34 ignored` in workspace tests)
-- Feature CI for the exact post-evidence head: PENDING PUSH
+- Feature CI for repair/evidence head `2639c3e771317b5819d666071cb3ca7ec3b441f6`:
+  `32099113149` — PASS, including PostgreSQL / MinIO / E2E contracts,
+  Architecture Fitness, frontend, Playwright, and CLI/MCP contracts
 - Canonical deserialization repair commit:
   `474285719a066c9810ac1cfed4886cf8bb455d2f`
 - Feature CI for the canonical deserialization repair: `31709350955` — PASS,
   including PostgreSQL / MinIO / E2E contracts
 - REVIEW-C must be requested against the exact remote HEAD after this evidence
-  update. No same-file alignment commit is required or valid as a self-reference.
+  update. The CI fact above is intentionally tied to the predecessor SHA; no
+  same-file alignment commit is required or valid as a self-reference.
 
 External scanners:
 
