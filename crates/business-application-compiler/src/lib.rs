@@ -623,16 +623,33 @@ pub fn dry_plan(
             reason: error.to_string(),
         })?
         .public_targets;
+    let current_public_capabilities = public_capability_dependencies(&current_packages);
+    let incoming_public_capabilities = public_capability_dependencies(&incoming.packages);
     let removed_public_targets = current_public_targets
         .into_iter()
         .filter(|target| !incoming_public_targets.contains(target))
         .collect::<Vec<_>>();
+    let removed_public_capabilities = current_public_capabilities
+        .into_iter()
+        .filter(|capability| !incoming_public_capabilities.contains(capability))
+        .collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
     let mut changes = Vec::new();
     let mut blocked_public_targets = BTreeSet::new();
+    let mut blocked_public_capabilities = BTreeSet::new();
     for target in &removed_public_targets {
         if push_public_target_blockers(target, &incoming_modules, &mut changes, &mut diagnostics) {
             blocked_public_targets.insert(public_target_key(target));
+        }
+    }
+    for capability in &removed_public_capabilities {
+        if push_public_capability_blockers(
+            capability,
+            &incoming_modules,
+            &mut changes,
+            &mut diagnostics,
+        ) {
+            blocked_public_capabilities.insert(stable_json_key(capability));
         }
     }
 
@@ -715,6 +732,16 @@ pub fn dry_plan(
                 target.owner_module_id == *id
                     && blocked_public_targets.contains(&public_target_key(target))
             });
+            if !blocked {
+                blocked = removed_public_capabilities.iter().any(|capability| {
+                    matches!(
+                        capability,
+                        PublishedDependencyReference::PublicCapability {
+                            owner_module_id, ..
+                        } if owner_module_id == id
+                    ) && blocked_public_capabilities.contains(&stable_json_key(capability))
+                });
+            }
             for (dependent_id, dependent) in &incoming_modules {
                 if dependent_id != id
                     && dependent
@@ -796,11 +823,16 @@ pub fn dry_plan(
     }
     for (key, (module_id, _)) in &current_components {
         if !incoming_components.contains_key(key) && incoming_modules.contains_key(module_id) {
-            let target_blocked = removed_public_targets.iter().any(|target| {
+            let public_target_blocked = removed_public_targets.iter().any(|target| {
                 target.owner_module_id == *module_id
                     && public_target_component_id(target) == key.as_str()
                     && blocked_public_targets.contains(&public_target_key(target))
             });
+            let capability_blocked = removed_public_capabilities.iter().any(|capability| {
+                public_capability_id(capability).as_deref() == Some(key.as_str())
+                    && blocked_public_capabilities.contains(&stable_json_key(capability))
+            });
+            let target_blocked = public_target_blocked || capability_blocked;
             if !target_blocked {
                 changes.push(PackageChange::RemoveContribution {
                     contribution_id: key.clone(),
@@ -886,6 +918,69 @@ fn incoming_has_extension_consumer(
             contribution.consumer_module_id == package.manifest.module_id && target(contribution)
         })
     })
+}
+
+fn public_capability_dependencies(
+    packages: &[BusinessApplicationPackage],
+) -> Vec<PublishedDependencyReference> {
+    dependency_catalog(packages)
+        .public_dependencies
+        .into_iter()
+        .filter(|dependency| {
+            matches!(
+                dependency,
+                PublishedDependencyReference::PublicCapability { .. }
+            )
+        })
+        .collect()
+}
+
+fn push_public_capability_blockers(
+    capability: &PublishedDependencyReference,
+    incoming_modules: &BTreeMap<BusinessModuleId, &BusinessApplicationPackage>,
+    changes: &mut Vec<PackageChange>,
+    diagnostics: &mut Vec<PlanDiagnostic>,
+) -> bool {
+    let mut consumers = Vec::new();
+    for package in incoming_modules.values() {
+        for point in &package.extension_points {
+            if point
+                .dependency_ids
+                .iter()
+                .any(|dependency| dependency == capability)
+            {
+                consumers.push((
+                    package.manifest.module_id.clone(),
+                    point.extension_point_id.to_string(),
+                ));
+            }
+        }
+    }
+    consumers.sort();
+    let has_consumers = !consumers.is_empty();
+    for (consumer_module_id, consumer_id) in consumers {
+        push_blocked(
+            changes,
+            diagnostics,
+            Some(consumer_module_id.clone()),
+            public_capability_id(capability).unwrap_or_else(|| stable_json_key(capability)),
+            format!(
+                "retained consumer {consumer_module_id} ({consumer_id}) uses removed public capability"
+            ),
+        );
+    }
+    has_consumers
+}
+
+fn public_capability_id(dependency: &PublishedDependencyReference) -> Option<String> {
+    match dependency {
+        PublishedDependencyReference::PublicCapability {
+            owner_module_id,
+            capability_id,
+            ..
+        } => Some(format!("{owner_module_id}.{capability_id}")),
+        _ => None,
+    }
 }
 
 fn push_public_target_blockers(

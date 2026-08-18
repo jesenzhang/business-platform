@@ -9,12 +9,13 @@ use business_application_compiler::{
 };
 use business_module_contracts::{
     AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId, BusinessModuleManifest,
-    BusinessModuleVersion, CompatibilityDescriptor, ContractDescriptor, DataClassification,
-    ExtensionAuthorizationRequirement, ExtensionContribution, ExtensionContributionKind,
-    ExtensionPointId, ExtensionPointLifecycle, ExtensionPointRemovalSemantics,
-    ExtensionPointVisibility, ManifestSchemaVersion, ModuleDataState, ModuleDependency,
-    ModuleInstallationState, NavigationContribution, PublicContributionTarget, PublicTargetKind,
-    PublishedDependencyReference, ResourceKindDescriptor, UiContributionId,
+    BusinessModuleVersion, CompatibilityDescriptor, ContractDescriptor, ContributionDescriptor,
+    DataClassification, ExtensionAuthorizationRequirement, ExtensionContribution,
+    ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
+    ExtensionPointRemovalSemantics, ExtensionPointVisibility, ManifestSchemaVersion,
+    ModuleDataState, ModuleDependency, ModuleInstallationState, NavigationContribution,
+    PublicContributionTarget, PublicTargetKind, PublishedDependencyReference,
+    ResourceKindDescriptor, UiContributionId,
 };
 
 fn package(id: &str, version: &str) -> BusinessApplicationPackage {
@@ -91,6 +92,34 @@ fn query_target(owner: &BusinessModuleId) -> PublicContributionTarget {
         },
         version: "1.0.0".to_owned(),
     }
+}
+
+fn capability_provider() -> BusinessApplicationPackage {
+    let mut provider = package("module-a", "1.0.0");
+    provider
+        .manifest
+        .agent_tool_contributions
+        .push(ContributionDescriptor {
+            contribution_id: "module-a.capability".to_owned(),
+            version: "1.0.0".to_owned(),
+        });
+    provider
+}
+
+fn capability_consumer(references_capability: bool) -> BusinessApplicationPackage {
+    let mut consumer = package("module-b", "1.0.0");
+    if references_capability {
+        let mut point = point_decl(ExtensionPointId::from_parts("module-b", "slot").unwrap());
+        point
+            .dependency_ids
+            .push(PublishedDependencyReference::PublicCapability {
+                owner_module_id: BusinessModuleId::new("module-a").unwrap(),
+                capability_id: "capability".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        consumer.extension_points.push(point);
+    }
+    consumer
 }
 
 #[test]
@@ -293,6 +322,74 @@ fn retained_public_target_consumers_block_target_removal() {
     assert!(blockers.contains(&"module-b"));
     assert!(blockers.contains(&"module-c"));
     assert!(blockers.contains(&"module-extension"));
+}
+
+#[test]
+fn retained_public_capability_consumer_blocks_provider_removal() {
+    let provider = capability_provider();
+    let consumer = capability_consumer(true);
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![provider, consumer.clone()]),
+        compiler_input(vec![consumer]),
+    )
+    .unwrap();
+
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval {
+            module_id: Some(module_id),
+            reason,
+            ..
+        } if module_id.as_str() == "module-b" && reason.contains("public capability")
+    )));
+}
+
+#[test]
+fn dropping_public_capability_reference_allows_provider_removal() {
+    let provider = capability_provider();
+    let current_consumer = capability_consumer(true);
+    let incoming_consumer = capability_consumer(false);
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![provider, current_consumer]),
+        compiler_input(vec![incoming_consumer]),
+    )
+    .unwrap();
+
+    assert!(plan.applicable);
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::RemoveModule { module_id, .. } if module_id.as_str() == "module-a"
+    )));
+}
+
+#[test]
+fn provider_removal_is_allowed_without_live_public_capability_consumer() {
+    let plan = dry_plan(&snapshot(vec![capability_provider()]), &compiled(vec![])).unwrap();
+
+    assert!(plan.applicable);
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::RemoveModule { module_id, .. } if module_id.as_str() == "module-a"
+    )));
+}
+
+#[test]
+fn public_capability_removal_planning_is_deterministic() {
+    let provider = capability_provider();
+    let consumer = capability_consumer(true);
+    let first = dry_plan_from_declarations(
+        &snapshot(vec![provider.clone(), consumer.clone()]),
+        compiler_input(vec![consumer.clone()]),
+    )
+    .unwrap();
+    let second = dry_plan_from_declarations(
+        &snapshot(vec![consumer.clone(), provider]),
+        compiler_input(vec![consumer]),
+    )
+    .unwrap();
+
+    assert_eq!(first, second);
 }
 
 #[test]
