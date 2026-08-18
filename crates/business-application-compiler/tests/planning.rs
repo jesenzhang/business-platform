@@ -8,11 +8,13 @@ use business_application_compiler::{
     PlanDiagnostic, PlanError,
 };
 use business_module_contracts::{
-    BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
-    DataClassification, ExtensionAuthorizationRequirement, ExtensionContribution,
-    ExtensionContributionKind, ExtensionPointId, ExtensionPointLifecycle,
-    ExtensionPointRemovalSemantics, ExtensionPointVisibility, ManifestSchemaVersion,
-    ModuleDataState, ModuleDependency, ModuleInstallationState, ResourceKindDescriptor,
+    AgentCapabilityContribution, AgentCapabilityId, BusinessModuleId, BusinessModuleManifest,
+    BusinessModuleVersion, CompatibilityDescriptor, ContractDescriptor, DataClassification,
+    ExtensionAuthorizationRequirement, ExtensionContribution, ExtensionContributionKind,
+    ExtensionPointId, ExtensionPointLifecycle, ExtensionPointRemovalSemantics,
+    ExtensionPointVisibility, ManifestSchemaVersion, ModuleDataState, ModuleDependency,
+    ModuleInstallationState, NavigationContribution, PublicContributionTarget, PublicTargetKind,
+    PublishedDependencyReference, ResourceKindDescriptor, UiContributionId,
 };
 
 fn package(id: &str, version: &str) -> BusinessApplicationPackage {
@@ -81,6 +83,16 @@ fn has_change(
     plan.changes.iter().any(predicate)
 }
 
+fn query_target(owner: &BusinessModuleId) -> PublicContributionTarget {
+    PublicContributionTarget {
+        owner_module_id: owner.clone(),
+        target: PublicTargetKind::Query {
+            query_id: "read".to_owned(),
+        },
+        version: "1.0.0".to_owned(),
+    }
+}
+
 #[test]
 fn add_upgrade_remove_and_retention_are_explicit() {
     let old = package("module-a", "1.0.0");
@@ -142,6 +154,145 @@ fn desired_disabled_state_emits_disable_module() {
         PackageChange::DisableModule { module_id } if module_id == &module
     )));
     assert!(plan.applicable);
+}
+
+#[test]
+fn adding_dependency_blocks_provider_removal_from_incoming_graph() {
+    let owner = package("module-a", "1.0.0");
+    let current_consumer = package("module-b", "1.0.0");
+    let mut incoming_consumer = current_consumer.clone();
+    incoming_consumer
+        .manifest
+        .dependencies
+        .push(ModuleDependency {
+            module_id: BusinessModuleId::new("module-a").unwrap(),
+            version_requirement: "^1.0.0".to_owned(),
+        });
+
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![owner, current_consumer]),
+        compiler_input(vec![incoming_consumer]),
+    )
+    .unwrap();
+
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval { module_id: Some(module_id), reason, .. }
+            if module_id.as_str() == "module-a" && reason.contains("dependency")
+    )));
+}
+
+#[test]
+fn dropping_dependency_allows_provider_removal_from_incoming_graph() {
+    let owner = package("module-a", "1.0.0");
+    let mut current_consumer = package("module-b", "1.0.0");
+    current_consumer
+        .manifest
+        .dependencies
+        .push(ModuleDependency {
+            module_id: BusinessModuleId::new("module-a").unwrap(),
+            version_requirement: "^1.0.0".to_owned(),
+        });
+
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![owner, current_consumer.clone()]),
+        compiler_input(vec![package("module-b", "1.0.0")]),
+    )
+    .unwrap();
+
+    assert!(plan.applicable);
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::RemoveModule { module_id, .. } if module_id.as_str() == "module-a"
+    )));
+}
+
+#[test]
+fn retained_public_target_consumers_block_target_removal() {
+    let owner_id = BusinessModuleId::new("module-a").unwrap();
+    let mut owner = package("module-a", "1.0.0");
+    owner.manifest.published_queries.push(ContractDescriptor {
+        contract_id: "read".to_owned(),
+        version: "1.0.0".to_owned(),
+    });
+
+    let mut ui_consumer = package("module-b", "1.0.0");
+    ui_consumer
+        .contributions
+        .navigation
+        .push(NavigationContribution {
+            contribution_id: UiContributionId::from_parts("module-b", "read-nav").unwrap(),
+            owner_module_id: ui_consumer.manifest.module_id.clone(),
+            schema_version: "1.0.0".to_owned(),
+            version: "1.0.0".to_owned(),
+            target: query_target(&owner_id),
+            label_key: "read".to_owned(),
+            ordering: None,
+            group: None,
+            visibility: "always".to_owned(),
+            required_policy: Vec::new(),
+            required_capability: Vec::new(),
+        });
+
+    let mut agent_consumer = package("module-c", "1.0.0");
+    agent_consumer
+        .contributions
+        .agent_capabilities
+        .push(AgentCapabilityContribution {
+            contribution_id: AgentCapabilityId::from_parts("module-c", "read-tool").unwrap(),
+            owner_module_id: agent_consumer.manifest.module_id.clone(),
+            schema_version: "1.0.0".to_owned(),
+            version: "1.0.0".to_owned(),
+            target: query_target(&owner_id),
+            label_key: "read".to_owned(),
+            required_policy: Vec::new(),
+            required_capability: Vec::new(),
+        });
+
+    let mut extension_consumer = package("module-extension", "1.0.0");
+    let mut point = point_decl(ExtensionPointId::from_parts("module-extension", "slot").unwrap());
+    point
+        .dependency_ids
+        .push(PublishedDependencyReference::PublicQuery {
+            owner_module_id: owner_id.clone(),
+            query_id: "read".to_owned(),
+            version: "1.0.0".to_owned(),
+        });
+    extension_consumer.extension_points.push(point);
+
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![
+            owner,
+            ui_consumer.clone(),
+            agent_consumer.clone(),
+            extension_consumer.clone(),
+        ]),
+        compiler_input(vec![
+            package("module-a", "1.0.0"),
+            ui_consumer,
+            agent_consumer,
+            extension_consumer,
+        ]),
+    )
+    .unwrap();
+
+    let blockers: Vec<_> = plan
+        .diagnostics
+        .iter()
+        .filter_map(|diagnostic| match diagnostic {
+            PlanDiagnostic::BlockedRemoval {
+                module_id: Some(module_id),
+                reason,
+                ..
+            } if reason.contains("public target") => Some(module_id.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(blockers.len(), 3);
+    assert!(blockers.contains(&"module-b"));
+    assert!(blockers.contains(&"module-c"));
+    assert!(blockers.contains(&"module-extension"));
 }
 
 #[test]
@@ -474,8 +625,8 @@ fn duplicate_current_module_is_rejected() {
 
 fn point_decl(id: ExtensionPointId) -> business_module_contracts::PublishedExtensionPoint {
     business_module_contracts::PublishedExtensionPoint {
+        owner_module_id: BusinessModuleId::new(id.module_id()).unwrap(),
         extension_point_id: id,
-        owner_module_id: BusinessModuleId::new("module-a").unwrap(),
         contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
         schema_version: "1.0.0".to_owned(),
         allowed_contribution_kind: ExtensionContributionKind::DetailUi,

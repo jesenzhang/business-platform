@@ -1251,9 +1251,24 @@ impl BusinessModuleManifest {
         validate_contracts(&self.published_queries, "query")?;
         validate_contracts(&self.published_events, "event")?;
         validate_resource_kinds(&self.resource_kinds)?;
-        validate_contributions(&self.semantic_contributions, "semantic")?;
-        validate_contributions(&self.ui_contributions, "ui")?;
-        validate_contributions(&self.agent_tool_contributions, "agent tool")?;
+        let mut contribution_ids = BTreeSet::new();
+        validate_contributions(
+            &self.semantic_contributions,
+            "semantic",
+            &mut contribution_ids,
+        )?;
+        validate_namespaced_contributions(
+            &self.ui_contributions,
+            "ui",
+            &self.module_id,
+            &mut contribution_ids,
+        )?;
+        validate_namespaced_contributions(
+            &self.agent_tool_contributions,
+            "agent tool",
+            &self.module_id,
+            &mut contribution_ids,
+        )?;
 
         let module_id = self.module_id.to_string();
         for dependency in &self.dependencies {
@@ -1542,18 +1557,40 @@ fn validate_resource_kinds(
 
 fn validate_contributions<T>(
     contributions: &[T],
-    _kind: &'static str,
+    kind: &'static str,
+    identifiers: &mut BTreeSet<String>,
 ) -> Result<(), ManifestValidationError>
 where
     T: ContributionIdentity,
 {
-    let mut identifiers = BTreeSet::new();
     for contribution in contributions {
         validate_non_empty(contribution.identifier(), "contribution identifier")?;
         validate_non_empty(contribution.version(), "contribution version")?;
         if !identifiers.insert(contribution.identifier().to_owned()) {
             return Err(ManifestValidationError::DuplicateIdentifier {
-                kind: "contribution",
+                kind,
+                identifier: contribution.identifier().to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_namespaced_contributions<T>(
+    contributions: &[T],
+    kind: &'static str,
+    owner_module_id: &BusinessModuleId,
+    identifiers: &mut BTreeSet<String>,
+) -> Result<(), ManifestValidationError>
+where
+    T: ContributionIdentity,
+{
+    for contribution in contributions {
+        contribution.validate_identifier(owner_module_id)?;
+        validate_non_empty(contribution.version(), "contribution version")?;
+        if !identifiers.insert(contribution.identifier().to_owned()) {
+            return Err(ManifestValidationError::DuplicateIdentifier {
+                kind,
                 identifier: contribution.identifier().to_owned(),
             });
         }
@@ -1564,6 +1601,10 @@ where
 trait ContributionIdentity {
     fn identifier(&self) -> &str;
     fn version(&self) -> &str;
+    fn validate_identifier(
+        &self,
+        owner_module_id: &BusinessModuleId,
+    ) -> Result<(), ManifestValidationError>;
 }
 
 impl ContributionIdentity for SemanticContributionDescriptor {
@@ -1573,6 +1614,17 @@ impl ContributionIdentity for SemanticContributionDescriptor {
 
     fn version(&self) -> &str {
         &self.version
+    }
+
+    fn validate_identifier(
+        &self,
+        owner_module_id: &BusinessModuleId,
+    ) -> Result<(), ManifestValidationError> {
+        validate_owner_namespaced_identifier(
+            self.identifier(),
+            owner_module_id,
+            "contribution identifier",
+        )
     }
 }
 
@@ -1584,6 +1636,33 @@ impl ContributionIdentity for ContributionDescriptor {
     fn version(&self) -> &str {
         &self.version
     }
+
+    fn validate_identifier(
+        &self,
+        owner_module_id: &BusinessModuleId,
+    ) -> Result<(), ManifestValidationError> {
+        validate_owner_namespaced_identifier(
+            self.identifier(),
+            owner_module_id,
+            "contribution identifier",
+        )
+    }
+}
+
+fn validate_owner_namespaced_identifier(
+    identifier: &str,
+    owner_module_id: &BusinessModuleId,
+    kind: &'static str,
+) -> Result<(), ManifestValidationError> {
+    let identity = NamespacedId::new(identifier.to_owned())
+        .map_err(|_| ManifestValidationError::InvalidField { kind })?;
+    if identity.module_id() != owner_module_id.as_str() {
+        return Err(ManifestValidationError::WrongContributionOwner {
+            expected: owner_module_id.to_string(),
+            actual: identity.module_id().to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn validate_version_requirement(requirement: &str) -> Result<(), ManifestValidationError> {
@@ -1611,6 +1690,32 @@ fn validate_version_requirement(requirement: &str) -> Result<(), ManifestValidat
 #[allow(clippy::unwrap_used, clippy::cloned_ref_to_slice_refs)]
 mod tests {
     use super::*;
+
+    fn empty_manifest(module_id: &str) -> BusinessModuleManifest {
+        let module_id = BusinessModuleId::new(module_id.to_owned()).unwrap();
+        BusinessModuleManifest {
+            module_id: module_id.clone(),
+            module_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            manifest_schema_version: ManifestSchemaVersion::new(
+                BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
+            )
+            .unwrap(),
+            owned_bounded_contexts: vec![format!("{module_id}-context")],
+            required_platform_capabilities: Vec::new(),
+            optional_platform_capabilities: Vec::new(),
+            published_commands: Vec::new(),
+            published_queries: Vec::new(),
+            published_events: Vec::new(),
+            resource_kinds: Vec::new(),
+            data_classification: vec![DataClassification::Internal],
+            migration_namespace: module_id.to_string(),
+            semantic_contributions: Vec::new(),
+            ui_contributions: Vec::new(),
+            agent_tool_contributions: Vec::new(),
+            dependencies: Vec::new(),
+            compatibility: CompatibilityDescriptor::default(),
+        }
+    }
 
     #[test]
     fn module_id_rejects_uppercase_and_repeated_separators() {
@@ -1695,6 +1800,36 @@ mod tests {
         assert!(matches!(
             manifest.validate(),
             Err(ManifestValidationError::UnsupportedSchemaVersion { .. })
+        ));
+    }
+
+    #[test]
+    fn legacy_ui_and_agent_ids_require_owner_namespaced_identity() {
+        let mut non_namespaced = empty_manifest("module-a");
+        non_namespaced
+            .ui_contributions
+            .push(ContributionDescriptor {
+                contribution_id: "navigation".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            non_namespaced.validate(),
+            Err(ManifestValidationError::InvalidField {
+                kind: "contribution identifier"
+            })
+        ));
+
+        let mut foreign = empty_manifest("module-a");
+        foreign
+            .agent_tool_contributions
+            .push(ContributionDescriptor {
+                contribution_id: "module-b.read".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        assert!(matches!(
+            foreign.validate(),
+            Err(ManifestValidationError::WrongContributionOwner { expected, actual })
+                if expected == "module-a" && actual == "module-b"
         ));
     }
 

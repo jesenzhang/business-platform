@@ -124,6 +124,32 @@ $businessApplicationCompilerCargo = Get-Content -Raw (Join-Path $root "crates/bu
 if ($businessApplicationCompilerCargo -match 'path\s*=\s*"\.\./\.\./(apps|crates)/(?!business-module-contracts)') {
     throw "business-application-compiler must not depend on implementation crates"
 }
+
+# `workspace = true` can hide an internal path dependency from a raw
+# Cargo.toml regex. Resolve the three generic crates through Cargo metadata and
+# enforce their complete internal-dependency allowlist. External registry
+# dependencies have no `path` and are not part of this boundary check.
+$genericDependencyAllowlist = @{
+    "business-module-contracts" = @()
+    "business-application-compiler" = @("business-module-contracts")
+    "semantic-contract" = @("business-module-contracts")
+}
+$workspaceMetadata = cargo metadata --format-version 1 --no-deps --locked | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) {
+    throw "Cargo metadata failed while validating generic crate dependencies"
+}
+foreach ($packageName in $genericDependencyAllowlist.Keys) {
+    $package = @($workspaceMetadata.packages | Where-Object { $_.name -eq $packageName }) | Select-Object -First 1
+    if ($null -eq $package) {
+        throw "Missing generic crate from Cargo metadata: $packageName"
+    }
+    foreach ($dependency in @($package.dependencies | Where-Object { $_.path })) {
+        if ($genericDependencyAllowlist[$packageName] -notcontains $dependency.name) {
+            throw "$packageName has forbidden internal dependency '$($dependency.name)'"
+        }
+    }
+}
+
 $businessApplicationCompilerSource = @(Get-ChildItem (Join-Path $root "crates/business-application-compiler/src") -Recurse -File | ForEach-Object {
     Get-Content -Raw $_.FullName
 }) -join [Environment]::NewLine

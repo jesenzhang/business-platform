@@ -24,6 +24,7 @@ runtime registry or a second business-data authority.
 | Public capability dependency catalog repair | `014d3a5fbc97e041c557900d7fde825a36d7b754` |
 | Rejected candidate under repair | `40c40784c8ae286d003ffaa2c5f702ab0768c749` |
 | Repair implementation | `f64e767` |
+| Rejected candidate exact-head CI | `7867123f6eb03db67a106d4cb754069465010386` / Run `32099631658` — PASS |
 | Exact REVIEW-C head | Supplied by the review request; intentionally not self-recorded |
 
 `PLAN_0011_IMPLEMENTATION_BASE` is `31b24c6993dbff1f3e88b2476e0c87460400ec31`.
@@ -126,6 +127,10 @@ Current repair validation supersedes the historical checkpoint details above:
 - Feature CI for repair/evidence head `2639c3e771317b5819d666071cb3ca7ec3b441f6`:
   `32099113149` — PASS, including PostgreSQL / MinIO / E2E contracts,
   Architecture Fitness, frontend, Playwright, and CLI/MCP contracts
+- Feature CI for rejected candidate exact HEAD
+  `7867123f6eb03db67a106d4cb754069465010386`: `32099631658` — PASS,
+  including PostgreSQL / MinIO / E2E contracts, Architecture Fitness,
+  frontend, Playwright, and CLI/MCP contracts
 - Canonical deserialization repair commit:
   `474285719a066c9810ac1cfed4886cf8bb455d2f`
 - Feature CI for the canonical deserialization repair: `31709350955` — PASS,

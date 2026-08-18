@@ -213,6 +213,70 @@ mod tests {
     }
 
     #[test]
+    fn rejects_foreign_and_non_namespaced_legacy_contribution_ids() {
+        for contribution_id in ["shared", "module-b.shared"] {
+            let mut package = package("module-a", "1.0.0");
+            package
+                .manifest
+                .ui_contributions
+                .push(ContributionDescriptor {
+                    contribution_id: contribution_id.to_owned(),
+                    version: "1.0.0".to_owned(),
+                });
+
+            assert!(matches!(
+                compile(input(vec![package])),
+                Err(CompilationError::Manifest(
+                    business_module_contracts::ManifestValidationError::InvalidField { .. }
+                        | business_module_contracts::ManifestValidationError::WrongContributionOwner { .. },
+                ))
+            ));
+        }
+    }
+
+    #[test]
+    fn extension_contribution_ids_share_the_manifest_collision_domain() {
+        let mut package = package("module-a", "1.0.0");
+        package
+            .manifest
+            .agent_tool_contributions
+            .push(ContributionDescriptor {
+                contribution_id: "module-a.shared".to_owned(),
+                version: "1.0.0".to_owned(),
+            });
+        let extension_point_id = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+        package.extension_points.push(PublishedExtensionPoint {
+            extension_point_id: extension_point_id.clone(),
+            owner_module_id: package.manifest.module_id.clone(),
+            contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            schema_version: "1.0.0".to_owned(),
+            allowed_contribution_kind: ExtensionContributionKind::DetailUi,
+            classification: DataClassification::Internal,
+            authorization_requirement: ExtensionAuthorizationRequirement {
+                policy_id: None,
+                capability_id: None,
+            },
+            lifecycle: ExtensionPointLifecycle::Published,
+            dependency_ids: Vec::new(),
+            removal_semantics: ExtensionPointRemovalSemantics::BlockedRemoval,
+            visibility: ExtensionPointVisibility::Public,
+        });
+        package.extension_contributions.push(ExtensionContribution {
+            contribution_id: ContributionId::from_parts("module-a", "shared").unwrap(),
+            consumer_module_id: package.manifest.module_id.clone(),
+            target_extension_point_id: extension_point_id,
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+
+        assert!(matches!(
+            compile(input(vec![package])),
+            Err(CompilationError::Duplicate { .. })
+        ));
+    }
+
+    #[test]
     fn permutations_have_identical_model_bytes_and_digest() {
         let mut a = package("module-a", "1.0.0");
         a.manifest
@@ -364,11 +428,11 @@ mod tests {
         let mut provider = package("module-a", "1.0.0");
         provider.manifest.agent_tool_contributions.extend([
             ContributionDescriptor {
-                contribution_id: "capability-z".to_owned(),
+                contribution_id: "module-a.capability-z".to_owned(),
                 version: "1.0.0".to_owned(),
             },
             ContributionDescriptor {
-                contribution_id: "capability-a".to_owned(),
+                contribution_id: "module-a.capability-a".to_owned(),
                 version: "1.0.0".to_owned(),
             },
         ]);

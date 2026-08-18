@@ -6,9 +6,10 @@
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
     ExtensionContribution, ExtensionPointId, ManifestValidationError, ModuleDataState,
-    ModuleDependency, ModuleInstallationState, PackageDigest, PublicContributionCatalog,
-    PublicContributionTarget, PublicTargetKind, PublishedDependencyCatalog,
-    PublishedDependencyReference, PublishedExtensionPoint, TypedContributionSet,
+    ModuleDependency, ModuleInstallationState, NamespacedId, PackageDigest,
+    PublicContributionCatalog, PublicContributionTarget, PublicTargetKind,
+    PublishedDependencyCatalog, PublishedDependencyReference, PublishedExtensionPoint,
+    TypedContributionSet,
 };
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -344,8 +345,6 @@ fn compile_with_context(
     let mut available_modules = context.module_versions.clone();
     let mut owned_contexts = BTreeMap::<String, String>::new();
     let mut public_ids = BTreeMap::<String, String>::new();
-    let mut extension_ids = BTreeSet::new();
-    let mut extension_contribution_ids = BTreeSet::new();
 
     for package in &input.packages {
         package.manifest.validate()?;
@@ -387,18 +386,17 @@ fn compile_with_context(
         register_manifest_ids(package, &mut owned_contexts, &mut public_ids)?;
         register_typed_contribution_ids(package, &mut public_ids)?;
         for point in &package.extension_points {
-            if !extension_ids.insert(point.extension_point_id.clone()) {
-                return Err(CompilationError::Duplicate {
-                    kind: "extension point",
-                    identifier: point.extension_point_id.to_string(),
-                });
-            }
             if point.owner_module_id != package.manifest.module_id {
                 return Err(CompilationError::OwnershipCollision {
                     kind: "extension point",
                     identifier: point.extension_point_id.to_string(),
                 });
             }
+            register_identity(
+                point.extension_point_id.to_string(),
+                package.manifest.module_id.as_str(),
+                &mut public_ids,
+            )?;
             point.validate_against_catalog(&dependency_catalog)?;
             parse_version(
                 "extension point contract version",
@@ -413,15 +411,14 @@ fn compile_with_context(
                     identifier: contribution.contribution_id.to_string(),
                 });
             }
-            if !extension_contribution_ids.insert(contribution.contribution_id.clone()) {
-                return Err(CompilationError::Duplicate {
-                    kind: "extension contribution",
-                    identifier: contribution.contribution_id.to_string(),
-                });
-            }
             parse_version(
                 "extension contribution contract version",
                 contribution.expected_contract_version.as_str(),
+            )?;
+            register_identity(
+                contribution.contribution_id.to_string(),
+                package.manifest.module_id.as_str(),
+                &mut public_ids,
             )?;
         }
     }
@@ -611,12 +608,38 @@ pub fn dry_plan(
         }
     }
 
+    let current_packages: Vec<_> = current
+        .modules
+        .iter()
+        .map(|snapshot| snapshot.package.clone())
+        .collect();
+    let current_public_targets = public_catalog(&current_packages)
+        .map_err(|error| PlanError::PlanningCompilation {
+            reason: error.to_string(),
+        })?
+        .public_targets;
+    let incoming_public_targets = public_catalog(&incoming.packages)
+        .map_err(|error| PlanError::PlanningCompilation {
+            reason: error.to_string(),
+        })?
+        .public_targets;
+    let removed_public_targets = current_public_targets
+        .into_iter()
+        .filter(|target| !incoming_public_targets.contains(target))
+        .collect::<Vec<_>>();
+    let mut diagnostics = Vec::new();
+    let mut changes = Vec::new();
+    let mut blocked_public_targets = BTreeSet::new();
+    for target in &removed_public_targets {
+        if push_public_target_blockers(target, &incoming_modules, &mut changes, &mut diagnostics) {
+            blocked_public_targets.insert(public_target_key(target));
+        }
+    }
+
     let mut incoming_digests = BTreeMap::new();
     for (id, package) in &incoming_modules {
         incoming_digests.insert(id.clone(), package_digest(package)?);
     }
-    let mut diagnostics = Vec::new();
-    let mut changes = Vec::new();
     for (id, package) in &incoming_modules {
         let digest =
             incoming_digests
@@ -688,12 +711,13 @@ pub fn dry_plan(
     }
     for (id, existing) in &current_modules {
         if !incoming_modules.contains_key(id) {
-            let mut blocked = false;
-            for (dependent_id, dependent) in &current_modules {
+            let mut blocked = removed_public_targets.iter().any(|target| {
+                target.owner_module_id == *id
+                    && blocked_public_targets.contains(&public_target_key(target))
+            });
+            for (dependent_id, dependent) in &incoming_modules {
                 if dependent_id != id
-                    && incoming_modules.contains_key(dependent_id)
                     && dependent
-                        .package
                         .manifest
                         .dependencies
                         .iter()
@@ -772,10 +796,17 @@ pub fn dry_plan(
     }
     for (key, (module_id, _)) in &current_components {
         if !incoming_components.contains_key(key) && incoming_modules.contains_key(module_id) {
-            changes.push(PackageChange::RemoveContribution {
-                contribution_id: key.clone(),
-                module_id: module_id.clone(),
+            let target_blocked = removed_public_targets.iter().any(|target| {
+                target.owner_module_id == *module_id
+                    && public_target_component_id(target) == key.as_str()
+                    && blocked_public_targets.contains(&public_target_key(target))
             });
+            if !target_blocked {
+                changes.push(PackageChange::RemoveContribution {
+                    contribution_id: key.clone(),
+                    module_id: module_id.clone(),
+                });
+            }
         }
     }
 
@@ -855,6 +886,127 @@ fn incoming_has_extension_consumer(
             contribution.consumer_module_id == package.manifest.module_id && target(contribution)
         })
     })
+}
+
+fn push_public_target_blockers(
+    target: &PublicContributionTarget,
+    incoming_modules: &BTreeMap<BusinessModuleId, &BusinessApplicationPackage>,
+    changes: &mut Vec<PackageChange>,
+    diagnostics: &mut Vec<PlanDiagnostic>,
+) -> bool {
+    let mut consumers = Vec::new();
+    for package in incoming_modules.values() {
+        macro_rules! collect_typed_consumers {
+            ($items:expr) => {
+                for item in $items {
+                    if &item.target == target {
+                        consumers.push((
+                            package.manifest.module_id.clone(),
+                            item.contribution_id.to_string(),
+                        ));
+                    }
+                }
+            };
+        }
+        collect_typed_consumers!(&package.contributions.navigation);
+        collect_typed_consumers!(&package.contributions.list_views);
+        collect_typed_consumers!(&package.contributions.detail_sections);
+        collect_typed_consumers!(&package.contributions.detail_tabs);
+        collect_typed_consumers!(&package.contributions.actions);
+        collect_typed_consumers!(&package.contributions.commands);
+        collect_typed_consumers!(&package.contributions.agent_capabilities);
+        for point in &package.extension_points {
+            if point
+                .dependency_ids
+                .iter()
+                .any(|dependency| public_dependency_matches_target(dependency, target))
+            {
+                consumers.push((
+                    package.manifest.module_id.clone(),
+                    point.extension_point_id.to_string(),
+                ));
+            }
+        }
+    }
+    consumers.sort();
+    let has_consumers = !consumers.is_empty();
+    for (consumer_module_id, consumer_id) in consumers {
+        push_blocked(
+            changes,
+            diagnostics,
+            Some(consumer_module_id.clone()),
+            public_target_id(target),
+            format!(
+                "retained consumer {consumer_module_id} ({consumer_id}) uses removed public target"
+            ),
+        );
+    }
+    has_consumers
+}
+
+fn public_dependency_matches_target(
+    dependency: &PublishedDependencyReference,
+    target: &PublicContributionTarget,
+) -> bool {
+    match (&target.target, dependency) {
+        (
+            PublicTargetKind::Resource { resource_kind },
+            PublishedDependencyReference::PublicResource {
+                owner_module_id,
+                resource_kind: dependency_id,
+                version,
+            },
+        ) => {
+            owner_module_id == &target.owner_module_id
+                && dependency_id == resource_kind
+                && version == &target.version
+        }
+        (
+            PublicTargetKind::Query { query_id },
+            PublishedDependencyReference::PublicQuery {
+                owner_module_id,
+                query_id: dependency_id,
+                version,
+            },
+        ) => {
+            owner_module_id == &target.owner_module_id
+                && dependency_id == query_id
+                && version == &target.version
+        }
+        (
+            PublicTargetKind::Command { command_id },
+            PublishedDependencyReference::PublicCommand {
+                owner_module_id,
+                command_id: dependency_id,
+                version,
+            },
+        ) => {
+            owner_module_id == &target.owner_module_id
+                && dependency_id == command_id
+                && version == &target.version
+        }
+        _ => false,
+    }
+}
+
+fn public_target_id(target: &PublicContributionTarget) -> String {
+    format!(
+        "{}.{}",
+        target.owner_module_id,
+        public_target_component_id(target)
+    )
+}
+
+fn public_target_component_id(target: &PublicContributionTarget) -> &str {
+    match &target.target {
+        PublicTargetKind::Resource { resource_kind } => resource_kind,
+        PublicTargetKind::Query { query_id } => query_id,
+        PublicTargetKind::Command { command_id } => command_id,
+    }
+}
+
+fn public_target_key(target: &PublicContributionTarget) -> String {
+    stable_json_key(target)
 }
 
 fn push_conflict(
@@ -1174,10 +1326,17 @@ fn dependency_catalog(packages: &[BusinessApplicationPackage]) -> PublishedDepen
                 .manifest
                 .agent_tool_contributions
                 .iter()
-                .map(|item| PublishedDependencyReference::PublicCapability {
-                    owner_module_id: owner.clone(),
-                    capability_id: item.contribution_id.clone(),
-                    version: item.version.clone(),
+                .map(|item| {
+                    let capability_id = NamespacedId::new(item.contribution_id.clone())
+                        .map_or_else(
+                            |_| item.contribution_id.clone(),
+                            |identity| identity.local_id().to_owned(),
+                        );
+                    PublishedDependencyReference::PublicCapability {
+                        owner_module_id: owner.clone(),
+                        capability_id,
+                        version: item.version.clone(),
+                    }
                 }),
         );
     }
@@ -1454,6 +1613,27 @@ fn register_typed_contribution_ids(
                 }
             });
         }
+    }
+    Ok(())
+}
+
+fn register_identity(
+    identifier: String,
+    owner: &str,
+    public_ids: &mut BTreeMap<String, String>,
+) -> Result<(), CompilationError> {
+    if let Some(previous) = public_ids.insert(identifier.clone(), owner.to_owned()) {
+        return Err(if previous == owner {
+            CompilationError::Duplicate {
+                kind: "public identifier",
+                identifier,
+            }
+        } else {
+            CompilationError::OwnershipCollision {
+                kind: "public identifier",
+                identifier,
+            }
+        });
     }
     Ok(())
 }
