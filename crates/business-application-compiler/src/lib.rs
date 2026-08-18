@@ -134,6 +134,8 @@ pub enum PlanDiagnostic {
 pub enum PlanError {
     #[error("incoming compiled package set is not canonical: {0}")]
     IncomingNotCanonical(String),
+    #[error("planning declarations could not be compiled: {reason}")]
+    PlanningCompilation { reason: String },
     #[error("duplicate module in {location}: '{identifier}'")]
     DuplicateModule {
         location: &'static str,
@@ -299,12 +301,47 @@ pub enum CompilationError {
     Digest,
 }
 
+#[derive(Debug, Clone, Default)]
+struct PlanningCompilationContext {
+    module_versions: BTreeMap<String, Version>,
+    public_catalog: PublicContributionCatalog,
+    dependency_catalog: PublishedDependencyCatalog,
+    extension_points: BTreeMap<ExtensionPointId, PublishedExtensionPoint>,
+}
+
 #[allow(clippy::too_many_lines)]
 pub fn compile(
+    input: BusinessApplicationCompilerInput,
+) -> Result<CompiledBusinessApplicationManifest, CompilationError> {
+    compile_with_context(input, &PlanningCompilationContext::default())
+}
+
+/// Builds a plan from raw desired declarations while resolving references that
+/// exist in the current registry as transition context. This seam is needed
+/// for a removal such as "owner omitted, consumer contribution still present":
+/// the desired state is intentionally not a standalone installable package set
+/// until the blocked transition is resolved. Unknown references that exist in
+/// neither input nor current state still fail closed.
+pub fn dry_plan_from_declarations(
+    current: &CurrentRegistrySnapshot,
+    input: BusinessApplicationCompilerInput,
+) -> Result<BusinessApplicationPlan, PlanError> {
+    let context = planning_compilation_context(current)?;
+    let compiled =
+        compile_with_context(input, &context).map_err(|error| PlanError::PlanningCompilation {
+            reason: error.to_string(),
+        })?;
+    dry_plan(current, &compiled)
+}
+
+#[allow(clippy::too_many_lines)]
+fn compile_with_context(
     mut input: BusinessApplicationCompilerInput,
+    context: &PlanningCompilationContext,
 ) -> Result<CompiledBusinessApplicationManifest, CompilationError> {
     let platform = parse_version("platform version", &input.platform_version)?;
     let mut modules = BTreeMap::new();
+    let mut available_modules = context.module_versions.clone();
     let mut owned_contexts = BTreeMap::<String, String>::new();
     let mut public_ids = BTreeMap::<String, String>::new();
     let mut extension_ids = BTreeSet::new();
@@ -313,8 +350,9 @@ pub fn compile(
     for package in &input.packages {
         package.manifest.validate()?;
     }
-    let public_catalog = public_catalog(&input.packages)?;
-    let dependency_catalog = dependency_catalog(&input.packages);
+    let public_catalog = merged_public_catalog(&input.packages, &context.public_catalog)?;
+    let dependency_catalog =
+        merged_dependency_catalog(&input.packages, &context.dependency_catalog);
 
     for package in &mut input.packages {
         let module_id = package.manifest.module_id.to_string();
@@ -339,6 +377,7 @@ pub fn compile(
                 });
             }
         }
+        available_modules.insert(module_id.clone(), module_version.clone());
         validate_platform(&package.manifest, &platform)?;
         package
             .contributions
@@ -400,7 +439,7 @@ pub fn compile(
     }
     for package in &input.packages {
         for dependency in &package.manifest.dependencies {
-            let Some(version) = modules.get(dependency.module_id.as_str()) else {
+            let Some(version) = available_modules.get(dependency.module_id.as_str()) else {
                 return Err(CompilationError::UnknownDependency {
                     module_id: dependency.module_id.to_string(),
                 });
@@ -420,6 +459,11 @@ pub fn compile(
                 .iter()
                 .flat_map(|p| p.extension_points.iter())
                 .find(|p| p.extension_point_id == contribution.target_extension_point_id)
+                .or_else(|| {
+                    context
+                        .extension_points
+                        .get(&contribution.target_extension_point_id)
+                })
                 .ok_or_else(|| CompilationError::UnknownExtension {
                     identifier: contribution.target_extension_point_id.to_string(),
                 })?;
@@ -451,6 +495,78 @@ pub fn compile(
     compiled.package_digest = PackageDigest::new(digest).map_err(|_| CompilationError::Digest)?;
     compiled.canonical_json = bytes;
     Ok(compiled)
+}
+
+fn planning_compilation_context(
+    current: &CurrentRegistrySnapshot,
+) -> Result<PlanningCompilationContext, PlanError> {
+    let mut context = PlanningCompilationContext::default();
+    let mut current_packages = Vec::with_capacity(current.modules.len());
+    for snapshot in &current.modules {
+        let module_id = snapshot.package.manifest.module_id.clone();
+        if context
+            .module_versions
+            .insert(
+                module_id.to_string(),
+                Version::parse(snapshot.package.manifest.module_version.as_str()).map_err(
+                    |error| PlanError::PlanningCompilation {
+                        reason: format!("invalid current module version: {error}"),
+                    },
+                )?,
+            )
+            .is_some()
+        {
+            return Err(PlanError::DuplicateModule {
+                location: "current registry snapshot",
+                identifier: module_id.to_string(),
+            });
+        }
+        for point in &snapshot.package.extension_points {
+            if context
+                .extension_points
+                .insert(point.extension_point_id.clone(), point.clone())
+                .is_some()
+            {
+                return Err(PlanError::DuplicateComponent {
+                    identifier: point.extension_point_id.to_string(),
+                });
+            }
+        }
+        current_packages.push(snapshot.package.clone());
+    }
+    context.public_catalog =
+        public_catalog(&current_packages).map_err(|error| PlanError::PlanningCompilation {
+            reason: error.to_string(),
+        })?;
+    context.dependency_catalog = dependency_catalog(&current_packages);
+    Ok(context)
+}
+
+fn merged_public_catalog(
+    packages: &[BusinessApplicationPackage],
+    external: &PublicContributionCatalog,
+) -> Result<PublicContributionCatalog, CompilationError> {
+    let incoming = public_catalog(packages)?;
+    let mut public_targets = external.public_targets.clone();
+    public_targets.extend(incoming.public_targets);
+    public_targets.sort_by_key(|target| serde_json::to_string(target).unwrap_or_default());
+    public_targets.dedup();
+    Ok(PublicContributionCatalog { public_targets })
+}
+
+fn merged_dependency_catalog(
+    packages: &[BusinessApplicationPackage],
+    external: &PublishedDependencyCatalog,
+) -> PublishedDependencyCatalog {
+    let incoming = dependency_catalog(packages);
+    let mut public_dependencies = external.public_dependencies.clone();
+    public_dependencies.extend(incoming.public_dependencies);
+    public_dependencies
+        .sort_by_key(|dependency| serde_json::to_string(dependency).unwrap_or_default());
+    public_dependencies.dedup();
+    PublishedDependencyCatalog {
+        public_dependencies,
+    }
 }
 
 /// Builds a deterministic, side-effect-free plan. This function only compares
@@ -595,16 +711,10 @@ pub fn dry_plan(
                 }
             }
             if !blocked {
-                let active_consumer = current.modules.iter().any(|module| {
-                    module
-                        .package
-                        .extension_contributions
-                        .iter()
-                        .any(|contribution| {
-                            contribution.target_extension_point_id.module_id() == id.as_str()
-                                && incoming_modules.contains_key(&contribution.consumer_module_id)
-                        })
-                });
+                let active_consumer =
+                    incoming_has_extension_consumer(&incoming_modules, |contribution| {
+                        contribution.target_extension_point_id.module_id() == id.as_str()
+                    });
                 if active_consumer {
                     push_blocked(
                         &mut changes,
@@ -686,11 +796,8 @@ pub fn dry_plan(
     }
     for (id, (owner, _)) in &current_points {
         if !incoming_points.contains_key(id) && incoming_modules.contains_key(owner) {
-            let live = current.modules.iter().any(|m| {
-                m.package.extension_contributions.iter().any(|c| {
-                    &c.target_extension_point_id == id
-                        && incoming_modules.contains_key(&c.consumer_module_id)
-                })
+            let live = incoming_has_extension_consumer(&incoming_modules, |contribution| {
+                &contribution.target_extension_point_id == id
             });
             if live {
                 push_blocked(
@@ -736,6 +843,17 @@ pub fn dry_plan(
         applicable: diagnostics.is_empty(),
         changes,
         diagnostics,
+    })
+}
+
+fn incoming_has_extension_consumer(
+    incoming_modules: &BTreeMap<BusinessModuleId, &BusinessApplicationPackage>,
+    target: impl Fn(&ExtensionContribution) -> bool,
+) -> bool {
+    incoming_modules.values().any(|package| {
+        package.extension_contributions.iter().any(|contribution| {
+            contribution.consumer_module_id == package.manifest.module_id && target(contribution)
+        })
     })
 }
 

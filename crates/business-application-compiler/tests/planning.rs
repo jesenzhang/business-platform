@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 
 use business_application_compiler::{
-    compile, dry_plan, BusinessApplicationCompilerInput, BusinessApplicationPackage,
-    CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange, PlanDiagnostic, PlanError,
+    compile, dry_plan, dry_plan_from_declarations, BusinessApplicationCompilerInput,
+    BusinessApplicationPackage, CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange,
+    PlanDiagnostic, PlanError,
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
@@ -43,16 +44,19 @@ fn package(id: &str, version: &str) -> BusinessApplicationPackage {
     }
 }
 
-fn compiled(
-    packages: Vec<BusinessApplicationPackage>,
-) -> business_application_compiler::IncomingCompiledPackages {
-    compile(BusinessApplicationCompilerInput {
+fn compiler_input(packages: Vec<BusinessApplicationPackage>) -> BusinessApplicationCompilerInput {
+    BusinessApplicationCompilerInput {
         platform_version: "1.2.0".to_owned(),
         packages,
         installed_versions: Default::default(),
         desired_installation_states: Default::default(),
-    })
-    .unwrap()
+    }
+}
+
+fn compiled(
+    packages: Vec<BusinessApplicationPackage>,
+) -> business_application_compiler::IncomingCompiledPackages {
+    compile(compiler_input(packages)).unwrap()
 }
 
 fn snapshot(packages: Vec<BusinessApplicationPackage>) -> CurrentRegistrySnapshot {
@@ -190,9 +194,9 @@ fn live_dependency_and_active_extension_consumer_block_removal() {
         module_id: BusinessModuleId::new("module-a").unwrap(),
         version_requirement: "^1.0.0".to_owned(),
     });
-    let blocked = dry_plan(
-        &snapshot(vec![owner.clone(), live_consumer]),
-        &compiled(vec![package("module-b", "1.0.0")]),
+    let blocked = dry_plan_from_declarations(
+        &snapshot(vec![owner.clone(), live_consumer.clone()]),
+        compiler_input(vec![live_consumer]),
     )
     .unwrap();
     assert!(!blocked.applicable);
@@ -215,18 +219,98 @@ fn live_dependency_and_active_extension_consumer_block_removal() {
             kind: ExtensionContributionKind::DetailUi,
         });
     let blocked = dry_plan(
-        &snapshot(vec![owner, extension_consumer]),
-        &compiled(vec![
-            package("module-a", "1.0.0"),
-            package("module-extension", "1.0.0"),
-        ]),
+        &snapshot(vec![owner.clone(), extension_consumer.clone()]),
+        &compiled(vec![package("module-a", "1.0.0")]),
     )
     .unwrap();
-    assert!(blocked.diagnostics.iter().any(|d| matches!(d, PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer"))));
+    assert!(!blocked
+        .diagnostics
+        .iter()
+        .any(|d| matches!(d, PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer"))));
+
+    let blocked = dry_plan_from_declarations(
+        &snapshot(vec![owner, extension_consumer.clone()]),
+        compiler_input(vec![extension_consumer]),
+    )
+    .unwrap();
+    assert!(blocked.diagnostics.iter().any(|d| matches!(
+        d,
+        PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer")
+    )));
 }
 
 #[test]
 fn owner_removal_with_active_extension_consumer_is_blocked() {
+    let point = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+    let mut owner = package("module-a", "1.0.0");
+    owner.extension_points.push(point_decl(point.clone()));
+    let mut consumer = package("module-extension", "1.0.0");
+    consumer
+        .extension_contributions
+        .push(ExtensionContribution {
+            contribution_id: business_module_contracts::ContributionId::from_parts(
+                "module-extension",
+                "use-slot",
+            )
+            .unwrap(),
+            consumer_module_id: consumer.manifest.module_id.clone(),
+            target_extension_point_id: point,
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![owner, consumer.clone()]),
+        compiler_input(vec![consumer]),
+    )
+    .unwrap();
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval { module_id: Some(module_id), reason, .. }
+            if module_id.as_str() == "module-a" && reason.contains("consumer")
+    )));
+}
+
+#[test]
+fn extension_point_removal_with_active_extension_consumer_is_blocked() {
+    let point = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+    let mut current_owner = package("module-a", "1.0.0");
+    current_owner
+        .extension_points
+        .push(point_decl(point.clone()));
+    let mut consumer = package("module-extension", "1.0.0");
+    consumer
+        .extension_contributions
+        .push(ExtensionContribution {
+            contribution_id: business_module_contracts::ContributionId::from_parts(
+                "module-extension",
+                "use-slot",
+            )
+            .unwrap(),
+            consumer_module_id: consumer.manifest.module_id.clone(),
+            target_extension_point_id: point.clone(),
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+    let plan = dry_plan_from_declarations(
+        &snapshot(vec![current_owner, consumer.clone()]),
+        compiler_input(vec![package("module-a", "1.0.0"), consumer]),
+    )
+    .unwrap();
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval { module_id: Some(module_id), identifier, reason }
+            if module_id.as_str() == "module-a"
+                && identifier == &point.to_string()
+                && reason.contains("consumer")
+    )));
+}
+
+#[test]
+fn owner_removal_is_allowed_when_retained_consumer_drops_contribution() {
     let point = ExtensionPointId::from_parts("module-a", "slot").unwrap();
     let mut owner = package("module-a", "1.0.0");
     owner.extension_points.push(point_decl(point.clone()));
@@ -250,11 +334,55 @@ fn owner_removal_with_active_extension_consumer_is_blocked() {
         &compiled(vec![package("module-extension", "1.0.0")]),
     )
     .unwrap();
-    assert!(!plan.applicable);
-    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+    assert!(plan.applicable);
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::RemoveModule { module_id, .. }
+            if module_id.as_str() == "module-a"
+    )));
+    assert!(!plan.diagnostics.iter().any(|diagnostic| matches!(
         diagnostic,
-        PlanDiagnostic::BlockedRemoval { module_id: Some(module_id), reason, .. }
-            if module_id.as_str() == "module-a" && reason.contains("consumer")
+        PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer")
+    )));
+}
+
+#[test]
+fn extension_point_removal_is_allowed_when_retained_consumer_drops_contribution() {
+    let point = ExtensionPointId::from_parts("module-a", "slot").unwrap();
+    let mut owner = package("module-a", "1.0.0");
+    owner.extension_points.push(point_decl(point.clone()));
+    let mut consumer = package("module-extension", "1.0.0");
+    consumer
+        .extension_contributions
+        .push(ExtensionContribution {
+            contribution_id: business_module_contracts::ContributionId::from_parts(
+                "module-extension",
+                "use-slot",
+            )
+            .unwrap(),
+            consumer_module_id: consumer.manifest.module_id.clone(),
+            target_extension_point_id: point.clone(),
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+    let plan = dry_plan(
+        &snapshot(vec![owner, consumer]),
+        &compiled(vec![
+            package("module-a", "1.0.0"),
+            package("module-extension", "1.0.0"),
+        ]),
+    )
+    .unwrap();
+    assert!(plan.applicable);
+    assert!(has_change(&plan, |change| matches!(
+        change,
+        PackageChange::RemoveExtensionPoint { extension_point_id, .. }
+            if extension_point_id == &point
+    )));
+    assert!(!plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::BlockedRemoval { reason, .. } if reason.contains("consumer")
     )));
 }
 
@@ -273,6 +401,32 @@ fn permutations_produce_identical_plan_and_diagnostics() {
     )
     .unwrap();
     assert_eq!(first, second);
+}
+
+#[test]
+fn planning_declarations_reject_unknown_external_extension_point() {
+    let mut consumer = package("module-extension", "1.0.0");
+    consumer
+        .extension_contributions
+        .push(ExtensionContribution {
+            contribution_id: business_module_contracts::ContributionId::from_parts(
+                "module-extension",
+                "unknown-slot",
+            )
+            .unwrap(),
+            consumer_module_id: consumer.manifest.module_id.clone(),
+            target_extension_point_id: ExtensionPointId::from_parts("module-a", "missing").unwrap(),
+            expected_contract_version: BusinessModuleVersion::new("1.0.0").unwrap(),
+            classification: DataClassification::Internal,
+            kind: ExtensionContributionKind::DetailUi,
+        });
+    assert!(matches!(
+        dry_plan_from_declarations(
+            &CurrentRegistrySnapshot::default(),
+            compiler_input(vec![consumer]),
+        ),
+        Err(PlanError::PlanningCompilation { reason }) if reason.contains("unknown extension point")
+    ));
 }
 
 #[test]

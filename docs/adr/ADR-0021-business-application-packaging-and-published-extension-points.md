@@ -105,6 +105,12 @@ Consumer 不得修改 Owner 的 private Domain/Persistence。
 
 Owner 删除 Extension Point 的 dry-plan 必须检查所有 consumer contribution、module dependency 和兼容窗口。只有消费者先移除/迁移贡献且当前 registry snapshot 满足反向引用为空，才可执行 point removal。Point removal 不自动删除 owner 或 consumer 的正式业务事实。
 
+The pure planner may accept raw desired declarations with the current registry
+snapshot as transition context when a live consumer or dependency would
+otherwise be rejected before planning. This context is used only to explain a
+`BlockedRemoval`; it does not relax standalone package compilation or create a
+second registry authority.
+
 ### 2.4 禁止跨模块 private mutation
 
 明确禁止：

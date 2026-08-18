@@ -297,6 +297,15 @@ Current compiled registry snapshot
 Incoming compiled package set
 ```
 
+The strict `dry_plan` seam accepts only a standalone compiled package set. For
+removal transitions that must explain an active dependency or extension
+consumer before the desired package set can be compiled independently, the
+compiler also exposes a pure `dry_plan_from_declarations` seam. It validates
+raw desired declarations against the current snapshot as transition context,
+returns `BlockedRemoval` for live references, and still rejects targets absent
+from both the incoming declarations and the current snapshot. Its intermediate
+context is not a second registry and is not an installable package artifact.
+
 输出只描述计划，不执行数据库/API/文件系统修改。
 
 必须能够回答：

@@ -1,8 +1,9 @@
 #![allow(clippy::default_trait_access, clippy::unwrap_used)]
 
 use business_application_compiler::{
-    compile, dry_plan, BusinessApplicationCompilerInput, BusinessApplicationPackage,
-    CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange, PlanDiagnostic,
+    compile, dry_plan, dry_plan_from_declarations, BusinessApplicationCompilerInput,
+    BusinessApplicationPackage, CurrentModuleSnapshot, CurrentRegistrySnapshot, PackageChange,
+    PlanDiagnostic,
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
@@ -165,22 +166,18 @@ fn module_removals_block_on_live_dependency_or_extension_consumer() {
         module_id: owner.manifest.module_id.clone(),
         version_requirement: "^1.0.0".to_owned(),
     });
-    let dependency_plan = dry_plan(
+    let dependency_plan = dry_plan_from_declarations(
         &snapshot(vec![owner.clone(), dependent.clone()]),
-        &compile(input(vec![package("module-b", "1.0.0")])).unwrap(),
+        input(vec![dependent]),
     )
     .unwrap();
     assert!(blocked(&dependency_plan));
 
     let mut owner_with_point = owner;
     owner_with_point.extension_points.push(point());
-    let extension_plan = dry_plan(
+    let extension_plan = dry_plan_from_declarations(
         &snapshot(vec![owner_with_point.clone(), extension_package()]),
-        &compile(input(vec![
-            package("module-a", "1.0.0"),
-            package("module-extension", "1.0.0"),
-        ]))
-        .unwrap(),
+        input(vec![extension_package()]),
     )
     .unwrap();
     assert!(blocked(&extension_plan));
