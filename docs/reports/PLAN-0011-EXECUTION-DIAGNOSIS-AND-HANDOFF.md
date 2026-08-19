@@ -2,14 +2,15 @@
 
 Document ID: `REPORT-PLAN-0011-EXECUTION-HANDOFF`
 
-Last verified: 2026-08-19, after Closeout CI Run `32214911706` for closeout
-commit `fd4b754e9518a42f1b6224056a171b30f8de2cb3` completed successfully
+State verification: 2026-08-19, after final-status CI Run `32216138288` for
+implementation/closeout state commit `3a42856cda587b205f8927c1d06e3aa5f532692d`
+completed successfully. This report is a subsequent docs-only handoff record.
 
 Status: `PLAN-0011 = Integrated / Archived / Closeout CI PASS / Branch Cleanup DONE`.
 This report records the execution diagnosis and handoff evidence.
 
-> 本文件在候选阶段保持未跟踪，避免改变 `ed870ac` 的 exact review HEAD；当前
-> closeout 阶段将把它纳入正式文档提交。
+> 本文件曾在候选阶段保持未跟踪，避免改变 `ed870ac` 的 exact review HEAD；现已
+> 随 closeout 文档提交纳入 `main`，并由最终状态 CI 验证。
 
 ## 1. 结论先行
 
@@ -17,25 +18,32 @@ PLAN-0011 长时间未完成的直接原因不是编译器、GitHub CI 或 Postg
 基础设施持续卡死，而是候选在自动化门禁通过后仍被独立 REVIEW-C 发现架构
 级阻塞，随后进入了多轮 bounded repair。历史 reviewed HEAD `f945a53` 的 4 个
 HIGH 已在 `ed870ac` 中完成 bounded repair；新的 exact-head CI 和 fresh
-REVIEW-C 均已通过。候选随后已 fast-forward 集成到 main，Main CI 也已通过；
-当前只剩最终 ancestor/clean 核验和 feature branch cleanup。
+REVIEW-C 均已通过。候选随后已 fast-forward 集成到 main，Main CI、Closeout CI
+和最终状态 CI 也已通过；最终 ancestor/clean 核验和 feature branch cleanup 均已完成。
 
-当前有效状态是：
+当前有效状态快照是：
 
 ```text
-origin/main = ed870acfe165756632c0519bb181fd5dcf8a11cd
+implementation/closeout state = 3a42856cda587b205f8927c1d06e3aa5f532692d
+main at final-status verification = 3a42856cda587b205f8927c1d06e3aa5f532692d
 PLAN-0011 implementation base = 31b24c6993dbff1f3e88b2476e0c87460400ec31
 latest candidate HEAD = ed870acfe165756632c0519bb181fd5dcf8a11cd
 latest candidate local gates = PASS
 latest candidate CI = Run 32210387950 / PASS (retry after cancelled attempt)
 fresh REVIEW-C for ed870ac = PASS (read-only reviewer Rawls; no actionable findings)
 previous reviewed HEAD f945a53 = historical FAIL / 4 HIGH, repaired by ed870ac
-main integration = DONE (fast-forward to ed870ac)
+main integration = DONE (fast-forward to ed870ac; closeout commits follow)
 Main CI = Run 32213985080 / PASS
 PLAN archive = DONE locally and in closeout commit
 Closeout CI = Run 32214911706 / PASS
 feature branch cleanup = DONE (local and remote deleted)
+final-status CI = Run 32216138288 / PASS (all jobs, head 3a42856c)
+state verification working tree = CLEAN
 ```
+
+本报告提交本身只增加诊断和 handoff 文档，不改变已接受的 PLAN-0011 实现状态。
+报告不自引用其未来 commit SHA；提交后的当前 `main` 应是 `3a42856` 的 docs-only
+后代，并以 Git 状态和远端 CI 作为可验证事实。
 
 长耗时是一个控制流程放大问题，而不是单一慢步骤：
 
@@ -53,30 +61,31 @@ feature branch cleanup = DONE (local and remote deleted)
 6. 多次全量 CI 的绿色结果提高了等待时间，却没有覆盖后来由 REVIEW-C 找到
    的细粒度不变量。
 
-因此，当前不是“再等 Main CI 就会完成”：`ed870ac` 的 exact CI、fresh REVIEW-C
-和 Main CI 均已 PASS。下一步是完成最终 ancestor/clean 核验并安全清理 feature
-branch；完成后 PLAN-0011 才能通过最终完成审计。
+因此，当前不是“再等 Main CI 就会完成”：`ed870ac` 的 exact CI、fresh REVIEW-C、
+Main CI、Closeout CI 和最终状态 CI 均已 PASS。PLAN-0011 已通过最终完成审计，
+没有需要恢复的实现或评审工作。
 
 ## 2. 权威当前状态
 
 | 项目 | 当前事实 | 结论 |
 | --- | --- | --- |
 | Repository | `F:\Workspace\business-platform` | 正确工作区 |
-| Branch | `main`（feature branch 仍待清理） | 当前集成分支 |
-| Local HEAD | `ed870acfe165756632c0519bb181fd5dcf8a11cd` | 候选已集成，CI/Review 已接受 |
-| Remote feature HEAD | `ed870acfe165756632c0519bb181fd5dcf8a11cd` | 历史候选仍可追溯 |
-| `origin/main` | `ed870acfe165756632c0519bb181fd5dcf8a11cd` | Main CI 已通过 |
-| Merge base | `ed870acfe165756632c0519bb181fd5dcf8a11cd` | feature 已完整集成 |
-| Ahead / behind | `0 ahead / 0 behind`（main） | 已集成 |
+| Branch | `main`（PLAN-0011 feature branch 已删除） | 当前集成分支 |
+| Implementation state | `3a42856cda587b205f8927c1d06e3aa5f532692d` | closeout 状态已验证 |
+| Remote feature HEAD | 不存在 | local/remote cleanup 已完成 |
+| `origin/main` at state verification | `3a42856cda587b205f8927c1d06e3aa5f532692d` | 最终状态 CI 已通过 |
+| Merge base at state verification | `3a42856cda587b205f8927c1d06e3aa5f532692d` | closeout history 已在 main |
+| Ahead / behind at state verification | `0 ahead / 0 behind`（main） | 已集成 |
 | Implementation base | `31b24c6993dbff1f3e88b2476e0c87460400ec31` | exact review base |
-| PLAN status | `Integrated / Archived` | 集成、归档和 Closeout CI 已完成；分支清理待完成 |
+| PLAN status | `Integrated / Archived` | 集成、归档、Closeout CI 和 cleanup 均完成 |
 | Latest exact-head CI | Run `32210387950`, HEAD `ed870ac`, `PASS` | 自动化门禁通过 |
 | Previous candidate REVIEW-C | HEAD `7867123`, `FAIL` | 历史候选已失效 |
 | REVIEW-C for `ed870ac` | `PASS` | Rawls 精确审查无 actionable findings |
 | Main CI | Run `32213985080`, `PASS` | main exact HEAD 已通过 |
 | Closeout CI | Run `32214911706`, `PASS` | closeout commit 已通过 |
+| Final-status CI | Run `32216138288`, HEAD `3a42856`, `PASS` | 最终状态提交全部 jobs 通过 |
 | Branch cleanup | `DONE` | local `-d` 与 remote `--delete` 均成功 |
-| Working tree | Closeout 文档修改 + handoff 待提交 | main 候选本身已通过 Main CI；closeout 提交尚未 push |
+| Working tree at state verification | clean | `main` 与 `origin/main` 一致 |
 
 implementation base 到 `ed870ac` 的已提交候选范围为 39 个提交、19 个文件，约
 6,126 行新增和 18 行删除；feature branch 在集成前相对 main 为 40 个提交。该
@@ -96,7 +105,7 @@ Marketplace、动态插件、PLAN-0006 实现或 C migration。
   与契约同步。
 
 它们已经属于远端 `ed870ac`，并有 exact CI、fresh REVIEW-C 和 Main CI 证据；handoff
-将在 closeout 提交中纳入正式记录。
+及 closeout 状态又已在 `fd4b754`、`9757669`、`3a42856` 中正式记录并通过对应 CI。
 
 ### 2.1 自动化验证事实
 
@@ -175,10 +184,11 @@ H4 的结论需要保守理解：仓库没有完整 worker telemetry，不能把
 
 ### 4.1 历史阻塞、已完成修复与当前阻塞
 
-当前没有未解决的 code/review、Main CI 或 Closeout CI 阻塞。`f945a53` 的 fresh REVIEW-C FAIL 是
-历史事实，四个 HIGH 已在 `ed870ac` 中修复，并已通过 exact-head CI 和新的
-fresh REVIEW-C。候选已 fast-forward 到 main，且 Main CI/Closeout CI 已通过；当前
-剩余阻塞只有 feature branch cleanup 前的最终 ancestor/clean 核验。
+当前没有未解决的 code/review、Main CI、Closeout CI 或仓库状态阻塞。`f945a53` 的
+fresh REVIEW-C FAIL 是历史事实，四个 HIGH 已在 `ed870ac` 中修复，并已通过
+exact-head CI 和新的 fresh REVIEW-C。候选已 fast-forward 到 main，且 Main
+CI/Closeout CI/最终状态 CI 已通过；ancestor、clean 和 feature branch cleanup
+核验也全部完成。
 
 历史候选 `7867123` 的 REVIEW-C 发现了以下五个 blocking findings：
 
@@ -304,6 +314,9 @@ source/design inspection，未开始具体 patch，已按停止协议结束；�
 - Run `32107765513`：约 14:38 至 14:42 (+08:00)，约 4 分钟，PASS。
 - `ed870ac`：2026-08-19 10:56:57 (+08:00)，完成 4 个 HIGH 的 bounded repair；Run
   `32210387950` 于 10:57 至 11:23 (+08:00) PASS，随后 fresh REVIEW-C PASS。
+- `fd4b754` / `9757669` / `3a42856`：2026-08-19 closeout、verification 和
+  branch-cleanup 状态提交；Closeout CI Runs `32214911706`、`32215330940` 和最终
+  状态 CI Run `32216138288` 均 PASS；该状态快照中 `HEAD == origin/main == 3a42856`。
 
 从 40c 到后续修复之间的完整 worker 等待、模型调用和人工处理 telemetry
 没有持久化，因此不能把这段日历间隔精确分摊给某一原因。能确定的是：CI
@@ -402,15 +415,21 @@ loop 不通过不得启动 full gates、阶段 hard timeout、停止时输出 pa
 和恢复命令。基础设施失败必须记录为 `INFRASTRUCTURE_BLOCKED`，不能与业务
 失败混在一起。
 
-## 7. 有效 handoff：接手后的最短恢复路径
+## 7. 有效 handoff：若后续需要复核/恢复的最短路径
+
+以下 Gate 1–4 是已经完成的证据链，不是当前待执行队列。若未来需要复核，必须
+从下列 immutable checkpoint 读取事实；不得把已归档 PLAN-0011 重新当作活动实现分支。
 
 ### Gate 0：保留当前事实
 
 1. 不 amend、force-push 或 rewrite `40c4078`、`7867123`、`f64e767`、
-   `2639c3e`、`880b9a6` 或 `f945a53`。
-2. 保持 feature branch，不能集成或删除。
+   `2639c3e`、`880b9a6`、`f945a53`、`ed870ac`、`fd4b754`、`9757669` 或
+   `3a42856`。
+2. 当前必须保持 `main`、工作树 clean，且 PLAN-0011 feature branch 保持已删除；
+   实现状态必须仍以 `3a42856` 为基线或其 docs-only 后代，不得改写该状态。
 3. 不恢复两个已中断 worker 的 partial state。
-4. 不把本 handoff 文件加入当前候选；它会改变 HEAD 并重新打开 CI/review 循环。
+4. 不把新的实现混入本 handoff 或归档 PLAN；若有新增需求，创建独立 Plan、
+   fresh branch 和新的 review/evidence 链。
 
 ### Gate 1：固化 bounded repair（已完成）
 
@@ -442,8 +461,9 @@ actionable findings，verdict 为 `PASS`，因此进入 Gate 3。不得把该 PA
 
 ### Gate 3：main integration（已完成）
 
-1. `git fetch origin --prune`，重新读取 `origin/main`；结果为
-   `ed870acfe165756632c0519bb181fd5dcf8a11cd`；
+1. `git fetch origin --prune`，重新读取 `origin/main`；候选集成时结果为
+   `ed870acfe165756632c0519bb181fd5dcf8a11cd`，最终 closeout 后为
+   `3a42856cda587b205f8927c1d06e3aa5f532692d`；
 2. 复核 main 是否改动 `business-module-contracts`、
    `business-application-compiler`、相关 ADR/fitness 或 PLAN 假设；
 3. 只有在 base 为 ancestor、无冲突且 scope 仍成立时，才允许 solo
@@ -451,18 +471,22 @@ actionable findings，verdict 为 `PASS`，因此进入 Gate 3。不得把该 PA
 4. 已无冲突 fast-forward 到 main 并 push；
 5. Main CI Run `32213985080` 已 PASS，进入 Gate 4。
 
-### Gate 4：Main CI PASS 后 closeout（进行中）
+### Gate 4：Main CI PASS 后 closeout（已完成）
 
 1. 已将 PLAN-0011 从 `docs/plans/current/` 移到 `docs/plans/archive/2026/`；
 2. 已更新 `docs/plans/README.md`、`docs/architecture/ARCHITECTURE_STATUS.md`
    和 Business Application Platform 文档状态；
 3. 已记录 implementation、candidate、review verdict、integration SHA、Main CI；
 4. closeout commit `fd4b754` 已 push，Closeout CI Run `32214911706` 已 PASS；
-5. 证明最终 closeout history 是 main ancestor、工作树 clean 后，才可用
-   `git branch -d` 和 `git push origin --delete` 清理 feature branch；禁止无证据
-   `-D`。
+5. closeout verification commit `9757669` 已 push，并有对应 Closeout CI
+   Run `32215330940` PASS；
+6. 已证明最终 closeout history 是 `main` ancestor 且工作树 clean，随后使用
+   `git branch -d` 和 `git push origin --delete` 清理 feature branch；未使用无证据
+   的 `-D`；
+7. branch cleanup record commit `3a42856` 已 push，最终状态 CI Run `32216138288`
+   已 PASS。
 
-## 8. 完成定义与明确未完成项
+## 8. 完成定义与当前状态
 
 PLAN-0011 在以下条件全部满足前都不能通过最终完成审计：
 
@@ -475,16 +499,19 @@ PLAN-0011 在以下条件全部满足前都不能通过最终完成审计：
 - feature branch 本地和远端安全删除；
 - 最终工作树 clean。
 
-当前明确未完成：
+当前完成状态：
 
 ```text
 Fresh REVIEW-C for ed870ac = PASS (Rawls, exact range 31b24c6..ed870ac)
-Current main = ed870ac, fast-forward integrated
+PLAN implementation state = 3a42856, closeout history integrated
 Main CI = PASS (Run 32213985080)
 PLAN archive = DONE
 Closeout commit/CI = DONE (fd4b754 / Run 32214911706)
+Closeout verification = DONE (9757669 / Run 32215330940)
 Closeout CI = PASS (Run 32214911706)
 Feature branch cleanup = DONE (local and remote deleted)
+Final-status CI = PASS (Run 32216138288; HEAD 3a42856)
+State-verification working tree = CLEAN; post-report HEAD must be a clean docs-only descendant
 ```
 
 当前明确禁止：PLAN-0012、PLAN-0006、Contract/C production migration、
