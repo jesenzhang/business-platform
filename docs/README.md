@@ -36,7 +36,7 @@
 | Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
 | 数据治理、分析与可视化 | [`architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md) | Baseline | 可重建分析投影、指标语义、受控查询、Dashboard 与报表边界 |
 | Business Module Isolation 与 Semantic Contract | [`architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md) | Baseline | 平台核心/业务模块隔离、模块 manifest、语义贡献、确定性编译和 legacy ACL 边界 |
-| Business Application Platform | [`architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md) | Proposed input | Platform Core/Business Module 边界、贡献、跨模块协作、生命周期和 synthetic validation |
+| Business Application Platform | [`architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md) | Baseline | Platform Core/Business Module 边界、贡献、跨模块协作、生命周期和 synthetic validation |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -142,9 +142,9 @@ reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
 
 ## 9. 当前实施
 
-- 当前执行计划：PLAN-0007（Active，local solo fast-forward）；PLAN-0011（Active，Stage 2 documentation-only activation）
+- 当前执行计划：PLAN-0007（Active，local solo fast-forward）；PLAN-0011（Integrated / Archived，Main `ed870ac`，Main CI `32213985080`）
 - PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-- PLAN-0011 Active：plans/current/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted；本次仅激活文档状态，不授权超出计划范围的 runtime）
+- PLAN-0011 Integrated / Archived：plans/archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted；纯 contract/compiler/dry-plan/fitness foundation 已集成；runtime/具体业务模块仍不在本计划范围）
 - PLAN-0009 Completed / Rehearsal Closed / Archived：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
 - 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed / NOT ACTIVE）
 - 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）

@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-13
-> 当前阶段：Architecture Foundation Convergence — document foundation integrated; PLAN-0011 Active; PLAN-0009 Rehearsal Closed
-> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Active / Stage 2 documentation activation；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
+> 最后更新：2026-08-19
+> 当前阶段：Architecture Foundation Convergence — document foundation and PLAN-0011 foundation integrated; PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -116,6 +116,16 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > `be7524974d70c4eef58111106c79f68e94f2cd3b`; no Rust, code, runtime, migration,
 > API, Worker, or dependency implementation is included.
 
+> 2026-08-19: PLAN-0011 reached Accepted Candidate at
+> `ed870acfe165756632c0519bb181fd5dcf8a11cd` after bounded repair and independent
+> REVIEW-C PASS over the exact implementation range. Feature CI `32210387950` and
+> Main CI `32213985080` passed all configured jobs, including Architecture Fitness,
+> frontend/CLI/MCP contracts, PostgreSQL/MinIO and E2E. The candidate was integrated
+> into main by solo fast-forward. PLAN-0011 is now Integrated / Archived. The
+> Business Application Platform document is promoted to Baseline; no runtime,
+> dynamic plugin, Marketplace, database migration, PLAN-0006 implementation,
+> PLAN-0009 production migration or concrete business module was introduced.
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
@@ -208,12 +218,12 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 - Business Module Isolation 与 Semantic Contract Baseline、ADR-0020、纯 Rust contract/compiler
   和确定性编译测试；现有业务 crate 尚未迁入 `modules/` 目录。
 
-Architecture Foundation Convergence 已集成文档基础：Business Application Platform
+Architecture Foundation Convergence 已集成文档基础和 PLAN-0011 foundation：Business Application Platform
 边界、Inter-Module Communication、Process Manager/Saga、Published Extension Point、
 Package/Dry Plan、UI/Agent/Semantic contribution 三层边界和 module-a/b/extension
-synthetic validation 已提出；ADR-0021/0022 已 Accepted，PLAN-0011 已进入 Active。
-本次仅完成文档 activation；不得把这些文档描述为已实现 Registry、安装器、卸载器、
-Saga runtime 或动态插件。
+synthetic validation 已形成；ADR-0021/0022 已 Accepted，PLAN-0011 已 Integrated / Archived。
+纯 Rust contract/compiler/dry-plan/fitness foundation 已实现；不得把这些文档或代码
+描述为已实现 Registry、安装器、卸载器、Saga runtime 或动态插件。
 
 Enterprise AI Workspace 现状：
 
@@ -347,7 +357,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待全面落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；本轮文档新增门禁设计待本次验证；Agent 门禁待 PLAN-0006
+自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；PLAN-0011 business application/compiler/dry-plan/fitness gates PASS；外部 cargo-audit/cargo-deny/gitleaks/trivy/syft/grype/osv-scanner 在当前环境 NOT RUN；Agent 门禁待 PLAN-0006
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
@@ -360,7 +370,8 @@ PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78
 PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
 PLAN-0010：Integrated / Archived（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-PLAN-0011：Active（Business Application Packaging and Contribution；ADR-0021/0022 已 Accepted；本次为 Stage 2 documentation-only activation）
+PLAN-0011：Integrated / Archived（Business Application Packaging and Contribution；Candidate/Main `ed870acfe165756632c0519bb181fd5dcf8a11cd`；Feature CI `32210387950`；Main CI `32213985080`；ADR-0021/0022 Accepted）
+Business Application Platform：Baseline（由 PLAN-0011 建立 packaging/contribution/compiler/dry-plan foundation；runtime/具体业务模块未实现）
 ```
 
 ## 8. PLAN-0006 采用前动作

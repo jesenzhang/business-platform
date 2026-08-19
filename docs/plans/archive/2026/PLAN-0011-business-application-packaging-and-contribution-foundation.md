@@ -1,12 +1,13 @@
 # PLAN-0011：Business Application Packaging & Contribution Foundation
 
 文档 ID：PLAN-0011
-版本：0.2
-状态：Active
-日期：2026-08-12
+版本：1.0
+状态：Integrated / Archived
+日期：2026-08-19
 Owner：Platform Foundation / Business Module Runtime / Frontend Platform
-架构前提：ADR-0020、ADR-0021、ADR-0022 均为 `Accepted`；本计划 activation gate 已满足，现进入 `Active`
-前置基线：PLAN-0010 已 `Integrated` 并归档；本次激活仅更新文档状态，不包含 Rust、代码或运行时实现
+架构前提：ADR-0020、ADR-0021、ADR-0022 均为 `Accepted`；本计划 activation gate 已满足并已完成集成
+前置基线：PLAN-0010 已 `Integrated` 并归档；PLAN-0011 已完成纯 Rust
+contract/compiler/dry-plan/fixture foundation，未引入 runtime、数据库迁移或具体业务模块
 主要参考：Twenty `65616332b452361e639c41d7340d54febf95fae5`；WrenAI `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902`
 
 ## 1. 背景
@@ -522,8 +523,8 @@ git diff --check
 - 本计划 scope 仍限制在纯 contract/compiler/dry-plan/fitness foundation。
 
 以上条件已于 2026-08-13 满足。Stage 2 Luna worker 基于精确基线
-`be7524974d70c4eef58111106c79f68e94f2cd3b` 完成本计划的文档-only activation；本次提交
-只更新计划激活状态及其文档索引，不包含实现变更。
+`be7524974d70c4eef58111106c79f68e94f2cd3b` 完成 activation；activation 当时只更新
+文档状态，后续实现阶段在独立 feature branch 完成。
 
 ## 15. Accepted Candidate Gate
 
@@ -542,6 +543,28 @@ git diff --check
 - module removal fixture PASS；
 - full workspace gates PASS；
 - exact Candidate HEAD remote CI PASS。
+
+### 15.1 Accepted Candidate 与 Integration Evidence
+
+以上条件已满足，证据如下：
+
+- Implementation base：`31b24c6993dbff1f3e88b2476e0c87460400ec31`；
+- Accepted Candidate：`ed870acfe165756632c0519bb181fd5dcf8a11cd`；
+- Feature exact-head CI：Run `32210387950`，PASS；
+- Independent REVIEW-C：Rawls 对精确范围
+  `31b24c6993dbff1f3e88b2476e0c87460400ec31..ed870acfe165756632c0519bb181fd5dcf8a11cd`
+  返回 PASS，无 actionable findings；
+- Main integration：`ed870acfe165756632c0519bb181fd5dcf8a11cd`，fast-forward；
+- Main CI：Run `32213985080`，PASS，包含 Rust、Architecture Fitness、前端、CLI/MCP、
+  PostgreSQL/MinIO/E2E；
+- Scope：仅包含 Business Module Contracts、Business Application Compiler、typed
+  contributions、Published Extension Point、SemVer、deterministic dry-plan、synthetic
+  fixtures、Architecture Fitness 与配套文档/测试；未引入 database、worker、runtime、
+  dynamic plugin、Marketplace、PLAN-0006、PLAN-0009 production migration 或具体业务模块。
+
+外部 `cargo-audit`、`cargo-deny`、`gitleaks`、`trivy`、`syft`、`grype`、
+`osv-scanner` 在本环境没有正式入口或可执行文件，状态记录为 `NOT RUN`，不宣称通过；
+这是后续发布扫描的明确接受风险，不改变本计划已定义的 Candidate/Main CI 验收结论。
 
 ## 16. 禁止事项
 
@@ -571,7 +594,8 @@ git diff --check
 
 ## 18. 完成定义
 
-本计划当前为 `Active`。以下是 Active 阶段的完成定义，不是本次文档-only activation 已完成的 runtime 证据。
+本计划已于 2026-08-19 以 `Integrated / Archived` 完成。以下成功标准已由
+Accepted Candidate、Main CI 和归档证据覆盖；本计划不包含 runtime executor 或真实业务模块。
 
 PLAN-0011 的成功标准不是“做出 App Store”，而是证明：
 
