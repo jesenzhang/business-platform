@@ -5,8 +5,8 @@ Document ID: `REPORT-PLAN-0011-EXECUTION-HANDOFF`
 Last verified: 2026-08-19, after Closeout CI Run `32214911706` for closeout
 commit `fd4b754e9518a42f1b6224056a171b30f8de2cb3` completed successfully
 
-Status: `PLAN-0011 = Integrated / Archived / Closeout CI PASS`; feature branch cleanup
-remains pending. This report records the execution diagnosis and handoff evidence.
+Status: `PLAN-0011 = Integrated / Archived / Closeout CI PASS / Branch Cleanup DONE`.
+This report records the execution diagnosis and handoff evidence.
 
 > 本文件在候选阶段保持未跟踪，避免改变 `ed870ac` 的 exact review HEAD；当前
 > closeout 阶段将把它纳入正式文档提交。
@@ -34,7 +34,7 @@ main integration = DONE (fast-forward to ed870ac)
 Main CI = Run 32213985080 / PASS
 PLAN archive = DONE locally and in closeout commit
 Closeout CI = Run 32214911706 / PASS
-feature branch cleanup = NOT YET ALLOWED
+feature branch cleanup = DONE (local and remote deleted)
 ```
 
 长耗时是一个控制流程放大问题，而不是单一慢步骤：
@@ -75,7 +75,7 @@ branch；完成后 PLAN-0011 才能通过最终完成审计。
 | REVIEW-C for `ed870ac` | `PASS` | Rawls 精确审查无 actionable findings |
 | Main CI | Run `32213985080`, `PASS` | main exact HEAD 已通过 |
 | Closeout CI | Run `32214911706`, `PASS` | closeout commit 已通过 |
-| Branch cleanup | `NOT ALLOWED YET` | Closeout CI 和最终 ancestor/clean 检查后才能删除 |
+| Branch cleanup | `DONE` | local `-d` 与 remote `--delete` 均成功 |
 | Working tree | Closeout 文档修改 + handoff 待提交 | main 候选本身已通过 Main CI；closeout 提交尚未 push |
 
 implementation base 到 `ed870ac` 的已提交候选范围为 39 个提交、19 个文件，约
@@ -484,7 +484,7 @@ Main CI = PASS (Run 32213985080)
 PLAN archive = DONE
 Closeout commit/CI = DONE (fd4b754 / Run 32214911706)
 Closeout CI = PASS (Run 32214911706)
-Feature branch cleanup = NOT ALLOWED YET
+Feature branch cleanup = DONE (local and remote deleted)
 ```
 
 当前明确禁止：PLAN-0012、PLAN-0006、Contract/C production migration、
@@ -498,5 +498,5 @@ WrenAI/Analytics runtime 或任何超出 PLAN-0011 的扩展。
 1. `f945a53` 是已 push、本地和远端 CI 通过、但被独立评审拒绝的历史 HEAD；
 2. `ed870ac` 已关闭这 4 个 HIGH，并取得 exact CI 与 fresh REVIEW-C PASS；不要
    重复 repair 或复用其他 SHA 的 verdict；
-3. 当前下一动作是确认 main ancestor 与工作树 clean 后，再安全删除 feature
-   branch。
+3. main ancestor、Closeout CI、工作树 clean 和 feature branch cleanup 均已完成；
+   当前可按完成审计关闭 PLAN-0011。
