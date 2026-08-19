@@ -2,11 +2,11 @@
 
 Document ID: `REPORT-PLAN-0011-EXECUTION-HANDOFF`
 
-Last verified: 2026-08-19, after Main CI Run `32213985080` for
-`ed870acfe165756632c0519bb181fd5dcf8a11cd` completed successfully
+Last verified: 2026-08-19, after Closeout CI Run `32214911706` for closeout
+commit `fd4b754e9518a42f1b6224056a171b30f8de2cb3` completed successfully
 
-Status: `PLAN-0011 = Integrated / Archived`; Closeout CI and feature branch cleanup
-remain pending. This report records the execution diagnosis and handoff evidence.
+Status: `PLAN-0011 = Integrated / Archived / Closeout CI PASS`; feature branch cleanup
+remains pending. This report records the execution diagnosis and handoff evidence.
 
 > 本文件在候选阶段保持未跟踪，避免改变 `ed870ac` 的 exact review HEAD；当前
 > closeout 阶段将把它纳入正式文档提交。
@@ -18,7 +18,7 @@ PLAN-0011 长时间未完成的直接原因不是编译器、GitHub CI 或 Postg
 级阻塞，随后进入了多轮 bounded repair。历史 reviewed HEAD `f945a53` 的 4 个
 HIGH 已在 `ed870ac` 中完成 bounded repair；新的 exact-head CI 和 fresh
 REVIEW-C 均已通过。候选随后已 fast-forward 集成到 main，Main CI 也已通过；
-当前只剩 Closeout CI 与分支清理这两个收尾门禁。
+当前只剩最终 ancestor/clean 核验和 feature branch cleanup。
 
 当前有效状态是：
 
@@ -33,7 +33,7 @@ previous reviewed HEAD f945a53 = historical FAIL / 4 HIGH, repaired by ed870ac
 main integration = DONE (fast-forward to ed870ac)
 Main CI = Run 32213985080 / PASS
 PLAN archive = DONE locally and in closeout commit
-Closeout CI = NOT RUN
+Closeout CI = Run 32214911706 / PASS
 feature branch cleanup = NOT YET ALLOWED
 ```
 
@@ -54,8 +54,8 @@ feature branch cleanup = NOT YET ALLOWED
    的细粒度不变量。
 
 因此，当前不是“再等 Main CI 就会完成”：`ed870ac` 的 exact CI、fresh REVIEW-C
-和 Main CI 均已 PASS。下一步是完成 Closeout CI 与安全分支清理；两者完成后
-PLAN-0011 才能通过最终完成审计。
+和 Main CI 均已 PASS。下一步是完成最终 ancestor/clean 核验并安全清理 feature
+branch；完成后 PLAN-0011 才能通过最终完成审计。
 
 ## 2. 权威当前状态
 
@@ -69,12 +69,12 @@ PLAN-0011 才能通过最终完成审计。
 | Merge base | `ed870acfe165756632c0519bb181fd5dcf8a11cd` | feature 已完整集成 |
 | Ahead / behind | `0 ahead / 0 behind`（main） | 已集成 |
 | Implementation base | `31b24c6993dbff1f3e88b2476e0c87460400ec31` | exact review base |
-| PLAN status | `Integrated / Archived` | 已完成集成与归档；Closeout CI/分支清理待完成 |
+| PLAN status | `Integrated / Archived` | 集成、归档和 Closeout CI 已完成；分支清理待完成 |
 | Latest exact-head CI | Run `32210387950`, HEAD `ed870ac`, `PASS` | 自动化门禁通过 |
 | Previous candidate REVIEW-C | HEAD `7867123`, `FAIL` | 历史候选已失效 |
 | REVIEW-C for `ed870ac` | `PASS` | Rawls 精确审查无 actionable findings |
 | Main CI | Run `32213985080`, `PASS` | main exact HEAD 已通过 |
-| Closeout CI | `NOT RUN` | 还不能启动 |
+| Closeout CI | Run `32214911706`, `PASS` | closeout commit 已通过 |
 | Branch cleanup | `NOT ALLOWED YET` | Closeout CI 和最终 ancestor/clean 检查后才能删除 |
 | Working tree | Closeout 文档修改 + handoff 待提交 | main 候选本身已通过 Main CI；closeout 提交尚未 push |
 
@@ -175,10 +175,10 @@ H4 的结论需要保守理解：仓库没有完整 worker telemetry，不能把
 
 ### 4.1 历史阻塞、已完成修复与当前阻塞
 
-当前没有未解决的 code/review 或 Main CI 阻塞。`f945a53` 的 fresh REVIEW-C FAIL 是
+当前没有未解决的 code/review、Main CI 或 Closeout CI 阻塞。`f945a53` 的 fresh REVIEW-C FAIL 是
 历史事实，四个 HIGH 已在 `ed870ac` 中修复，并已通过 exact-head CI 和新的
-fresh REVIEW-C。候选已 fast-forward 到 main，且 Main CI 已通过；当前剩余阻塞
-是 Closeout CI 与 feature branch cleanup 两个收尾门禁。
+fresh REVIEW-C。候选已 fast-forward 到 main，且 Main CI/Closeout CI 已通过；当前
+剩余阻塞只有 feature branch cleanup 前的最终 ancestor/clean 核验。
 
 历史候选 `7867123` 的 REVIEW-C 发现了以下五个 blocking findings：
 
@@ -457,7 +457,7 @@ actionable findings，verdict 为 `PASS`，因此进入 Gate 3。不得把该 PA
 2. 已更新 `docs/plans/README.md`、`docs/architecture/ARCHITECTURE_STATUS.md`
    和 Business Application Platform 文档状态；
 3. 已记录 implementation、candidate、review verdict、integration SHA、Main CI；
-4. 当前 closeout 文档提交待 push，随后等待 Closeout CI PASS；
+4. closeout commit `fd4b754` 已 push，Closeout CI Run `32214911706` 已 PASS；
 5. 证明最终 closeout history 是 main ancestor、工作树 clean 后，才可用
    `git branch -d` 和 `git push origin --delete` 清理 feature branch；禁止无证据
    `-D`。
@@ -482,8 +482,8 @@ Fresh REVIEW-C for ed870ac = PASS (Rawls, exact range 31b24c6..ed870ac)
 Current main = ed870ac, fast-forward integrated
 Main CI = PASS (Run 32213985080)
 PLAN archive = DONE
-Closeout commit/CI = PENDING
-Closeout CI = NOT RUN
+Closeout commit/CI = DONE (fd4b754 / Run 32214911706)
+Closeout CI = PASS (Run 32214911706)
 Feature branch cleanup = NOT ALLOWED YET
 ```
 
@@ -498,5 +498,5 @@ WrenAI/Analytics runtime 或任何超出 PLAN-0011 的扩展。
 1. `f945a53` 是已 push、本地和远端 CI 通过、但被独立评审拒绝的历史 HEAD；
 2. `ed870ac` 已关闭这 4 个 HIGH，并取得 exact CI 与 fresh REVIEW-C PASS；不要
    重复 repair 或复用其他 SHA 的 verdict；
-3. 当前下一动作是提交 closeout 文档、等待 Closeout CI，确认 main ancestor 与
-   工作树 clean 后，再安全删除 feature branch。
+3. 当前下一动作是确认 main ancestor 与工作树 clean 后，再安全删除 feature
+   branch。
