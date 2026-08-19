@@ -32,6 +32,7 @@ fn navigation(
         owner_module_id: owner.clone(),
         schema_version: "ui.v1".into(),
         version: "1.0.0".into(),
+        classification: DataClassification::Internal,
         target: target(target_owner),
         label_key: "module-a.summary".into(),
         ordering: Some(10),
@@ -162,6 +163,92 @@ fn malformed_incoming_public_target_is_rejected() {
         Err(ManifestValidationError::InvalidField {
             kind: "public target command ID"
         })
+    ));
+}
+
+#[test]
+fn ui_and_agent_target_surfaces_are_closed_and_capability_targets_are_published() {
+    let owner = module("module-a");
+    let catalog = PublicContributionCatalog {
+        public_targets: vec![
+            PublicContributionTarget {
+                owner_module_id: owner.clone(),
+                target: PublicTargetKind::Resource {
+                    resource_kind: "record".into(),
+                },
+                version: "1.0.0".into(),
+            },
+            PublicContributionTarget {
+                owner_module_id: owner.clone(),
+                target: PublicTargetKind::Query {
+                    query_id: "summary".into(),
+                },
+                version: "1.0.0".into(),
+            },
+            PublicContributionTarget {
+                owner_module_id: owner.clone(),
+                target: PublicTargetKind::Command {
+                    command_id: "update".into(),
+                },
+                version: "1.0.0".into(),
+            },
+            PublicContributionTarget {
+                owner_module_id: owner.clone(),
+                target: PublicTargetKind::Capability {
+                    capability_id: "summarize".into(),
+                },
+                version: "1.0.0".into(),
+            },
+        ],
+    };
+
+    let mut ui_capability = navigation(&owner, &owner, "capability");
+    ui_capability.target = catalog.public_targets[3].clone();
+    let ui_targeting_command = {
+        let mut item = navigation(&owner, &owner, "command");
+        item.target = catalog.public_targets[2].clone();
+        item
+    };
+    let ui = TypedContributionSet {
+        navigation: vec![ui_capability, ui_targeting_command],
+        ..TypedContributionSet::default()
+    };
+    assert!(matches!(
+        ui.validate(&owner, &catalog),
+        Err(
+            ManifestValidationError::UnsupportedTypedContributionTarget {
+                contribution_kind: "UI",
+                target_kind: "command"
+            }
+        )
+    ));
+
+    let agent = AgentCapabilityContribution {
+        contribution_id: match AgentCapabilityId::from_parts(&owner, "tool") {
+            Ok(value) => value,
+            Err(error) => panic!("invalid fixture agent contribution: {error}"),
+        },
+        owner_module_id: owner.clone(),
+        schema_version: "agent.v1".into(),
+        version: "1.0.0".into(),
+        classification: DataClassification::Internal,
+        target: catalog.public_targets[0].clone(),
+        label_key: "record".into(),
+        required_policy: vec![],
+        required_capability: vec![],
+    };
+    let agents = TypedContributionSet {
+        agent_capabilities: vec![agent],
+        ..TypedContributionSet::default()
+    };
+    assert!(matches!(
+        agents.validate(&owner, &catalog),
+        Err(
+            ManifestValidationError::UnsupportedTypedContributionTarget {
+                contribution_kind: "Agent",
+                target_kind: "resource"
+            }
+        )
     ));
 }
 

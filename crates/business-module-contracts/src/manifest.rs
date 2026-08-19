@@ -804,6 +804,7 @@ pub enum PublicTargetKind {
     Resource { resource_kind: String },
     Query { query_id: String },
     Command { command_id: String },
+    Capability { capability_id: String },
 }
 
 /// A declaration of a policy requirement. Declaration never grants access.
@@ -839,6 +840,7 @@ macro_rules! ui_contribution {
             pub owner_module_id: BusinessModuleId,
             pub schema_version: String,
             pub version: String,
+            pub classification: DataClassification,
             pub target: PublicContributionTarget,
             pub label_key: String,
             #[serde(default)]
@@ -869,6 +871,7 @@ pub struct AgentCapabilityContribution {
     pub owner_module_id: BusinessModuleId,
     pub schema_version: String,
     pub version: String,
+    pub classification: DataClassification,
     pub target: PublicContributionTarget,
     pub label_key: String,
     #[serde(default)]
@@ -944,6 +947,7 @@ impl TypedContributionSet {
             ($items:expr) => {
                 for item in &$items {
                     check_typed_id(item.contribution_id.module_id(), &item.owner_module_id)?;
+                    validate_typed_public_target(&item.target, catalog, "UI")?;
                     check(
                         item.contribution_id.as_str(),
                         &item.owner_module_id,
@@ -966,6 +970,7 @@ impl TypedContributionSet {
         check_ui!(self.commands);
         for item in &self.agent_capabilities {
             check_typed_id(item.contribution_id.module_id(), &item.owner_module_id)?;
+            validate_typed_public_target(&item.target, catalog, "Agent")?;
             check(
                 item.contribution_id.as_str(),
                 &item.owner_module_id,
@@ -1142,6 +1147,13 @@ fn validate_public_target_shape(
                 kind: "public target command ID",
             })?;
         }
+        PublicTargetKind::Capability { capability_id } => {
+            validate_local_id(capability_id).map_err(|_| {
+                ManifestValidationError::InvalidField {
+                    kind: "public target capability ID",
+                }
+            })?;
+        }
     }
     BusinessModuleVersion::new(target.version.clone()).map_err(|_| {
         ManifestValidationError::InvalidField {
@@ -1149,6 +1161,47 @@ fn validate_public_target_shape(
         }
     })?;
     Ok(())
+}
+
+fn validate_typed_public_target(
+    target: &PublicContributionTarget,
+    catalog: &PublicContributionCatalog,
+    contribution_kind: &'static str,
+) -> Result<(), ManifestValidationError> {
+    validate_public_target(target, catalog)?;
+    let allowed = match contribution_kind {
+        "UI" => matches!(
+            &target.target,
+            PublicTargetKind::Resource { .. }
+                | PublicTargetKind::Query { .. }
+                | PublicTargetKind::Capability { .. }
+        ),
+        "Agent" => matches!(
+            &target.target,
+            PublicTargetKind::Query { .. }
+                | PublicTargetKind::Command { .. }
+                | PublicTargetKind::Capability { .. }
+        ),
+        _ => false,
+    };
+    if allowed {
+        return Ok(());
+    }
+    Err(
+        ManifestValidationError::UnsupportedTypedContributionTarget {
+            contribution_kind,
+            target_kind: public_target_kind_name(&target.target),
+        },
+    )
+}
+
+fn public_target_kind_name(target: &PublicTargetKind) -> &'static str {
+    match target {
+        PublicTargetKind::Resource { .. } => "resource",
+        PublicTargetKind::Query { .. } => "query",
+        PublicTargetKind::Command { .. } => "command",
+        PublicTargetKind::Capability { .. } => "capability",
+    }
 }
 
 /// A dependency on another published business module.
@@ -1358,6 +1411,13 @@ pub enum ManifestValidationError {
     /// The consumer kind is not the kind published by the owner.
     #[error("unsupported extension contribution kind")]
     UnsupportedExtensionContributionKind,
+    /// A typed UI or Agent contribution points at a surface that its contract
+    /// does not permit.
+    #[error("unsupported {contribution_kind} contribution target kind '{target_kind}'")]
+    UnsupportedTypedContributionTarget {
+        contribution_kind: &'static str,
+        target_kind: &'static str,
+    },
     /// Removing this point would strand an active consumer.
     #[error("removal of extension point '{extension_point_id}' is blocked by a live consumer")]
     BlockedExtensionPointRemoval { extension_point_id: String },

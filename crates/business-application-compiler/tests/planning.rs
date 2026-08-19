@@ -52,6 +52,7 @@ fn compiler_input(packages: Vec<BusinessApplicationPackage>) -> BusinessApplicat
         platform_version: "1.2.0".to_owned(),
         packages,
         installed_versions: Default::default(),
+        available_platform_capabilities: Default::default(),
         desired_installation_states: Default::default(),
     }
 }
@@ -171,6 +172,7 @@ fn desired_disabled_state_emits_disable_module() {
         platform_version: "1.2.0".to_owned(),
         packages: vec![package("module-a", "1.0.0")],
         installed_versions: Default::default(),
+        available_platform_capabilities: Default::default(),
         desired_installation_states: BTreeMap::from([(
             module.clone(),
             ModuleInstallationState::Disabled,
@@ -255,6 +257,7 @@ fn retained_public_target_consumers_block_target_removal() {
             owner_module_id: ui_consumer.manifest.module_id.clone(),
             schema_version: "1.0.0".to_owned(),
             version: "1.0.0".to_owned(),
+            classification: DataClassification::Internal,
             target: query_target(&owner_id),
             label_key: "read".to_owned(),
             ordering: None,
@@ -273,6 +276,7 @@ fn retained_public_target_consumers_block_target_removal() {
             owner_module_id: agent_consumer.manifest.module_id.clone(),
             schema_version: "1.0.0".to_owned(),
             version: "1.0.0".to_owned(),
+            classification: DataClassification::Internal,
             target: query_target(&owner_id),
             label_key: "read".to_owned(),
             required_policy: Vec::new(),
@@ -746,13 +750,83 @@ fn planning_declarations_reject_unknown_external_extension_point() {
             classification: DataClassification::Internal,
             kind: ExtensionContributionKind::DetailUi,
         });
-    assert!(matches!(
-        dry_plan_from_declarations(
-            &CurrentRegistrySnapshot::default(),
-            compiler_input(vec![consumer]),
-        ),
-        Err(PlanError::PlanningCompilation { reason }) if reason.contains("unknown extension point")
-    ));
+    let plan = dry_plan_from_declarations(
+        &CurrentRegistrySnapshot::default(),
+        compiler_input(vec![consumer]),
+    )
+    .unwrap();
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::Conflict { reason, .. } if reason.contains("unknown extension point")
+    )));
+}
+
+#[test]
+fn planning_unknown_dependency_is_a_structured_conflict() {
+    let mut dependent = package("module-b", "1.0.0");
+    dependent.manifest.dependencies.push(ModuleDependency {
+        module_id: BusinessModuleId::new("missing").unwrap(),
+        version_requirement: "^1.0.0".into(),
+    });
+
+    let plan = dry_plan_from_declarations(
+        &CurrentRegistrySnapshot::default(),
+        compiler_input(vec![dependent]),
+    )
+    .unwrap();
+
+    assert!(!plan.applicable);
+    assert!(plan.changes.iter().any(|change| matches!(
+        change,
+        PackageChange::Conflict { identifier, .. } if identifier == "missing"
+    )));
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::Conflict { identifier, reason, .. }
+            if identifier == "missing" && reason.contains("unknown module dependency")
+    )));
+}
+
+#[test]
+fn planning_incompatible_dependency_is_a_structured_conflict() {
+    let mut dependent = package("module-b", "1.0.0");
+    dependent.manifest.dependencies.push(ModuleDependency {
+        module_id: BusinessModuleId::new("module-a").unwrap(),
+        version_requirement: "^2.0.0".into(),
+    });
+
+    let plan = dry_plan_from_declarations(
+        &CurrentRegistrySnapshot::default(),
+        compiler_input(vec![package("module-a", "1.0.0"), dependent]),
+    )
+    .unwrap();
+
+    assert!(!plan.applicable);
+    assert!(plan.diagnostics.iter().any(|diagnostic| matches!(
+        diagnostic,
+        PlanDiagnostic::Conflict { identifier, reason, .. }
+            if identifier == "module-a" && reason.contains("incompatible")
+    )));
+}
+
+#[test]
+fn planning_ownership_collision_is_a_structured_conflict() {
+    let mut other = package("module-b", "1.0.0");
+    other.manifest.owned_bounded_contexts = vec!["module-a-context".into()];
+
+    let plan = dry_plan_from_declarations(
+        &CurrentRegistrySnapshot::default(),
+        compiler_input(vec![package("module-a", "1.0.0"), other]),
+    )
+    .unwrap();
+
+    assert!(!plan.applicable);
+    assert!(plan.changes.iter().any(|change| matches!(
+        change,
+        PackageChange::Conflict { identifier, .. }
+            if identifier == "module-a-context"
+    )));
 }
 
 #[test]

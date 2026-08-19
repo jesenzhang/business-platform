@@ -423,12 +423,14 @@ PLAN-0010 additionally requires：
   / NOT ACTIVE, and PLAN-0009 remains Completed / Rehearsal Closed.
 
 PLAN-0011 additionally makes the packaging foundation executable as a fitness
-function. `scripts/check-architecture.ps1` scans the production source of
-`business-application-compiler` and rejects persistence/web/provider/runtime
-dependencies, concrete business or synthetic fixture names, automatic business
-data purge operation tokens, and duplicate semantic-authority type declarations.
-Fixture names are permitted only in integration tests. The compiler remains
-responsible for package/contribution/extension compilation and dry-plan evidence;
+function. `scripts/check-architecture.ps1` scans production source in
+`business-module-contracts`, `business-application-compiler`, and
+`semantic-contract`, rejecting persistence/web/provider/runtime dependencies,
+concrete business or synthetic fixture names, automatic business data purge
+operation tokens, and duplicate semantic-authority type declarations. Inline
+`#[cfg(test)]` sections and test/fixture paths are excluded from the production
+scan; fixture names are permitted only in tests. The compiler remains responsible
+for package/contribution/extension compilation and dry-plan evidence;
 `semantic-contract` remains the sole semantic compiler/authority.
 
 ## 27. Architecture Foundation Convergence gates
@@ -445,5 +447,6 @@ Architecture Foundation Convergence 文档阶段新增以下 Required 设计门�
 - Process Manager/Saga 是唯一跨模块业务流程模型，且与 Durable Task Job/Step/Lease/Fence/Retry/Recovery 状态分离；
 - Published Extension Point 的 owner、consumer、stable ID、schema/version、classification、authorization、dependency 和 removal semantics 可验证；live consumer 存在时 removal 必须 Blocked；
 - compiled package manifest 和 dry-plan 对输入顺序保持稳定排序、canonical bytes、SHA-256 digest 和诊断顺序；
+- required platform capability 必须 against explicit evidence/catalog 解析并 fail closed；UI/Agent target 类型和 classification 必须由 typed contract 闭合校验；规划冲突必须输出结构化 `Conflict`；
 - Module removal 不能暗示或自动执行 business data purge；
 - UI、Agent、Semantic contribution 共享 module identity 但有独立 schema/authorization，Agent Tool 只能调用 Application API。

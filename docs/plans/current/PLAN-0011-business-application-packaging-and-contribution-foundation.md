@@ -155,6 +155,12 @@ visibility condition contract
 version
 ```
 
+UI contribution 还必须声明 `classification`，并且 target 类型闭合为
+`Resource`、`Query` 或已由 owner 发布并进入 capability catalog 的
+`Capability`。Agent contribution 同样必须声明 `classification`，但只允许
+`Query`、`Command` 或已批准的 published `Capability`；不能把宽泛的 public
+target descriptor 当作权限或任意业务入口。
+
 禁止 UI contribution 携带：
 
 - SQL；
@@ -297,6 +303,11 @@ Current compiled registry snapshot
 Incoming compiled package set
 ```
 
+Platform capability resolution 使用 compiler input 提供的显式、纯数据
+`PlatformCapabilityEvidence` catalog。Required capability 缺少匹配 evidence
+或版本不满足时必须 fail closed；compiled manifest 只保留实际解析到的 evidence
+以支持 canonical rebuild，不授予运行时权限。
+
 The strict `dry_plan` seam accepts only a standalone compiled package set. For
 removal transitions that must explain an active dependency or extension
 consumer before the desired package set can be compiled independently, the
@@ -318,6 +329,11 @@ context is not a second registry and is not an installable package artifact.
 - 是否存在 extension point 被删除但 consumer 未先迁移。
 
 任何 unresolved conflict 必须 fail closed。
+
+对 unknown/incompatible dependency、ownership collision、dependency cycle 或
+unknown extension target 等可规划冲突，dry-plan 必须返回结构化
+`PackageChange::Conflict` 与 `PlanDiagnostic::Conflict`，不能只返回不可操作的
+编译错误字符串；格式错误和违反 manifest 不变量的输入仍保持 fail-closed error。
 
 ## 8. Lifecycle 与数据保留
 

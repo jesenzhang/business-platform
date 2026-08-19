@@ -48,6 +48,7 @@ fn input(packages: Vec<BusinessApplicationPackage>) -> BusinessApplicationCompil
         platform_version: "1.2.0".to_owned(),
         packages,
         installed_versions: Default::default(),
+        available_platform_capabilities: Default::default(),
         desired_installation_states: Default::default(),
     }
 }

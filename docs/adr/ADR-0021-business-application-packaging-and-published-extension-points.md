@@ -148,6 +148,13 @@ Command
 
 UI contribution 不得携带数据库访问、SQL、secret、任意 native/plugin executable 或直接写其他模块 private state 的 callback。
 
+每个 typed UI contribution 必须带 `classification`，其 target 类型只允许
+`Resource`、`Query` 或 owner 已发布并进入 public capability catalog 的
+`Capability`。Agent capability contribution 也必须带 `classification`，但只允许
+`Query`、`Command` 或 approved published `Capability`；target descriptor 不是
+权限授予。Capability requirement 的解析必须使用 host 明确提供的 capability
+evidence，缺少 required evidence 或版本不兼容时 fail closed。
+
 未来如需动态 Front Component，必须单独 ADR 讨论 sandbox、版本、权限、CSP/DOM isolation 和供应链安全。
 
 ### 2.6 Policy/Agent 只声明 requirement
@@ -178,6 +185,10 @@ Current Registry Snapshot
 - Dependency/Compatibility change；
 - blocked removal；
 - ownership/version/conflict diagnostics。
+
+Unknown/incompatible dependency、ownership collision、dependency cycle 和
+unknown extension target 等可规划冲突必须以结构化 `Conflict` change/diagnostic
+输出；manifest 格式错误仍不得被降级为可应用计划。
 
 Plan 阶段不得产生业务数据或 persistence side effect。
 

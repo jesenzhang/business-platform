@@ -150,14 +150,38 @@ foreach ($packageName in $genericDependencyAllowlist.Keys) {
     }
 }
 
-$businessApplicationCompilerSource = @(Get-ChildItem (Join-Path $root "crates/business-application-compiler/src") -Recurse -File | ForEach-Object {
-    Get-Content -Raw $_.FullName
+$genericProductionSourcePaths = @(
+    "crates/business-module-contracts/src",
+    "crates/business-application-compiler/src",
+    "crates/semantic-contract/src"
+)
+$genericProductionSourceFiles = foreach ($sourcePath in $genericProductionSourcePaths) {
+    Get-ChildItem (Join-Path $root $sourcePath) -Recurse -File |
+        Where-Object { $_.FullName -notmatch "\\(tests|fixtures)\\" }
+}
+$genericProductionSource = @($genericProductionSourceFiles | ForEach-Object {
+    $content = Get-Content -Raw $_.FullName
+    [regex]::Replace($content, '(?s)\r?\n#\[cfg\(test\)\].*$', '')
 }) -join [Environment]::NewLine
-foreach ($forbiddenCompilerToken in @(
+foreach ($forbiddenGenericToken in @(
     "axum", "sqlx", "reqwest", "object-storage", "messaging", "ai-provider",
     "WrenAI", "wren-ai", "Twenty", "Odoo", "Frappe", "ERPNext",
     "module-a", "module-b", "module-extension",
-    "PurgeBusinessData", "DeleteData", "DropBusinessFacts", "PurgeOperation",
+    "contract_management", "legacy-contract", "C Project", "plan-0009",
+    "PurgeBusinessData", "DeleteData", "DropBusinessFacts", "PurgeOperation"
+)) {
+    if ($genericProductionSource -match [regex]::Escape($forbiddenGenericToken)) {
+        throw "PLAN-0011 generic production boundary violation: source contains '$forbiddenGenericToken'"
+    }
+}
+
+$businessApplicationCompilerSource = @(Get-ChildItem (Join-Path $root "crates/business-application-compiler/src") -Recurse -File |
+    Where-Object { $_.FullName -notmatch "\\(tests|fixtures)\\" } |
+    ForEach-Object {
+    $content = Get-Content -Raw $_.FullName
+    [regex]::Replace($content, '(?s)\r?\n#\[cfg\(test\)\].*$', '')
+}) -join [Environment]::NewLine
+foreach ($forbiddenCompilerToken in @(
     "DatasetDefinition", "MetricDefinition", "DimensionDefinition",
     "RelationshipDefinition", "LineageDefinition"
 )) {

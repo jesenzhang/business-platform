@@ -171,6 +171,10 @@ pub struct BusinessApplicationCompilerInput {
     pub packages: Vec<BusinessApplicationPackage>,
     #[serde(default)]
     pub installed_versions: BTreeMap<BusinessModuleId, BusinessModuleVersion>,
+    /// Host-provided capability evidence. A declaration never grants a
+    /// capability; required capabilities must resolve against this catalog.
+    #[serde(default)]
+    pub available_platform_capabilities: Vec<PlatformCapabilityEvidence>,
     /// Desired installation states for incoming modules. An omitted module is
     /// planned for removal; `Uninstalled` is therefore not a valid incoming
     /// desired state.
@@ -185,10 +189,22 @@ pub struct CompiledBusinessApplicationManifest {
     pub packages: Vec<BusinessApplicationPackage>,
     #[serde(default)]
     pub desired_installation_states: BTreeMap<BusinessModuleId, ModuleInstallationState>,
+    /// The subset of host evidence used to compile this manifest. Keeping the
+    /// resolved evidence makes deserialization and revalidation reproducible.
+    #[serde(default)]
+    pub resolved_platform_capabilities: Vec<PlatformCapabilityEvidence>,
     /// SHA-256 of `canonical_json`; this field is excluded from that payload.
     pub package_digest: PackageDigest,
     #[serde(skip)]
     canonical_json: Vec<u8>,
+}
+
+/// Version evidence supplied by the host for a platform capability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformCapabilityEvidence {
+    pub capability_id: String,
+    pub version: String,
 }
 
 impl CompiledBusinessApplicationManifest {
@@ -217,6 +233,8 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
             packages: Vec<BusinessApplicationPackage>,
             #[serde(default)]
             desired_installation_states: BTreeMap<BusinessModuleId, ModuleInstallationState>,
+            #[serde(default)]
+            resolved_platform_capabilities: Vec<PlatformCapabilityEvidence>,
             package_digest: PackageDigest,
         }
 
@@ -226,6 +244,7 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
             platform_version: serialized.platform_version,
             packages: serialized.packages,
             desired_installation_states: serialized.desired_installation_states,
+            resolved_platform_capabilities: serialized.resolved_platform_capabilities,
             package_digest: serialized.package_digest,
             canonical_json: Vec::new(),
         };
@@ -241,6 +260,7 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
             platform_version: manifest.platform_version.clone(),
             packages: manifest.packages.clone(),
             installed_versions: BTreeMap::new(),
+            available_platform_capabilities: manifest.resolved_platform_capabilities.clone(),
             desired_installation_states: manifest.desired_installation_states.clone(),
         })
         .map_err(|error| {
@@ -265,6 +285,23 @@ pub enum CompilationError {
     InvalidRequirement { field: &'static str, value: String },
     #[error("platform version '{version}' is incompatible with package '{module_id}'")]
     IncompatiblePlatform { module_id: String, version: String },
+    #[error(
+        "required platform capability '{capability_id}' for package '{module_id}' is not available"
+    )]
+    MissingPlatformCapability {
+        module_id: String,
+        capability_id: String,
+        requirement: String,
+    },
+    #[error("available platform capability '{capability_id}' version '{available}' does not satisfy '{requirement}' for package '{module_id}'")]
+    IncompatiblePlatformCapability {
+        module_id: String,
+        capability_id: String,
+        available: String,
+        requirement: String,
+    },
+    #[error("duplicate platform capability evidence '{capability_id}'")]
+    DuplicatePlatformCapabilityEvidence { capability_id: String },
     #[error("unknown module dependency '{module_id}'")]
     UnknownDependency { module_id: String },
     #[error("module dependency '{module_id}' is incompatible with '{requirement}'")]
@@ -328,11 +365,54 @@ pub fn dry_plan_from_declarations(
     input: BusinessApplicationCompilerInput,
 ) -> Result<BusinessApplicationPlan, PlanError> {
     let context = planning_compilation_context(current)?;
-    let compiled =
-        compile_with_context(input, &context).map_err(|error| PlanError::PlanningCompilation {
-            reason: error.to_string(),
-        })?;
+    let compiled = match compile_with_context(input, &context) {
+        Ok(compiled) => compiled,
+        Err(error) => {
+            if let Some(plan) = structured_compilation_conflict(&error) {
+                return Ok(plan);
+            }
+            return Err(PlanError::PlanningCompilation {
+                reason: error.to_string(),
+            });
+        }
+    };
     dry_plan(current, &compiled)
+}
+
+fn structured_compilation_conflict(error: &CompilationError) -> Option<BusinessApplicationPlan> {
+    let (module_id, identifier) = match error {
+        CompilationError::IncompatiblePlatform { module_id, .. }
+        | CompilationError::Downgrade { module_id, .. }
+        | CompilationError::MissingPlatformCapability { module_id, .. }
+        | CompilationError::IncompatiblePlatformCapability { module_id, .. } => (
+            BusinessModuleId::new(module_id.clone()).ok(),
+            module_id.clone(),
+        ),
+        CompilationError::UnknownDependency { module_id }
+        | CompilationError::IncompatibleDependency { module_id, .. }
+        | CompilationError::UnknownExtension {
+            identifier: module_id,
+        } => (None, module_id.clone()),
+        CompilationError::DependencyCycle => (None, "dependency-cycle".to_owned()),
+        CompilationError::Duplicate { identifier, .. }
+        | CompilationError::OwnershipCollision { identifier, .. } => (None, identifier.clone()),
+        _ => return None,
+    };
+    let reason = error.to_string();
+    let mut changes = Vec::new();
+    let mut diagnostics = Vec::new();
+    push_conflict(
+        &mut changes,
+        &mut diagnostics,
+        module_id,
+        identifier,
+        &reason,
+    );
+    Some(BusinessApplicationPlan {
+        changes,
+        diagnostics,
+        applicable: false,
+    })
 }
 
 #[allow(clippy::too_many_lines)]
@@ -341,6 +421,8 @@ fn compile_with_context(
     context: &PlanningCompilationContext,
 ) -> Result<CompiledBusinessApplicationManifest, CompilationError> {
     let platform = parse_version("platform version", &input.platform_version)?;
+    let available_platform_capabilities =
+        normalize_platform_capabilities(&input.available_platform_capabilities)?;
     let mut modules = BTreeMap::new();
     let mut available_modules = context.module_versions.clone();
     let mut owned_contexts = BTreeMap::<String, String>::new();
@@ -377,7 +459,11 @@ fn compile_with_context(
             }
         }
         available_modules.insert(module_id.clone(), module_version.clone());
-        validate_platform(&package.manifest, &platform)?;
+        validate_platform(
+            &package.manifest,
+            &platform,
+            &available_platform_capabilities,
+        )?;
         package
             .contributions
             .validate(&package.manifest.module_id, &public_catalog)?;
@@ -479,11 +565,14 @@ fn compile_with_context(
     input
         .packages
         .sort_by_key(|p| p.manifest.module_id.to_string());
+    let resolved_platform_capabilities =
+        resolve_platform_capabilities(&input.packages, &available_platform_capabilities);
     let mut compiled = CompiledBusinessApplicationManifest {
         schema_version: BUSINESS_APPLICATION_PACKAGE_SCHEMA_VERSION.to_owned(),
         platform_version: platform.to_string(),
         packages: input.packages,
         desired_installation_states: input.desired_installation_states,
+        resolved_platform_capabilities,
         package_digest: PackageDigest::new("0".repeat(64)).map_err(|_| CompilationError::Digest)?,
         canonical_json: Vec::new(),
     };
@@ -1081,6 +1170,18 @@ fn public_dependency_matches_target(
                 && dependency_id == command_id
                 && version == &target.version
         }
+        (
+            PublicTargetKind::Capability { capability_id },
+            PublishedDependencyReference::PublicCapability {
+                owner_module_id,
+                capability_id: dependency_id,
+                version,
+            },
+        ) => {
+            owner_module_id == &target.owner_module_id
+                && dependency_id == capability_id
+                && version == &target.version
+        }
         _ => false,
     }
 }
@@ -1098,6 +1199,7 @@ fn public_target_component_id(target: &PublicContributionTarget) -> &str {
         PublicTargetKind::Resource { resource_kind } => resource_kind,
         PublicTargetKind::Query { query_id } => query_id,
         PublicTargetKind::Command { command_id } => command_id,
+        PublicTargetKind::Capability { capability_id } => capability_id,
     }
 }
 
@@ -1277,12 +1379,14 @@ fn canonical_bytes(
         platform_version: &'a str,
         packages: &'a [BusinessApplicationPackage],
         desired_installation_states: &'a BTreeMap<BusinessModuleId, ModuleInstallationState>,
+        resolved_platform_capabilities: &'a [PlatformCapabilityEvidence],
     }
     serde_json::to_vec(&Canonical {
         schema_version: &compiled.schema_version,
         platform_version: &compiled.platform_version,
         packages: &compiled.packages,
         desired_installation_states: &compiled.desired_installation_states,
+        resolved_platform_capabilities: &compiled.resolved_platform_capabilities,
     })
 }
 
@@ -1319,6 +1423,20 @@ fn public_catalog(
                 version: item.version.clone(),
             }
         }));
+        for item in &package.manifest.agent_tool_contributions {
+            let capability_id = NamespacedId::new(item.contribution_id.clone()).map_err(|_| {
+                CompilationError::Manifest(ManifestValidationError::InvalidField {
+                    kind: "agent capability identifier",
+                })
+            })?;
+            targets.push(PublicContributionTarget {
+                owner_module_id: owner.clone(),
+                target: PublicTargetKind::Capability {
+                    capability_id: capability_id.local_id().to_owned(),
+                },
+                version: item.version.clone(),
+            });
+        }
     }
     targets.sort_by_key(|target| serde_json::to_string(target).unwrap_or_else(|_| String::new()));
     if targets.windows(2).any(|pair| pair[0] == pair[1]) {
@@ -1387,6 +1505,7 @@ fn dependency_catalog(packages: &[BusinessApplicationPackage]) -> PublishedDepen
 fn validate_platform(
     manifest: &BusinessModuleManifest,
     platform: &Version,
+    available_capabilities: &[PlatformCapabilityEvidence],
 ) -> Result<(), CompilationError> {
     let min = manifest
         .compatibility
@@ -1409,14 +1528,90 @@ fn validate_platform(
             version: platform.to_string(),
         });
     }
-    for capability in manifest
-        .required_platform_capabilities
-        .iter()
-        .chain(&manifest.optional_platform_capabilities)
-    {
+    for capability in &manifest.required_platform_capabilities {
+        let requirement =
+            parse_requirement("platform capability", &capability.version_requirement)?;
+        let Some(evidence) = available_capabilities
+            .iter()
+            .find(|evidence| evidence.capability_id == capability.capability_id)
+        else {
+            return Err(CompilationError::MissingPlatformCapability {
+                module_id: manifest.module_id.to_string(),
+                capability_id: capability.capability_id.clone(),
+                requirement: capability.version_requirement.clone(),
+            });
+        };
+        let available =
+            Version::parse(&evidence.version).map_err(|_| CompilationError::InvalidVersion {
+                field: "platform capability evidence version",
+                value: evidence.version.clone(),
+            })?;
+        if !requirement.matches(&available) {
+            return Err(CompilationError::IncompatiblePlatformCapability {
+                module_id: manifest.module_id.to_string(),
+                capability_id: capability.capability_id.clone(),
+                available: available.to_string(),
+                requirement: capability.version_requirement.clone(),
+            });
+        }
+    }
+    for capability in &manifest.optional_platform_capabilities {
         parse_requirement("platform capability", &capability.version_requirement)?;
     }
     Ok(())
+}
+
+fn normalize_platform_capabilities(
+    evidence: &[PlatformCapabilityEvidence],
+) -> Result<Vec<PlatformCapabilityEvidence>, CompilationError> {
+    let mut normalized = BTreeMap::new();
+    for item in evidence {
+        let version = parse_version("platform capability evidence version", &item.version)?;
+        if normalized
+            .insert(item.capability_id.clone(), version.to_string())
+            .is_some()
+        {
+            return Err(CompilationError::DuplicatePlatformCapabilityEvidence {
+                capability_id: item.capability_id.clone(),
+            });
+        }
+    }
+    Ok(normalized
+        .into_iter()
+        .map(|(capability_id, version)| PlatformCapabilityEvidence {
+            capability_id,
+            version,
+        })
+        .collect())
+}
+
+fn resolve_platform_capabilities(
+    packages: &[BusinessApplicationPackage],
+    available: &[PlatformCapabilityEvidence],
+) -> Vec<PlatformCapabilityEvidence> {
+    let mut resolved = BTreeSet::new();
+    for package in packages {
+        for capability in &package.manifest.required_platform_capabilities {
+            resolved.insert(capability.capability_id.clone());
+        }
+        for capability in &package.manifest.optional_platform_capabilities {
+            let Ok(requirement) = VersionReq::parse(&capability.version_requirement) else {
+                continue;
+            };
+            if available.iter().any(|evidence| {
+                evidence.capability_id == capability.capability_id
+                    && Version::parse(&evidence.version)
+                        .is_ok_and(|version| requirement.matches(&version))
+            }) {
+                resolved.insert(capability.capability_id.clone());
+            }
+        }
+    }
+    available
+        .iter()
+        .filter(|evidence| resolved.contains(&evidence.capability_id))
+        .cloned()
+        .collect()
 }
 
 fn validate_manifest_versions(manifest: &BusinessModuleManifest) -> Result<(), CompilationError> {

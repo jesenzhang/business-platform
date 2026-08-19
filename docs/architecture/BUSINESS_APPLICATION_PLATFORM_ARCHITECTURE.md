@@ -76,11 +76,11 @@ UI、Agent、Semantic、Policy 和 Extension contribution 必须属于同一个 
 
 ### UI Contribution
 
-第一阶段仅允许宿主控制的声明式类型：Navigation、ListView、DetailSection、DetailTab、Action、Command。它引用公开 Resource Kind/Query/Capability 和 translation key；不携带 SQL、private table/column、credential、任意 executable blob 或直接业务写 callback。UI 只表达展示和用户意图，业务规则仍由 Application API 执行。
+第一阶段仅允许宿主控制的声明式类型：Navigation、ListView、DetailSection、DetailTab、Action、Command。每个 contribution 带 classification，并且只引用公开 Resource Kind、Query 或 owner 已发布并进入 capability catalog 的 Capability 和 translation key；不携带 SQL、private table/column、credential、任意 executable blob 或直接业务写 callback。UI 只表达展示和用户意图，业务规则仍由 Application API 执行。
 
 ### Agent Contribution
 
-模块声明 typed query tool、approved action tool、Context/Skill 或 capability requirement。Agent Tool 只能调用公开 Application API/Query/Command，授权由 Platform Policy/Capability Grant 决定；模块声明不等于授予权限。Agent 不得访问数据库、schema、private repository 或任意 HTTP/SQL/Shell。
+模块声明 typed query tool、approved action tool、Context/Skill 或 capability requirement。每个 Agent contribution 带 classification，target 只允许 Query、Command 或 approved published Capability。Agent Tool 只能调用公开 Application API/Query/Command，授权由 Platform Policy/Capability Grant 决定；模块声明不等于授予权限。Agent 不得访问数据库、schema、private repository 或任意 HTTP/SQL/Shell。
 
 ### Semantic Contribution
 
@@ -123,6 +123,10 @@ Business Module Source
   → deterministic dry-plan
 ```
 
+Required platform capability 必须 against compiler input 的显式 capability
+evidence/catalog fail-closed resolution；compiled manifest 保存解析证据以便
+canonical rebuild，但不产生授权或第二个 capability owner。
+
 ### 6.1 稳定身份与兼容
 
 - Module ID、Contribution ID、Extension Point ID、Resource Kind ID 全部 stable/namespaced；
@@ -143,7 +147,7 @@ DependencyChange / CompatibilityChange
 BlockedRemoval / Conflict
 ```
 
-Plan 不能产生数据库、文件、网络或业务状态副作用。`Uninstalled != Data Purged`：移除注册/代码不自动清除业务事实；Purge 是独立授权、保留规则、审计、验证和恢复流程。
+Plan 不能产生数据库、文件、网络或业务状态副作用。可规划的未知/不兼容依赖、ownership collision、cycle 和未知 extension target 必须生成结构化 `Conflict`；`Uninstalled != Data Purged`：移除注册/代码不自动清除业务事实；Purge 是独立授权、保留规则、审计、验证和恢复流程。
 
 ## 7. Lifecycle
 

@@ -1,6 +1,6 @@
 use business_application_compiler::{
     compile, BusinessApplicationCompilerInput, BusinessApplicationPackage, CompilationError,
-    CompiledBusinessApplicationManifest,
+    CompiledBusinessApplicationManifest, PlatformCapabilityEvidence,
 };
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
@@ -50,6 +50,7 @@ mod tests {
             platform_version: "1.2.0".to_owned(),
             packages,
             installed_versions: Default::default(),
+            available_platform_capabilities: Default::default(),
             desired_installation_states: Default::default(),
         }
     }
@@ -86,6 +87,41 @@ mod tests {
         a.manifest.compatibility.minimum_platform_version = Some("1.0.0".to_owned());
         a.manifest.compatibility.maximum_platform_version = Some("2.0.0".to_owned());
         assert!(compile(input(vec![a])).is_ok());
+    }
+
+    #[test]
+    fn required_platform_capabilities_resolve_against_explicit_evidence() {
+        let mut module = package("module-a", "1.0.0");
+        module.manifest.required_platform_capabilities.push(
+            business_module_contracts::PlatformCapabilityRequirement {
+                capability_id: "analytics".into(),
+                version_requirement: "^1.0.0".into(),
+            },
+        );
+
+        assert!(matches!(
+            compile(input(vec![module.clone()])),
+            Err(CompilationError::MissingPlatformCapability { capability_id, .. })
+                if capability_id == "analytics"
+        ));
+
+        let mut with_evidence = input(vec![module.clone()]);
+        with_evidence.available_platform_capabilities = vec![PlatformCapabilityEvidence {
+            capability_id: "analytics".into(),
+            version: "1.2.0".into(),
+        }];
+        assert!(compile(with_evidence).is_ok());
+
+        let mut incompatible = input(vec![module]);
+        incompatible.available_platform_capabilities = vec![PlatformCapabilityEvidence {
+            capability_id: "analytics".into(),
+            version: "2.0.0".into(),
+        }];
+        assert!(matches!(
+            compile(incompatible),
+            Err(CompilationError::IncompatiblePlatformCapability { capability_id, .. })
+                if capability_id == "analytics"
+        ));
     }
 
     #[test]
@@ -185,6 +221,7 @@ mod tests {
                 owner_module_id: BusinessModuleId::new("module-a").unwrap(),
                 schema_version: "1.0.0".to_owned(),
                 version: "1.0.0".to_owned(),
+                classification: DataClassification::Internal,
                 target: PublicContributionTarget {
                     owner_module_id: BusinessModuleId::new("module-a").unwrap(),
                     target: PublicTargetKind::Resource {
@@ -313,6 +350,35 @@ mod tests {
     }
 
     #[test]
+    fn serialized_compiled_manifest_preserves_resolved_capability_evidence() {
+        let mut module = package("module-a", "1.0.0");
+        module.manifest.required_platform_capabilities.push(
+            business_module_contracts::PlatformCapabilityRequirement {
+                capability_id: "analytics".into(),
+                version_requirement: "^1.0.0".into(),
+            },
+        );
+        let mut source = input(vec![module]);
+        source.available_platform_capabilities = vec![PlatformCapabilityEvidence {
+            capability_id: "analytics".into(),
+            version: "1.2.0".into(),
+        }];
+        let compiled = compile(source).unwrap();
+        assert_eq!(
+            compiled.resolved_platform_capabilities,
+            vec![PlatformCapabilityEvidence {
+                capability_id: "analytics".into(),
+                version: "1.2.0".into(),
+            }]
+        );
+
+        let encoded = serde_json::to_vec(&compiled).unwrap();
+        let decoded: CompiledBusinessApplicationManifest =
+            serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, compiled);
+    }
+
+    #[test]
     fn deserializing_tampered_package_digest_fails_closed() {
         let compiled = compile(input(vec![package("module-a", "1.0.0")])).unwrap();
         let mut encoded: serde_json::Value =
@@ -406,6 +472,7 @@ mod tests {
                 owner_module_id: BusinessModuleId::new("module-b").unwrap(),
                 schema_version: "1.0.0".to_owned(),
                 version: "1.0.0".to_owned(),
+                classification: DataClassification::Internal,
                 target: PublicContributionTarget {
                     owner_module_id: BusinessModuleId::new("module-a").unwrap(),
                     target: PublicTargetKind::Resource {
@@ -420,6 +487,48 @@ mod tests {
                 required_policy: Vec::new(),
                 required_capability: Vec::new(),
             });
+        assert!(compile(input(vec![consumer, owner])).is_ok());
+    }
+
+    #[test]
+    fn typed_ui_can_target_a_published_capability() {
+        let mut owner = package("module-a", "1.0.0");
+        owner
+            .manifest
+            .agent_tool_contributions
+            .push(ContributionDescriptor {
+                contribution_id: "module-a.summarize".into(),
+                version: "1.0.0".into(),
+            });
+        let mut consumer = package("module-b", "1.0.0");
+        consumer
+            .contributions
+            .navigation
+            .push(business_module_contracts::NavigationContribution {
+                contribution_id: business_module_contracts::UiContributionId::from_parts(
+                    "module-b",
+                    "summarize",
+                )
+                .unwrap(),
+                owner_module_id: consumer.manifest.module_id.clone(),
+                schema_version: "1.0.0".into(),
+                version: "1.0.0".into(),
+                classification: DataClassification::Internal,
+                target: PublicContributionTarget {
+                    owner_module_id: owner.manifest.module_id.clone(),
+                    target: PublicTargetKind::Capability {
+                        capability_id: "summarize".into(),
+                    },
+                    version: "1.0.0".into(),
+                },
+                label_key: "summarize".into(),
+                ordering: None,
+                group: None,
+                visibility: "always".into(),
+                required_policy: Vec::new(),
+                required_capability: Vec::new(),
+            });
+
         assert!(compile(input(vec![consumer, owner])).is_ok());
     }
 
