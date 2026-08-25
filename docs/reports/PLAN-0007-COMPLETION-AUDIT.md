@@ -14,10 +14,26 @@ PLAN-0007 is `Integrated / Archived` on `main`, via a docs-only archival commit.
 | --- | --- |
 | Base / implementation SHA (milestone start, where all PLAN-0007 deliverables live) | `ec6cff141a89dcdf5de2f2ea2b8b001384f88755` |
 | Archival type | docs-only (audit report + plan archival + status/README sync) |
+| Main CI | `32828251032` — PASS |
 
 All six completion-definition items and all six delivery slices are verified PASS or NOT RUN with
 an explicit environment reason. No gate failed for a code reason and no code change was required to
 pass audit.
+
+## CI acceptance
+
+Main CI run `32828251032` (HEAD `main`, docs-only archival commit) passed all configured jobs:
+
+- Format (Rust 1.94.1), Check (Rust 1.94.1), Clippy (Rust 1.94.1) `-D warnings`;
+- Unit tests (`cargo test --workspace --all-features`);
+- Architecture Fitness (`./scripts/check-architecture.ps1`);
+- CLI and MCP contracts (`cargo test -p business-cli / -p agent-adapter / -p business-api-client` + `openapi.json` parse);
+- Frontend checks (`npm run lint/typecheck/test/build`);
+- Frontend Playwright smoke (`npm run test:e2e`);
+- PostgreSQL + MinIO + E2E contracts (real infrastructure, migrations, multipart upload, E2E).
+
+This CI run is the authoritative evidence for the NOT RUN items listed below (PostgreSQL/MinIO
+integration tests and Playwright smoke).
 
 ## Completion-definition verification
 
