@@ -14,7 +14,8 @@ PLAN-0007 is `Integrated / Archived` on `main`, via a docs-only archival commit.
 | --- | --- |
 | Base / implementation SHA (milestone start, where all PLAN-0007 deliverables live) | `ec6cff141a89dcdf5de2f2ea2b8b001384f88755` |
 | Archival type | docs-only (audit report + plan archival + status/README sync) |
-| Main CI | `32828251032` — PASS |
+| Final HEAD | `6bc676a7cc70a…`（`docs(plan-0012): record main CI acceptance for PLAN-0007 audit`） |
+| Main CI | archival commit `32828251032` — PASS；final HEAD `32829029296` — PASS |
 
 All six completion-definition items and all six delivery slices are verified PASS or NOT RUN with
 an explicit environment reason. No gate failed for a code reason and no code change was required to
@@ -22,7 +23,9 @@ pass audit.
 
 ## CI acceptance
 
-Main CI run `32828251032` (HEAD `main`, docs-only archival commit) passed all configured jobs:
+Two docs-only Main CI runs passed all configured jobs:
+`32828251032` (HEAD `d9a0c5b`, archival commit) and `32829029296` (HEAD `6bc676a`, final
+commit recording this acceptance). Both cover the same authoritative gates:
 
 - Format (Rust 1.94.1), Check (Rust 1.94.1), Clippy (Rust 1.94.1) `-D warnings`;
 - Unit tests (`cargo test --workspace --all-features`);
