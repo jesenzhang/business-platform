@@ -2,8 +2,9 @@
 
 文档 ID：PLAN-0007  
 版本：0.1  
-状态：Active / local solo fast-forward  
-日期：2026-08-07  
+状态：Integrated / Archived（由 PLAN-0012 M0 完成审计后归档；Base/implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`）  
+完成审计：`docs/reports/PLAN-0007-COMPLETION-AUDIT.md`  
+日期：2026-08-07（原 Active）；2026-08-25 归档  
 责任边界：Document Management、Document Intelligence、Runtime Governance 的外部访问面  
 前置计划：PLAN-0001～PLAN-0005 已 Integrated；PLAN-0006 保持 Proposed / NOT ACTIVE
 

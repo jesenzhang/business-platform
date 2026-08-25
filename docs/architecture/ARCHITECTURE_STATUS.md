@@ -1,9 +1,9 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-19
-> 当前阶段：Architecture Foundation Convergence — document foundation and PLAN-0011 foundation integrated; PLAN-0009 Rehearsal Closed
-> 当前计划：PLAN-0007 Active / completion audit pending；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
+> 最后更新：2026-08-25
+> 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
+> 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -125,6 +125,14 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > Business Application Platform document is promoted to Baseline; no runtime,
 > dynamic plugin, Marketplace, database migration, PLAN-0006 implementation,
 > PLAN-0009 production migration or concrete business module was introduced.
+
+> 2026-08-25: PLAN-0012 M0 完成收支——PLAN-0007 completion audit（
+> `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`）逐项核对完成定义与六项交付切片，
+> 全部门禁 PASS 或带原因 NOT RUN（本机 PostgreSQL/MinIO 与 Playwright 因沙箱/环境
+> NOT RUN，GitHub CI 覆盖）。PLAN-0007 归档至 `docs/plans/archive/2026/`，状态
+> Integrated / Archived（implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`）。
+> 本里程碑仅文档收尾，未修改业务代码、Cargo.toml、迁移或 openapi.json。PLAN-0012
+> 为当前唯一 Active 计划，M1（model-provider 集成决策与 ADR-0023）可从干净起点启动。
 
 ## 1. 当前权威结论
 
@@ -367,7 +375,7 @@ PLAN-0008：Integrated / Archived（Base `35d1d01fd49a70ee996fbb5fb72818a632989e
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
 
-PLAN-0007：Active / local solo fast-forward（Business Console、Public REST Contract、CLI、read-only MCP；未归档）
+PLAN-0007：Integrated / Archived（Business Console、Public REST Contract、CLI、read-only MCP；implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`；completion audit `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`，由 PLAN-0012 M0 完成；全部门禁 PASS 或带原因 NOT RUN，Windows PostgreSQL/MinIO 与本地 Playwright NOT RUN）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
 PLAN-0010：Integrated / Archived（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
 PLAN-0011：Integrated / Archived（Business Application Packaging and Contribution；Candidate/Main `ed870acfe165756632c0519bb181fd5dcf8a11cd`；Feature CI `32210387950`；Main CI `32213985080`；ADR-0021/0022 Accepted）

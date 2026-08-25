@@ -24,8 +24,7 @@ plans/
 ## 当前计划
 
 - [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed / NOT ACTIVE`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
-- [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP；completion audit pending（由 PLAN-0012 M0 收尾归档）。
-- [`current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md`](current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：`Active`，Runnable v0.1：PLAN-0007 收尾、OIDC/JWT 真实认证、`jarvis-model-provider` 集成、可观测性与预生产就绪。
+- [`current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md`](current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：`Active`，Runnable v0.1：OIDC/JWT 真实认证、`jarvis-model-provider` 集成、可观测性与预生产就绪（M0 PLAN-0007 收尾已完成）。
 
 ## 已归档计划
 
@@ -34,6 +33,7 @@ plans/
 - [`archive/2026/PLAN-0003-persistence-query-architecture.md`](archive/2026/PLAN-0003-persistence-query-architecture.md)：`Integrated`，持久化、查询与多数据库架构。
 - [`archive/2026/PLAN-0004-durable-document-processing-mvp.md`](archive/2026/PLAN-0004-durable-document-processing-mvp.md)：`Integrated`，持久化文档处理、Lease/Fence 和恢复。
 - [`archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)：`Integrated`，Runtime Audit、Integrity 和 Controlled Repair。
+- [`archive/2026/PLAN-0007-business-console-and-external-access-demo.md`](archive/2026/PLAN-0007-business-console-and-external-access-demo.md)：`Integrated / Archived`，Business Console、Public REST Contract、CLI 和 read-only MCP；完成审计 `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`（by PLAN-0012 M0）；implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`。
 - [`archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md`](archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md)：`Integrated`，Document lifecycle、revision、processing binding 和 evidence foundation。
 - [`archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Completed / Rehearsal Closed / Archived`，read-only、隔离 rehearsal；production migration `NOT GRANTED`。
 - [`archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Integrated`，模块隔离、语义契约和纯 Rust 确定性 compiler。
