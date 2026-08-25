@@ -24,7 +24,8 @@ plans/
 ## 当前计划
 
 - [`current/PLAN-0006-enterprise-ai-workspace-foundation.md`](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：`Proposed / NOT ACTIVE`，建立 Workspace、Skill/Context/Tool Registry、任务级 Capability、Observation 和只读业务助手垂直切片；尚未激活实现。
-- [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP。
+- [`current/PLAN-0007-business-console-and-external-access-demo.md`](current/PLAN-0007-business-console-and-external-access-demo.md)：`Active`，Business Console、Public REST Contract、CLI 和 read-only MCP；completion audit pending（由 PLAN-0012 M0 收尾归档）。
+- [`current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md`](current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：`Active`，Runnable v0.1：PLAN-0007 收尾、OIDC/JWT 真实认证、`jarvis-model-provider` 集成、可观测性与预生产就绪。
 
 ## 已归档计划
 
