@@ -5,6 +5,7 @@
 //! be substituted without changing job ownership.
 
 mod config;
+mod extractor;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -14,7 +15,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use config::{AiWorkerConfig, WorkerDatabaseBackend};
+use config::{AiProviderMode, AiWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
     AiTask, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
@@ -24,6 +25,7 @@ use document_processing::{
     DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionError, ExtractionRequest,
     ProcessingSource,
 };
+use extractor::ModelBackedExtractor;
 use object_storage::{LocalStorageClient, ObjectKey, ObjectStorageClient, S3Client, StorageError};
 use tokio::sync::oneshot;
 use tokio::task::{JoinHandle, JoinSet};
@@ -176,6 +178,11 @@ async fn main() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("AI_WORKER__DATABASE__URL is required"))?;
     let storage = build_storage(&config.storage).await?;
 
+    let extractor: Arc<dyn DocumentFieldExtractor> = match config.ai_provider.mode {
+        AiProviderMode::Deterministic => Arc::new(DeterministicLocalExtractor),
+        AiProviderMode::Real => Arc::new(ModelBackedExtractor::from_config(&config.ai_provider)?),
+    };
+
     let (execution, queries, documents) = match config.database.backend {
         WorkerDatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
@@ -241,10 +248,18 @@ async fn main() -> anyhow::Result<()> {
                     if let Some(task) = task {
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
+                        let extractor_for_task = Arc::clone(&extractor);
                         let config_for_task = config.clone();
                         task_set.spawn(async move {
                             let _permit = permit;
-                            process_task(&services_for_task, &source_for_task, task, &config_for_task).await;
+                            process_task(
+                                &services_for_task,
+                                &source_for_task,
+                                task,
+                                &config_for_task,
+                                extractor_for_task.as_ref(),
+                            )
+                            .await;
                         });
                     } else {
                         drop(permit);
@@ -308,6 +323,7 @@ async fn process_task(
     source: &StorageSource,
     task: AiTask,
     config: &AiWorkerConfig,
+    extractor: &dyn DocumentFieldExtractor,
 ) {
     let Some(token) = task.lease_token.clone() else {
         tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "claimed AI task has no lease token; refusing work");
@@ -345,7 +361,7 @@ async fn process_task(
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| ExtractionError::InvalidTextEncoding)?
             .to_string();
-        let candidate = DeterministicLocalExtractor
+        let candidate = extractor
             .extract(ExtractionRequest {
                 tenant_id: task.tenant_id,
                 job_id: task.job_id,

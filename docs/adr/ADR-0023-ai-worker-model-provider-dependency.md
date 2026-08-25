@@ -1,6 +1,7 @@
 # ADR-0023：ai-worker 的 model-provider 依赖与可替换性边界
 
-> 状态：Accepted（含 2026-08-25 修订：接入形式从 git 依赖改为 vendored 源码）  
+> 状态：Accepted（含 2026-08-25 修订一：接入形式从 git 依赖改为 vendored 源码；
+> 修订二：M2 落地 `ModelBackedExtractor` 提取器实现与契约测试）  
 > 日期：2026-08-25  
 > 决策所有者：Document Intelligence（AI Provider 适配）、平台可观测性  
 > 关联文档：[PLAN-0012](../plans/current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)、
@@ -146,6 +147,20 @@ path dependency 引用。
   `apps/ai-worker/Cargo.toml` 且必须为 vendored path。
 - 回滚：移除 ai-worker 的 path 依赖并删除 `vendor/jarvis/`；`Cargo.lock` 随 `cargo` 自动回退；
   AI 提取回退 deterministic 开关（M2）。移除依赖无需触碰业务事实。
+
+M2（2026-08-25）落地补充：
+- 新增 `apps/ai-worker/src/extractor.rs`：`ModelBackedExtractor` 实现 `DocumentFieldExtractor`，
+  通过注入的 `Arc<dyn ModelProvider>` 完成字段提取；`from_config` 仅在 `mode=real` 且校验通过后构建。
+- prompt 构造为 system 指令 + 文档正文（system 指令固定 `document-extraction-v1`）；响应解析剥离代码
+  fence/文本剥离后取最外层 JSON 对象并校验 `CandidatePayload`（≤256KiB），缺失/畸形按 `AiInvalidResponse`。
+- 错误映射：`Authentication|RateLimit|Timeout|Unavailable → AiProviderUnavailable`（复用 AI Task retry
+  分类），`Aborted → Cancelled`，`InvalidRequest|Serialization|Protocol|StreamInterrupted|Unsupported|Other`
+  → `AiInvalidResponse`；provider 原始响应与未解析文本不进入日志、DTO 或返回候选对象。
+- 契约测试 8 例（`MockProvider`/`ScriptedProvider`）验证正常解析（含代码 fence）、非 JSON 输出、
+  ProviderUnavailable、RateLimit+429 retry-after、Abort 及错误映射；并保留 `DeterministicLocalExtractor`
+  作为离线/测试降级路径（回归保留）。
+- `main.rs` 组合根按 `config.ai_provider.mode` 选择 `DeterministicLocalExtractor` 或 `ModelBackedExtractor`
+  并注入 `process_task`；模型 provider 仍仅此组合根可见。
 
 ## 8. 验证证据
 

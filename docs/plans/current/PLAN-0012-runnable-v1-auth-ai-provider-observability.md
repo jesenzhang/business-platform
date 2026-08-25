@@ -84,13 +84,25 @@
 `document-processing` 核心层零新增依赖；`DeterministicLocalExtractor`
 保留为测试/离线降级路径，由配置开关选择。
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
-| T2.1 | 契约设计：`ModelBackedExtractor` 实现 `DocumentFieldExtractor`；错误映射表（ProviderErrorKind → ExtractionError/失败分类），不泄漏凭据与原始响应 | 2h |
-| T2.2 | 适配器实现：prompt 构造、响应解析为 Candidate 字段、超时/重试语义（复用既有 AI Task retry 分类） | 4h |
-| T2.3 | 密钥接入：`runtime-config` secret_url 承载 provider API key；fail-closed 校验；日志脱敏验证 | 2h |
-| T2.4 | 契约测试：`MockProvider`/`ScriptedProvider` 注入测试（正常、协议错误、超时、429 retry-after、abort）；确定性提取器回归 | 3h |
-| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h |
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
+| T2.1 | 契约设计：`ModelBackedExtractor` 实现 `DocumentFieldExtractor`；错误映射表（ProviderErrorKind → ExtractionError/失败分类），不泄漏凭据与原始响应 | 2h | ✅ |
+| T2.2 | 适配器实现：prompt 构造、响应解析为 Candidate 字段、超时/重试语义（复用既有 AI Task retry 分类） | 4h | ✅ |
+| T2.3 | 密钥接入：`runtime-config` secret_url 承载 provider API key；fail-closed 校验；日志脱敏验证 | 2h | ✅ |
+| T2.4 | 契约测试：`MockProvider`/`ScriptedProvider` 注入测试（正常、协议错误、超时、429 retry-after、abort）；确定性提取器回归 | 3h | ✅ |
+| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h | ⬜（所需核心完成；真实 provider smoke 依赖密钥，按可选路径，未执行 NOT RUN） |
+
+**M2 落地要点**（记录于 ADR-0023 第 7/8 节的实现补充）：
+- `ModelBackedExtractor` 位于 `apps/ai-worker/src/extractor.rs`（新增），实现 `DocumentFieldExtractor`；
+  `document-processing` 核心层零新增依赖。
+- 错误映射：`Authentication|RateLimit|Timeout|Unavailable → AiProviderUnavailable`（复用 AI Task
+  retry 分类），`Aborted → Cancelled`，其余协议/序列化 → `AiInvalidResponse`；凭据与原始响应不外泄。
+- 契约测试 8 例（`MockProvider`/`ScriptedProvider`）：有效 JSON（含代码 fence 剥离）、非 JSON 输出、
+  ProviderUnavailable、RateLimit+429 retry-after、Abort，外加错误映射单元测试与确定性回归。
+- 配置：`AiWorkerConfig.ai_provider`（`mode`/`provider_id`/`model`/`api`/`base_url`/`api_key`/
+  `request_timeout_secs`/`max_output_tokens`）；`real` 模式 fail-closed（非空 model 与 API key）。
+- `main.rs`：按 `mode` 组合 deterministic/real 提取器并以 `Arc<dyn DocumentFieldExtractor>` 注入
+  `process_task`。
 
 ### M3 — 真实认证（~12h）
 

@@ -10,6 +10,7 @@ tracing = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 runtime-config = { workspace = true }

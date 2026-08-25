@@ -9,6 +9,19 @@ pub enum WorkerDatabaseBackend {
     Sqlite,
 }
 
+/// Selects the field-extraction implementation used by the worker.
+///
+/// `deterministic` is the offline/test default. `real` wires a live
+/// model-provider endpoint and fails closed at startup when required
+/// credentials are missing (PLAN-0012 M2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AiProviderMode {
+    #[default]
+    Deterministic,
+    Real,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {
     #[serde(default)]
@@ -50,6 +63,49 @@ pub struct AiWorkerConfig {
     pub test_task_delay_millis: u64,
     #[serde(default)]
     pub observability: ObservabilityConfig,
+    #[serde(default)]
+    pub ai_provider: AiProviderConfig,
+}
+
+/// Runtime configuration for the live model-provider integration.
+///
+/// Only the `real` mode consumes these values; `deterministic` ignores them.
+/// The API key and base URL are never logged or exposed through DTOs
+/// (ADR-0023). The base URL must resolve to HTTPS or loopback HTTP, which is
+/// validated at provider build time by `check-architecture`/`ProviderFactory`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AiProviderConfig {
+    #[serde(default)]
+    pub mode: AiProviderMode,
+    #[serde(default = "default_provider_id")]
+    pub provider_id: String,
+    #[serde(default = "default_provider_model")]
+    pub model: String,
+    #[serde(default = "default_provider_api")]
+    pub api: String,
+    #[serde(default)]
+    pub base_url: Option<SecretUrl>,
+    #[serde(default)]
+    pub api_key: Option<Secret<String>>,
+    #[serde(default = "default_request_timeout_secs")]
+    pub request_timeout_secs: u64,
+    #[serde(default)]
+    pub max_output_tokens: Option<u32>,
+}
+
+impl Default for AiProviderConfig {
+    fn default() -> Self {
+        Self {
+            mode: AiProviderMode::default(),
+            provider_id: default_provider_id(),
+            model: default_provider_model(),
+            api: default_provider_api(),
+            base_url: None,
+            api_key: None,
+            request_timeout_secs: default_request_timeout_secs(),
+            max_output_tokens: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -150,12 +206,37 @@ impl AiWorkerConfig {
         if self.env == RuntimeEnvironment::Production && self.database.url.is_none() {
             return Err("production AI Worker requires a database URL".to_string());
         }
+        if self.ai_provider.mode == AiProviderMode::Real {
+            if self.ai_provider.model.trim().is_empty() {
+                return Err("real AI provider requires a non-empty model".to_string());
+            }
+            if self
+                .ai_provider
+                .api_key
+                .as_ref()
+                .is_none_or(|key| key.expose().trim().is_empty())
+            {
+                return Err("real AI provider requires an API key".to_string());
+            }
+        }
         Ok(())
     }
 }
 
 fn default_worker_id() -> String {
     format!("ai-worker-{}", std::process::id())
+}
+fn default_provider_id() -> String {
+    "openai".to_string()
+}
+fn default_provider_model() -> String {
+    String::new()
+}
+fn default_provider_api() -> String {
+    "openai_completions".to_string()
+}
+const fn default_request_timeout_secs() -> u64 {
+    120
 }
 const fn default_lease_duration() -> i64 {
     30
