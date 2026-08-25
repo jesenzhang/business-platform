@@ -2467,7 +2467,6 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "jarvis-model-provider"
 version = "0.1.0"
-source = "git+https://github.com/jesenzhang/jarvis-rs?rev=0485827bd3cf735527de330c42aa6c4d85552b92#0485827bd3cf735527de330c42aa6c4d85552b92"
 dependencies = [
  "async-trait",
  "bytes",

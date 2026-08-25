@@ -1,6 +1,0 @@
-# PLAN-0012 M1: route git-dependency fetches through the system git CLI so the
-# pinned jarvis-model-provider source resolves identically on local Windows and
-# GitHub CI (see ADR-0023). libgit2's built-in fetch intermittently gets HTTP
-# 401 on this host even for an anonymous public repository.
-[net]
-git-fetch-with-cli = true

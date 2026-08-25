@@ -1,0 +1,37 @@
+# Vendored from `https://github.com/jesenzhang/jarvis-rs` at rev
+# `0485827bd3cf735527de330c42aa6c4d85552b92` (crates/model-provider).
+#
+# Provenance: the upstream repository is private and not fetchable by the
+# GitHub Actions runner, so per PLAN-0012 / ADR-0023 the crate is vendored as
+# a path dependency instead of a git dependency. Keep this copy in sync with
+# upstream intentionally: no automatic sync is in place.
+#
+# Upstream used workspace-inherited settings which are inlined here so this
+# crate compiles standalone inside the business-platform workspace.
+
+[package]
+name = "jarvis-model-provider"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Jarvis Team"]
+repository = "https://github.com/jarvis-rs/jarvis-rs"
+readme = "README.md"
+description = "Standalone model protocol library for OpenAI-compatible chat, Anthropic Messages, and OpenAI image generation"
+keywords = ["ai", "llm", "openai", "anthropic", "streaming"]
+categories = ["api-bindings", "asynchronous"]
+
+[lib]
+name = "jarvis_model_provider"
+
+[dependencies]
+async-trait = "0.1"
+bytes = "1.6"
+futures = "0.3"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+thiserror = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }

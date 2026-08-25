@@ -51,14 +51,14 @@
   rust-version 1.94.1 满足；thiserror 1（1.0.69）与本仓库 thiserror 2（2.0.19）在 Cargo
   图中并存；reqwest 特性并集引入 default-tls（native-tls/schannel/openssl）与 rustls 双
   TLS 栈，接受并记录；tokio 单一版本 1.53.1；
-- **接入方式（定稿）**：git dependency 锁定已推送 rev
-  `0485827bd3cf735527de330c42aa6c4d85552b92`（GitHub 远端 main 的已验证 HEAD，不跟踪
-  main）。仓库根 `.cargo/config.toml` 设 `net.git-fetch-with-cli = true` 使本地与 CI 用系统
-  git CLI 拉取，规避 libgit2 内置 fetch 对匿名 public 仓库的偶发 HTTP 401；
-- **CI 可访问性（验证通过）**：`jesenzhang/jarvis-rs` 为 public 仓库，`git ls-remote`/
-  `git clone` 与 `cargo check` 均无需凭据成功解析；GitHub Actions 拉取可行性成立（最终
-  以 Main CI 为准）。无 vendor 触发。注意：与原假设不同，本机未发现 jarvis-rs 本地工作树
-  clone，因此不依赖"本地未提交修改"这一前提，直接锁定远端已推送 rev。
+- **接入方式（定稿，ADR-0023 修订）**：**vendored 源码**。初选 git dependency 锁定
+  rev `0485827bd3cf735527de330c42aa6c4d85552b92`；Main CI 实测无法拉取
+  `jesenzhang/jarvis-rs`（私有/受限，匿名 404），全部 cargo 任务在 dependency 解析失败。
+  按本计划回退策略切换为 vendor：源快照置于 `vendor/jarvis/model-provider/`，ai-worker 以
+  path 依赖引用；不再保留 `.cargo/config.toml` 的 git-fetch 变通；
+- **CI 可访问性（定稿）**：GitHub Actions 无法拉取私有 `jesenzhang/jarvis-rs` → 采用
+  vendored 源码，从而 CI 自包含。若未来仓库公开或为 CI 配置私有仓库读取凭据，再于
+  ADR-0023 评估是否切回 git/registry。
 
 ## 里程碑
 
@@ -74,9 +74,9 @@
 
 | 任务 | 内容 | 预估 | 状态 |
 |---|---|---|---|
-| T1.1 | 验证 git dependency 可解析（锁定 rev 0485827）；`cargo check -p ai-worker` 通过；确认 GitHub Actions 拉取可行性 | 2h | ✅ 完成 |
-| T1.2 | ADR-0023：model-provider 依赖选择、版本锁定策略、reqwest 特性并集代价、密钥边界、可替换性（`DocumentFieldExtractor` port 保持稳定） | 2h | ✅ 完成 |
-| T1.3 | 更新本计划架构预检为定稿事实；确认 ai-worker 是唯一允许依赖 model-provider 的 crate，并在 `check-architecture.ps1` 增加对应门禁 | 2h | ✅ 完成 |
+| T1.1 | 验证 model-provider 接入与 CI 可拉取性：本地 `cargo check -p ai-worker` 通过（git rev 0485827）；Main CI 实测无法拉取私有仓库 → 按回退策略改 vendored path，`cargo check` 复通 | 2h | ✅ 完成 |
+| T1.2 | ADR-0023：model-provider 依赖选择、版本锁定策略、reqwest 特性并集代价、密钥边界、可替换性（`DocumentFieldExtractor` port 保持稳定）；记录 CI 私有仓库不可达→vendored 修订 | 2h | ✅ 完成 |
+| T1.3 | 更新本计划架构预检为定稿事实；确认 ai-worker 是唯一允许依赖 model-provider 的 crate，并在 `check-architecture.ps1` 增加对应门禁（断言 vendored path、禁止 git URL、禁止核心 crate 依赖） | 2h | ✅ 完成 |
 
 ### M2 — AI Provider 适配层实现（~14h）
 

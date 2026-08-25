@@ -47,7 +47,7 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0020`](ADR-0020-business-module-isolation-and-semantic-contract.md) | Business Module Isolation and Semantic Contract | Accepted | 平台核心/业务模块隔离、语义贡献、确定性编译和 C legacy ACL 预留 |
 | [`ADR-0021`](ADR-0021-business-application-packaging-and-published-extension-points.md) | Business Application Packaging and Published Extension Points | Accepted | 稳定 package、贡献、扩展点、兼容性和移除计划 |
 | [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Accepted | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
-| [`ADR-0023`](ADR-0023-ai-worker-model-provider-dependency.md) | ai-worker 的 model-provider 依赖与可替换性边界 | Accepted | git rev 锁定、reqwest TLS 并集代价、密钥边界、DocumentFieldExtractor 可替换、隔离门禁 |
+| [`ADR-0023`](ADR-0023-ai-worker-model-provider-dependency.md) | ai-worker 的 model-provider 依赖与可替换性边界 | Accepted | vendored path（CI 私有仓库不可达）、reqwest TLS 并集代价、密钥边界、DocumentFieldExtractor 可替换、隔离门禁 |
 
 ## 4. ADR-0003 的完整 Baseline
 

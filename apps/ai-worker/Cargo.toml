@@ -22,8 +22,9 @@ document = { workspace = true }
 object-storage = { workspace = true }
 sqlx = { workspace = true }
 # PLAN-0012 M1: model-provider is scoped solely to the ai-worker composition root
-# (see ADR-0023). git dep is pinned to a pushed rev, never tracked to main.
-jarvis-model-provider = { git = "https://github.com/jesenzhang/jarvis-rs", rev = "0485827bd3cf735527de330c42aa6c4d85552b92" }
+# (see ADR-0023). Integrated as a vendored path dependency because the upstream
+# private repository is not fetchable by the GitHub Actions runner.
+jarvis-model-provider = { path = "../../vendor/jarvis/model-provider" }
 
 [lints]
 workspace = true

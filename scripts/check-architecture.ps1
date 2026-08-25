@@ -65,15 +65,23 @@ Assert-NotContains "apps/ai-worker/src" @(
     "FixedPipelineRunner"
 ) "ai-worker must use the execution unit of work for writes"
 # ADR-0023 / PLAN-0012: jarvis-model-provider is scoped solely to the ai-worker
-# composition root. No other crate may declare or reference the git dependency.
+# composition root, integrated as a vendored path dependency under vendor/.
+# ai-worker must reference it via the vendored path; no other crate may declare
+# it, and nothing may reintroduce it as a git dependency.
 $aiWorkerCargo = Get-Content -Raw (Join-Path $root "apps/ai-worker/Cargo.toml")
-if ($aiWorkerCargo -notmatch 'jarvis-model-provider\s*=\s*\{\s*git\s*=\s*"https://github\.com/jesenzhang/jarvis-rs"\s*,\s*rev\s*=\s*"[0-9a-f]{40}"\s*\}') {
-    throw "ai-worker must declare jarvis-model-provider as a git dependency pinned to a 40-hex rev"
+if ($aiWorkerCargo -notmatch 'jarvis-model-provider\s*=\s*\{\s*path\s*=\s*"\.\./\.\./vendor/jarvis/model-provider"\s*\}') {
+    throw "ai-worker must declare jarvis-model-provider as the vendored path dependency under vendor/jarvis/model-provider"
+}
+if ($aiWorkerCargo -match "jarvis-rs") {
+    throw "ai-worker must not reference the private upstream jarvis-rs git dependency; use the vendored path"
+}
+if (-not (Test-Path (Join-Path $root "vendor/jarvis/model-provider/Cargo.toml"))) {
+    throw "vendored model-provider crate missing: vendor/jarvis/model-provider/Cargo.toml"
 }
 foreach ($cratePath in @("crates/document-processing", "crates/ai-application", "apps/business-api", "crates/public-api-contracts", "crates/business-module-contracts", "crates/business-application-compiler", "crates/semantic-contract")) {
     $cargoPath = Join-Path $root "$cratePath/Cargo.toml"
     if (Test-Path $cargoPath) {
-        if ((Get-Content -Raw $cargoPath) -match 'jarvis-model-provider|jarvis-rs') {
+        if ((Get-Content -Raw $cargoPath) -match 'jarvis-model-provider|vendor/jarvis|jarvis-rs') {
             throw "model-provider must not be a dependency of $cratePath"
         }
     }
