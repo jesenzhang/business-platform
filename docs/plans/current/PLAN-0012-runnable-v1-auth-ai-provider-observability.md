@@ -36,23 +36,29 @@
 | 状态归属 | AI Task 的 lease/fence/retry 语义不变；provider 调用是无外部效果副作用边界（失败可重试）。 |
 | 公开能力 | 无新增公开 API 契约；认证中间件行为变化对客户端表现为 401 语义收紧。 |
 | 一致性 | provider 调用失败映射为既有 `ClassifiedProcessingFailure` 重试/死信语义，不引入新的分布式事务。 |
-| 安全 | API key 通过 `runtime-config` secret_url 承载，fail-closed，不进日志/DTO/公共输出；provider 原始错误对外部响应脱敏。 |
+| 安全 | API key 通过 `runtime-config` secret_url 承载，fail-closed，不进日志/DTO/公共输出；provider 原始错误对外部响应脱敏；provider base URL 只允许 HTTPS 或 loopback。 |
 | 部署 | 新增外部依赖：IdP（demo 用 Keycloak 或等价）、model provider endpoint；均通过配置接入，不改部署拓扑。 |
+| model-provider 边界（ADR-0023） | `jarvis-model-provider` 仅存在于 ai-worker 组合根；`document-processing` 核心层与业务 crate 零依赖；由 `check-architecture.ps1` 强制。 |
 
-## 依赖决策（已核实事实）
+## 依赖决策（M1 定稿事实）
 
 - `jarvis-model-provider`（lib 名 `jarvis_model_provider`）核心 trait 为
   `ModelProvider::complete/stream`，提供 `OpenAiCompatibleProvider`、
   `AnthropicProvider` 与测试用 `MockProvider`/`ScriptedProvider`；
 - 错误模型 `ProviderError`（`ProviderErrorKind` + `FailurePhase` + retry-after）
   可映射到既有 `ExtractionError`/`ClassifiedProcessingFailure`；
-- 依赖兼容：reqwest 0.12 / tokio 1 / edition 2021 / MSRV 无声明（仓库
-  rust-version 1.94.1 满足）；thiserror 1 与本仓库 thiserror 2 可在 Cargo
-  图中并存；reqwest 特性并集会引入 default-tls，接受该代价并在 ADR 记录；
-- **接入方式**：git dependency 锁定已推送 rev（不跟踪 main——jarvis-rs 本地
-  工作树存在未提交的 V1 hardening 修改，main 分支不稳定）；
-- CI 可访问性：GitHub Actions 需能拉取 `jesenzhang/jarvis-rs`（public 或
-  配置凭据）；若不可访问则降级为 vendored 源码，该决策在 ADR-0023 定稿。
+- 依赖兼容（M1 实测，见 ADR-0023 第 8 节）：reqwest 0.12 / tokio 1 / edition 2021 /
+  rust-version 1.94.1 满足；thiserror 1（1.0.69）与本仓库 thiserror 2（2.0.19）在 Cargo
+  图中并存；reqwest 特性并集引入 default-tls（native-tls/schannel/openssl）与 rustls 双
+  TLS 栈，接受并记录；tokio 单一版本 1.53.1；
+- **接入方式（定稿）**：git dependency 锁定已推送 rev
+  `0485827bd3cf735527de330c42aa6c4d85552b92`（GitHub 远端 main 的已验证 HEAD，不跟踪
+  main）。仓库根 `.cargo/config.toml` 设 `net.git-fetch-with-cli = true` 使本地与 CI 用系统
+  git CLI 拉取，规避 libgit2 内置 fetch 对匿名 public 仓库的偶发 HTTP 401；
+- **CI 可访问性（验证通过）**：`jesenzhang/jarvis-rs` 为 public 仓库，`git ls-remote`/
+  `git clone` 与 `cargo check` 均无需凭据成功解析；GitHub Actions 拉取可行性成立（最终
+  以 Main CI 为准）。无 vendor 触发。注意：与原假设不同，本机未发现 jarvis-rs 本地工作树
+  clone，因此不依赖"本地未提交修改"这一前提，直接锁定远端已推送 rev。
 
 ## 里程碑
 
@@ -66,11 +72,11 @@
 
 ### M1 — model-provider 集成决策与 ADR（~6h）
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
-| T1.1 | 验证 git dependency 可解析（锁定 rev）；确认 GitHub Actions 拉取可行性；`cargo check` 通过 | 2h |
-| T1.2 | ADR-0023：model-provider 依赖选择、版本锁定策略、reqwest 特性并集代价、密钥边界、可替换性（`DocumentFieldExtractor` port 保持稳定） | 2h |
-| T1.3 | 更新本计划架构预检为定稿事实；确认 ai-worker 是唯一允许依赖 model-provider 的 crate，并在 `check-architecture.ps1` 增加对应门禁 | 2h |
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
+| T1.1 | 验证 git dependency 可解析（锁定 rev 0485827）；`cargo check -p ai-worker` 通过；确认 GitHub Actions 拉取可行性 | 2h | ✅ 完成 |
+| T1.2 | ADR-0023：model-provider 依赖选择、版本锁定策略、reqwest 特性并集代价、密钥边界、可替换性（`DocumentFieldExtractor` port 保持稳定） | 2h | ✅ 完成 |
+| T1.3 | 更新本计划架构预检为定稿事实；确认 ai-worker 是唯一允许依赖 model-provider 的 crate，并在 `check-architecture.ps1` 增加对应门禁 | 2h | ✅ 完成 |
 
 ### M2 — AI Provider 适配层实现（~14h）
 

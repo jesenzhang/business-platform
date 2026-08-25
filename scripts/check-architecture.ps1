@@ -64,6 +64,20 @@ Assert-NotContains "apps/ai-worker/src" @(
     "ProcessingStepStore",
     "FixedPipelineRunner"
 ) "ai-worker must use the execution unit of work for writes"
+# ADR-0023 / PLAN-0012: jarvis-model-provider is scoped solely to the ai-worker
+# composition root. No other crate may declare or reference the git dependency.
+$aiWorkerCargo = Get-Content -Raw (Join-Path $root "apps/ai-worker/Cargo.toml")
+if ($aiWorkerCargo -notmatch 'jarvis-model-provider\s*=\s*\{\s*git\s*=\s*"https://github\.com/jesenzhang/jarvis-rs"\s*,\s*rev\s*=\s*"[0-9a-f]{40}"\s*\}') {
+    throw "ai-worker must declare jarvis-model-provider as a git dependency pinned to a 40-hex rev"
+}
+foreach ($cratePath in @("crates/document-processing", "crates/ai-application", "apps/business-api", "crates/public-api-contracts", "crates/business-module-contracts", "crates/business-application-compiler", "crates/semantic-contract")) {
+    $cargoPath = Join-Path $root "$cratePath/Cargo.toml"
+    if (Test-Path $cargoPath) {
+        if ((Get-Content -Raw $cargoPath) -match 'jarvis-model-provider|jarvis-rs') {
+            throw "model-provider must not be a dependency of $cratePath"
+        }
+    }
+}
 Assert-NotContains "apps/business-api/src" @(
     "ProcessingJobCommandPort",
     "ProcessingStepStore",
