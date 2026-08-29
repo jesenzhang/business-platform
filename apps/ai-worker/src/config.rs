@@ -73,6 +73,9 @@ pub struct AiWorkerConfig {
 /// The API key and base URL are never logged or exposed through DTOs
 /// (ADR-0023). The base URL must resolve to HTTPS or loopback HTTP, which is
 /// validated at provider build time by `check-architecture`/`ProviderFactory`.
+/// Plaintext HTTP to RFC1918 addresses additionally requires the explicit
+/// `allow_private_http` opt-in, which stays fail-closed (default off) in every
+/// environment.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiProviderConfig {
     #[serde(default)]
@@ -91,6 +94,12 @@ pub struct AiProviderConfig {
     pub request_timeout_secs: u64,
     #[serde(default)]
     pub max_output_tokens: Option<u32>,
+    /// Explicit opt-in to plaintext HTTP against RFC1918 intranet endpoints
+    /// (`EndpointPolicy::TrustedPrivateHttp`). Loopback HTTP and HTTPS remain
+    /// allowed without this flag. Default false so a non-TLS base URL fails
+    /// closed at provider build time.
+    #[serde(default)]
+    pub allow_private_http: bool,
 }
 
 impl Default for AiProviderConfig {
@@ -104,6 +113,7 @@ impl Default for AiProviderConfig {
             api_key: None,
             request_timeout_secs: default_request_timeout_secs(),
             max_output_tokens: None,
+            allow_private_http: false,
         }
     }
 }

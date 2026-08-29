@@ -62,7 +62,9 @@ impl ModelBackedExtractor {
     ///
     /// Only reachable when `mode == real`; configuration validation already
     /// requires a non-empty API key. Unsupported API names and non-conformant
-    /// base URLs fail here before any request is dispatched.
+    /// base URLs fail here before any request is dispatched. Plaintext HTTP to
+    /// RFC1918 addresses requires the explicit `allow_private_http` opt-in;
+    /// HTTPS and loopback HTTP are always accepted.
     pub fn from_config(config: &AiProviderConfig) -> anyhow::Result<Self> {
         let api_key = config
             .api_key
@@ -75,12 +77,22 @@ impl ModelBackedExtractor {
             "anthropic" | "anthropic_messages" => Api::AnthropicMessages,
             other => anyhow::bail!("unsupported AI provider api: {other}"),
         };
+        let endpoint_policy = if config.allow_private_http {
+            tracing::warn!(
+                "AI provider endpoint policy is trusted-private-http: plaintext \
+                 intranet transport; credentials, prompts and model responses \
+                 are not encrypted in transit"
+            );
+            jarvis_model_provider::providers::EndpointPolicy::TrustedPrivateHttp
+        } else {
+            jarvis_model_provider::providers::EndpointPolicy::SecureOrLoopback
+        };
         let provider_id = ProviderId::new(config.provider_id.clone())
             .map_err(|message| anyhow::anyhow!("invalid AI provider id: {message}"))?;
         let provider = ProviderFactory::build(ProviderConfig {
             api_key,
             base_url: config.base_url.as_ref().map(|url| url.expose().to_string()),
-            endpoint_policy: jarvis_model_provider::providers::EndpointPolicy::SecureOrLoopback,
+            endpoint_policy,
             request_timeout: Duration::from_secs(config.request_timeout_secs),
             provider_id,
             api,
@@ -233,12 +245,14 @@ fn parse_payload(
 #[cfg(test)]
 mod tests {
     use super::{map_provider_error, ModelBackedExtractor};
+    use crate::config::{AiProviderConfig, AiProviderMode};
     use document_processing::{DocumentFieldExtractor, ExtractionError, ExtractionRequest};
     use jarvis_model_provider::providers::{MockProvider, ScriptedProvider};
     use jarvis_model_provider::{
         AssistantMessage, Completion, CompletionMetadata, FailurePhase, ProviderError,
         ProviderErrorKind, StopReason, StreamEvent,
     };
+    use runtime_config::{Secret, SecretUrl};
     use std::sync::Arc;
     use uuid::Uuid;
 
@@ -382,5 +396,100 @@ mod tests {
             Ok(_) => unreachable!("expected abort failure"),
             Err(error) => assert_eq!(error, ExtractionError::Cancelled),
         }
+    }
+
+    fn provider_config(base_url: &str, allow_private_http: bool) -> AiProviderConfig {
+        AiProviderConfig {
+            mode: AiProviderMode::Real,
+            provider_id: "smoke".to_string(),
+            model: "test-model".to_string(),
+            api: "openai_completions".to_string(),
+            base_url: Some(
+                SecretUrl::parse(base_url)
+                    .unwrap_or_else(|error| unreachable!("valid base url: {error}")),
+            ),
+            api_key: Some(Secret::new("dummy".to_string())),
+            request_timeout_secs: 120,
+            max_output_tokens: Some(512),
+            allow_private_http,
+        }
+    }
+
+    #[test]
+    fn from_config_rejects_plaintext_private_http_by_default() {
+        let result = ModelBackedExtractor::from_config(&provider_config(
+            "http://192.168.1.10:8080/v1",
+            false,
+        ));
+        let Err(error) = result else {
+            unreachable!("plaintext RFC1918 endpoint must fail closed without opt-in")
+        };
+        assert!(error.to_string().contains("failed to build AI provider"));
+    }
+
+    #[test]
+    fn from_config_accepts_private_http_with_explicit_opt_in() {
+        ModelBackedExtractor::from_config(&provider_config("http://192.168.1.10:8080/v1", true))
+            .unwrap_or_else(|error| unreachable!("opt-in private http must build: {error}"));
+    }
+
+    #[test]
+    fn from_config_still_rejects_unknown_api() {
+        let mut config = provider_config("http://192.168.1.10:8080/v1", true);
+        config.api = "unknown_api".to_string();
+        let result = ModelBackedExtractor::from_config(&config);
+        let Err(error) = result else {
+            unreachable!("unknown api name must fail closed")
+        };
+        assert!(error.to_string().contains("unsupported AI provider api"));
+    }
+
+    /// PLAN-0012 T2.5 manual smoke against a real OpenAI-compatible endpoint.
+    ///
+    /// Ignored by default because it requires a reachable model endpoint. Run
+    /// locally with:
+    ///
+    /// ```text
+    /// AI_SMOKE_BASE_URL=http://<host>:<port>/v1 \
+    /// cargo test -p ai-worker --all-features real_provider_smoke -- --ignored --nocapture
+    /// ```
+    ///
+    /// `AI_SMOKE_MODEL` (default `qwen3_vl`) and `AI_SMOKE_API_KEY` (default
+    /// `dummy`) are optional. The endpoint address is intentionally read from
+    /// the environment so no intranet URL is committed to the repository.
+    #[tokio::test]
+    #[ignore = "requires a reachable intranet model provider; run manually with --ignored"]
+    async fn real_provider_smoke_extracts_candidate() -> Result<(), Box<dyn std::error::Error>> {
+        let base_url = std::env::var("AI_SMOKE_BASE_URL")
+            .map_err(|_| "set AI_SMOKE_BASE_URL to run the real provider smoke")?;
+        let model = std::env::var("AI_SMOKE_MODEL").unwrap_or_else(|_| "qwen3_vl".to_string());
+        let api_key = std::env::var("AI_SMOKE_API_KEY").unwrap_or_else(|_| "dummy".to_string());
+        let mut config = provider_config(&base_url, true);
+        config.model = model;
+        config.api_key = Some(Secret::new(api_key));
+        // Reasoning-style deployments (e.g. qwen3 served via vLLM) spend output
+        // budget on hidden reasoning before emitting the final JSON; keep the
+        // budget generous so the answer is not truncated to an empty payload.
+        config.max_output_tokens = Some(4096);
+        let Ok(extractor) = ModelBackedExtractor::from_config(&config) else {
+            unreachable!("smoke config must build");
+        };
+        let sample = "MEMORANDUM\n\nTo: All staff\nFrom: Operations\nDate: 2026-08-29\n\
+Subject: Quarterly facility maintenance window\n\nThe data center will undergo \
+power maintenance from 2026-09-05 to 2026-09-06. Services may be degraded.\n";
+        let candidate = match extractor.extract(request(sample)).await {
+            Ok(candidate) => candidate,
+            Err(error) => return Err(format!("real provider smoke failed: {error:?}").into()),
+        };
+        println!(
+            "smoke ok: document_type={} title={:?} language={:?} fields={} warnings={}",
+            candidate.payload.document_type,
+            candidate.payload.title,
+            candidate.payload.language,
+            candidate.payload.fields.len(),
+            candidate.payload.warnings.len(),
+        );
+        assert!(!candidate.payload.document_type.trim().is_empty());
+        Ok(())
     }
 }

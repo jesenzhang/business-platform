@@ -1328,6 +1328,39 @@ mod tests {
         .await
     }
 
+    /// Bind a loopback-free RFC1918 fixture address for tests that exercise
+    /// the `TrustedPrivateHttp` endpoint policy, which rejects loopback.
+    async fn private_fixture_listener() -> TcpListener {
+        for variable in ["COMPUTERNAME", "HOSTNAME"] {
+            let Some(hostname) = std::env::var_os(variable) else {
+                continue;
+            };
+            let hostname = hostname.to_string_lossy().into_owned();
+            let Ok(addresses) =
+                std::net::ToSocketAddrs::to_socket_addrs(&(hostname.as_str(), 0u16))
+            else {
+                continue;
+            };
+            for address in addresses {
+                if let std::net::IpAddr::V4(ip) = address.ip() {
+                    let [first, second, _, _] = ip.octets();
+                    if first == 10
+                        || (first == 172 && (16..=31).contains(&second))
+                        || (first == 192 && second == 168)
+                    {
+                        return TcpListener::bind(std::net::SocketAddr::new(
+                            std::net::IpAddr::V4(ip),
+                            0,
+                        ))
+                        .await
+                        .unwrap();
+                    }
+                }
+            }
+        }
+        panic!("TrustedPrivateHttp test requires one local RFC1918 interface");
+    }
+
     async fn fixture_with_response(
         response_body: String,
         content_type: &'static str,
@@ -1872,7 +1905,57 @@ mod tests {
 
     #[tokio::test]
     async fn profile_connection_uses_profile_endpoint_and_auth_contract() {
-        let (base_url, request_receiver) = fixture().await;
+        let listener = private_fixture_listener().await;
+        let address = listener.local_addr().unwrap();
+        let base_url = format!("http://{address}/v1");
+        let (request_sender, request_receiver) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            loop {
+                let count = socket.read(&mut chunk).await.unwrap();
+                if count == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..count]);
+                let Some(header_start) =
+                    request.windows(4).position(|window| window == b"\r\n\r\n")
+                else {
+                    continue;
+                };
+                let header_end = header_start + 4;
+                let content_length = String::from_utf8_lossy(&request[..header_end])
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length:")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap_or_default();
+                while request.len() < header_end + content_length {
+                    let count = socket.read(&mut chunk).await.unwrap();
+                    if count == 0 {
+                        break;
+                    }
+                    request.extend_from_slice(&chunk[..count]);
+                }
+                let body_text = String::from_utf8_lossy(
+                    &request
+                        [header_end..header_end + content_length.min(request.len() - header_end)],
+                )
+                .into_owned();
+                let body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}";
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                socket.write_all(response.as_bytes()).await.unwrap();
+                let _ = request_sender.send(body_text);
+                return;
+            }
+        });
         let profile = profile_for_refresh()
             .with_base_url(base_url)
             .with_endpoint_policy(crate::providers::EndpointPolicy::TrustedPrivateHttp);
@@ -2211,7 +2294,7 @@ mod tests {
 
     #[tokio::test]
     async fn trusted_private_http_catalog_rejects_redirects() {
-        let redirect_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let redirect_listener = private_fixture_listener().await;
         let redirect_address = redirect_listener.local_addr().unwrap();
         let target_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let target_address = target_listener.local_addr().unwrap();

@@ -271,6 +271,8 @@ struct ChatRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     enable_thinking: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    chat_template_kwargs: Option<ChatTemplateKwargs>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     thinking_budget: Option<u32>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -291,6 +293,14 @@ struct ChatThinking {
 #[derive(Serialize)]
 struct ChatReasoning {
     enabled: bool,
+}
+
+/// Qwen chat-template thinking switches served through `chat_template_kwargs`
+/// on vLLM/SGLang style OpenAI-compatible endpoints.
+#[derive(Serialize)]
+struct ChatTemplateKwargs {
+    enable_thinking: bool,
+    preserve_thinking: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -472,6 +482,7 @@ fn chat_request(
         reasoning: reasoning_fields.reasoning,
         thinking: reasoning_fields.thinking,
         enable_thinking: reasoning_fields.enable_thinking,
+        chat_template_kwargs: reasoning_fields.chat_template_kwargs,
         thinking_budget: reasoning_fields.thinking_budget,
         stream,
         stream_options: stream.then_some(StreamOptions {
@@ -521,6 +532,7 @@ struct ReasoningWireFields {
     reasoning: Option<ChatReasoning>,
     thinking: Option<ChatThinking>,
     enable_thinking: Option<bool>,
+    chat_template_kwargs: Option<ChatTemplateKwargs>,
     thinking_budget: Option<u32>,
 }
 
@@ -533,6 +545,7 @@ fn reasoning_wire_fields(
         reasoning: None,
         thinking: None,
         enable_thinking: None,
+        chat_template_kwargs: None,
         thinking_budget: None,
     };
     let Some(reasoning) = reasoning else {
@@ -574,6 +587,12 @@ fn reasoning_wire_fields(
                 .enabled
                 .then_some(reasoning.budget_tokens)
                 .flatten();
+        }
+        crate::ReasoningEncoding::QwenChatTemplateToggle => {
+            fields.chat_template_kwargs = Some(ChatTemplateKwargs {
+                enable_thinking: reasoning.enabled,
+                preserve_thinking: true,
+            });
         }
     }
     fields

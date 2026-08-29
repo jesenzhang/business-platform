@@ -160,7 +160,7 @@ fn provider_replay_available(
                 || value
                     .replay_items()
                     .iter()
-                    .any(|item| item.reference() == reference)
+                    .any(|item| item.reference() == Some(reference))
         }
         _ => false,
     }

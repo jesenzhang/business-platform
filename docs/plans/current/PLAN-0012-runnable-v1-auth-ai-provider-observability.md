@@ -55,7 +55,12 @@
   rev `0485827bd3cf735527de330c42aa6c4d85552b92`；Main CI 实测无法拉取
   `jesenzhang/jarvis-rs`（私有/受限，匿名 404），全部 cargo 任务在 dependency 解析失败。
   按本计划回退策略切换为 vendor：源快照置于 `vendor/jarvis/model-provider/`，ai-worker 以
-  path 依赖引用；不再保留 `.cargo/config.toml` 的 git-fetch 变通；
+  path 依赖引用；不再保留 `.cargo/config.toml` 的 git-fetch 变通。2026-08-30 快照升级至
+  上游本地提交 `af9fbe7`（crate 0.3.0-dev.1），无本地魔改（ADR-0023 第 7 节 T2.5 补充）。
+- **内网 HTTP endpoint（2026-08-30 定稿）**：真实 smoke 使用内网 OpenAI-compatible 部署。
+  为此引入 fail-closed 的 `AiProviderConfig.allow_private_http`（默认 false）：显式 opt-in 后
+  映射上游 `EndpointPolicy::TrustedPrivateHttp`（RFC1918 明文 HTTP），否则维持
+  HTTPS-or-loopback 拒绝语义；端点地址不入库，仅经 `AI_SMOKE_BASE_URL` 环境变量传入。
 - **CI 可访问性（定稿）**：GitHub Actions 无法拉取私有 `jesenzhang/jarvis-rs` → 采用
   vendored 源码，从而 CI 自包含。若未来仓库公开或为 CI 配置私有仓库读取凭据，再于
   ADR-0023 评估是否切回 git/registry。
@@ -90,7 +95,7 @@
 | T2.2 | 适配器实现：prompt 构造、响应解析为 Candidate 字段、超时/重试语义（复用既有 AI Task retry 分类） | 4h | ✅ |
 | T2.3 | 密钥接入：`runtime-config` secret_url 承载 provider API key；fail-closed 校验；日志脱敏验证 | 2h | ✅ |
 | T2.4 | 契约测试：`MockProvider`/`ScriptedProvider` 注入测试（正常、协议错误、超时、429 retry-after、abort）；确定性提取器回归 | 3h | ✅ |
-| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h | ⬜（所需核心完成；真实 provider smoke 依赖密钥，按可选路径，未执行 NOT RUN） |
+| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h | ✅（2026-08-30 真实 smoke 通过：内网 vLLM qwen3_vl，见 ADR-0023 第 7/8 节 T2.5 补充） |
 
 **M2 落地要点**（记录于 ADR-0023 第 7/8 节的实现补充）：
 - `ModelBackedExtractor` 位于 `apps/ai-worker/src/extractor.rs`（新增），实现 `DocumentFieldExtractor`；

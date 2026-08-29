@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-25
+> 最后更新：2026-08-30
 > 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
 > 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
@@ -133,6 +133,17 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > Integrated / Archived（implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`）。
 > 本里程碑仅文档收尾，未修改业务代码、Cargo.toml、迁移或 openapi.json。PLAN-0012
 > 为当前唯一 Active 计划，M1（model-provider 集成决策与 ADR-0023）可从干净起点启动。
+
+> 2026-08-30: PLAN-0012 M2 全部完成（T2.1–T2.5）。vendored jarvis-model-provider
+> 快照升级至上游 `af9fbe7`（0.3.0-dev.1，无本地魔改）；新增 fail-closed 的
+> `allow_private_http` 配置映射上游 `EndpointPolicy::TrustedPrivateHttp`，默认仍为
+> HTTPS-or-loopback 拒绝语义。真实 provider smoke 通过（内网 vLLM qwen3_vl，
+> OpenAI-compatible；提取 title/language/fields/warnings 正常，证据见 ADR-0023
+> 第 7/8 节）。全仓 fmt/check/clippy/test --no-fail-fast 与
+> check-architecture.ps1 PASS；agent-adapter 上游失败测试在本机沙箱存在经基线
+> 复现确认的既有 flake（连接 `127.0.0.1:9` 被代答 -32003），单包隔离通过，由 CI
+> 覆盖。PLAN-0012 剩余：M3（真实认证）、M4（预生产环境与可观测性）、M5（v0.1
+> 发布审计）。
 
 ## 1. 当前权威结论
 

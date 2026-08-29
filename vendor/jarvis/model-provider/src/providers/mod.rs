@@ -235,7 +235,11 @@ pub fn normalize_base_url(
             ));
         }
         ("http", EndpointPolicy::SecureOrLoopback, true, _) => {}
-        ("http", EndpointPolicy::TrustedPrivateHttp, true, _) => {}
+        ("http", EndpointPolicy::TrustedPrivateHttp, true, _) => {
+            return Err(invalid(
+                "--allow-private-http is not valid for loopback; loopback HTTP already uses the secure-or-loopback policy",
+            ));
+        }
         ("http", EndpointPolicy::TrustedPrivateHttp, _, true) => {}
         ("http", EndpointPolicy::SecureOrLoopback, _, _) => {
             return Err(invalid(format!(

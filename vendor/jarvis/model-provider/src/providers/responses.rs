@@ -15,10 +15,11 @@ use crate::{
     AbortSignal, Api, AssistantContent, AssistantMessage, Completion, CompletionMetadata,
     CompletionRequest, ContinuationRef, ContinuationScope, DataRetentionPolicy, FailurePhase,
     Message, ModelProvider, OpenAiResponsesContinuation, OpenAiResponsesContinuationMode,
-    OpenAiResponsesReplayItem, OutputConstraint, ProviderCapabilities, ProviderContinuation,
-    ProviderError, ProviderErrorKind, ProviderId, ProviderStream, ReasoningContent,
-    ReasoningPortability, RequestOptions, StopReason, StreamEvent, TextContent, ToolCall,
-    ToolChoice, ToolConstraint, ToolResultContent, Usage, UserContent,
+    OpenAiResponsesReplayItem, OpenAiResponsesReplaySegment, OutputConstraint,
+    ProviderCapabilities, ProviderContinuation, ProviderError, ProviderErrorKind, ProviderId,
+    ProviderStream, ReasoningContent, ReasoningPortability, RequestOptions, StopReason,
+    StreamEvent, TextContent, ToolCall, ToolChoice, ToolConstraint, ToolResultContent, Usage,
+    UserContent,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
@@ -237,7 +238,7 @@ impl ModelProvider for OpenAiResponsesProvider {
                 .filter(|continuation| {
                     continuation.mode() == OpenAiResponsesContinuationMode::Stateless
                 })
-                .map(|continuation| continuation.replay_items().to_vec())
+                .map(|continuation| continuation.replay_segments().to_vec())
                 .unwrap_or_default(),
             response.bytes_stream(),
             self.api_key.clone(),
@@ -253,30 +254,64 @@ impl ModelProvider for OpenAiResponsesProvider {
 fn responses_request(request: &CompletionRequest, stream: bool) -> Result<Value, ProviderError> {
     let mut instructions = Vec::new();
     let mut input = Vec::new();
-    let conversation = if let Some(continuation) = request.continuation.as_ref() {
-        let continuation = continuation.openai_responses().ok_or_else(|| {
-            unsupported("continuation protocol is not supported by OpenAI Responses")
-        })?;
-        continuation
-            .scope()
-            .uncovered_history(&request.messages)
-            .map_err(invalid)?
-    } else {
-        request.messages.clone()
+    let continuation = request
+        .continuation
+        .as_ref()
+        .map(|continuation| {
+            continuation.openai_responses().ok_or_else(|| {
+                unsupported("continuation protocol is not supported by OpenAI Responses")
+            })
+        })
+        .transpose()?;
+    // Stateful mode means the provider retains the covered conversation
+    // prefix, so only the validated uncovered suffix is encoded. Stateless
+    // mode means the provider retains nothing: every required historical
+    // user/tool input is encoded in place, and anchored assistant outputs are
+    // substituted with their provider-native replay segments. Stateless replay
+    // must never apply server-coverage prefix elision.
+    let covered_boundary = match continuation {
+        Some(value) if value.mode() == OpenAiResponsesContinuationMode::Stateful => Some(
+            value
+                .scope()
+                .validate_history(&request.messages)
+                .map_err(invalid)?,
+        ),
+        _ => None,
     };
-    for message in &request.messages {
+    // Non-system message index (system messages are request-level
+    // instructions and sit outside the coverage boundary).
+    let mut conversation_index = 0usize;
+    for (message_index, message) in request.messages.iter().enumerate() {
         if let Message::System { content } = message {
             instructions.push(content.clone());
+            continue;
         }
-    }
-    for message in &conversation {
+        let is_covered = covered_boundary.is_some_and(|covered| conversation_index < covered);
+        conversation_index += 1;
+        if is_covered {
+            continue;
+        }
         match message {
-            Message::System { .. } => {}
+            Message::System { .. } => unreachable!("system messages were handled above"),
             Message::User { content } => input.push(json!({
                 "role": "user",
                 "content": user_content(content)?,
             })),
-            Message::Assistant(message) => input.extend(assistant_input(message)?),
+            Message::Assistant(message) => {
+                let items = continuation
+                    .and_then(|value| {
+                        value
+                            .replay_segment_for_message(&request.messages, message_index)
+                            .transpose()
+                    })
+                    .transpose()
+                    .map_err(invalid)?;
+                if let Some(items) = items {
+                    input.extend(items.iter().map(responses_replay_item));
+                } else {
+                    input.extend(assistant_input(message)?);
+                }
+            }
             Message::ToolResult {
                 tool_call_id,
                 content,
@@ -371,19 +406,9 @@ fn apply_continuation(
             unsupported("stateful Responses continuation has no previous response id")
         })?;
         body["previous_response_id"] = json!(response_id);
-    } else if !continuation.replay_items().is_empty() {
-        let input = body
-            .get_mut("input")
-            .and_then(Value::as_array_mut)
-            .ok_or_else(|| serialization("Responses continuation input is not an array"))?;
-        let mut replay = continuation
-            .replay_items()
-            .iter()
-            .map(responses_replay_item)
-            .collect::<Vec<_>>();
-        replay.append(input);
-        *input = replay;
     }
+    // Stateless replay items are already substituted at their anchored history
+    // positions during conversation encoding; nothing is prepended here.
     Ok(())
 }
 
@@ -395,22 +420,26 @@ fn responses_replay_item(item: &OpenAiResponsesReplayItem) -> Value {
             summary,
             ..
         } => {
-            let mut value = json!({
-                "type": "reasoning",
-                "encrypted_content": encrypted_content,
-            });
+            let mut value = serde_json::Map::new();
+            value.insert("type".into(), json!("reasoning"));
             if let Some(item_id) = item_id {
-                value["id"] = json!(item_id);
+                value.insert("id".into(), json!(item_id));
+            }
+            if let Some(encrypted_content) = encrypted_content {
+                value.insert("encrypted_content".into(), json!(encrypted_content));
             }
             if !summary.is_empty() {
-                value["summary"] = Value::Array(
-                    summary
-                        .iter()
-                        .map(|text| json!({"type": "summary_text", "text": text}))
-                        .collect(),
+                value.insert(
+                    "summary".into(),
+                    Value::Array(
+                        summary
+                            .iter()
+                            .map(|text| json!({"type": "summary_text", "text": text}))
+                            .collect(),
+                    ),
                 );
             }
-            value
+            Value::Object(value)
         }
         OpenAiResponsesReplayItem::AssistantMessage {
             item_id,
@@ -615,6 +644,11 @@ fn completion_from_response(
         }
     }
     let message = AssistantMessage { content };
+    // The replay items collected above reproduce exactly this normalized
+    // assistant message, so the new segment anchors to its sequence-sensitive
+    // identity within the full request history.
+    let current_anchor =
+        crate::assistant_history_anchor(history, &message).map_err(response_protocol)?;
     let has_tools = !message.tool_calls().is_empty();
     let stop_reason = match status {
         "completed" if has_tools => StopReason::ToolUse,
@@ -637,17 +671,33 @@ fn completion_from_response(
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
-    let mut replay = previous_continuation
+    // Carry forward the earlier still-required stateless segments, then add
+    // exactly one segment for the assistant output this response produced.
+    let mut segments = previous_continuation
         .and_then(ProviderContinuation::openai_responses)
         .filter(|continuation| continuation.mode() == OpenAiResponsesContinuationMode::Stateless)
-        .map(|continuation| continuation.replay_items().to_vec())
+        .map(|continuation| continuation.replay_segments().to_vec())
         .unwrap_or_default();
-    replay.append(&mut replay_items);
+    if !replay_items.is_empty() {
+        segments.push(OpenAiResponsesReplaySegment::new(
+            current_anchor,
+            std::mem::take(&mut replay_items),
+        ));
+    }
+    // Stateful mode records the server-retained coverage through the new
+    // assistant output; stateless mode ignores it.
     let mut covered_history = history.to_vec();
     covered_history.push(Message::Assistant(message.clone()));
-    let scope = ContinuationScope::for_history(&covered_history).map_err(response_protocol)?;
-    let continuation =
-        responses_continuation(provider, model, response_id, replay, retention, scope)?;
+    let covered_scope =
+        ContinuationScope::for_history(&covered_history).map_err(response_protocol)?;
+    let continuation = responses_continuation(
+        provider,
+        model,
+        response_id,
+        segments,
+        retention,
+        covered_scope,
+    )?;
     Ok(Completion {
         metadata: metadata(&message, stop_reason.clone(), true, elapsed),
         message,
@@ -757,18 +807,26 @@ fn parse_reasoning_output(
             continuation_ref: reference.clone(),
         }));
     }
-    Ok(encrypted.map(|encrypted_content| {
-        OpenAiResponsesReplayItem::reasoning(
+    // Every reasoning output item enters the replay segment. Encrypted items
+    // carry their provider-native payload and reference; portable summaries
+    // replay as summary-only items so stateless manual replay reproduces the
+    // complete ordered provider output.
+    let item_id = item.get("id").and_then(Value::as_str).map(str::to_owned);
+    let summary_texts = summary
+        .iter()
+        .filter_map(|part| part.get("text").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    Ok(match encrypted {
+        Some(encrypted_content) => Some(OpenAiResponsesReplayItem::reasoning(
             reference.expect("encrypted Responses reasoning has a reference"),
-            item.get("id").and_then(Value::as_str).map(str::to_owned),
+            item_id,
             encrypted_content,
-            summary
-                .iter()
-                .filter_map(|part| part.get("text").and_then(Value::as_str))
-                .map(str::to_owned)
-                .collect(),
-        )
-    }))
+            summary_texts,
+        )),
+        None => (!summary_text.is_empty())
+            .then(|| OpenAiResponsesReplayItem::portable_reasoning(summary_texts, item_id)),
+    })
 }
 
 fn parse_tool_call(item: &Value) -> Result<(ToolCall, OpenAiResponsesReplayItem), ProviderError> {
@@ -806,9 +864,9 @@ fn responses_continuation(
     provider: &ProviderId,
     model: &str,
     response_id: Option<String>,
-    replay_items: Vec<OpenAiResponsesReplayItem>,
+    replay_segments: Vec<OpenAiResponsesReplaySegment>,
     retention: DataRetentionPolicy,
-    scope: ContinuationScope,
+    covered_scope: ContinuationScope,
 ) -> Result<Option<ProviderContinuation>, ProviderError> {
     let mode = if retention != DataRetentionPolicy::Ephemeral {
         OpenAiResponsesContinuationMode::Stateful
@@ -816,23 +874,33 @@ fn responses_continuation(
         OpenAiResponsesContinuationMode::Stateless
     };
     if (mode == OpenAiResponsesContinuationMode::Stateful && response_id.is_none())
-        || (mode == OpenAiResponsesContinuationMode::Stateless && replay_items.is_empty())
+        || (mode == OpenAiResponsesContinuationMode::Stateless && replay_segments.is_empty())
     {
         return Ok(None);
     }
-    let replay_items = if mode == OpenAiResponsesContinuationMode::Stateful {
-        Vec::new()
-    } else {
-        replay_items
+    // Stateful mode keeps the server-retained coverage boundary so the next
+    // request can trim only that verified prefix. Stateless mode claims no
+    // server coverage: full history is re-sent with anchored substitution.
+    let scope = match mode {
+        OpenAiResponsesContinuationMode::Stateful => covered_scope,
+        OpenAiResponsesContinuationMode::Stateless => ContinuationScope::empty(),
     };
     Ok(Some(ProviderContinuation::OpenAiResponses(
-        OpenAiResponsesContinuation::with_replay(
+        OpenAiResponsesContinuation::with_segments(
             provider.clone(),
             model,
-            response_id,
+            if mode == OpenAiResponsesContinuationMode::Stateful {
+                response_id
+            } else {
+                None
+            },
             mode,
             scope,
-            replay_items,
+            if mode == OpenAiResponsesContinuationMode::Stateful {
+                Vec::new()
+            } else {
+                replay_segments
+            },
         )
         .map_err(response_protocol)?,
     )))
@@ -916,7 +984,7 @@ struct ResponsesStream {
     model: String,
     retention: DataRetentionPolicy,
     history: Vec<Message>,
-    prior_replay_items: Vec<OpenAiResponsesReplayItem>,
+    prior_replay_segments: Vec<OpenAiResponsesReplaySegment>,
     queue: VecDeque<Result<StreamEvent, ProviderError>>,
     tools: BTreeMap<usize, PartialTool>,
     tool_arguments_bytes: usize,
@@ -948,7 +1016,7 @@ impl ResponsesStream {
         provider: ProviderId,
         retention: DataRetentionPolicy,
         history: Vec<Message>,
-        prior_replay_items: Vec<OpenAiResponsesReplayItem>,
+        prior_replay_segments: Vec<OpenAiResponsesReplaySegment>,
         body: S,
         api_key: String,
         abort: Option<AbortSignal>,
@@ -968,7 +1036,7 @@ impl ResponsesStream {
             model,
             retention,
             history,
-            prior_replay_items,
+            prior_replay_segments,
             queue,
             tools: BTreeMap::new(),
             tool_arguments_bytes: 0,
@@ -1695,21 +1763,29 @@ impl ResponsesStream {
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .map(str::to_owned);
-        let mut replay_items = std::mem::take(&mut self.prior_replay_items);
-        replay_items.extend(self.replay_items_from_output(output)?);
+        let new_items = self.replay_items_from_output(output)?;
         let message = AssistantMessage {
             content: self.completed_content.values().cloned().collect(),
         };
+        // The segment anchor is computed only now that the final normalized
+        // assistant message is known. Interrupted streams never reach this
+        // point, so no partial projection can become a valid anchor.
+        let current_anchor =
+            crate::assistant_history_anchor(&self.history, &message).map_err(protocol)?;
+        let mut segments = std::mem::take(&mut self.prior_replay_segments);
+        if !new_items.is_empty() {
+            segments.push(OpenAiResponsesReplaySegment::new(current_anchor, new_items));
+        }
         let mut covered_history = self.history.clone();
         covered_history.push(Message::Assistant(message));
-        let scope = ContinuationScope::for_history(&covered_history).map_err(protocol)?;
+        let covered_scope = ContinuationScope::for_history(&covered_history).map_err(protocol)?;
         if let Some(continuation) = responses_continuation(
             &self.provider,
             &self.model,
             response_id,
-            replay_items,
+            segments,
             self.retention,
-            scope,
+            covered_scope,
         )? {
             self.queue
                 .push_back(Ok(StreamEvent::Continuation(continuation)));
@@ -1755,25 +1831,36 @@ impl ResponsesStream {
                 }
                 Some("reasoning") => {
                     let snapshot = stream_reasoning_snapshot(item)?;
-                    if let Some(encrypted_content) = snapshot.encrypted_content {
-                        replay_items.push(OpenAiResponsesReplayItem::reasoning(
-                            reference,
-                            item.get("id").and_then(Value::as_str).map(str::to_owned),
-                            encrypted_content,
-                            item.get("summary").and_then(Value::as_array).map_or_else(
-                                Vec::new,
-                                |summary| {
-                                    summary
-                                        .iter()
-                                        .filter_map(|part| {
-                                            part.get("text")
-                                                .and_then(Value::as_str)
-                                                .map(str::to_owned)
-                                        })
-                                        .collect()
-                                },
-                            ),
-                        ));
+                    let item_id = item.get("id").and_then(Value::as_str).map(str::to_owned);
+                    let summary = item.get("summary").and_then(Value::as_array).map_or_else(
+                        Vec::new,
+                        |summary| {
+                            summary
+                                .iter()
+                                .filter_map(|part| {
+                                    part.get("text").and_then(Value::as_str).map(str::to_owned)
+                                })
+                                .collect()
+                        },
+                    );
+                    match snapshot.encrypted_content {
+                        Some(encrypted_content) => {
+                            replay_items.push(OpenAiResponsesReplayItem::reasoning(
+                                reference,
+                                item_id,
+                                encrypted_content,
+                                summary,
+                            ))
+                        }
+                        // Portable reasoning stays in the replay segment so
+                        // stateless replay preserves the full output shape.
+                        None => {
+                            if !summary.is_empty() {
+                                replay_items.push(OpenAiResponsesReplayItem::portable_reasoning(
+                                    summary, item_id,
+                                ));
+                            }
+                        }
                     }
                 }
                 Some("function_call") => {
