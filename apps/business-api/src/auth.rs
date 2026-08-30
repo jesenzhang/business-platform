@@ -316,6 +316,12 @@ fn authenticate_dev(
 /// operators but never exposed to the client.
 fn unauthorized(kind: AuthError, public_message: &str) -> ApiError {
     tracing::debug!(?kind, "authentication rejected");
+    crate::metrics::record_auth_failure(match kind {
+        AuthError::MissingToken => "missing_token",
+        AuthError::InvalidToken => "invalid_token",
+        AuthError::MissingTenant => "missing_tenant",
+        AuthError::InvalidPrincipal => "invalid_principal",
+    });
     ApiError::from(AppError::Unauthorized(public_message.to_owned()))
 }
 

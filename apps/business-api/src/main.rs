@@ -236,6 +236,10 @@ async fn main() -> anyhow::Result<()> {
         oidc,
     };
 
+    // PLAN-0012 T4.2: install the Prometheus recorder before serving; the
+    // /metrics endpoint renders from the installed handle.
+    business_api::metrics::install_metrics();
+
     let app = routes::create_router(state, auth_config, &config.server);
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;

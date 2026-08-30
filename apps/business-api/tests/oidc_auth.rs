@@ -423,6 +423,27 @@ async fn algorithm_none_is_rejected() {
 }
 
 #[tokio::test]
+async fn metrics_endpoint_is_public_and_counts_requests() {
+    let server = JwksServer::spawn().await;
+    let router = oidc_router(validator_for(&server.jwks_url));
+    business_api::metrics::install_metrics();
+    // One rejected request goes through the metrics layer.
+    let status = status_of(router.clone(), get("/api/v1/anything")).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let response = router
+        .oneshot(get("/metrics"))
+        .await
+        .expect("metrics must respond");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), 1_048_576)
+        .await
+        .expect("metrics body");
+    let text = String::from_utf8(body.to_vec()).expect("utf8 metrics body");
+    assert!(text.contains("http_requests_total"), "got: {text}");
+    assert!(text.contains("auth_failures_total"), "got: {text}");
+}
+
+#[tokio::test]
 async fn claim_mapping_populates_tenant_user_and_permissions() {
     let server = JwksServer::spawn().await;
     let validator = validator_for(&server.jwks_url);

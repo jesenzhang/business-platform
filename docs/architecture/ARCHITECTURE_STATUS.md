@@ -164,8 +164,15 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 预生产采集。备份/恢复：`deploy/operations/drill-backup-restore.sh` 一体化演练
 > 脚本（seed→pg_dump/mc mirror→恢复到 `*_restore`→行数/表数/对象 roundtrip 校验），
 > 本机执行 NOT RUN（无本地 PostgreSQL/MinIO）。Runbook v0.1：`docs/operations/
-> RUNBOOK.md`（部署/就绪/升级/回滚/备份/故障处置/安全基线/已知缺口）。PLAN-0012
-> 剩余：T3.3（IdP compose + console 登录）、T4.2（/metrics）、M5 发布审计。
+> RUNBOOK.md`（部署/就绪/升级/回滚/备份/故障处置/安全基线/已知缺口）。
+
+> 2026-08-30 (3): PLAN-0012 T4.2 v0.1 完成。`business-api` 新增公共 `/metrics`
+> Prometheus 文本端点（metrics-exporter-prometheus，无全局标签泄漏；标签有界：
+> method + 数值 status、认证失败 reason 类别），`http_requests_total`、
+> `http_request_duration_seconds`、`auth_failures_total` 已接入；契约测试验证
+> 端点公开性与计数器出现。worker 侧吞吐/租约/AI 时延指标与 dashboard 配置为
+> 后续批次。PLAN-0012 剩余：T3.3（IdP compose + console 登录）、M5 发布审计
+> （T4.2 worker 指标与 T4.3 演练首跑在 M5 一并收口）。
 
 ## 1. 当前权威结论
 

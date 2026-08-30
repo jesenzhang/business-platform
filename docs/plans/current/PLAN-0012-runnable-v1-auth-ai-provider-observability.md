@@ -123,7 +123,7 @@
 | 任务 | 内容 | 预估 | 状态 |
 |---|---|---|---|
 | T4.1 | observability crate 落地：结构化 JSON 日志 + 请求 ID 贯穿 API/Worker | 4h | ✅（2026-08-30：`observability::LogFormat`（text/json，启动 fail-fast 解析），四个进程 config 增 `log_format`；请求 ID 已由 tower-http request-id 贯穿 API） |
-| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h |
+| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h | ◐ v0.1 完成（2026-08-30：`business-api` 公共 `/metrics` Prometheus 文本端点 + `http_requests_total`/`http_request_duration_seconds`/`auth_failures_total` 有界标签指标，14 例契约测试含指标断言）；worker 侧吞吐/租约/AI 时延指标与 dashboard 配置后置（独立批次） |
 | T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h | ◐ 脚本落地（`deploy/operations/drill-backup-restore.sh`：seed→备份→恢复到 `*_restore`→行数/对象/一致性校验）；本机演练执行 NOT RUN（无本地 PostgreSQL/MinIO），预生产首跑待 M5 |
 | T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h | ✅（2026-08-30 新增 `security` CI job：cargo-audit --deny warnings、gitleaks-action、trivy fs CRITICAL/HIGH；本地执行 NOT RUN，由 GitHub CI 首跑验证） |
 | T4.5 | Runbook 初版：部署、升级、回滚、故障处置 | 2h | ✅（2026-08-30：`docs/operations/RUNBOOK.md` v0.1，含已知缺口清单） |

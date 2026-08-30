@@ -59,7 +59,7 @@
 | AI 提取持续失败（429/5xx） | provider 过载 | 失败自动按 retry 分类重试/死信；持续过载时切 `deterministic` 模式保流程 |
 | 修复执行卡住 | 审批门控或 lease 竞争 | 修复必须经 dry-run → approve → execute；检查 governance-worker 日志与 repair ledger 状态 |
 
-日志与追踪：`observability.log_format = json`（预生产/生产）输出单行 JSON；请求 ID 由 API 中间件贯穿；可选 `otlp_endpoint` 导出 trace。
+日志与追踪：`observability.log_format = json`（预生产/生产）输出单行 JSON；请求 ID 由 API 中间件贯穿；可选 `otlp_endpoint` 导出 trace。指标：`GET /metrics`（无认证，供 Prometheus scrape），含 `http_requests_total{method,status}`、`http_request_duration_seconds`、`auth_failures_total{reason}`；worker 侧指标后续批次补充。
 
 ## 7. 安全基线
 
@@ -71,6 +71,6 @@
 ## 8. 已知缺口（v0.1）
 
 - WAL/PITR 与自动备份调度尚未建立（当前为手动/演练脚本）；
-- `/metrics` 抓取端点未实现（T4.2 后续批次）；
+- worker 侧 `/metrics` 指标（吞吐/租约/AI 时延）与 dashboard 配置尚未实现；
 - IdP demo compose 与 console 登录流程（T3.3）后置；
 - 性能/容量基线（M5 T5.1）尚未建立。
