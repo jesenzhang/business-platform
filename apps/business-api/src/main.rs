@@ -35,9 +35,17 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
+    let log_format =
+        observability::LogFormat::parse(&config.observability.log_format).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unsupported observability.log_format: {}",
+                config.observability.log_format
+            )
+        })?;
     let _guard = observability::init_tracing(
         &config.observability.service_name,
         &config.observability.log_level,
+        log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
 

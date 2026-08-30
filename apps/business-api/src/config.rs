@@ -131,6 +131,9 @@ pub struct ObservabilityConfig {
     pub otlp_endpoint: Option<String>,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// `text` (development default) or `json` (preproduction/production).
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
 }
 
 impl Default for ObservabilityConfig {
@@ -139,6 +142,7 @@ impl Default for ObservabilityConfig {
             service_name: default_service_name(),
             otlp_endpoint: None,
             log_level: default_log_level(),
+            log_format: default_log_format(),
         }
     }
 }
@@ -325,6 +329,9 @@ const fn default_acquire_timeout_secs() -> u64 {
     10
 }
 
+fn default_log_format() -> String {
+    "text".to_string()
+}
 fn default_service_name() -> String {
     "business-api".to_string()
 }

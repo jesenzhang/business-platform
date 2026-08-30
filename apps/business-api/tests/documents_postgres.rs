@@ -60,6 +60,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
             service_name: "business-api-postgres-test".to_string(),
             otlp_endpoint: None,
             log_level: "info".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {

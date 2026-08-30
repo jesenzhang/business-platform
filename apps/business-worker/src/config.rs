@@ -102,6 +102,9 @@ pub struct ObservabilityConfig {
     pub log_level: String,
     #[serde(default)]
     pub otlp_endpoint: Option<String>,
+    /// `text` (development default) or `json` (preproduction/production).
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
 }
 
 impl Default for ObservabilityConfig {
@@ -109,6 +112,7 @@ impl Default for ObservabilityConfig {
         Self {
             log_level: default_log_level(),
             otlp_endpoint: None,
+            log_format: default_log_format(),
         }
     }
 }
@@ -179,6 +183,9 @@ const fn default_poll_interval() -> u64 {
 }
 const fn default_max_content_bytes() -> usize {
     16 * 1024 * 1024
+}
+fn default_log_format() -> String {
+    "text".to_string()
 }
 fn default_log_level() -> String {
     "info".to_string()

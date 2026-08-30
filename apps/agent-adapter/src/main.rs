@@ -56,9 +56,17 @@ async fn main() -> anyhow::Result<()> {
     if config.auth.bearer_token.trim().is_empty() {
         anyhow::bail!("MCP bearer token must be configured")
     }
+    let log_format =
+        observability::LogFormat::parse(&config.observability.log_format).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unsupported observability.log_format: {}",
+                config.observability.log_format
+            )
+        })?;
     let _guard = observability::init_tracing(
         "agent-adapter",
         &config.observability.log_level,
+        log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
     let client = BusinessApiClient::new(ClientConfig::new(

@@ -116,6 +116,7 @@ fn upload_router(
             service_name: "plan-0008-postgres-minio-upload".to_string(),
             otlp_endpoint: None,
             log_level: "info".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {

@@ -109,6 +109,7 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             service_name: "business-api-test".to_string(),
             otlp_endpoint: None,
             log_level: "off".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {

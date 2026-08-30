@@ -105,7 +105,7 @@ impl ReadinessProbe for EmptyPorts {
 struct JwksServer {
     jwks_url: String,
     /// Flip to false to simulate a JWKS outage.
-    _healthy: Arc<AtomicBool>,
+    healthy: Arc<AtomicBool>,
 }
 
 impl JwksServer {
@@ -136,12 +136,12 @@ impl JwksServer {
         });
         Self {
             jwks_url: format!("http://{addr}/jwks.json"),
-            _healthy: healthy,
+            healthy,
         }
     }
 
     fn set_healthy(&self, healthy: bool) {
-        self._healthy.store(healthy, Ordering::Relaxed);
+        self.healthy.store(healthy, Ordering::Relaxed);
     }
 }
 

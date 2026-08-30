@@ -252,6 +252,7 @@ fn test_router_with_storage(
             service_name: "test".to_string(),
             otlp_endpoint: None,
             log_level: "info".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {

@@ -159,6 +159,14 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > clippy/test --no-fail-fast（495 pass / 0 fail）与 check-architecture.ps1 PASS。
 > PLAN-0012 剩余：T3.3、T4.1/T4.2/T4.3/T4.5、M5 发布审计。
 
+> 2026-08-30 (2): PLAN-0012 T4.1/T4.3/T4.5 完成。可观测性：`observability::LogFormat`
+> （text/json fail-fast），四个进程统一 `log_format` 配置，JSON 单行日志可供
+> 预生产采集。备份/恢复：`deploy/operations/drill-backup-restore.sh` 一体化演练
+> 脚本（seed→pg_dump/mc mirror→恢复到 `*_restore`→行数/表数/对象 roundtrip 校验），
+> 本机执行 NOT RUN（无本地 PostgreSQL/MinIO）。Runbook v0.1：`docs/operations/
+> RUNBOOK.md`（部署/就绪/升级/回滚/备份/故障处置/安全基线/已知缺口）。PLAN-0012
+> 剩余：T3.3（IdP compose + console 登录）、T4.2（/metrics）、M5 发布审计。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
