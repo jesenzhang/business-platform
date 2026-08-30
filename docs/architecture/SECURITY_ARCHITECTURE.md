@@ -343,3 +343,21 @@ Business API 的可信认证上下文决定，MCP 的 adapter token 不能扩大
 公共 DTO、OpenAPI 和 MCP result 不返回 object/storage key、bucket、内部路径、
 raw text、prompt、credential 或 provider 原始错误。Demo 静态 token 只用于本地
 development；生产配置对开发认证 fail-closed。
+
+### 23.1 PLAN-0012 M3 真实认证实现状态（2026-08-30）
+
+Business API 已落地 OIDC/JWT 认证（PLAN-0012 T3.1/T3.2）：
+
+- 验证路径：Bearer JWT 的签名通过 issuer JWKS 验证（默认 OIDC discovery 解析
+  `jwks_uri`，可用 `auth.jwks_url` 显式覆盖），`exp`/`iss` 强制校验，
+  `auth.audience` 配置后校验 `aud`；JWKS 结果带 TTL 缓存，未知 `kid` 触发即时
+  刷新（支持 key rotation）。
+- fail-closed：仅允许 ES256/RS256（`alg=none` 在 key 查找前拒绝）；dev auth
+  关闭时 `auth.issuer_url` 必须配置（配置校验强制）；JWKS 不可达时请求被拒绝
+  而不是绕过验证；所有认证失败对客户端表现为无细节的 401。
+- 声明映射：`tenant_id`（UUID、非 nil）与 `user_id`（缺省回落 `sub`）必须存在；
+  `management_permissions` 声明映射既有 ManagementPermission 集合，未识别的
+  权限串一律不授予；`roles` 原样保留。声明不得来自请求头。
+- CLI/MCP：token 均为参数化 bearer 凭证，真实 JWT 无需代码改动即可传递。
+- Keycloak 等 IdP 的 demo compose 与 console 登录流程（T3.3）尚未实现，
+  属 PLAN-0012 后续工作。

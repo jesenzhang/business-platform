@@ -187,6 +187,24 @@ async fn main() -> anyhow::Result<()> {
         storage: Some(StorageServices { objects: storage }),
     });
 
+    // PLAN-0012 M3: the OIDC validator is built whenever an issuer is
+    // configured. Dev-mode requests take the static-token path and never touch
+    // it; with dev auth disabled it is the only authentication boundary, and
+    // config validation guarantees a non-empty issuer at that point.
+    let oidc = if config.auth.issuer_url.trim().is_empty() {
+        None
+    } else {
+        tracing::info!(
+            issuer = %config.auth.issuer_url,
+            "OIDC JWT validation enabled"
+        );
+        Some(std::sync::Arc::new(business_api::oidc::OidcValidator::new(
+            config.auth.issuer_url.clone(),
+            config.auth.audience.clone(),
+            config.auth.jwks_url.clone(),
+        )))
+    };
+
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled: config.auth.dev_auth_enabled,
         dev_secret: config
@@ -207,6 +225,7 @@ async fn main() -> anyhow::Result<()> {
         dev_user_id: config.auth.dev_user_id,
         dev_subject: config.auth.dev_subject.clone(),
         dev_roles: config.auth.dev_roles.clone(),
+        oidc,
     };
 
     let app = routes::create_router(state, auth_config, &config.server);

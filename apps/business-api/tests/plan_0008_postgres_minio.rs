@@ -121,6 +121,7 @@ fn upload_router(
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
+            jwks_url: None,
             dev_secret: Some(Secret::new("local-pg-e2e-only".to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
@@ -156,6 +157,7 @@ fn upload_router(
             dev_user_id: Some(user),
             dev_subject: Some("plan-0008-upload-test".to_string()),
             dev_roles: BTreeSet::new(),
+            oidc: None,
         },
         &config.server,
     )

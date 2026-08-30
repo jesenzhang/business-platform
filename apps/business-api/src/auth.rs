@@ -2,7 +2,9 @@
 //!
 //! Development mode: accepts a static dev token and uses a server-configured
 //! fixed identity.
-//! Production mode: validates JWT against OIDC issuer (skeleton for now).
+//! Production mode: validates JWT against the configured OIDC issuer via
+//! [`crate::oidc::OidcValidator`] (JWKS signature, `exp`, `iss`, `aud`),
+//! then maps the verified claims onto the request principal.
 
 use axum::extract::{Request, State};
 use axum::http::header;
@@ -12,6 +14,7 @@ use shared_kernel::error::AppError;
 use shared_kernel::tenant::TenantContext;
 use std::collections::BTreeSet;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::api_error::ApiError;
 
@@ -172,6 +175,10 @@ pub struct AuthMiddlewareConfig {
     pub dev_user_id: Option<uuid::Uuid>,
     pub dev_subject: Option<String>,
     pub dev_roles: BTreeSet<String>,
+    /// OIDC validator for production authentication. Required when
+    /// `dev_auth_enabled` is false; absent together with dev auth disabled is
+    /// a startup misconfiguration that keeps every request rejected.
+    pub oidc: Option<Arc<crate::oidc::OidcValidator>>,
 }
 
 /// Middleware that extracts and validates authentication.
@@ -182,8 +189,9 @@ pub struct AuthMiddlewareConfig {
 /// - Ignores request-controlled tenant, user, and permission headers
 ///
 /// In production mode:
-/// - Would validate JWT against the OIDC issuer (not yet implemented)
-/// - For now, rejects all requests (fail-closed)
+/// - Validates the JWT signature against the issuer JWKS and enforces
+///   `exp`/`iss`/`aud`; verified claims map onto the request principal
+/// - Any validation failure is a fail-closed generic `401`
 ///
 /// On success the resolved [`TenantContext`] is inserted into request
 /// extensions so downstream handlers and extractors can access it.
@@ -204,14 +212,40 @@ pub async fn auth_middleware(
         request.headers_mut().remove("x-management-permissions");
         Ok(next.run(request).await)
     } else {
-        // Production OIDC/JWT validation is not implemented yet. Fail closed
-        // rather than accidentally granting access.
-        tracing::warn!("production authentication requested but OIDC validation is not yet implemented; rejecting request");
-        Err(unauthorized(
-            AuthError::InvalidToken,
-            "authentication not available",
-        ))
+        authenticate_oidc(&config, &token, &mut request).await?;
+        request.headers_mut().remove("x-management-permissions");
+        Ok(next.run(request).await)
     }
+}
+
+/// Production-mode authentication: verify the JWT against the configured OIDC
+/// issuer and map the verified claims onto the request principal.
+///
+/// Any failure is fail-closed: a generic `401` without issuer, claim, or JWKS
+/// details. A JWKS outage rejects requests instead of bypassing validation.
+async fn authenticate_oidc(
+    config: &AuthMiddlewareConfig,
+    token: &str,
+    request: &mut Request,
+) -> Result<(), ApiError> {
+    let Some(validator) = &config.oidc else {
+        tracing::error!("OIDC auth enabled but no validator is configured; rejecting request");
+        return Err(unauthorized(
+            AuthError::InvalidToken,
+            "authentication misconfigured",
+        ));
+    };
+    let principal = validator
+        .validate(token)
+        .await
+        .map_err(|error| unauthorized(error, "invalid token"))?;
+    let tenant_context = TenantContext::new(
+        principal.tenant_id().to_string(),
+        principal.user_id().to_string(),
+    );
+    request.extensions_mut().insert(tenant_context);
+    request.extensions_mut().insert(principal);
+    Ok(())
 }
 
 /// Extract the bearer token from the `Authorization` header, if present and
@@ -305,6 +339,7 @@ mod tests {
             dev_user_id: Some(user),
             dev_subject: Some("dev-user".to_string()),
             dev_roles: BTreeSet::new(),
+            oidc: None,
         };
         let mut request = Request::builder()
             .header("x-tenant-id", uuid::Uuid::new_v4().to_string())

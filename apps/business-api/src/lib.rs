@@ -9,5 +9,6 @@ pub mod api_error;
 pub mod api_response;
 pub mod auth;
 pub mod config;
+pub mod oidc;
 pub mod routes;
 pub mod state;

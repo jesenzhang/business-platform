@@ -96,10 +96,16 @@ impl Default for StorageConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthConfig {
+    /// OIDC issuer URL. Required when dev auth is disabled (validated).
     #[serde(default)]
     pub issuer_url: String,
+    /// Expected `aud` claim. When unset, audience validation is skipped.
     #[serde(default)]
     pub audience: Option<String>,
+    /// Explicit JWKS URL override. When unset, the JWKS location is resolved
+    /// through OIDC discovery (`{issuer_url}/.well-known/openid-configuration`).
+    #[serde(default)]
+    pub jwks_url: Option<String>,
     #[serde(default)]
     pub dev_secret: Option<Secret<String>>,
     #[serde(default)]
@@ -256,9 +262,14 @@ impl BusinessApiConfig {
             if self.auth.issuer_url.trim().is_empty() {
                 messages.push("auth.issuer_url must not be empty in production".to_string());
             }
-            if self.server.cors_origins.iter().any(|origin| origin == "*") {
-                messages.push("server.cors_origins must not contain * in production".to_string());
-            }
+        } else if self.auth.issuer_url.trim().is_empty() {
+            // Without dev auth the only authentication path is OIDC; a missing
+            // issuer would leave the API unreachable-by-design (fail closed).
+            messages
+                .push("auth.issuer_url must be configured when dev auth is disabled".to_string());
+        }
+        if self.server.cors_origins.iter().any(|origin| origin == "*") {
+            messages.push("server.cors_origins must not contain * in production".to_string());
         }
         if messages.is_empty() {
             Ok(())
@@ -350,8 +361,11 @@ mod tests {
             },
             storage: StorageConfig::default(),
             auth: AuthConfig {
-                issuer_url: String::new(),
+                // Dev auth is disabled in this fixture, so OIDC must be
+                // configured for validation to pass (fail-closed rule).
+                issuer_url: "https://identity.example.test/realms/test".to_string(),
                 audience: None,
+                jwks_url: None,
                 dev_secret: None,
                 dev_auth_enabled: false,
                 dev_permissions: BTreeSet::new(),

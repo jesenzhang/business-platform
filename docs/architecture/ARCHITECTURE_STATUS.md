@@ -145,6 +145,20 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 覆盖。PLAN-0012 剩余：M3（真实认证）、M4（预生产环境与可观测性）、M5（v0.1
 > 发布审计）。
 
+> 2026-08-30: PLAN-0012 M3 核心完成（T3.1/T3.2/T3.4）+ T4.4。Business API 生产
+> 认证落地：`OidcValidator`（`apps/business-api/src/oidc.rs`）经 issuer JWKS 验证
+> Bearer JWT（OIDC discovery 默认、`auth.jwks_url` 覆盖、TTL 缓存、未知 kid 即时
+> 刷新），强制 exp/iss/aud（可配 audience），仅 ES256/RS256；dev auth 关闭时
+> `auth.issuer_url` 由配置校验强制；JWKS 故障 fail-closed；声明 `tenant_id`/
+> `user_id`/`management_permissions`/`roles` 映射到既有 TenantContext/
+> ManagementPermission，未识别权限不授予。13 例契约测试覆盖有效/过期/错
+> audience/错 issuer/篡改/未知 kid/缺失或 nil tenant/JWKS 故障/alg=none 与声明
+> 映射。CLI/MCP bearer token 已参数化，无需改动。CI 新增 `security` job
+> （cargo-audit/gitleaks/trivy），本地 NOT RUN 由 GitHub CI 首跑验证。T3.3
+> （IdP demo compose + console 登录）按计划风险缓解后置。全仓门禁：fmt/check/
+> clippy/test --no-fail-fast（495 pass / 0 fail）与 check-architecture.ps1 PASS。
+> PLAN-0012 剩余：T3.3、T4.1/T4.2/T4.3/T4.5、M5 发布审计。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；

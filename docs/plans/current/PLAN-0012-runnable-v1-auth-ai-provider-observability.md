@@ -111,21 +111,21 @@
 
 ### M3 — 真实认证（~12h）
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
-| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h |
-| T3.2 | 租户/权限映射：JWT 声明→TenantContext/ManagementPermission；401/403/跨租户 not-found 契约测试 | 3h |
-| T3.3 | demo compose 增加 IdP（Keycloak 或等价轻量方案）+ console 登录流程 + token 刷新 | 3h |
-| T3.4 | CLI/MCP token 传递适配与测试 | 2h |
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
+| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h | ✅（2026-08-30，`apps/business-api/src/oidc.rs`；ES256/RS256 allow-list、JWKS TTL 缓存 + 未知 kid 即时刷新、discovery 默认 + `auth.jwks_url` 覆盖、dev auth 关闭时 issuer_url 强制） |
+| T3.2 | 租户/权限映射：JWT 声明→TenantContext/ManagementPermission；401/403/跨租户 not-found 契约测试 | 3h | ✅（13 例契约测试 `tests/oidc_auth.rs`：有效/过期/错 audience/错 issuer/篡改签名/未知 kid/缺失或 nil tenant/JWKS 故障/alg=none 全 401，声明映射断言） |
+| T3.3 | demo compose 增加 IdP（Keycloak 或等价轻量方案）+ console 登录流程 + token 刷新 | 3h | ⬜ 后置（按本计划风险缓解：JWKS 静态验证最小闭环已落地，IdP 完整接入后置） |
+| T3.4 | CLI/MCP token 传递适配与测试 | 2h | ✅（CLI `--token` 与 agent-adapter bearer 配置均已参数化，真实 JWT 直接可用，无代码改动） |
 
 ### M4 — 预生产环境与可观测性（~14h）
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
 | T4.1 | observability crate 落地：结构化 JSON 日志 + 请求 ID 贯穿 API/Worker | 4h |
 | T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h |
 | T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h |
-| T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h |
+| T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h | ✅（2026-08-30 新增 `security` CI job：cargo-audit --deny warnings、gitleaks-action、trivy fs CRITICAL/HIGH；本地执行 NOT RUN，由 GitHub CI 首跑验证） |
 | T4.5 | Runbook 初版：部署、升级、回滚、故障处置 | 2h |
 
 ### M5 — v0.1 发布审计（~7h）

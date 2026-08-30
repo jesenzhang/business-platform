@@ -65,6 +65,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
+            jwks_url: None,
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
@@ -102,6 +103,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
             dev_user_id: Some(Uuid::parse_str(USER_ID).expect("user fixture")),
             dev_subject: Some("postgres-document-test-user".to_string()),
             dev_roles: BTreeSet::new(),
+            oidc: None,
         },
         &config.server,
     )
