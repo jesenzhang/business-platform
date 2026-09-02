@@ -81,13 +81,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: trivy (filesystem vulnerability scan)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: "true"
+        # Direct pinned release download instead of trivy-action: the
+        # action's installer failed silently (exit 1, no diagnostics) when
+        # the release asset fetch broke, which made the gate undiagnosable.
+        run: |
+          set -euo pipefail
+          TRIVY_VERSION=0.74.0
+          curl -fsSL --retry 3 \
+            -o /tmp/trivy.tgz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          tar -xzf /tmp/trivy.tgz -C /tmp trivy
+          /tmp/trivy version
+          /tmp/trivy fs --scanners vuln --severity CRITICAL,HIGH \
+            --ignore-unfixed --exit-code 1 .
 
   frontend:
     name: Frontend checks
