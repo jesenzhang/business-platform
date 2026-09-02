@@ -70,13 +70,27 @@ is_dangerous_root() {
   local root="$1"
   case "$root" in
     / | //) return 0 ;;
-    /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* \
-    | /home | /home/* | /lib | /lib/* | /lib64 | /lib64/* | /media | /media/* \
-    | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* \
-    | /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* \
-    | /tmp | /usr | /usr/* | /var | /var/*) return 0 ;;
     [A-Za-z]:\\* | [A-Za-z]:/* | [A-Za-z]:*) fail "refusing Windows drive root as BACKUP_DIR: $root" ;;
   esac
+  # A root strictly inside the invocation working tree is the operator's own
+  # workspace (the drill default `./target/backup-drill` lives there, and the
+  # cleanup trap only ever removes the drill's own `run-*` directory under
+  # it). CI checkouts legitimately live under /home or /var, so the system
+  # prefix denial below applies only to paths outside the working tree.
+  local cwd_abs in_work_tree=0
+  cwd_abs="$(resolve_abs "$PWD")"
+  case "$root" in
+    "$cwd_abs"/*) in_work_tree=1 ;;
+  esac
+  if [ "$in_work_tree" -eq 0 ]; then
+    case "$root" in
+      /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* \
+      | /home | /home/* | /lib | /lib/* | /lib64 | /lib64/* | /media | /media/* \
+      | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* \
+      | /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* \
+      | /tmp | /usr | /usr/* | /var | /var/*) return 0 ;;
+    esac
+  fi
   # require at least two path segments below the filesystem root
   local stripped="${root#/}"
   case "$stripped" in
