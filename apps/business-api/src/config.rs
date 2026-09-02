@@ -99,7 +99,8 @@ pub struct AuthConfig {
     /// OIDC issuer URL. Required when dev auth is disabled (validated).
     #[serde(default)]
     pub issuer_url: String,
-    /// Expected `aud` claim. When unset, audience validation is skipped.
+    /// Expected `aud` claim. Required (non-empty) in production, where the
+    /// validator enforces it; optional only for development use.
     #[serde(default)]
     pub audience: Option<String>,
     /// Explicit JWKS URL override. When unset, the JWKS location is resolved
@@ -265,6 +266,27 @@ impl BusinessApiConfig {
             }
             if self.auth.issuer_url.trim().is_empty() {
                 messages.push("auth.issuer_url must not be empty in production".to_string());
+            } else if !is_https_url(&self.auth.issuer_url) {
+                messages.push("auth.issuer_url must use https in production".to_string());
+            }
+            // PLAN-0012 release hardening: production tokens must be bound to
+            // this audience, otherwise any client token from the same issuer
+            // (same realm, other applications) would be accepted here.
+            if self
+                .auth
+                .audience
+                .as_deref()
+                .is_none_or(|audience| audience.trim().is_empty())
+            {
+                messages.push("auth.audience must be configured in production".to_string());
+            }
+            if self
+                .auth
+                .jwks_url
+                .as_deref()
+                .is_some_and(|jwks_url| !jwks_url.trim().is_empty() && !is_https_url(jwks_url))
+            {
+                messages.push("auth.jwks_url must use https in production".to_string());
             }
         } else if self.auth.issuer_url.trim().is_empty() {
             // Without dev auth the only authentication path is OIDC; a missing
@@ -331,6 +353,11 @@ const fn default_acquire_timeout_secs() -> u64 {
 
 fn default_log_format() -> String {
     "text".to_string()
+}
+
+/// True when the URL carries an explicit `https://` scheme (case-insensitive).
+fn is_https_url(value: &str) -> bool {
+    value.trim().to_ascii_lowercase().starts_with("https://")
 }
 fn default_service_name() -> String {
     "business-api".to_string()
@@ -434,5 +461,69 @@ mod tests {
             unreachable!();
         };
         assert!(error.to_string().contains("max_connections"));
+    }
+
+    /// A production config that satisfies every production auth rule
+    /// (PLAN-0012 release hardening): https issuer, non-empty audience,
+    /// https jwks override.
+    fn production_config() -> BusinessApiConfig {
+        let mut config = valid_config();
+        config.env = RuntimeEnvironment::Production;
+        config.auth.issuer_url = "https://identity.example.test/realms/prod".to_string();
+        config.auth.audience = Some("business-api".to_string());
+        config.auth.jwks_url = Some("https://identity.example.test/realms/prod/certs".to_string());
+        config
+    }
+
+    #[test]
+    fn production_auth_passes_with_https_and_audience() {
+        assert!(production_config().validate().is_ok());
+    }
+
+    #[test]
+    fn production_rejects_missing_or_blank_audience() {
+        for audience in [None, Some("   ".to_string())] {
+            let mut config = production_config();
+            config.auth.audience = audience;
+            let Err(error) = config.validate() else {
+                unreachable!();
+            };
+            assert!(error
+                .to_string()
+                .contains("auth.audience must be configured in production"));
+        }
+    }
+
+    #[test]
+    fn production_rejects_plaintext_issuer_url() {
+        let mut config = production_config();
+        config.auth.issuer_url = "http://identity.example.test/realms/prod".to_string();
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error
+            .to_string()
+            .contains("auth.issuer_url must use https in production"));
+    }
+
+    #[test]
+    fn production_rejects_plaintext_jwks_url() {
+        let mut config = production_config();
+        config.auth.jwks_url = Some("http://identity.example.test/realms/prod/certs".to_string());
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error
+            .to_string()
+            .contains("auth.jwks_url must use https in production"));
+    }
+
+    #[test]
+    fn production_rejects_wildcard_scheme_audience_only_issuer_with_https() {
+        // Discovery-based setups (no jwks_url override) remain valid; only an
+        // explicitly configured plaintext jwks_url fails the transport rule.
+        let mut config = production_config();
+        config.auth.jwks_url = None;
+        assert!(config.validate().is_ok());
     }
 }

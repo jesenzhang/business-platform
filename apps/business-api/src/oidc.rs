@@ -56,6 +56,11 @@ pub struct OidcValidator {
     issuer_url: String,
     audience: Option<String>,
     jwks_url: Option<String>,
+    /// When true, every endpoint this validator contacts (issuer discovery and
+    /// JWKS, explicit or discovered) must use `https://`. Config validation
+    /// enforces this for production at startup; the validator re-checks every
+    /// URL it actually fetches as defense in depth.
+    require_https: bool,
     cache: RwLock<JwksCache>,
 }
 
@@ -70,8 +75,26 @@ struct TokenClaims {
 
 impl OidcValidator {
     pub fn new(issuer_url: String, audience: Option<String>, jwks_url: Option<String>) -> Self {
+        Self::with_transport_policy(issuer_url, audience, jwks_url, false)
+    }
+
+    /// Build a validator with an explicit transport policy. Production
+    /// composition must pass `require_https = true` so identity material is
+    /// never fetched over plaintext HTTP.
+    #[must_use]
+    pub fn with_transport_policy(
+        issuer_url: String,
+        audience: Option<String>,
+        jwks_url: Option<String>,
+        require_https: bool,
+    ) -> Self {
+        // Redirects are never followed: discovery and JWKS endpoints must be
+        // reachable at their configured locations. A redirect response is
+        // treated as an outage (fail closed) instead of silently widening the
+        // trust boundary to whatever target the server points at.
         let client = reqwest::Client::builder()
             .timeout(FETCH_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap_or_default();
         Self {
@@ -79,6 +102,7 @@ impl OidcValidator {
             issuer_url,
             audience,
             jwks_url,
+            require_https,
             cache: RwLock::new(JwksCache {
                 keys: HashMap::new(),
                 fetched_at: None,
@@ -151,11 +175,22 @@ impl OidcValidator {
         })
     }
 
+    /// Defense-in-depth transport check applied to every URL actually
+    /// fetched, independent of startup config validation.
+    fn enforce_https(&self, url: &str) -> Result<(), AuthError> {
+        if self.require_https && !url.trim().to_ascii_lowercase().starts_with("https://") {
+            tracing::debug!("OIDC transport endpoint must use https under the production policy");
+            return Err(AuthError::InvalidToken);
+        }
+        Ok(())
+    }
+
     async fn fetch_jwks(&self) -> Result<JwkSet, AuthError> {
         let url = match self.jwks_url.as_deref() {
             Some(url) => url.to_owned(),
             None => self.discover_jwks_url().await?,
         };
+        self.enforce_https(&url)?;
         let response = self.client.get(&url).send().await.map_err(|error| {
             tracing::debug!(%error, "JWKS fetch failed");
             AuthError::InvalidToken
@@ -177,6 +212,7 @@ impl OidcValidator {
             "{}/.well-known/openid-configuration",
             self.issuer_url.trim_end_matches('/')
         );
+        self.enforce_https(&url)?;
         let response = self.client.get(&url).send().await.map_err(|error| {
             tracing::debug!(%error, "OIDC discovery fetch failed");
             AuthError::InvalidToken

@@ -206,11 +206,16 @@ async fn main() -> anyhow::Result<()> {
             issuer = %config.auth.issuer_url,
             "OIDC JWT validation enabled"
         );
-        Some(std::sync::Arc::new(business_api::oidc::OidcValidator::new(
-            config.auth.issuer_url.clone(),
-            config.auth.audience.clone(),
-            config.auth.jwks_url.clone(),
-        )))
+        // Production identity material must not travel over plaintext HTTP:
+        // the validator re-checks every fetched URL under this policy.
+        Some(std::sync::Arc::new(
+            business_api::oidc::OidcValidator::with_transport_policy(
+                config.auth.issuer_url.clone(),
+                config.auth.audience.clone(),
+                config.auth.jwks_url.clone(),
+                config.env == runtime_config::RuntimeEnvironment::Production,
+            ),
+        ))
     };
 
     let auth_config = AuthMiddlewareConfig {

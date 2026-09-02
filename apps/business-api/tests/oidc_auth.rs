@@ -1,10 +1,15 @@
-//! OIDC/JWT authentication contract tests (PLAN-0012 M3, T3.1/T3.2).
+//! OIDC/JWT authentication contract tests (PLAN-0012 M3, T3.1/T3.2, plus
+//! release hardening).
 //!
 //! The tests spin up a local JWKS endpoint serving an in-test ES256 (P-256)
 //! key, build the real router with dev auth disabled, and exercise the full
 //! fail-closed matrix: valid token, expired token, wrong audience, wrong
 //! issuer, tampered signature, unknown `kid`, missing/nil tenant claim, JWKS
-//! outage, `alg=none`, and the verified-claim → principal mapping.
+//! outage, `alg=none`, and the verified-claim → principal mapping. The release
+//! hardening block additionally proves that JWKS redirects are never
+//! followed, that the production transport policy rejects plaintext JWKS
+//! endpoints, and that a real OIDC principal cannot read another tenant's
+//! document (not-found contract, no existence leak).
 
 #![allow(clippy::expect_used)]
 
@@ -205,7 +210,20 @@ fn chrono_offset_now(seconds: i64) -> u64 {
 }
 
 fn oidc_router(validator: Arc<OidcValidator>) -> axum::Router {
-    let ports = Arc::new(EmptyPorts);
+    oidc_router_with_ports(Arc::new(EmptyPorts), validator)
+}
+
+/// Router with dev auth disabled and OIDC as the only authentication path,
+/// backed by caller-supplied ports (the release-hardening tests use a
+/// tenant-keyed detail port for cross-tenant isolation).
+fn oidc_router_with_ports<T>(ports: Arc<T>, validator: Arc<OidcValidator>) -> axum::Router
+where
+    T: CreateDocumentUnitOfWork
+        + DocumentDetailQuery
+        + DocumentListQuery
+        + ReadinessProbe
+        + 'static,
+{
     let state = Arc::new(AppState {
         documents: DocumentServices {
             create: Arc::new(document::application::CreateDocumentMetadata::new(
@@ -478,4 +496,208 @@ async fn user_id_falls_back_to_sub_when_uuid() {
         .await
         .expect("valid token must produce a principal");
     assert_eq!(principal.user_id().to_string(), USER_ID);
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-0012 release hardening: redirect control, production transport policy,
+// and cross-tenant isolation for real OIDC principals.
+// ---------------------------------------------------------------------------
+
+/// HTTP stub that answers every JWKS request with a 302 to `target`. If the
+/// validator ever followed redirects, the token would verify against the
+/// healthy target; fail-closed behaviour must reject instead.
+struct RedirectStub {
+    url: String,
+}
+
+impl RedirectStub {
+    async fn spawn(target: &str) -> Self {
+        let target = target.to_owned();
+        let app: axum::Router =
+            axum::Router::new().route(
+                "/jwks.json",
+                axum::routing::get(move || {
+                    let location = target.clone();
+                    async move {
+                        (axum::http::StatusCode::FOUND, [("location", location)]).into_response()
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test redirect listener must bind");
+        let addr = listener.local_addr().expect("listener address");
+        tokio::spawn(async move {
+            axum::serve(listener, app)
+                .await
+                .expect("test redirect server must serve");
+        });
+        Self {
+            url: format!("http://{addr}/jwks.json"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn jwks_redirect_is_never_followed() {
+    let healthy = JwksServer::spawn().await;
+    let redirect = RedirectStub::spawn(&healthy.jwks_url).await;
+    // Control: pointing at the healthy endpoint directly passes auth (404 for
+    // the unknown route), so the rejection below cannot come from the token.
+    let control = status_of(
+        oidc_router(validator_for(&healthy.jwks_url)),
+        authorized_get("/api/v1/anything", &sign_token(&base_claims(), Some(KID))),
+    )
+    .await;
+    assert_eq!(control, StatusCode::NOT_FOUND);
+    let router = oidc_router(validator_for(&redirect.url));
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/anything", &sign_token(&base_claims(), Some(KID))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn production_transport_policy_rejects_plaintext_jwks_transport() {
+    // The in-test JWKS is served over plaintext http (it must stay reachable
+    // for the development-path tests). Under the production transport policy
+    // the very same healthy endpoint must fail closed without a request.
+    let server = JwksServer::spawn().await;
+    let strict = Arc::new(OidcValidator::with_transport_policy(
+        ISSUER.to_string(),
+        Some(AUDIENCE.to_string()),
+        Some(server.jwks_url.clone()),
+        true,
+    ));
+    let router = oidc_router(strict);
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/anything", &sign_token(&base_claims(), Some(KID))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    // Control: the development transport policy still accepts the local
+    // plaintext endpoint, proving the rejection is the transport rule.
+    let router = oidc_router(validator_for(&server.jwks_url));
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/anything", &sign_token(&base_claims(), Some(KID))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+const INTRUDER_TENANT: &str = "99999999-8888-7777-6666-555555555555";
+const DOCUMENT_ID: &str = "a1b2c3d4-0000-4000-8000-000000000001";
+
+/// Detail port that only resolves the fixed document for its owning tenant,
+/// mirroring the tenant-keyed queries of the real adapters.
+struct TenantKeyedPorts {
+    owner_tenant: uuid::Uuid,
+    document_id: uuid::Uuid,
+}
+
+#[async_trait]
+impl CreateDocumentUnitOfWork for TenantKeyedPorts {
+    async fn execute(
+        &self,
+        _command: PersistNewDocument,
+    ) -> Result<CreateDocumentResult, ApplicationPortError> {
+        Err(ApplicationPortError::Unavailable)
+    }
+}
+
+#[async_trait]
+impl DocumentDetailQuery for TenantKeyedPorts {
+    async fn execute(
+        &self,
+        tenant_id: uuid::Uuid,
+        document_id: uuid::Uuid,
+    ) -> Result<Option<document::query::DocumentDetailView>, QueryError> {
+        if tenant_id != self.owner_tenant || document_id != self.document_id {
+            return Ok(None);
+        }
+        Ok(Some(document::query::DocumentDetailView {
+            id: document_id,
+            tenant_id: self.owner_tenant,
+            original_filename: "contract.txt".to_owned(),
+            content_type: "text/plain".to_owned(),
+            status: document::query::DocumentStatusView::Active,
+            version: 1,
+            content_revision: 1,
+            revision_id: uuid::Uuid::nil(),
+            revision_no: 1,
+            is_current: true,
+            size_bytes: Some(11),
+            created_by: uuid::Uuid::nil(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }))
+    }
+}
+
+#[async_trait]
+impl DocumentListQuery for TenantKeyedPorts {
+    async fn execute(&self, _request: DocumentListRequest) -> Result<DocumentListPage, QueryError> {
+        Ok(DocumentListPage {
+            items: Vec::new(),
+            next_cursor: None,
+        })
+    }
+
+    async fn count(
+        &self,
+        _tenant_id: uuid::Uuid,
+        _filter: DocumentListFilter,
+    ) -> Result<u64, QueryError> {
+        Ok(0)
+    }
+}
+
+#[async_trait]
+impl ReadinessProbe for TenantKeyedPorts {
+    async fn check(&self) -> ReadinessReport {
+        ReadinessReport {
+            status: ReadinessStatus::NotReady,
+            database: "unavailable",
+            migrations: "unknown",
+        }
+    }
+}
+
+#[tokio::test]
+async fn oidc_principal_cannot_read_foreign_tenant_document() {
+    let server = JwksServer::spawn().await;
+    let router = oidc_router_with_ports(
+        Arc::new(TenantKeyedPorts {
+            owner_tenant: TENANT_ID.parse().expect("owner tenant uuid"),
+            document_id: DOCUMENT_ID.parse().expect("document uuid"),
+        }),
+        validator_for(&server.jwks_url),
+    );
+    // Foreign principal: fully valid token, different tenant → the document
+    // contract returns not-found (no existence leak), never 403 with data.
+    let mut claims = base_claims();
+    claims["tenant_id"] = json!(INTRUDER_TENANT);
+    let status = status_of(
+        router.clone(),
+        authorized_get(
+            &format!("/api/v1/documents/{DOCUMENT_ID}"),
+            &sign_token(&claims, Some(KID)),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // Owner principal for the same document → 200.
+    let status = status_of(
+        router,
+        authorized_get(
+            &format!("/api/v1/documents/{DOCUMENT_ID}"),
+            &sign_token(&base_claims(), Some(KID)),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
 }
