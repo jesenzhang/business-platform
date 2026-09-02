@@ -249,6 +249,10 @@ trivy), Frontend checks, and Frontend Playwright smoke.
 
 ### Slice C — preproduction acceptance: still BLOCKED / NOT RUN
 
+> Superseded: the staging environment was provisioned after this entry
+> was written; see the following amendment “Slice C real staging
+> acceptance”.
+
 Environment re-probe on this workspace (2026-09-02T16:3xZ UTC): `docker`,
 `psql`, `pg_dump`, `mc` binaries all absent from `PATH`; no
 `deploy/staging/` configuration exists in the repository; no real IdP
@@ -268,3 +272,170 @@ Slice A fix and Slice B gates are complete on this branch; Slice C still
 cannot pass here. The conditional final actions remain unmet on Slice C
 alone: `v0.1` tag **withheld**, PLAN-0012 **not archived**,
 `docs/plans/README.md` **not** updated for archival.
+
+## Amendment — Slice C real staging acceptance (2026-09-03, branch `codex/plan-0012-slice-c-staging`)
+
+This amendment records the first real (non-fake, non-stub) preproduction
+staging run and the defects it surfaced. Evidence files live outside the
+repository under `F:\Workspace\business-platform-staging\evidence\`
+(numbered `01`–`19`); this audit quotes them. No credential, endpoint
+secret, or database password is recorded here or committed anywhere.
+
+### Identity
+
+| Identity | Value |
+| --- | --- |
+| Base | `main@a673c44` |
+| Branch | `codex/plan-0012-slice-c-staging` |
+| Code commits | `0809f83` (Slice A attribution) · `ac58991` (observability histogram buckets) · `d0076e0` (processing contract determinism) · `3ab22dd` (contract-suite DB isolation) · `0f27420` (clippy doc-markdown fix) |
+| Docs commits | `8fd46de`, `589e6a6`, this amendment |
+| Execution window | 2026-09-02T18:00Z–19:35Z (UTC), this workspace |
+
+### Environment (Docker-free staging, real components only)
+
+| Component | Reality used |
+| --- | --- |
+| PostgreSQL | local PostgreSQL 18 (`D:\Program Files\PostgreSQL\18`), database `business_platform`, full migration set applied on PG18 (compatibility evidence) |
+| Model provider | intranet vLLM endpoint (OpenAI-compatible `/v1`, model `qwen3_5_122B_A10B`) — real inference, no stub |
+| Object storage | local MinIO (no Docker), buckets `enterprise-documents` + contract bucket |
+| Metrics / dashboards | local Prometheus (`:9090`), Grafana 12.4.10 (`:3001`), dashboard `plan-0012-v0-1-candidate` |
+| Processes | `business-api :3000` (dev-auth mode), `business-worker :9464`, `ai-worker :9465`, all built from this branch |
+| IdP | **not configured** — user chose "option A" (reuse of the T2.5 IdP) but issuer/audience/client/test-account parameters were not supplied; production-mode login/refresh acceptance therefore stays BLOCKED (see Limitations) |
+
+### Scenario matrix (mandate item by item)
+
+| Scenario | Result | Evidence |
+| --- | --- | --- |
+| login/refresh | PARTIAL — dev-auth token exercised end-to-end; production IdP flow BLOCKED pending IdP parameters | token flows through upload/job/review calls in `01`–`09` |
+| upload + idempotent replay | PASS — 201 then replayed 200 with same document id; fingerprint conflict rejected | `01-upload.json`, `02-upload-replay.json` |
+| real AI extraction | PASS — real vLLM produced candidate fields; candidate passed validation into `waiting_for_review` | `03-job-created.json`, `05-candidate.json` |
+| Review approve | PASS — optimistic-lock review transition, audit + outbox recorded | `06-review.json`, `07-job-after-review.json` |
+| worker crash/recovery | PASS — killed worker mid-`extract_fields`; expired-lease scan reclaimed the lease (`reclaimed=1`) and a second worker resumed the same step at fence version 2 (`ai-worker-2.log` 2026-09-02T18:03:02Z); job reached `waiting_for_review` with no duplicate side effects | `08-crash-recovery*.txt`, `logs/ai-worker-2.log` |
+| backup/restore drill | PASS — `drill-backup-restore.sh`: pg_dump (118,124 bytes) + bucket mirror restored into an isolated drill DB/bucket; row counts + marker object md5 roundtrip verified (`42f5137a…d748a`) | `10-backup-restore-drill.log` |
+| 20-concurrent smoke ×2 | PASS — see metrics below | `12/13-load-report.json`, `11/14-resource-samples.csv` |
+| Prometheus scrape | PASS — 3/3 targets up (`business-api`, `business-worker`, `ai-worker`) | live `/api/v1/targets` |
+| Grafana dashboard | PASS with documented zero-event series | `19-dashboard-panel-data-check.txt` |
+| label cardinality | PASS — sampled custom metrics expose 2–7 series each (histograms with the fixed 15-bucket `_le` set); no unbounded labels | same file + live `/api/v1/series` |
+
+### 20-concurrent smoke metrics (dev-auth staging, real stack)
+
+Run 1 — `12-load-report.json`, 2026-09-02T18:05:51Z–18:07:30Z:
+
+| Op | n | errors | p50 ms | p95 ms | p99 ms | throughput |
+| --- | --- | --- | --- | --- | --- | --- |
+| upload (20 concurrent) | 200 | 0 | 935.7 | 1431.9 | 1619.8 | 20.61 req/s |
+| list | 200 | 0 | 1.7 | 19.5 | 23.5 | 20.61 req/s |
+| job create | 20 | 0 | 132.4 | 137.1 | 137.7 | 141.9 req/s |
+| pipeline e2e to `waiting_for_review` | 20 | 0 failed | 44.2 s | 77.1 s (max 87.2 s) | — | 13.77 jobs/min |
+
+Run 2 — `13-load-report.json`, 2026-09-02T18:25:15Z–18:27:00Z (staged
+while a second worker pair processed the run-1 backlog, hence slower):
+
+| Op | n | errors | p50 ms | p95 ms | p99 ms | throughput |
+| --- | --- | --- | --- | --- | --- | --- |
+| upload | 200 | 0 | 1389.7 | 2537.4 | 2686.5 | 13.63 req/s |
+| list | 200 | 0 | 1.9 | 21.1 | 26.3 | 13.63 req/s |
+| job create | 20 | 0 | 270.8 | 302.4 | 310.2 | 64.2 req/s |
+| pipeline e2e | 20 | 1 job `failed` | 55.3 s | 86.2 s (max 87.2 s) | — | 13.76 jobs/min |
+
+The single pipeline failure was `ai_invalid_response`: the real model
+returned an unparseable extraction payload for one document and the
+pipeline correctly failed that job closed-form after retries instead of
+stalling — counted honestly in the error rate (1/20 = 5%).
+
+Resource water level (`14-resource-samples.csv`,
+2026-09-02T18:12:29Z–18:35:30Z — this window mixes the load runs with
+contract-suite diagnostics, so it is labelled MIXED, not a clean
+load-only window): host CPU p50 24.4% / p95 80.5% / max 100% (the
+machine also ran the cargo test battery in the same window); working-set
+MB p50/p95 — `ai-worker` 13.2/16.0, `business-api` 29.2/32.8,
+`business-worker` 13.1/15.8, MinIO 255.4/284.7. PostgreSQL CPU delta was
+NOT measurable (service runs as a different account and the sampler did
+not cover it) — recorded as a sampling limitation, not as a pass.
+
+### Defect found and fixed by the staging run (`ac58991`)
+
+Prometheus scraped correct counters/sums but every duration histogram
+rendered as a Go summary with zero quantiles, so all p95 panels read
+zero. Root cause: `metrics-exporter-prometheus` 0.17 exposes histograms
+without configured buckets as summaries. Fixed in `crates/observability`
+by explicit `DURATION_BUCKETS` (5 ms…120 s) via
+`set_buckets_for_metric(Matcher::Suffix("_seconds"), …)` plus a
+regression test asserting `_bucket{le=…}` series in the rendered text.
+Verified live: after restart, `processing_job_queue_wait_seconds_bucket`
+and `ai_task_duration_seconds_bucket` series are present.
+
+### Grafana dashboard verification (`19-dashboard-panel-data-check.txt`)
+
+All 8 panels' PromQL evaluated through the datasource API: 6 panels
+return data; 2 panels are PARTIAL purely because their event classes are
+empty in this staging window (no 429/5xx from the provider, no
+worker-side lease loss after the drill). Raw-counter spot checks confirm
+the wiring: `processing_leases_reclaimed_total` = 2 (the two drill
+reclaims) while `ai_provider_rate_limited_total`,
+`ai_provider_server_error_total`, `processing_lease_lost_total` and
+`ai_lease_lost_total` are absent, which in this exporter means zero
+increments. Verdict: panels are correctly wired; "no data" reflects
+genuinely empty event classes, not broken queries.
+
+### Contract-gate determinism fixes discovered while running the CI mirror locally
+
+Running the exact ci.yml contract-test list against one local PG18
+database exposed three real cross-target defects (each reproduced from
+raw assertion values in the `15`/`16` battery logs):
+
+1. `document-processing-postgres` contracts timed the crashed worker's
+   lease from stale virtual time while the store deliberately fences
+   writes against the database wall clock
+   (`lease_expires_at > CURRENT_TIMESTAMP`); under host load this is a
+   correct `LeaseLost`, not a product bug — fixed test-only (`d0076e0`).
+2. `outbox_events` claim/recovery statements are table-wide, and three
+   targets left pending rows behind (processing contracts, the
+   persistence-contract harness, the governance fixture), poisoning the
+   messaging outbox contract counts — all producers now clean their own
+   rows (`d0076e0`, `3ab22dd`).
+3. `query_contracts`' EXPLAIN index assertion flipped on planner
+   statistics left stale by earlier targets' churn — it now runs
+   `ANALYZE documents` first, and cleans the harness's outbox rows via a
+   before/after event snapshot (`3ab22dd`); `inbox_idempotency` raced
+   its own `CREATE TABLE IF NOT EXISTS` under parallel threads — gated
+   by a process-wide `OnceCell` (`3ab22dd`).
+
+Final CI-mirror battery on a fresh, migrated database:
+`TOTAL FAILING TARGETS: 0` (`18-ci-contract-battery-hygiene-green.log`).
+Workspace gates re-run after these commits: fmt / check / clippy /
+default tests / `check-architecture.ps1` / `check-openapi.ps1` — all
+PASS (Git Bash, Windows; the PowerShell gates executed natively, exit 0).
+
+### CI fix→fail→fix loop (branch)
+
+Run `33673045645` on `3ab22dd`: 9/10 jobs green; Clippy failed on Rust
+1.94.1 (`doc_markdown`: bare `PostgreSQL` in the new doc comment — the
+local toolchain predates that check). Fixed in `0f27420`; the
+re-run's outcome is recorded in the branch CI history.
+
+### Limitations (honest)
+
+- Production-auth acceptance (login/refresh against the real IdP) is
+  BLOCKED: "option A" parameters (issuer/audience/client/test accounts)
+  were never supplied. Dev-auth mode covered every downstream scenario
+  but is not a substitute under the mandate's no-substitution rule.
+- The resource window in `14` mixes load with contract diagnostics, and
+  PostgreSQL process CPU is unsampled; the water levels above must be
+  quoted with that caveat.
+- The discarded 18:19:58Z load attempt (`13-load-run.log` traceback) was
+  an operator error (stale idempotency keys reused from run 1 caused a
+  409 phase abort); it is kept as evidence and is not counted as a
+  product failure.
+- Staging ran `business-api` in dev-auth mode, and the vLLM endpoint
+  requires no real credential on this intranet; neither is production
+  authN evidence.
+
+### Release decision (still conditional)
+
+Slice C functional acceptance (upload→real AI→Review, crash/recovery
+fencing, backup/restore, 20-concurrent smoke, observability) is now PASS
+on real components, with the single IdP leg BLOCKED pending parameters.
+The mandate's final gate remains: merge to `main` + Main CI green before
+`v0.1` tag / PLAN-0012 archive / plans README update. `v0.1` remains
+**withheld**.
