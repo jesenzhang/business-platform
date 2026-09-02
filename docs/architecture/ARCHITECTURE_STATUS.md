@@ -210,8 +210,9 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > check-openapi.ps1、`DRILL_SELFTEST=1` 演练自检。Slice C（预生产验收：真实
 > IdP/model-provider、20 并发性能 smoke、全链路演练、Prometheus/Grafana
 > 抓取与标签基数验证）因本工作区无 staging 与真实凭据，按门禁要求标记
-> BLOCKED/NOT RUN，不以 fake/stub 替代证据；v0.1 tag 与 PLAN-0012 归档继续
-> 推迟至 Slice C PASS、变更合入 main 且 Main CI 全绿。
+> BLOCKED/NOT RUN，不以 fake/stub 替代证据。变更已合入 main（PR #9，
+> merge `eb62451`，Main CI `33637882962` 全绿），但 v0.1 tag 与 PLAN-0012
+> 归档继续推迟，唯一未决条件为 Slice C 在预生产环境以真实证据 PASS。
 
 ## 1. 当前权威结论
 

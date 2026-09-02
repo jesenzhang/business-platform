@@ -239,8 +239,9 @@ bash deploy/operations/drill-backup-restore.sh`。
 Slice C（预生产验收：真实 IdP/model-provider + PostgreSQL + 对象存储 +
 Prometheus/Grafana、20 并发性能 smoke、全链路演练、指标抓取/标签基数验证）：
 当前工作区无 staging 环境与真实凭据，**BLOCKED / NOT RUN**，不得以
-fake/stub/本地测试替代验收证据。T5.1/T5.2 保持未验收状态；v0.1 tag 与
-PLAN-0012 归档在 Slice C PASS、变更合入 main 且 Main CI 全绿之前不执行。
+fake/stub/本地测试替代验收证据。T5.1/T5.2 保持未验收状态；变更已合入
+main（PR #9，merge `eb62451`，Main CI `33637882962` 全绿），但 v0.1 tag 与
+PLAN-0012 归档在 Slice C 于预生产环境 PASS 之前不执行。
 
 ## 完成定义
 

@@ -172,10 +172,13 @@ or keys (`AI_SMOKE_BASE_URL` and friends unset). Accordingly:
 
 ### Release decision (unchanged)
 
-Because Slice C cannot pass in this environment, the conditional final actions
-(“仅当 Slice A/B/C 全部 PASS、变更合入 main 且 Main CI 全绿后”) remain
-unmet: the `v0.1` tag is **still withheld**, PLAN-0012 is **not archived**, and
-`docs/plans/README.md` is **not** updated for archival. The branch may be
-merged to `main` as the auditable preproduction candidate (consistent with the
-release-hardening merge precedent) once its CI run is green; merging does not
-discharge the Slice C evidence requirement.
+The branch was merged to `main` as `eb62451` (PR #9, merge commit; branch CI
+`33635752037`/`33637294711` and the PR run re-run all green, Main CI
+`33637882962` — success), so two of the three merge-side preconditions are
+met. Because Slice C cannot pass in this environment, the conditional final
+actions (“仅当 Slice A/B/C 全部 PASS、变更合入 main 且 Main CI 全绿后”)
+remain unmet on Slice C alone: the `v0.1` tag is **still withheld**, PLAN-0012
+is **not archived**, and `docs/plans/README.md` is **not** updated for
+archival. Merging did not discharge the Slice C evidence requirement; the
+tag/archive trigger is a staging run of the Slice C items with this audit
+amended by their real evidence.
