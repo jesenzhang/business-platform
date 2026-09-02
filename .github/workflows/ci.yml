@@ -84,12 +84,20 @@ jobs:
         # Direct pinned release download instead of trivy-action: the
         # action's installer failed silently (exit 1, no diagnostics) when
         # the release asset fetch broke, which made the gate undiagnosable.
+        # Maintenance policy: to bump TRIVY_VERSION, recompute the checksum
+        # from the upstream trivy_<version>_checksums.txt release asset,
+        # update TRIVY_SHA256 explicitly, and re-run this job. A checksum
+        # mismatch aborts the step before trivy is ever executed.
+        env:
+          TRIVY_VERSION: 0.74.0
+          TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
         run: |
           set -euo pipefail
-          TRIVY_VERSION=0.74.0
           curl -fsSL --retry 3 \
             -o /tmp/trivy.tgz \
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          printf '%s  %s\n' "$TRIVY_SHA256" /tmp/trivy.tgz | sha256sum --check - \
+            || { echo "::error::trivy tarball SHA-256 mismatch (expected ${TRIVY_SHA256})"; exit 1; }
           tar -xzf /tmp/trivy.tgz -C /tmp trivy
           /tmp/trivy version
           /tmp/trivy fs --scanners vuln --severity CRITICAL,HIGH \
@@ -226,9 +234,24 @@ jobs:
           bash scripts/test-postgres-minio-multiprocess.sh
       - name: Backup/restore drill selftest (path guards, cleanup ownership)
         run: DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh
-      - name: Install MinIO client
+      - name: Install MinIO client (pinned release, checksum-verified)
+        # dl.min.io/latest is mutable and silently changed the mc CLI surface
+        # once before (removed `mc mb --force`), so the drill client is pinned
+        # to an immutable GitHub release asset. Maintenance policy: to bump
+        # MC_VERSION, recompute the checksum from the upstream
+        # mc.linux-amd64.<version>.sha256sum release asset, update MC_SHA256
+        # explicitly, and re-run this job. A checksum mismatch aborts the step
+        # before mc is ever executed.
+        env:
+          MC_VERSION: RELEASE.2025-08-13T08-35-41Z
+          MC_SHA256: 01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891
         run: |
-          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            -o /usr/local/bin/mc \
+            "https://github.com/minio/mc/releases/download/${MC_VERSION}/mc.linux-amd64.${MC_VERSION}"
+          printf '%s  %s\n' "$MC_SHA256" /usr/local/bin/mc | sha256sum --check - \
+            || { echo "::error::mc binary SHA-256 mismatch (expected ${MC_SHA256})"; exit 1; }
           chmod +x /usr/local/bin/mc
           mc --version
       - name: Backup/restore drill (PostgreSQL + MinIO, unique drill-owned targets)
