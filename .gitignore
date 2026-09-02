@@ -41,3 +41,5 @@ flamegraph.svg
 node_modules/
 
 apps/business-console/dist/
+
+apps/business-console/test-results/

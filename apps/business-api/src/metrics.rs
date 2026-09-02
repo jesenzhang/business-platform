@@ -94,6 +94,11 @@ pub async fn track_requests(request: Request, next: Next) -> axum::response::Res
     response
 }
 
+/// Record one authentication rejection with a bounded reason class.
+pub fn record_auth_failure(reason: &str) {
+    metrics::counter!("auth_failures_total", "reason" => reason.to_owned()).increment(1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_method;
@@ -122,9 +127,4 @@ mod tests {
         let trace = Method::from_bytes(b"TRACE").unwrap_or_else(|_| unreachable!());
         assert_eq!(normalize_method(&trace), "OTHER");
     }
-}
-
-/// Record one authentication rejection with a bounded reason class.
-pub fn record_auth_failure(reason: &str) {
-    metrics::counter!("auth_failures_total", "reason" => reason.to_owned()).increment(1);
 }
