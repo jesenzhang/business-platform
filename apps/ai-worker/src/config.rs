@@ -159,6 +159,10 @@ pub struct ObservabilityConfig {
     /// `text` (development default) or `json` (preproduction/production).
     #[serde(default = "default_log_format")]
     pub log_format: String,
+    /// Prometheus scrape listen address serving `GET /metrics`
+    /// (PLAN-0012 T4.2). Required in production.
+    #[serde(default)]
+    pub metrics_addr: Option<String>,
 }
 
 impl Default for ObservabilityConfig {
@@ -167,6 +171,7 @@ impl Default for ObservabilityConfig {
             log_level: default_log_level(),
             otlp_endpoint: None,
             log_format: default_log_format(),
+            metrics_addr: None,
         }
     }
 }
@@ -230,6 +235,17 @@ impl AiWorkerConfig {
                 .eq_ignore_ascii_case("json")
         {
             return Err("observability.log_format must be json in production".to_string());
+        }
+        // PLAN-0012 T4.2: production workers must expose a scrape endpoint,
+        // otherwise the AI latency/queue/429 signals are operationally dark.
+        if self.env == RuntimeEnvironment::Production
+            && self
+                .observability
+                .metrics_addr
+                .as_deref()
+                .is_none_or(|addr| addr.trim().is_empty())
+        {
+            return Err("observability.metrics_addr must be configured in production".to_string());
         }
         if self.ai_provider.mode == AiProviderMode::Real {
             if self.ai_provider.model.trim().is_empty() {
@@ -320,10 +336,25 @@ mod tests {
             test_task_delay_millis: 0,
             observability: ObservabilityConfig {
                 log_format: "json".to_string(),
+                metrics_addr: Some("127.0.0.1:9465".to_string()),
                 ..ObservabilityConfig::default()
             },
             ai_provider: AiProviderConfig::default(),
         }
+    }
+
+    #[test]
+    fn production_requires_metrics_addr() {
+        let mut config = production_config();
+        config.observability.metrics_addr = None;
+        assert_eq!(
+            config.validate().err().as_deref(),
+            Some("observability.metrics_addr must be configured in production")
+        );
+        config.observability.metrics_addr = Some("   ".to_string());
+        assert!(config.validate().is_err());
+        config.observability.metrics_addr = Some("127.0.0.1:9465".to_string());
+        assert!(config.validate().is_ok());
     }
 
     #[test]

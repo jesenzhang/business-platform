@@ -31,4 +31,11 @@ log_level = "info"
 # PLAN-0012 T4.5: production log output is JSON for machine ingestion; config
 # validation rejects the human-readable text default in production.
 log_format = "json"
+# PLAN-0012 T4.2: workers expose Prometheus /metrics on this internal address;
+# production validation requires it. `business-api` serves /metrics on its own
+# public port and ignores this key. When business-worker and ai-worker share a
+# host, override per process, e.g.
+# BUSINESS_WORKER__OBSERVABILITY__METRICS_ADDR=127.0.0.1:9464
+# AI_WORKER__OBSERVABILITY__METRICS_ADDR=127.0.0.1:9465
+metrics_addr = "0.0.0.0:9464"
 # otlp_endpoint = "http://otel-collector:4317"

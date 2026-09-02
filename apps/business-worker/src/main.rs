@@ -1,6 +1,7 @@
 //! Durable business worker for the fixed document-processing pipeline.
 
 mod config;
+mod metrics;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -182,6 +183,15 @@ async fn main() -> anyhow::Result<()> {
         log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
+    // PLAN-0012 T4.2: workers expose Prometheus metrics on an internal
+    // address; production validation already requires it to be configured.
+    let _metrics_server = match config.observability.metrics_addr.as_deref() {
+        Some(addr) => {
+            observability::metrics::install_metrics();
+            Some(observability::metrics::spawn_metrics_server(addr).await?)
+        }
+        None => None,
+    };
     let storage = build_storage(&config.storage).await?;
 
     let (execution, queries, documents) =
@@ -256,7 +266,10 @@ async fn main() -> anyhow::Result<()> {
             () = sleep(next_poll.saturating_duration_since(Instant::now())) => {
                 let now = Utc::now();
                 match services.execution.reclaim_expired_jobs(now).await {
-                    Ok(reclaimed) if reclaimed > 0 => tracing::info!(worker_id = %config.worker_id, reclaimed, "expired processing leases reclaimed"),
+                    Ok(reclaimed) if reclaimed > 0 => {
+                        metrics::record_leases_reclaimed(reclaimed);
+                        tracing::info!(worker_id = %config.worker_id, reclaimed, "expired processing leases reclaimed");
+                    }
                     Ok(_) => {}
                     Err(error) => tracing::error!(worker_id = %config.worker_id, error = %error, "failed to reclaim expired processing leases"),
                 }
@@ -272,6 +285,10 @@ async fn main() -> anyhow::Result<()> {
                     };
                     if let Some(claimed) = claimed {
                         tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, correlation_id = claimed.job.correlation_id().unwrap_or("-"), "processing job claimed");
+                        metrics::record_queue_wait(
+                            now.signed_duration_since(claimed.job.created_at())
+                                .num_milliseconds(),
+                        );
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
                         let config_for_task = config.clone();
@@ -366,9 +383,11 @@ async fn process_claimed(
     let heartbeat_lost_flag = Arc::clone(&heartbeat.lost);
     let heartbeat_stopped = heartbeat.stop().await;
     let heartbeat_lost = heartbeat_lost_flag.load(Ordering::Acquire);
+    let lease_proven = heartbeat_stopped && !heartbeat_lost;
     if let Err(error) = result {
-        if !matches!(error, ExtractionError::LeaseLost) && !heartbeat_lost && heartbeat_stopped {
+        if !matches!(error, ExtractionError::LeaseLost) && lease_proven {
             let failure = classify_failure(&error, job.attempt_count());
+            metrics::record_disposition(&failure.disposition);
             if let Err(persistence_error) = services
                 .execution
                 .retry_or_fail_step(job.tenant_id(), job.id(), step, failure, &fence, Utc::now())
@@ -376,22 +395,32 @@ async fn process_claimed(
             {
                 tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, error = %persistence_error, "failed to persist processing step failure");
             }
-        } else if !heartbeat_stopped || heartbeat_lost {
+        } else if lease_proven {
+            metrics::record_lease_lost();
+        } else {
+            metrics::record_lease_lost();
             tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, "processing step result discarded because lease state was not proven");
         }
+        metrics::record_attempt(if lease_proven {
+            metrics::AttemptOutcome::Failed
+        } else {
+            metrics::AttemptOutcome::LeaseUnproven
+        });
         tracing::warn!(job_id = %job.id(), step = %step, failure_code = error.code(), correlation_id = job.correlation_id().unwrap_or("-"), "processing job step failed");
-    } else if !heartbeat_lost
-        && heartbeat_stopped
-        && job.status() == document_processing::ProcessingJobStatus::Running
-    {
-        if let Err(error) = services
-            .execution
-            .release_job(job.tenant_id(), job.id(), &fence, Utc::now())
-            .await
-        {
-            tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, error = %error, "failed to release processing job lease");
+    } else if lease_proven {
+        metrics::record_attempt(metrics::AttemptOutcome::Succeeded);
+        if job.status() == document_processing::ProcessingJobStatus::Running {
+            if let Err(error) = services
+                .execution
+                .release_job(job.tenant_id(), job.id(), &fence, Utc::now())
+                .await
+            {
+                tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, error = %error, "failed to release processing job lease");
+            }
         }
-    } else if !heartbeat_stopped || heartbeat_lost {
+    } else {
+        metrics::record_attempt(metrics::AttemptOutcome::LeaseUnproven);
+        metrics::record_lease_lost();
         tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, "processing job lease was not released because lease state was not proven");
     }
 }

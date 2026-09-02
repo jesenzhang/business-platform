@@ -124,11 +124,24 @@ impl DocumentFieldExtractor for ModelBackedExtractor {
         );
         completion_request.temperature = Some(0.0);
         completion_request.max_output_tokens = self.max_output_tokens;
-        let completion = self
-            .provider
-            .complete(completion_request)
-            .await
-            .map_err(|error| map_provider_error(&error))?;
+        let started = std::time::Instant::now();
+        let completion = self.provider.complete(completion_request).await;
+        crate::metrics::record_provider_request(
+            started.elapsed().as_secs_f64(),
+            completion.is_ok(),
+        );
+        if let Some(status) = completion
+            .as_ref()
+            .err()
+            .and_then(|error| error.http_status)
+        {
+            if status == 429 {
+                crate::metrics::record_provider_rate_limited();
+            } else if (500..=599).contains(&status) {
+                crate::metrics::record_provider_server_error();
+            }
+        }
+        let completion = completion.map_err(|error| map_provider_error(&error))?;
         let payload = parse_payload(&completion.message.text_value(), &request)?;
         ExtractionCandidate::new(
             request.tenant_id,

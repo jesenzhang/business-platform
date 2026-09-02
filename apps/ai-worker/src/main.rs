@@ -6,6 +6,7 @@
 
 mod config;
 mod extractor;
+mod metrics;
 mod retry;
 
 use std::sync::{
@@ -181,6 +182,15 @@ async fn main() -> anyhow::Result<()> {
         log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
+    // PLAN-0012 T4.2: workers expose Prometheus metrics on an internal
+    // address; production validation already requires it to be configured.
+    let _metrics_server = match config.observability.metrics_addr.as_deref() {
+        Some(addr) => {
+            observability::metrics::install_metrics();
+            Some(observability::metrics::spawn_metrics_server(addr).await?)
+        }
+        None => None,
+    };
     let url = config
         .database
         .url
@@ -242,7 +252,10 @@ async fn main() -> anyhow::Result<()> {
             () = sleep(Duration::from_millis(config.poll_interval_millis)) => {
                 let now = Utc::now();
                 match services.execution.reclaim_expired_ai_tasks(now).await {
-                    Ok(reclaimed) if reclaimed > 0 => tracing::info!(worker_id = %config.worker_id, reclaimed, "expired AI leases reclaimed"),
+                    Ok(reclaimed) if reclaimed > 0 => {
+                        metrics::record_leases_reclaimed(reclaimed);
+                        tracing::info!(worker_id = %config.worker_id, reclaimed, "expired AI leases reclaimed");
+                    }
                     Ok(_) => {}
                     Err(error) => tracing::error!(worker_id = %config.worker_id, error = %error, "failed to reclaim expired AI leases"),
                 }
@@ -256,6 +269,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                     };
                     if let Some(task) = task {
+                        metrics::record_queue_wait(
+                            now.signed_duration_since(task.created_at).num_milliseconds(),
+                        );
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
                         let extractor_for_task = Arc::clone(&extractor);
@@ -339,6 +355,7 @@ async fn process_task(
         tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "claimed AI task has no lease token; refusing work");
         return;
     };
+    let started = std::time::Instant::now();
     let fence = ExecutionFence::new(config.worker_id.clone(), token, task.fence_version);
     tracing::info!(task_id = %task.id, job_id = %task.job_id, step = %task.step_kind, fence = task.fence_version, correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task claimed");
     let heartbeat = LeaseHeartbeatGuard::start(
@@ -393,8 +410,10 @@ async fn process_task(
     let heartbeat_lost_flag = Arc::clone(&heartbeat.lost);
     let heartbeat_stopped = heartbeat.stop().await;
     let heartbeat_lost = heartbeat_lost_flag.load(Ordering::Acquire);
+    metrics::record_task_duration(started.elapsed().as_secs_f64());
     match result {
         Ok(candidate) if heartbeat_stopped && !heartbeat_lost => {
+            metrics::record_task_outcome(metrics::TaskOutcome::Succeeded);
             let completion = CompleteAiTaskCommand {
                 tenant_id: task.tenant_id,
                 job_id: task.job_id,
@@ -407,13 +426,18 @@ async fn process_task(
                 .complete_ai_and_resume(completion, Utc::now())
                 .await
             {
+                metrics::record_lease_lost();
                 tracing::warn!(task_id = %task.id, error = %error, "AI task completion was fenced");
             }
         }
         Ok(_) => {
+            metrics::record_task_outcome(metrics::TaskOutcome::LeaseUnproven);
+            metrics::record_lease_lost();
             tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "AI task result discarded because lease state was not proven");
         }
         Err(error) if heartbeat_stopped && !heartbeat_lost => {
+            metrics::record_task_outcome(metrics::TaskOutcome::Failed);
+            metrics::record_disposition(&classify_failure(&error, task.attempt_count).disposition);
             tracing::warn!(task_id = %task.id, failure_code = error.code(), correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task failed");
             if let Err(persistence_error) = services
                 .execution
@@ -431,6 +455,8 @@ async fn process_task(
             }
         }
         Err(error) => {
+            metrics::record_task_outcome(metrics::TaskOutcome::LeaseUnproven);
+            metrics::record_lease_lost();
             tracing::warn!(tenant_id = %task.tenant_id, task_id = %task.id, failure_code = error.code(), correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task failed without a provable lease; state transition skipped");
         }
     }
