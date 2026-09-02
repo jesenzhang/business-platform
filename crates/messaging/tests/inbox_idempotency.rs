@@ -3,6 +3,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use messaging::InboxIdempotency;
+use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 async fn setup_pool() -> sqlx::PgPool {
@@ -14,24 +15,34 @@ async fn setup_pool() -> sqlx::PgPool {
         .expect("failed to connect to PostgreSQL")
 }
 
+/// `CREATE TABLE IF NOT EXISTS` is not concurrency safe in PostgreSQL: two
+/// parallel sessions can pass the existence check together and one fails on
+/// the duplicate. Tests in this binary run on parallel threads, so the schema
+/// setup happens exactly once per test process.
+static PREPARED: OnceCell<()> = OnceCell::const_new();
+
 async fn prepare(pool: &sqlx::PgPool) {
-    runtime_migration::MIGRATOR
-        .run(pool)
-        .await
-        .expect("failed to run migrations");
-    sqlx::query(
-        r"
-        CREATE TABLE IF NOT EXISTS inbox_contract_effects (
-            consumer_name VARCHAR(200) NOT NULL,
-            event_id UUID NOT NULL,
-            effect_count INTEGER NOT NULL,
-            PRIMARY KEY (consumer_name, event_id)
-        )
-        ",
-    )
-    .execute(pool)
-    .await
-    .expect("failed to create contract projection");
+    PREPARED
+        .get_or_init(|| async {
+            runtime_migration::MIGRATOR
+                .run(pool)
+                .await
+                .expect("failed to run migrations");
+            sqlx::query(
+                r"
+                CREATE TABLE IF NOT EXISTS inbox_contract_effects (
+                    consumer_name VARCHAR(200) NOT NULL,
+                    event_id UUID NOT NULL,
+                    effect_count INTEGER NOT NULL,
+                    PRIMARY KEY (consumer_name, event_id)
+                )
+                ",
+            )
+            .execute(pool)
+            .await
+            .expect("failed to create contract projection");
+        })
+        .await;
 }
 
 async fn consume(pool: &sqlx::PgPool, consumer: &str, event_id: Uuid) -> bool {

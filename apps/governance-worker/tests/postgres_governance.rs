@@ -175,4 +175,37 @@ async fn postgres_scan_and_requeue_repair_are_durable() {
             .await
             .expect("read repair ledger");
     assert_eq!(ledger_count, 1);
+
+    // The fixture and repair flow leave tenant-scoped rows in the shared test
+    // database. Delete them so table-wide contract targets (outbox reliability
+    // claims, planner statistics for query contracts) start from a clean state.
+    for sql in [
+        "DELETE FROM outbox_events WHERE tenant_id = $1",
+        "DELETE FROM audit_events WHERE tenant_id = $1",
+        "DELETE FROM data_repair_events WHERE tenant_id = $1",
+        "DELETE FROM data_repair_steps WHERE tenant_id = $1",
+        "DELETE FROM data_repair_runs WHERE tenant_id = $1",
+        "DELETE FROM data_integrity_findings WHERE tenant_id = $1",
+        "DELETE FROM data_integrity_scan_runs WHERE tenant_id = $1",
+        "DELETE FROM document_ai_tasks WHERE tenant_id = $1",
+        "DELETE FROM document_processing_steps WHERE tenant_id = $1",
+        "DELETE FROM document_processing_jobs WHERE tenant_id = $1",
+        "DELETE FROM documents WHERE tenant_id = $1",
+    ] {
+        if sql.contains("outbox_events") {
+            // `outbox_events.tenant_id` is TEXT while every other table here
+            // stores the tenant as UUID.
+            sqlx::query(sql)
+                .bind(tenant_id.to_string())
+                .execute(&pool)
+                .await
+                .unwrap_or_else(|_| unreachable!());
+        } else {
+            sqlx::query(sql)
+                .bind(tenant_id)
+                .execute(&pool)
+                .await
+                .unwrap_or_else(|_| unreachable!());
+        }
+    }
 }
