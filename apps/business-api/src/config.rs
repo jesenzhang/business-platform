@@ -298,14 +298,17 @@ impl BusinessApiConfig {
             {
                 messages.push("observability.log_format must be json in production".to_string());
             }
+            // Wildcard CORS is a development convenience only (see the
+            // wildcard default in `config/default.toml`); production
+            // origins must be enumerated explicitly.
+            if self.server.cors_origins.iter().any(|origin| origin == "*") {
+                messages.push("server.cors_origins must not contain * in production".to_string());
+            }
         } else if self.auth.issuer_url.trim().is_empty() {
             // Without dev auth the only authentication path is OIDC; a missing
             // issuer would leave the API unreachable-by-design (fail closed).
             messages
                 .push("auth.issuer_url must be configured when dev auth is disabled".to_string());
-        }
-        if self.server.cors_origins.iter().any(|origin| origin == "*") {
-            messages.push("server.cors_origins must not contain * in production".to_string());
         }
         if messages.is_empty() {
             Ok(())
@@ -425,6 +428,16 @@ mod tests {
     #[test]
     fn api_configuration_does_not_require_storage_or_messaging() {
         assert!(valid_config().validate().is_ok());
+    }
+
+    #[test]
+    fn development_allows_wildcard_cors_default() {
+        // `config/default.toml` ships the wildcard CORS default and the
+        // multi-process E2E harness boots with `ENV=development`; only
+        // production enumerates origins, so this must keep validating.
+        let mut config = valid_config();
+        config.server.cors_origins = vec!["*".to_string()];
+        assert!(config.validate().is_ok());
     }
 
     #[test]
