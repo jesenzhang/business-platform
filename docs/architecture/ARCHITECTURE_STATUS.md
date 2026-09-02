@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-30
+> 最后更新：2026-09-02
 > 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
 > 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
@@ -194,6 +194,24 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > stub server（连接拒绝/上游 5xx/协议错误/正常返回四态）。
 > PLAN-0012 剩余：T3.3 后置、M5 发布审计（性能 smoke、预生产全链路
 > 演练、v0.1 tag）。
+
+> 2026-09-02 (2): PLAN-0012 Release Closure（`codex/plan-0012-release-closure`）
+> 完成审阅修复与全仓验证。① CI 供应链：trivy 0.74.0 与演练用 MinIO mc
+> RELEASE.2025-08-13T08-35-41Z 固定为不可变 GitHub release 资产，SHA-256
+> 显式维护、下载后执行前校验，不匹配立即中止（维护策略注释在 ci.yml）。
+> ② ai-worker：`TaskOutcome::Succeeded` 移至 fenced completion 持久成功之后，
+> completion 被 fence 或持久化失败改记 `lease_unproven` + lease lost，保证每
+> attempt 恰好一个最终 outcome（进程内 CountingRecorder 回归测试，red→green
+> 验证）。③ business-api-client 代理测试保存/恢复代理环境变量并以进程级
+> 互斥串行化，消除全局环境污染与并行竞争。④ 生产配置 fail-closed 拒绝
+> 空白/纯空白 `auth.jwks_url`（新增配置测试）。⑤ RUNBOOK/本状态/计划/完成
+> 审计同步。Slice B 门禁全 PASS：fmt/check/clippy `-D warnings`/test
+> `--workspace --all-features`（本机）、check-architecture.ps1、
+> check-openapi.ps1、`DRILL_SELFTEST=1` 演练自检。Slice C（预生产验收：真实
+> IdP/model-provider、20 并发性能 smoke、全链路演练、Prometheus/Grafana
+> 抓取与标签基数验证）因本工作区无 staging 与真实凭据，按门禁要求标记
+> BLOCKED/NOT RUN，不以 fake/stub 替代证据；v0.1 tag 与 PLAN-0012 归档继续
+> 推迟至 Slice C PASS、变更合入 main 且 Main CI 全绿。
 
 ## 1. 当前权威结论
 

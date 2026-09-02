@@ -1,7 +1,7 @@
 # PLAN-0012 Completion Audit
 
 Document ID: REPORT-PLAN-0012-COMPLETION-AUDIT  
-Status: Final  
+Status: Final (amended 2026-09-02 — Release Closure, see final section)  
 Date: 2026-09-02  
 Scope: PLAN-0012 release-hardening completion verification on branch
 `codex/plan-0012-release-hardening` (20 commits `3d90765..f2c1e0b` over `main`).
@@ -110,3 +110,71 @@ and passing in CI run `33617370509`.
   re-runs) pass on staging and this report is amended with their evidence.
 - PLAN-0012 archival: withheld with the tag; the plan stays under
   `docs/plans/current/` until the tag conditions are met.
+
+## Amendment — Release Closure (2026-09-02, branch `codex/plan-0012-release-closure`)
+
+This amendment records the release-closure pass on top of `main@899dd3c`
+(the merged release-hardening candidate). It does not restate the audit
+above; it records the review fixes, the local gate battery, and the
+Slice C (preproduction acceptance) status.
+
+### Identity
+
+| Identity | Value |
+| --- | --- |
+| Base | `main@899dd3c` |
+| Branch | `codex/plan-0012-release-closure` |
+| Fix commits | `0f1405d` (CI pinning/checksums), `c0e54e2` (Succeeded-after-persist), `c8a54bd` (proxy env isolation), `b8e952a` (blank jwks_url rejection), docs sync (this amendment + RUNBOOK/ARCHITECTURE_STATUS/plan) |
+| Branch CI | to be recorded below once the push run completes |
+
+### Slice A — review fixes
+
+| # | Fix | Evidence |
+| --- | --- | --- |
+| A1 | CI pins trivy `0.74.0` and MinIO `mc RELEASE.2025-08-13T08-35-41Z` to immutable GitHub release assets; SHA-256 checksums explicitly maintained in the workflow with a documented bump policy; verification runs after download and before execution, and any mismatch aborts the step (`sha256sum --check` + explicit `exit 1`) | `0f1405d` (`.github/workflows/ci.yml`); checksums cross-checked against upstream `checksums.txt`/`.sha256sum` release assets |
+| A2 | ai-worker records `TaskOutcome::Succeeded` only after `complete_ai_and_resume` returns success; a fenced or persistence-failed completion records `lease_unproven` + lease-lost instead, so every attempt emits exactly one final outcome | `c0e54e2`: in-process counting `metrics::Recorder` regression tests over all three completion outcomes (durable success / fenced / persistence-failed); red→green verified by temporarily re-introducing the early-`Succeeded` bug (the fenced and persistence-failure tests failed, then passed again after restoring the fix) |
+| A3 | The proxy test saves and restores the original `HTTP_PROXY`/`http_proxy`/`ALL_PROXY`/`all_proxy` values (RAII guard) and serializes environment mutation behind a process-wide mutex, eliminating global env pollution and races with other env-var tests | `c8a54bd`: restore-exactness test (`proxy_environment_is_restored_after_the_client_construction_window`) + original no-proxy behaviour test under the guard |
+| A4 | Production config rejects blank/whitespace-only `auth.jwks_url` (a blank override would suppress OIDC discovery and fail every JWKS fetch — fail-closed at startup instead) | `b8e952a` (`apps/business-api/src/config.rs`): `production_rejects_blank_jwks_url` covers `Some("")` and `Some("   ")`; existing https/no-override tests retained |
+| A5 | RUNBOOK, `ARCHITECTURE_STATUS.md`, PLAN-0012 and this audit now reflect actual status (production audience mandatory, blank `jwks_url` rejected, CI-executed drill and pinned/verified CI tools, Slice C blocked state) | docs sync commit on this branch |
+
+### Slice B — local gate battery (Windows, Git Bash, this workspace)
+
+All executed on this branch after the fixes; all PASS.
+
+| Gate | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | PASS |
+| `cargo check --workspace --all-targets --all-features` | PASS |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | PASS |
+| `cargo test --workspace --all-features` | PASS — all 131 test-target result lines `ok`, 0 failures (chain exit 0) |
+| `scripts/check-architecture.ps1` | PASS (cargo-metadata architecture fitness + OpenAPI contract + architecture fitness) |
+| `scripts/check-openapi.ps1` | PASS |
+| `DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh` | PASS (`[drill selftest] PASS`, exit 0) |
+
+### Slice C — preproduction acceptance: BLOCKED / NOT RUN
+
+The mandate is explicit: 如缺少 staging 或真实凭据，必须将 Slice C 标记为
+BLOCKED/NOT RUN，不得用 fake、stub 或本地测试替代验收证据。
+
+Environment probe on this workspace found no staging deployment and no real
+credentials: no docker/psql/pg_dump/mc binaries available locally, no
+`deploy/staging/` configuration, and no real IdP or model-provider endpoints
+or keys (`AI_SMOKE_BASE_URL` and friends unset). Accordingly:
+
+| C item | Status | Reason / re-run condition |
+| --- | --- | --- |
+| Real IdP + real model-provider + PostgreSQL + object storage + Prometheus/Grafana | BLOCKED | No staging stack or credentials here; requires provisioning access to the preproduction environment |
+| 20-concurrent performance smoke (p50/p95/throughput/error rate/resources) | BLOCKED | Same; run on staging and record numbers here before tagging |
+| Full chain login/refresh → upload → real AI extraction → Review → worker crash/recovery → backup/restore | BLOCKED | Same; the chain is covered locally only by fakes/stubs and CI infra tests, which the mandate does not accept as this evidence |
+| Prometheus scrape / Grafana dashboard / label-cardinality live verification | BLOCKED | Only shipped config reviewed; needs the staging observability stack |
+| Record commands/env/SHA/time/metrics into this audit | PENDING | To be appended by whoever executes the staging run; no evidence may be simulated |
+
+### Release decision (unchanged)
+
+Because Slice C cannot pass in this environment, the conditional final actions
+(“仅当 Slice A/B/C 全部 PASS、变更合入 main 且 Main CI 全绿后”) remain
+unmet: the `v0.1` tag is **still withheld**, PLAN-0012 is **not archived**, and
+`docs/plans/README.md` is **not** updated for archival. The branch may be
+merged to `main` as the auditable preproduction candidate (consistent with the
+release-hardening merge precedent) once its CI run is green; merging does not
+discharge the Slice C evidence requirement.
