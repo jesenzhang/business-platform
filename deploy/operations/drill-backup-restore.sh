@@ -198,7 +198,10 @@ case "$LIVE_DB" in
 esac
 RESTORE_DB="${LIVE_DB}_drill_${STAMP}_${RAND}"
 RESTORE_URL="${DATABASE_URL%/*}/${RESTORE_DB}"
-RESTORE_BUCKET="${BUCKET}-restore-${STAMP}-${RAND}"
+# S3 bucket names must be lowercase (3-63 chars, [a-z0-9.-]); the ISO-8601
+# stamp carries uppercase T/Z, so the bucket suffix is lowercased while the
+# database name (PostgreSQL, no such rule) keeps the readable stamp.
+RESTORE_BUCKET="${BUCKET}-restore-$(printf '%s' "$STAMP" | tr 'A-Z' 'a-z')-${RAND}"
 
 MARKER_ID="$(uuidgen 2>/dev/null || python -c 'import uuid; print(uuid.uuid4())')"
 MARKER_KEY="backup-drill-marker-${STAMP}-${RAND}.txt"
