@@ -28,5 +28,9 @@ sqlx = { workspace = true }
 # private repository is not fetchable by the GitHub Actions runner.
 jarvis-model-provider = { path = "../../vendor/jarvis/model-provider" }
 
+[dev-dependencies]
+bytes = { workspace = true }
+futures-util = { workspace = true }
+
 [lints]
 workspace = true
