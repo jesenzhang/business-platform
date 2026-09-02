@@ -295,7 +295,7 @@ log "restoring database backup into $RESTORE_DB"
 pg_restore --no-owner --dbname "$RESTORE_URL" "$DRILL_DIR/db-${STAMP}.dump"
 
 log "restoring bucket mirror into $RESTORE_BUCKET"
-mc mb --force "drill/$RESTORE_BUCKET" >/dev/null
+mc mb --ignore-existing "drill/$RESTORE_BUCKET" >/dev/null
 RESTORE_BUCKET_CREATED="yes"
 mc mirror --overwrite "$DRILL_DIR/minio-${STAMP}" "drill/$RESTORE_BUCKET" >/dev/null
 
