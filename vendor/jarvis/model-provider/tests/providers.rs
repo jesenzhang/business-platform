@@ -11,7 +11,8 @@ use jarvis_model_provider::{
     ImageGenerationProvider, ImageGenerationRequest, ImageOutputFormat, ImageQuality,
     ImageResponseFormat, ImageSize, MaxOutputTokensField, MemoryCredentialStore, Message,
     ModelCapabilities, ModelCatalog, ModelCost, ModelProvider, ModelSpec, Models, OAuthCredential,
-    OpenAiCompletionsCompatibility, OpenAiSystemRole, OpenAiThinkingDialect, OutputConstraint,
+    OpenAiCompletionsCompatibility, OpenAiResponsesContinuationMode, OpenAiResponsesReplayItem,
+    OpenAiResponsesReplaySegment, OpenAiSystemRole, OpenAiThinkingDialect, OutputConstraint,
     ProviderConfig, ProviderContinuation, ProviderError, ProviderErrorKind, ProviderFactory,
     ProviderId, ProviderProfile, ReasoningConfig, ReasoningContent, ReasoningPortability,
     RequestOptions, StopReason, StreamAccumulator, StreamEvent, ToolChoice, ToolConstraint,
@@ -252,19 +253,34 @@ fn request_with_max_output_tokens(
     model: ModelSpec,
     max_output_tokens: Option<u32>,
 ) -> CompletionRequest {
-    CompletionRequest {
+    let mut request = CompletionRequest::new(
         model,
-        messages: vec![Message::system("You are concise."), Message::user("hello")],
-        tools: Vec::new(),
-        temperature: None,
-        max_output_tokens,
-        top_p: None,
-        tool_choice: None,
-        reasoning: None,
-        output_constraint: None,
-        retention: jarvis_model_provider::DataRetentionPolicy::Ephemeral,
-        continuation: None,
+        vec![Message::system("You are concise."), Message::user("hello")],
+    );
+    request.max_output_tokens = max_output_tokens;
+    request
+}
+
+fn reasoning_config(
+    enabled: bool,
+    budget_tokens: Option<u32>,
+    effort: Option<&'static str>,
+    summary: Option<&'static str>,
+) -> ReasoningConfig {
+    let mut config = if enabled {
+        ReasoningConfig::enabled(budget_tokens)
+    } else {
+        ReasoningConfig::disabled()
+    };
+    if enabled {
+        if let Some(effort) = effort {
+            config = config.with_effort(effort);
+        }
+        if let Some(summary) = summary {
+            config = config.with_summary(summary);
+        }
     }
+    config
 }
 
 fn without_reasoning_effort() -> OpenAiCompletionsCompatibility {
@@ -497,6 +513,75 @@ async fn openai_qwen_dialect_serializes_enable_thinking_and_budget() {
     assert!(body.get("reasoning_effort").is_none());
     assert!(body.get("reasoning").is_none());
     assert!(body.get("thinking").is_none());
+}
+
+#[tokio::test]
+async fn openai_qwen_chat_template_dialect_serializes_chat_template_kwargs() {
+    let (base_url, request_receiver) = fixture(
+        "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}".into(),
+        "application/json",
+    )
+    .await;
+    let compatibility: OpenAiCompletionsCompatibility = serde_json::from_value(serde_json::json!({
+        "supports_reasoning_effort": false,
+        "thinking_dialect": "qwen_chat_template",
+    }))
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(compatibility).unwrap()["thinking_dialect"],
+        "qwen_chat_template"
+    );
+    let provider = OpenAiCompatibleProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_compatibility(compatibility)
+        .with_base_url(&base_url)
+        .unwrap();
+    let mut request = request(ModelSpec::custom(
+        "qwen-chat-template-test",
+        ProviderId::new("openai").unwrap(),
+        Api::OpenAiCompletions,
+    ));
+    request.reasoning = Some(ReasoningConfig::disabled());
+    provider.complete(request).await.unwrap();
+
+    let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
+    assert_eq!(body["chat_template_kwargs"]["enable_thinking"], false);
+    assert_eq!(body["chat_template_kwargs"]["preserve_thinking"], true);
+    assert!(body.get("enable_thinking").is_none());
+    assert!(body.get("reasoning_effort").is_none());
+    assert!(body.get("reasoning").is_none());
+    assert!(body.get("thinking").is_none());
+}
+
+#[tokio::test]
+async fn openai_qwen_chat_template_dialect_serializes_enabled_thinking() {
+    let (base_url, request_receiver) = fixture(
+        "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}".into(),
+        "application/json",
+    )
+    .await;
+    let provider = OpenAiCompatibleProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_compatibility(OpenAiCompletionsCompatibility {
+            supports_reasoning_effort: false,
+            thinking_dialect: OpenAiThinkingDialect::QwenChatTemplate,
+            ..OpenAiCompletionsCompatibility::default()
+        })
+        .with_base_url(&base_url)
+        .unwrap();
+    let mut request = request(ModelSpec::custom(
+        "qwen-chat-template-test",
+        ProviderId::new("openai").unwrap(),
+        Api::OpenAiCompletions,
+    ));
+    request.reasoning = Some(ReasoningConfig::enabled(Some(512)));
+    provider.complete(request).await.unwrap();
+
+    let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
+    assert_eq!(body["chat_template_kwargs"]["enable_thinking"], true);
+    assert_eq!(body["chat_template_kwargs"]["preserve_thinking"], true);
+    assert!(body.get("enable_thinking").is_none());
+    assert!(body.get("thinking_budget").is_none());
 }
 
 #[tokio::test]
@@ -781,12 +866,7 @@ async fn openai_thinking_object_dialect_serializes_enabled_reasoning() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     provider.complete(request).await.unwrap();
 
     let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
@@ -1212,12 +1292,7 @@ async fn openai_thinking_object_dialect_works_for_streaming() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     jarvis_model_provider::collect_stream(provider.stream(request).await.unwrap())
         .await
         .unwrap();
@@ -1247,12 +1322,7 @@ async fn openai_together_dialect_works_for_streaming() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     jarvis_model_provider::collect_stream(provider.stream(request).await.unwrap())
         .await
         .unwrap();
@@ -1283,12 +1353,7 @@ async fn openai_qwen_dialect_works_for_streaming() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     jarvis_model_provider::collect_stream(provider.stream(request).await.unwrap())
         .await
         .unwrap();
@@ -1362,12 +1427,7 @@ async fn provider_factory_can_apply_combined_openai_compatibility() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     provider.complete(request).await.unwrap();
 
     let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
@@ -2593,12 +2653,7 @@ async fn openai_tool_choice_and_reasoning_are_serialized() {
         constraint: Some(ToolConstraint::StrictJsonSchema),
     }];
     request.tool_choice = Some(ToolChoice::Required);
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: Some(128),
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, Some(128), Some("high"), None));
     provider.complete(request).await.unwrap();
     let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
     assert_eq!(body["tool_choice"], "required");
@@ -3019,12 +3074,7 @@ async fn openai_reasoning_effort_can_be_omitted_for_enabled_reasoning() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     provider.complete(request).await.unwrap();
 
     let body: serde_json::Value = serde_json::from_str(&request_receiver.await.unwrap()).unwrap();
@@ -3074,12 +3124,7 @@ async fn openai_reasoning_effort_opt_out_works_for_streaming() {
         ProviderId::new("openai").unwrap(),
         Api::OpenAiCompletions,
     ));
-    request.reasoning = Some(ReasoningConfig {
-        enabled: true,
-        budget_tokens: None,
-        effort: Some("high".into()),
-        summary: None,
-    });
+    request.reasoning = Some(reasoning_config(true, None, Some("high"), None));
     jarvis_model_provider::collect_stream(provider.stream(request).await.unwrap())
         .await
         .unwrap();
@@ -4076,19 +4121,25 @@ async fn responses_continuation_is_typed_and_replayed_without_message_pollution(
     second_provider.complete(follow_up).await.unwrap();
     let body: serde_json::Value = serde_json::from_str(&second_receiver.await.unwrap()).unwrap();
     assert_eq!(body.get("previous_response_id"), None);
-    assert_eq!(body["input"][0]["type"], "reasoning");
-    assert_eq!(body["input"][0]["encrypted_content"], "encrypted-plan");
-    assert_eq!(body["input"][1]["type"], "function_call");
-    assert_eq!(body["input"][1]["call_id"], "call-1");
-    assert_eq!(body["input"][1]["id"], "fc_1");
-    assert_eq!(body["input"][2]["type"], "reasoning");
-    assert_eq!(body["input"][2]["encrypted_content"], "encrypted-plan-two");
-    assert_eq!(body["input"][3]["type"], "message");
-    assert_eq!(body["input"][3]["phase"], "final");
-    assert_eq!(body["input"][3]["content"][0]["text"], "answer");
-    assert_eq!(body["input"][4]["type"], "function_call_output");
-    assert_eq!(body["input"][4]["call_id"], "call-1");
-    assert_eq!(body["input"][5]["role"], "user");
+    // Stateless manual replay retains the complete required history: the
+    // original user input stays first, anchored assistant outputs are
+    // substituted in place, and user/tool inputs keep their positions.
+    assert_eq!(body["input"][0]["role"], "user");
+    assert_eq!(body["input"][0]["content"][0]["text"], "hello");
+    assert_eq!(body["input"][1]["type"], "reasoning");
+    assert_eq!(body["input"][1]["encrypted_content"], "encrypted-plan");
+    assert_eq!(body["input"][2]["type"], "function_call");
+    assert_eq!(body["input"][2]["call_id"], "call-1");
+    assert_eq!(body["input"][2]["id"], "fc_1");
+    assert_eq!(body["input"][3]["type"], "reasoning");
+    assert_eq!(body["input"][3]["encrypted_content"], "encrypted-plan-two");
+    assert_eq!(body["input"][4]["type"], "message");
+    assert_eq!(body["input"][4]["phase"], "final");
+    assert_eq!(body["input"][4]["content"][0]["text"], "answer");
+    assert_eq!(body["input"][5]["type"], "function_call_output");
+    assert_eq!(body["input"][5]["call_id"], "call-1");
+    assert_eq!(body["input"][6]["role"], "user");
+    assert_eq!(body["input"][6]["content"][0]["text"], "next question");
 
     let wrong_provider =
         OpenAiResponsesProvider::new(ProviderId::new("other").unwrap(), "secret").unwrap();
@@ -4206,12 +4257,41 @@ fn stateless_responses_continuation_requires_encrypted_replay_state() {
     let error = jarvis_model_provider::OpenAiResponsesContinuation::new(
         ProviderId::new("openai").unwrap(),
         "gpt-test",
-        Some("resp_1".into()),
+        None,
         Vec::new(),
         false,
     )
     .unwrap_err();
     assert!(error.contains("no replay state"));
+}
+
+#[test]
+fn stateless_responses_rejects_server_coverage_claims() {
+    let reference = ContinuationRef::new("reasoning").unwrap();
+    let anchor =
+        jarvis_model_provider::history_message_ids(&[Message::user("u1")]).unwrap()[0].clone();
+    let error = jarvis_model_provider::OpenAiResponsesContinuation::with_segments(
+        ProviderId::new("openai").unwrap(),
+        "gpt-test",
+        Some("resp_1".into()),
+        OpenAiResponsesContinuationMode::Stateless,
+        ContinuationScope::for_history(&[Message::user("u1")]).unwrap(),
+        vec![OpenAiResponsesReplaySegment::new(
+            anchor,
+            vec![OpenAiResponsesReplayItem::reasoning(
+                reference,
+                Some("rs_1".into()),
+                "encrypted",
+                Vec::new(),
+            )],
+        )],
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("must not retain a response id")
+            || error.contains("must not claim server coverage"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -4250,4 +4330,587 @@ fn usage_cost_uses_uncached_input_and_rejects_malformed_subdivisions() {
         Err(jarvis_model_provider::UsageError::CacheTokensExceedInput { .. })
     ));
     assert!(!malformed.has_consistent_accounting());
+}
+
+// ========================================================================
+// M7.1 stateless Responses test matrix
+// ========================================================================
+
+fn responses_test_model() -> ModelSpec {
+    ModelSpec::custom(
+        "gpt-test",
+        ProviderId::new("openai").unwrap(),
+        Api::OpenAiResponses,
+    )
+}
+
+fn reasoning_output(id: &str, encrypted: &str, summary: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type": "reasoning",
+        "id": id,
+        "summary": [{"type": "summary_text", "text": summary}],
+        "encrypted_content": encrypted
+    })
+}
+
+fn function_call_output(id: &str, call_id: &str, name: &str, arguments: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type": "function_call",
+        "id": id,
+        "call_id": call_id,
+        "name": name,
+        "arguments": arguments
+    })
+}
+
+fn message_output(text: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "output_text", "text": text}]
+    })
+}
+
+fn wire_input_types(body: &serde_json::Value) -> Vec<String> {
+    body["input"]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .map(|item| {
+                    item.get("type")
+                        .and_then(serde_json::Value::as_str)
+                        .or_else(|| item.get("role").and_then(serde_json::Value::as_str))
+                        .unwrap_or_default()
+                        .to_string()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// TEST 1 — the original user input must survive stateless replay.
+#[tokio::test]
+async fn m71_stateless_replay_retains_original_user_input() {
+    let first_body = serde_json::json!({
+        "id": "m71_t1_1",
+        "status": "completed",
+        "output": [
+            reasoning_output("rs_1", "enc-plan", "plan"),
+            function_call_output("fc_1", "call-1", "lookup", "{\"q\":1}")
+        ],
+        "usage": {"input_tokens": 2, "output_tokens": 3}
+    });
+    let (first_url, _) = fixture(first_body.to_string(), "application/json").await;
+    let provider = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&first_url)
+        .unwrap();
+    let model = responses_test_model();
+    let first = provider.complete(request(model.clone())).await.unwrap();
+    let continuation = first.continuation.expect("encrypted output must continue");
+
+    let (second_url, receiver) = fixture(
+        r#"{"id":"m71_t1_2","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}],"usage":{"input_tokens":3,"output_tokens":1}}"#.into(),
+        "application/json",
+    )
+    .await;
+    let second = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&second_url)
+        .unwrap();
+    let mut follow_up = request(model);
+    follow_up.messages.push(Message::Assistant(first.message));
+    follow_up.messages.push(Message::tool_result(
+        "call-1",
+        Some("lookup".into()),
+        "result",
+    ));
+    follow_up.messages.push(Message::user("next"));
+    follow_up.continuation = Some(continuation);
+    second.complete(follow_up).await.unwrap();
+    let body: serde_json::Value = serde_json::from_str(&receiver.await.unwrap()).unwrap();
+    assert_eq!(
+        wire_input_types(&body),
+        [
+            "user",
+            "reasoning",
+            "function_call",
+            "function_call_output",
+            "user"
+        ]
+    );
+    assert_eq!(body["input"][0]["content"][0]["text"], "hello");
+    assert_eq!(body["input"][4]["content"][0]["text"], "next");
+}
+
+/// TEST 2 — two assistant segments preserve full conversation order.
+#[tokio::test]
+async fn m71_stateless_two_segments_preserve_conversation_order() {
+    // Turn 1: reasoning + function call.
+    let turn1_body = serde_json::json!({
+        "id": "m71_t2_1",
+        "status": "completed",
+        "output": [
+            reasoning_output("rs_1", "enc-r1", "plan one"),
+            function_call_output("fc_1", "call-1", "lookup", "{\"q\":1}")
+        ],
+        "usage": {"input_tokens": 2, "output_tokens": 3}
+    });
+    let (url1, _) = fixture(turn1_body.to_string(), "application/json").await;
+    let provider1 = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&url1)
+        .unwrap();
+    let model = responses_test_model();
+    let completion1 = provider1.complete(request(model.clone())).await.unwrap();
+
+    // Turn 2: reasoning + message, replaying turn-1 history with its segment.
+    let turn2_body = serde_json::json!({
+        "id": "m71_t2_2",
+        "status": "completed",
+        "output": [
+            reasoning_output("rs_2", "enc-r2", "plan two"),
+            message_output("final answer")
+        ],
+        "usage": {"input_tokens": 5, "output_tokens": 4}
+    });
+    let (url2, _) = fixture(turn2_body.to_string(), "application/json").await;
+    let provider2 = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&url2)
+        .unwrap();
+    let mut follow_up1 = request(model.clone());
+    follow_up1
+        .messages
+        .push(Message::Assistant(completion1.message.clone()));
+    follow_up1.messages.push(Message::tool_result(
+        "call-1",
+        Some("lookup".into()),
+        "result one",
+    ));
+    follow_up1.messages.push(Message::user("turn two question"));
+    follow_up1.continuation = completion1.continuation.clone();
+    let completion2 = provider2.complete(follow_up1).await.unwrap();
+    assert_eq!(
+        completion2
+            .continuation
+            .as_ref()
+            .and_then(ProviderContinuation::openai_responses)
+            .map(jarvis_model_provider::OpenAiResponsesContinuation::replay_segment_count),
+        Some(2),
+        "turn 2 must carry both anchored segments"
+    );
+
+    // Turn 3: send full accumulated history with the newest continuation.
+    let (url3, receiver) = fixture(
+        r#"{"id":"m71_t2_3","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}],"usage":{"input_tokens":8,"output_tokens":1}}"#.into(),
+        "application/json",
+    )
+    .await;
+    let provider3 = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&url3)
+        .unwrap();
+    let mut follow_up2 = request(model);
+    follow_up2
+        .messages
+        .push(Message::Assistant(completion1.message));
+    follow_up2.messages.push(Message::tool_result(
+        "call-1",
+        Some("lookup".into()),
+        "result one",
+    ));
+    follow_up2.messages.push(Message::user("turn two question"));
+    follow_up2
+        .messages
+        .push(Message::Assistant(completion2.message));
+    follow_up2
+        .messages
+        .push(Message::user("turn three question"));
+    follow_up2.continuation = completion2.continuation;
+    provider3.complete(follow_up2).await.unwrap();
+    let body: serde_json::Value = serde_json::from_str(&receiver.await.unwrap()).unwrap();
+    assert_eq!(
+        wire_input_types(&body),
+        [
+            "user",
+            "reasoning",            // A1 replay R1
+            "function_call",        // A1 replay FC1
+            "function_call_output", // T1
+            "user",
+            "reasoning", // A2 replay R2
+            "message",   // A2 replay Message2
+            "user"
+        ]
+    );
+    assert_eq!(body["input"][0]["content"][0]["text"], "hello");
+    assert_eq!(body["input"][6]["content"][0]["text"], "final answer");
+}
+
+/// TEST 3 — a portable assistant without a segment encodes normally.
+#[tokio::test]
+async fn m71_stateless_portable_assistant_encodes_normally() {
+    let encrypted_body = serde_json::json!({
+        "id": "m71_t3_1",
+        "status": "completed",
+        "output": [reasoning_output("rs_9", "enc-x", "plan")],
+        "usage": {"input_tokens": 2, "output_tokens": 1}
+    });
+    let (url1, _) = fixture(encrypted_body.to_string(), "application/json").await;
+    let provider1 = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&url1)
+        .unwrap();
+    let model = responses_test_model();
+    let with_reasoning = provider1.complete(request(model)).await.unwrap();
+    let continuation = with_reasoning
+        .continuation
+        .expect("encrypted reasoning must continue");
+
+    let (url2, receiver) = fixture(
+        r#"{"id":"m71_t3_2","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}],"usage":{"input_tokens":4,"output_tokens":1}}"#.into(),
+        "application/json",
+    )
+    .await;
+    let provider2 = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&url2)
+        .unwrap();
+    // History keeps the anchored provider-bound assistant and adds an
+    // ordinary portable assistant entry that needs no replay segment.
+    let portable_assistant = Message::Assistant(AssistantMessage {
+        content: vec![AssistantContent::Text(
+            jarvis_model_provider::TextContent::new("older portable answer"),
+        )],
+    });
+    let mut next = request(responses_test_model());
+    next.messages
+        .push(Message::Assistant(with_reasoning.message));
+    next.messages.push(portable_assistant);
+    next.messages.push(Message::user("follow-up"));
+    next.continuation = Some(continuation);
+    provider2.complete(next).await.unwrap();
+    let body: serde_json::Value = serde_json::from_str(&receiver.await.unwrap()).unwrap();
+    assert_eq!(
+        wire_input_types(&body),
+        ["user", "reasoning", "message", "user"]
+    );
+    assert_eq!(
+        body["input"][2]["content"][0]["text"],
+        "older portable answer"
+    );
+    assert_eq!(body["input"][3]["content"][0]["text"], "follow-up");
+}
+
+/// TEST 4 — an edited anchored assistant fails before dispatch.
+#[test]
+fn m71_stateless_edited_anchor_fails_closed() {
+    let reference = ContinuationRef::new("r-edit").unwrap();
+    let message_ref = ContinuationRef::new("m-edit").unwrap();
+    let assistant = Message::Assistant(AssistantMessage {
+        content: vec![
+            AssistantContent::Reasoning(ReasoningContent {
+                text: String::new(),
+                redacted: true,
+                portability: ReasoningPortability::ProviderBound,
+                continuation_ref: Some(reference.clone()),
+            }),
+            AssistantContent::Text(jarvis_model_provider::TextContent::new("original")),
+        ],
+    });
+    let history = vec![Message::user("u1"), assistant];
+    let anchor = jarvis_model_provider::history_message_ids(&history).unwrap()[1].clone();
+    let continuation = ProviderContinuation::OpenAiResponses(
+        jarvis_model_provider::OpenAiResponsesContinuation::with_segments(
+            ProviderId::new("openai").unwrap(),
+            "gpt-test",
+            None,
+            OpenAiResponsesContinuationMode::Stateless,
+            ContinuationScope::empty(),
+            vec![OpenAiResponsesReplaySegment::new(
+                anchor,
+                vec![
+                    OpenAiResponsesReplayItem::reasoning(
+                        reference,
+                        Some("rs_1".into()),
+                        "enc",
+                        Vec::new(),
+                    ),
+                    OpenAiResponsesReplayItem::assistant_message(
+                        message_ref,
+                        Some("msg_1".into()),
+                        None,
+                        "original",
+                    ),
+                ],
+            )],
+        )
+        .unwrap(),
+    );
+    continuation.validate_for_history(&history).unwrap();
+    // Edited text changes the anchor identity; validation must fail closed.
+    let mut edited_history = history.clone();
+    if let Message::Assistant(message) = &mut edited_history[1] {
+        message.content[1] =
+            AssistantContent::Text(jarvis_model_provider::TextContent::new("edited"));
+    }
+    let error = continuation
+        .validate_for_history(&edited_history)
+        .unwrap_err();
+    assert!(error.contains("anchor no longer matches"), "{error}");
+}
+
+/// TEST 5 — ProviderBound reasoning without any matching segment fails.
+#[test]
+fn m71_stateless_missing_segment_fails_closed() {
+    let reference = ContinuationRef::new("r-missing").unwrap();
+    let assistant = Message::Assistant(AssistantMessage {
+        content: vec![AssistantContent::Reasoning(ReasoningContent {
+            text: String::new(),
+            redacted: true,
+            portability: ReasoningPortability::ProviderBound,
+            continuation_ref: Some(reference),
+        })],
+    });
+    let messages = vec![Message::user("u1"), assistant];
+    // Segment bound to a different (nonexistent in this history) anchor.
+    let other_anchor =
+        jarvis_model_provider::history_message_ids(&[Message::user("other")]).unwrap()[0].clone();
+    let continuation = ProviderContinuation::OpenAiResponses(
+        jarvis_model_provider::OpenAiResponsesContinuation::with_segments(
+            ProviderId::new("openai").unwrap(),
+            "gpt-test",
+            None,
+            OpenAiResponsesContinuationMode::Stateless,
+            ContinuationScope::empty(),
+            vec![OpenAiResponsesReplaySegment::new(
+                other_anchor,
+                vec![OpenAiResponsesReplayItem::reasoning(
+                    ContinuationRef::new("unused").unwrap(),
+                    Some("rs_x".into()),
+                    "enc",
+                    Vec::new(),
+                )],
+            )],
+        )
+        .unwrap(),
+    );
+    let error = continuation.validate_for_history(&messages).unwrap_err();
+    assert!(
+        error.contains("missing replay metadata") || error.contains("anchor no longer matches"),
+        "{error}"
+    );
+}
+
+/// TEST 6 — an extra segment whose anchor does not exist fails.
+#[test]
+fn m71_stateless_extra_segment_fails_closed() {
+    let reference = ContinuationRef::new("r-real").unwrap();
+    let assistant = Message::Assistant(AssistantMessage {
+        content: vec![AssistantContent::Reasoning(ReasoningContent {
+            text: String::new(),
+            redacted: true,
+            portability: ReasoningPortability::ProviderBound,
+            continuation_ref: Some(reference.clone()),
+        })],
+    });
+    let messages = vec![Message::user("u1"), assistant];
+    let real_anchor = jarvis_model_provider::history_message_ids(&messages).unwrap()[1].clone();
+    let stale_anchor =
+        jarvis_model_provider::history_message_ids(&[Message::user("stale")]).unwrap()[0].clone();
+    let continuation = ProviderContinuation::OpenAiResponses(
+        jarvis_model_provider::OpenAiResponsesContinuation::with_segments(
+            ProviderId::new("openai").unwrap(),
+            "gpt-test",
+            None,
+            OpenAiResponsesContinuationMode::Stateless,
+            ContinuationScope::empty(),
+            vec![
+                OpenAiResponsesReplaySegment::new(
+                    real_anchor,
+                    vec![OpenAiResponsesReplayItem::reasoning(
+                        reference,
+                        Some("rs_a".into()),
+                        "enc-a",
+                        Vec::new(),
+                    )],
+                ),
+                OpenAiResponsesReplaySegment::new(
+                    stale_anchor,
+                    vec![OpenAiResponsesReplayItem::reasoning(
+                        ContinuationRef::new("r-extra").unwrap(),
+                        Some("rs_b".into()),
+                        "enc-b",
+                        Vec::new(),
+                    )],
+                ),
+            ],
+        )
+        .unwrap(),
+    );
+    let error = continuation.validate_for_history(&messages).unwrap_err();
+    assert!(error.contains("anchor no longer matches"), "{error}");
+}
+
+/// TEST 7 — segment storage order does not affect association.
+#[test]
+fn m71_stateless_segment_association_is_anchor_based() {
+    let ref_a = ContinuationRef::new("ra").unwrap();
+    let ref_b = ContinuationRef::new("rb").unwrap();
+    let assistant_a = Message::Assistant(AssistantMessage {
+        content: vec![AssistantContent::Reasoning(ReasoningContent {
+            text: String::new(),
+            redacted: true,
+            portability: ReasoningPortability::ProviderBound,
+            continuation_ref: Some(ref_a.clone()),
+        })],
+    });
+    let assistant_b = Message::Assistant(AssistantMessage {
+        content: vec![AssistantContent::Reasoning(ReasoningContent {
+            text: String::new(),
+            redacted: true,
+            portability: ReasoningPortability::ProviderBound,
+            continuation_ref: Some(ref_b.clone()),
+        })],
+    });
+    let messages = vec![
+        Message::user("u1"),
+        assistant_a,
+        Message::user("u2"),
+        assistant_b,
+    ];
+    let anchor_a = jarvis_model_provider::history_message_ids(&messages).unwrap()[1].clone();
+    let anchor_b = jarvis_model_provider::history_message_ids(&messages).unwrap()[3].clone();
+    // Store B before A: association must still resolve by anchor identity.
+    let continuation = ProviderContinuation::OpenAiResponses(
+        jarvis_model_provider::OpenAiResponsesContinuation::with_segments(
+            ProviderId::new("openai").unwrap(),
+            "gpt-test",
+            None,
+            OpenAiResponsesContinuationMode::Stateless,
+            ContinuationScope::empty(),
+            vec![
+                OpenAiResponsesReplaySegment::new(
+                    anchor_b,
+                    vec![OpenAiResponsesReplayItem::reasoning(
+                        ref_b.clone(),
+                        Some("rs_b".into()),
+                        "enc-b",
+                        Vec::new(),
+                    )],
+                ),
+                OpenAiResponsesReplaySegment::new(
+                    anchor_a,
+                    vec![OpenAiResponsesReplayItem::reasoning(
+                        ref_a,
+                        Some("rs_a".into()),
+                        "enc-a",
+                        Vec::new(),
+                    )],
+                ),
+            ],
+        )
+        .unwrap(),
+    );
+    continuation.validate_for_history(&messages).unwrap();
+}
+
+/// TEST 8 — stream and complete produce equivalent segmentation.
+#[tokio::test]
+async fn m71_stream_and_complete_produce_equivalent_continuations() {
+    let model = responses_test_model();
+    let sse_body = concat!(
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"reasoning\"}}\n\n",
+        "event: response.reasoning_summary_text.delta\n",
+        "data: {\"type\":\"response.reasoning_summary_text.delta\",\"delta\":\"plan\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"plan\"}],\"encrypted_content\":\"parity-enc\"}}\n\n",
+        "event: response.output_item.added\n",
+        "data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"type\":\"function_call\",\"call_id\":\"call-p\",\"name\":\"lookup\",\"arguments\":\"\"}}\n\n",
+        "event: response.function_call_arguments.delta\n",
+        "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"delta\":\"{\\\"q\\\":1}\"}\n\n",
+        "event: response.output_item.done\n",
+        "data: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"type\":\"function_call\",\"id\":\"fc_p\",\"call_id\":\"call-p\",\"name\":\"lookup\",\"arguments\":\"{\\\"q\\\":1}\"}}\n\n",
+        "event: response.completed\n",
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_parity\",\"status\":\"completed\",\"output\":[{\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"plan\"}],\"encrypted_content\":\"parity-enc\"},{\"type\":\"function_call\",\"id\":\"fc_p\",\"call_id\":\"call-p\",\"name\":\"lookup\",\"arguments\":\"{\\\"q\\\":1}\"}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}}\n\n"
+    );
+    let (stream_url, _) = fixture(sse_body.into(), "text/event-stream").await;
+    let streaming = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&stream_url)
+        .unwrap();
+    let streamed = jarvis_model_provider::collect_stream(
+        streaming.stream(request(model.clone())).await.unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let complete_body = serde_json::json!({
+        "id": "resp_parity",
+        "status": "completed",
+        "output": [
+            {"type":"reasoning","summary":[{"type":"summary_text","text":"plan"}],"encrypted_content":"parity-enc"},
+            {"type":"function_call","id":"fc_p","call_id":"call-p","name":"lookup","arguments":"{\"q\":1}"}
+        ],
+        "usage": {"input_tokens": 2, "output_tokens": 3}
+    });
+    let (complete_url, _) = fixture(complete_body.to_string(), "application/json").await;
+    let non_streaming = OpenAiResponsesProvider::new(ProviderId::new("openai").unwrap(), "secret")
+        .unwrap()
+        .with_base_url(&complete_url)
+        .unwrap();
+    let completed = non_streaming.complete(request(model)).await.unwrap();
+
+    // Equivalent normalized messages and segmentation shape. Item references
+    // are generated per call, so compare structure and payload sizes.
+    let streamed_cont = streamed
+        .continuation
+        .as_ref()
+        .unwrap()
+        .openai_responses()
+        .unwrap();
+    let completed_cont = completed
+        .continuation
+        .as_ref()
+        .unwrap()
+        .openai_responses()
+        .unwrap();
+    assert_eq!(streamed_cont.mode(), completed_cont.mode());
+    assert_eq!(
+        streamed_cont.replay_segment_count(),
+        completed_cont.replay_segment_count()
+    );
+    assert_eq!(
+        streamed_cont.replay_item_count(),
+        completed_cont.replay_item_count()
+    );
+    for (a, b) in streamed_cont
+        .replay_segments()
+        .iter()
+        .zip(completed_cont.replay_segments())
+    {
+        assert_eq!(a.items().len(), b.items().len());
+        for (item_a, item_b) in a.items().iter().zip(b.items()) {
+            assert_eq!(item_a.kind(), item_b.kind());
+            // Compare redacted payload size through the safe Debug contract.
+            let debug_a = format!("{item_a:?}");
+            let debug_b = format!("{item_b:?}");
+            let bytes = |text: &str| {
+                text.split("sensitive_bytes: ")
+                    .nth(1)
+                    .and_then(|rest| rest.split(',').next())
+                    .and_then(|value| value.trim_end_matches(')').trim().parse::<usize>().ok())
+            };
+            assert_eq!(bytes(&debug_a), bytes(&debug_b));
+        }
+    }
+    // Neither normalized message leaks the encrypted payload.
+    let streamed_json = serde_json::to_value(&streamed.message).unwrap().to_string();
+    let completed_json = serde_json::to_value(&completed.message)
+        .unwrap()
+        .to_string();
+    assert!(!streamed_json.contains("parity-enc"));
+    assert!(!completed_json.contains("parity-enc"));
 }

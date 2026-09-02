@@ -110,11 +110,13 @@ pub fn create_router(
 
     let public_routes = Router::new()
         .route("/health/live", get(health::liveness))
-        .route("/health/ready", get(health::readiness));
+        .route("/health/ready", get(health::readiness))
+        .route("/metrics", get(crate::metrics::metrics_handler));
 
     Router::new()
         .merge(public_routes)
         .merge(protected_routes)
+        .layer(axum::middleware::from_fn(crate::metrics::track_requests))
         .layer(CompressionLayer::new())
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,

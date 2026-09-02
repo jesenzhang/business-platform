@@ -1,0 +1,191 @@
+{
+  "uid": "plan-0012-v0-1-candidate",
+  "title": "Document Processing — v0.1 Candidate (PLAN-0012 T4.2)",
+  "tags": ["plan-0012", "document-processing"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Job throughput (attempts/s by outcome)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(processing_job_attempts_total[5m])) by (outcome)",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Job queue wait p95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(processing_job_queue_wait_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.5, sum(rate(processing_job_queue_wait_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "AI task outcomes (tasks/s) + duration p95",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ai_tasks_total[5m])) by (outcome)",
+          "legendFormat": "{{outcome}}/s"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(ai_task_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "duration p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum(rate(ai_provider_request_seconds_bucket[5m])) by (le))",
+          "legendFormat": "provider call p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "AI provider pressure: 429 / 5xx / queue wait",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ai_provider_rate_limited_total[5m]))",
+          "legendFormat": "429/s"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(ai_provider_server_error_total[5m]))",
+          "legendFormat": "5xx/s"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum(rate(ai_task_queue_wait_seconds_bucket[5m])) by (le))",
+          "legendFormat": "AI queue wait p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Lease losses and expired-lease reclaims (15m)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(processing_leases_reclaimed_total[15m]))",
+          "legendFormat": "job leases reclaimed"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(processing_lease_lost_total[15m]))",
+          "legendFormat": "job lease lost"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(increase(ai_leases_reclaimed_total[15m]))",
+          "legendFormat": "AI leases reclaimed"
+        },
+        {
+          "refId": "D",
+          "expr": "sum(increase(ai_lease_lost_total[15m]))",
+          "legendFormat": "AI lease lost"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Failure dispositions (retry = retry pressure)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(processing_step_dispositions_total[5m])) by (disposition)",
+          "legendFormat": "step {{disposition}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(ai_task_dispositions_total[5m])) by (disposition)",
+          "legendFormat": "ai {{disposition}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "API requests by method (5m rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_requests_total[5m])) by (method)",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "AI queue wait p95 (backlog indicator)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(ai_task_queue_wait_seconds_bucket[15m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(processing_job_queue_wait_seconds_bucket[15m])) by (le))",
+          "legendFormat": "job p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      }
+    ]
+  }
+}

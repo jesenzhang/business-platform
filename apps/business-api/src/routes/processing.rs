@@ -283,7 +283,15 @@ pub async fn create_for_document(
             ApiError::validation("invalid processing job request"),
             &headers,
         )
-    })?;
+    })?
+    // PLAN-0012 T4.5: bind the durable job (and everything it enqueues) to the
+    // inbound request correlation id so audit rows and worker logs join one chain.
+    .with_correlation_id(Some(
+        headers
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .map_or_else(|| Uuid::now_v7().to_string(), str::to_string),
+    ));
     let stored = services
         .execution
         .create_job(&job)

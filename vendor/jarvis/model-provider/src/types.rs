@@ -88,6 +88,10 @@ pub enum OpenAiThinkingDialect {
     Together,
     /// Send Qwen/DashScope's top-level `enable_thinking` boolean.
     Qwen,
+    /// Send Qwen thinking toggles through `chat_template_kwargs` (vLLM /
+    /// SGLang served Qwen models ignore the top-level `enable_thinking`
+    /// field but honor their chat-template switches).
+    QwenChatTemplate,
 }
 
 /// The reasoning wire field family selected by an OpenAI-compatible dialect.
@@ -102,6 +106,7 @@ pub enum ReasoningEncoding {
     ThinkingObject,
     TogetherToggle,
     QwenToggle,
+    QwenChatTemplateToggle,
 }
 
 /// The history field family paired with a reasoning request encoding.
@@ -142,6 +147,11 @@ impl OpenAiThinkingDialect {
             },
             Self::Qwen => ReasoningWirePolicy {
                 encoding: ReasoningEncoding::QwenToggle,
+                history: ReasoningHistoryEncoding::ReasoningContent,
+                effort_enabled: false,
+            },
+            Self::QwenChatTemplate => ReasoningWirePolicy {
+                encoding: ReasoningEncoding::QwenChatTemplateToggle,
                 history: ReasoningHistoryEncoding::ReasoningContent,
                 effort_enabled: false,
             },
@@ -580,7 +590,14 @@ pub enum ToolChoice {
 }
 
 /// Request-side reasoning control. Response reasoning blocks remain separate.
+///
+/// This V1 surface is `#[non_exhaustive]`: future optional provider reasoning
+/// controls are added without becoming an immediate source-breaking change
+/// for external consumers. Construct through [`ReasoningConfig::enabled`],
+/// [`ReasoningConfig::disabled`], or the builder methods; serialized data
+/// keeps decoding because wire compatibility is unchanged.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ReasoningConfig {
     pub enabled: bool,
     pub budget_tokens: Option<u32>,
@@ -607,6 +624,21 @@ impl ReasoningConfig {
             effort: None,
             summary: None,
         }
+    }
+
+    pub fn with_budget_tokens(mut self, budget_tokens: u32) -> Self {
+        self.budget_tokens = Some(budget_tokens);
+        self
+    }
+
+    pub fn with_effort(mut self, effort: impl Into<String>) -> Self {
+        self.effort = Some(effort.into());
+        self
+    }
+
+    pub fn with_summary(mut self, summary: impl Into<String>) -> Self {
+        self.summary = Some(summary.into());
+        self
     }
 }
 
@@ -833,7 +865,15 @@ pub struct Completion {
     pub metadata: CompletionMetadata,
 }
 
+/// One provider-neutral completion request.
+///
+/// This V1 surface is `#[non_exhaustive]`: future optional request fields do
+/// not become an immediate source-breaking change for external consumers.
+/// Construct through [`CompletionRequest::new`] plus the `with_*` builder
+/// methods; serialized data keeps decoding because wire compatibility is
+/// unchanged.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CompletionRequest {
     pub model: ModelSpec,
     pub messages: Vec<Message>,
@@ -870,6 +910,65 @@ impl CompletionRequest {
         }
     }
 
+    pub fn with_tools(mut self, tools: Vec<ToolSpec>) -> Self {
+        self.tools = tools;
+        self
+    }
+
+    pub fn with_temperature(mut self, temperature: f32) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    /// Set the temperature directly from an optional value.
+    pub fn with_temperature_opt(mut self, temperature: Option<f32>) -> Self {
+        self.temperature = temperature;
+        self
+    }
+
+    pub fn with_max_output_tokens(mut self, max_output_tokens: u32) -> Self {
+        self.max_output_tokens = Some(max_output_tokens);
+        self
+    }
+
+    /// Set the output-token limit directly from an optional value.
+    pub fn with_max_output_tokens_opt(mut self, max_output_tokens: Option<u32>) -> Self {
+        self.max_output_tokens = max_output_tokens;
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f32) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    /// Set the top-p value directly from an optional value.
+    pub fn with_top_p_opt(mut self, top_p: Option<f32>) -> Self {
+        self.top_p = top_p;
+        self
+    }
+
+    pub fn with_tool_choice(mut self, tool_choice: ToolChoice) -> Self {
+        self.tool_choice = Some(tool_choice);
+        self
+    }
+
+    pub fn with_reasoning(mut self, reasoning: ReasoningConfig) -> Self {
+        self.reasoning = Some(reasoning);
+        self
+    }
+
+    /// Set reasoning controls directly from an optional value.
+    pub fn with_reasoning_opt(mut self, reasoning: Option<ReasoningConfig>) -> Self {
+        self.reasoning = reasoning;
+        self
+    }
+
+    pub fn with_retention(mut self, retention: DataRetentionPolicy) -> Self {
+        self.retention = retention;
+        self
+    }
+
     pub fn with_output_constraint(mut self, constraint: OutputConstraint) -> Self {
         self.output_constraint = Some(constraint);
         self
@@ -877,6 +976,12 @@ impl CompletionRequest {
 
     pub fn with_continuation(mut self, continuation: ProviderContinuation) -> Self {
         self.continuation = Some(continuation);
+        self
+    }
+
+    /// Set the continuation sidecar directly from an optional value.
+    pub fn with_continuation_opt(mut self, continuation: Option<ProviderContinuation>) -> Self {
+        self.continuation = continuation;
         self
     }
 }

@@ -162,6 +162,21 @@ M2（2026-08-25）落地补充：
 - `main.rs` 组合根按 `config.ai_provider.mode` 选择 `DeterministicLocalExtractor` 或 `ModelBackedExtractor`
   并注入 `process_task`；模型 provider 仍仅此组合根可见。
 
+T2.5 补充（2026-08-30，真实 provider smoke 与快照升级）：
+- vendored 快照从 rev `0485827` 升级为上游 jarvis-rs 本地提交
+  `af9fbe754ef20c7de9a96d5f030e8044e97414ad`（crate 版本 0.3.0-dev.1）；`Cargo.toml` 保持
+  内联依赖清单与 provenance 头，无本地代码魔改。上游 API 与既有适配层兼容（`cargo check` 复通）。
+- 上游新增 `EndpointPolicy::TrustedPrivateHttp`（RFC1918 明文 HTTP 显式信任策略）。为接入内网
+  vLLM 部署，`AiProviderConfig` 新增 `allow_private_http`（默认 false，fail-closed）：false 时
+  非 HTTPS/loopback 的 base URL 在 provider 构建期拒绝；true 时映射为 TrustedPrivateHttp 并在
+  组合根输出明文传输告警。生产环境同样默认拒绝，需显式配置才放行。
+- 单元测试新增：默认拒绝明文 RFC1918、显式 opt-in 后构建成功、未知 api 名称仍拒绝。
+- 真实 smoke（`#[ignore]` 手工测试 `real_provider_smoke_extracts_candidate`，端点地址仅从
+  `AI_SMOKE_BASE_URL` 环境变量读取，不提交内网地址）在本机通过：OpenAI-compatible 端点
+  （vLLM 托管 qwen3_vl，reasoning 型输出）从样例备忘录提取出 title/language/7 个 fields/1 条
+  warning，耗时约 6 秒。reasoning 模型会先消耗输出预算，smoke 配置将 `max_output_tokens` 放宽
+  到 4096 以避免答案被截断为空 payload。
+
 ## 8. 验证证据
 
 - `cargo check -p ai-worker`：PASS，`jarvis-model-provider v0.1.0 (F:\…\vendor\jarvis\model-provider)` 被编译。
@@ -171,6 +186,17 @@ M2（2026-08-25）落地补充：
 - Main CI：首次 git 依赖提交（72470bb）全部 cargo 任务在 dependency 解析失败（私有仓库不可达）；切换
   vendored 后应恢复绿（见最终 CI 记录）。
 - `git ls-remote https://github.com/jesenzhang/jarvis-rs.git` 无需凭据将失败；本机凭据缓存使本地可拉取。
+
+T2.5 补充（2026-08-30）：
+- `cargo test -p ai-worker --all-features`：12 例（11 pass + 1 ignored smoke）；`--ignored` 真实
+  provider smoke PASS（内网 vLLM/qwen3_vl，提取结果见第 7 节 T2.5 补充）。
+- `cargo fmt --all -- --check` / `cargo check --workspace --all-targets --all-features` /
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`：PASS。
+- `cargo test --workspace --all-features --no-fail-fast`：全仓 481 pass / 1 fail，唯一失败为
+  agent-adapter `upstream_failure_is_reported_without_fake_business_data`，经干净 HEAD 基线复现
+  确认为本机沙箱网络拦截导致的既有 flake（`127.0.0.1:9` 连接被代答 5xx → Api 错误 -32003，而
+  非预期的连接拒绝 Transport -32001）；单包隔离运行稳定通过，与 vendored 升级无关，CI 环境覆盖。
+- `scripts/check-architecture.ps1`：PASS（含 vendored-path 与隔离断言）。
 
 ## 9. 后续复审条件
 

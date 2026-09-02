@@ -70,7 +70,14 @@ pub struct BusinessApiClient {
 
 impl BusinessApiClient {
     pub fn new(config: ClientConfig) -> Result<Self, ClientError> {
-        let http = reqwest::Client::builder().timeout(config.timeout).build()?;
+        // The base URL is the (typically internal) Business API, so requests
+        // must never inherit machine proxy settings (Windows system proxy,
+        // `*_PROXY` environment variables): that would hand the bearer token
+        // to a third-party proxy and break internal reachability.
+        let http = reqwest::Client::builder()
+            .timeout(config.timeout)
+            .no_proxy()
+            .build()?;
         Ok(Self {
             http,
             base_url: config.base_url,
@@ -342,4 +349,55 @@ pub struct UploadRequest {
     pub content_type: String,
     pub body: Bytes,
     pub idempotency_key: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    /// Plain-HTTP responder on an owned socket, so tests never depend on
+    /// host port state or third-party servers.
+    fn spawn_http_responder(status_line: &'static str, body: &'static [u8]) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap_or_else(|_| unreachable!());
+        let addr = listener.local_addr().unwrap_or_else(|_| unreachable!());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                let mut scratch = [0_u8; 4096];
+                let _unused = stream.read(&mut scratch);
+                let head = format!(
+                    "{status_line}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _unused = stream
+                    .write_all(head.as_bytes())
+                    .and_then(|()| stream.write_all(body));
+                let _unused = stream.flush();
+            }
+        });
+        addr.to_string()
+    }
+
+    #[tokio::test]
+    async fn requests_never_route_through_environment_proxies() {
+        // A proxy-aware client would reach the 503 responder configured via
+        // `*_PROXY` instead of the 200 responder at the API base URL.
+        let api = spawn_http_responder("HTTP/1.1 200 OK", br#"{"status":"ready"}"#);
+        let proxy = spawn_http_responder("HTTP/1.1 503 Service Unavailable", b"");
+        for (key, value) in [
+            ("HTTP_PROXY", format!("http://{proxy}")),
+            ("http_proxy", format!("http://{proxy}")),
+            ("ALL_PROXY", format!("http://{proxy}")),
+            ("all_proxy", format!("http://{proxy}")),
+        ] {
+            std::env::set_var(key, value);
+        }
+        let config = ClientConfig::new(format!("http://{api}"), "test-token")
+            .unwrap_or_else(|_| unreachable!());
+        let client = BusinessApiClient::new(config).unwrap_or_else(|_| unreachable!());
+        let ready = client.status().await;
+        assert!(ready.is_ok(), "expected direct API response, got {ready:?}");
+    }
 }

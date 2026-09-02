@@ -14,7 +14,12 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
 bytes = "1"
-aws-sdk-s3 = "1"
+# Drop the SDK's default "rustls" feature: it selects aws-smithy-runtime's
+# legacy hyper-0.14 TLS connector (hyper 0.14 / hyper-rustls 0.24 / rustls
+# 0.21 / rustls-webpki 0.101 / h2 0.3, several with open advisories).
+# "default-https-client" alone provides the modern hyper-1.x rustls client;
+# everything else matches the SDK defaults exactly.
+aws-sdk-s3 = { version = "1", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
 aws-smithy-types = "1"
 shared-kernel = { workspace = true }
 futures-util = { workspace = true }

@@ -55,7 +55,12 @@
   rev `0485827bd3cf735527de330c42aa6c4d85552b92`；Main CI 实测无法拉取
   `jesenzhang/jarvis-rs`（私有/受限，匿名 404），全部 cargo 任务在 dependency 解析失败。
   按本计划回退策略切换为 vendor：源快照置于 `vendor/jarvis/model-provider/`，ai-worker 以
-  path 依赖引用；不再保留 `.cargo/config.toml` 的 git-fetch 变通；
+  path 依赖引用；不再保留 `.cargo/config.toml` 的 git-fetch 变通。2026-08-30 快照升级至
+  上游本地提交 `af9fbe7`（crate 0.3.0-dev.1），无本地魔改（ADR-0023 第 7 节 T2.5 补充）。
+- **内网 HTTP endpoint（2026-08-30 定稿）**：真实 smoke 使用内网 OpenAI-compatible 部署。
+  为此引入 fail-closed 的 `AiProviderConfig.allow_private_http`（默认 false）：显式 opt-in 后
+  映射上游 `EndpointPolicy::TrustedPrivateHttp`（RFC1918 明文 HTTP），否则维持
+  HTTPS-or-loopback 拒绝语义；端点地址不入库，仅经 `AI_SMOKE_BASE_URL` 环境变量传入。
 - **CI 可访问性（定稿）**：GitHub Actions 无法拉取私有 `jesenzhang/jarvis-rs` → 采用
   vendored 源码，从而 CI 自包含。若未来仓库公开或为 CI 配置私有仓库读取凭据，再于
   ADR-0023 评估是否切回 git/registry。
@@ -90,7 +95,7 @@
 | T2.2 | 适配器实现：prompt 构造、响应解析为 Candidate 字段、超时/重试语义（复用既有 AI Task retry 分类） | 4h | ✅ |
 | T2.3 | 密钥接入：`runtime-config` secret_url 承载 provider API key；fail-closed 校验；日志脱敏验证 | 2h | ✅ |
 | T2.4 | 契约测试：`MockProvider`/`ScriptedProvider` 注入测试（正常、协议错误、超时、429 retry-after、abort）；确定性提取器回归 | 3h | ✅ |
-| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h | ⬜（所需核心完成；真实 provider smoke 依赖密钥，按可选路径，未执行 NOT RUN） |
+| T2.5 | ai-worker 组合注入 + 配置开关（deterministic/real）；lease/fence 语义回归；真实 provider 手工 smoke（可选，密钥可用时） | 3h | ✅（2026-08-30 真实 smoke 通过：内网 vLLM qwen3_vl，见 ADR-0023 第 7/8 节 T2.5 补充） |
 
 **M2 落地要点**（记录于 ADR-0023 第 7/8 节的实现补充）：
 - `ModelBackedExtractor` 位于 `apps/ai-worker/src/extractor.rs`（新增），实现 `DocumentFieldExtractor`；
@@ -106,22 +111,22 @@
 
 ### M3 — 真实认证（~12h）
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
-| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h |
-| T3.2 | 租户/权限映射：JWT 声明→TenantContext/ManagementPermission；401/403/跨租户 not-found 契约测试 | 3h |
-| T3.3 | demo compose 增加 IdP（Keycloak 或等价轻量方案）+ console 登录流程 + token 刷新 | 3h |
-| T3.4 | CLI/MCP token 传递适配与测试 | 2h |
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
+| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h | ✅（2026-08-30，`apps/business-api/src/oidc.rs`；ES256/RS256 allow-list、JWKS TTL 缓存 + 未知 kid 即时刷新、discovery 默认 + `auth.jwks_url` 覆盖、dev auth 关闭时 issuer_url 强制；2026-09-02 生产加固：audience 必填、issuer/jwks HTTPS-only、JWKS/discovery 不跟随重定向、生产 transport fail-closed，配置回归 + 契约测试覆盖） |
+| T3.2 | 租户/权限映射：JWT 声明→TenantContext/ManagementPermission；401/403/跨租户 not-found 契约测试 | 3h | ✅（13 例契约测试 `tests/oidc_auth.rs`：有效/过期/错 audience/错 issuer/篡改签名/未知 kid/缺失或 nil tenant/JWKS 故障/alg=none 全 401，声明映射断言） |
+| T3.3 | demo compose 增加 IdP（Keycloak 或等价轻量方案）+ console 登录流程 + token 刷新 | 3h | ⬜ 后置（按本计划风险缓解：JWKS 静态验证最小闭环已落地，IdP 完整接入后置） |
+| T3.4 | CLI/MCP token 传递适配与测试 | 2h | ✅（CLI `--token` 与 agent-adapter bearer 配置均已参数化，真实 JWT 直接可用，无代码改动） |
 
 ### M4 — 预生产环境与可观测性（~14h）
 
-| 任务 | 内容 | 预估 |
-|---|---|---|
-| T4.1 | observability crate 落地：结构化 JSON 日志 + 请求 ID 贯穿 API/Worker | 4h |
-| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h |
-| T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h |
-| T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h |
-| T4.5 | Runbook 初版：部署、升级、回滚、故障处置 | 2h |
+| 任务 | 内容 | 预估 | 状态 |
+|---|---|---|---|
+| T4.1 | observability crate 落地：结构化 JSON 日志 + 请求 ID 贯穿 API/Worker | 4h | ✅（2026-08-30：`observability::LogFormat`（text/json，启动 fail-fast 解析），四个进程 config 增 `log_format`；请求 ID 已由 tower-http request-id 贯穿 API） |
+| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h | ✅（2026-08-30：`business-api` 公共 `/metrics` Prometheus 文本端点 + `http_requests_total`/`http_request_duration_seconds`/`auth_failures_total` 有界标签指标，14 例契约测试含指标断言；2026-09-02 发布加固补齐：worker `/metrics`（`observability.metrics_addr` 生产必填 fail-closed）新增排队等待、吞吐（bounded outcome）、lease 丢失/回收、重试 disposition、AI 任务/Provider 时延、429/5xx 指标；HTTP method 归一固定集合；`x-request-id`→correlation_id 贯穿 Job/AI Task/审计/worker 日志（migration 018/SQLite 008）；生产强制 JSON 日志回归测试；`deploy/observability/` Prometheus 抓取配置 + 最小 Grafana dashboard。标签全部代码枚举，无 tenant/文档/路径/模型输出。真实 Prometheus/Grafana 栈抓取为预生产项，本地 NOT RUN） |
+| T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h | ◐ 脚本落地（2026-09-02 加固重写：seed 标记先于备份并校验 checksum/size、唯一安全 drill 子目录、恢复到唯一 `*_restore` bucket、从恢复目标验证、trap 清理、禁止对未验证 `BACKUP_DIR` 执行删除；CI 可运行）；本机演练执行 NOT RUN（无本地 PostgreSQL/MinIO/docker），预生产首跑待 M5 |
+| T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h | ✅（2026-08-30 新增 `security` CI job：cargo-audit --deny warnings、gitleaks-action、trivy fs CRITICAL/HIGH；本地执行 NOT RUN，由 GitHub CI 首跑验证） |
+| T4.5 | Runbook 初版：部署、升级、回滚、故障处置 | 2h | ✅（2026-08-30：`docs/operations/RUNBOOK.md` v0.1，含已知缺口清单） |
 
 ### M5 — v0.1 发布审计（~7h）
 
@@ -182,6 +187,28 @@ M0 ──→ M1 ──→ M2 ──┬──→ M5 (v0.1)
 - 回滚：认证回退 dev token（配置开关）；AI 提取回退 deterministic（配置
   开关）；移除 model-provider 依赖只需还原 ai-worker 组合根与 Cargo.toml。
   不回滚既有迁移，不删除业务事实。
+
+## 发布加固（2026-09-02，v0.1 候选收口批次）
+
+在 M2–M4 基础上，为消除 v0.1 发布阻断项执行以下加固（均有回归测试）：
+
+1. **备份演练脚本重写**：`BACKUP_DIR` 未验证禁止删除；唯一安全 drill 子目录；
+   seed 标记先于备份写入并校验 checksum/size；恢复到唯一 restore bucket 并
+   从恢复目标验证；trap 清理；CI 可运行。
+2. **OIDC 信任边界**：生产 audience 必填；issuer/jwks HTTPS-only；
+   JWKS/discovery 禁止重定向；真实 OIDC principal 跨租户拒绝契约测试；
+   JWKS 不可达 fail-closed。
+3. **AI Provider 重试语义**：`ProviderError.retry_after` 不丢失（429 钳制后
+   采用）；Timeout/5xx 平台 backoff；Authentication/InvalidRequest 永久化；
+   ProviderError→disposition 端到端测试；核心层零 provider 类型。
+4. **可观测性**：三进程生产 JSON 日志 fail-closed + 回归测试；request/correlation
+   ID 贯穿 ProcessingJob/AI Task/Audit/Worker 日志（migration 018/008）；
+   HTTP method 固定集合归一；worker 指标（吞吐/排队/lease/重试/AI 时延/429/5xx）
+   + `deploy/observability/` Prometheus + 最小 dashboard；不使用 tenant_id、
+   文档正文、路径、模型响应或其他高基数/敏感标签。
+5. **测试稳定性**：agent-adapter 固定端口（127.0.0.1:9）flake 替换为进程内
+   确定性 stub server（连接拒绝/上游 5xx/协议错误/正常返回）；全仓
+   `cargo test --workspace --all-features` 连续两次通过。
 
 ## 完成定义
 

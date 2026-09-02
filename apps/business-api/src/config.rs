@@ -96,10 +96,17 @@ impl Default for StorageConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthConfig {
+    /// OIDC issuer URL. Required when dev auth is disabled (validated).
     #[serde(default)]
     pub issuer_url: String,
+    /// Expected `aud` claim. Required (non-empty) in production, where the
+    /// validator enforces it; optional only for development use.
     #[serde(default)]
     pub audience: Option<String>,
+    /// Explicit JWKS URL override. When unset, the JWKS location is resolved
+    /// through OIDC discovery (`{issuer_url}/.well-known/openid-configuration`).
+    #[serde(default)]
+    pub jwks_url: Option<String>,
     #[serde(default)]
     pub dev_secret: Option<Secret<String>>,
     #[serde(default)]
@@ -125,6 +132,9 @@ pub struct ObservabilityConfig {
     pub otlp_endpoint: Option<String>,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// `text` (development default) or `json` (preproduction/production).
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
 }
 
 impl Default for ObservabilityConfig {
@@ -133,6 +143,7 @@ impl Default for ObservabilityConfig {
             service_name: default_service_name(),
             otlp_endpoint: None,
             log_level: default_log_level(),
+            log_format: default_log_format(),
         }
     }
 }
@@ -255,10 +266,49 @@ impl BusinessApiConfig {
             }
             if self.auth.issuer_url.trim().is_empty() {
                 messages.push("auth.issuer_url must not be empty in production".to_string());
+            } else if !is_https_url(&self.auth.issuer_url) {
+                messages.push("auth.issuer_url must use https in production".to_string());
             }
+            // PLAN-0012 release hardening: production tokens must be bound to
+            // this audience, otherwise any client token from the same issuer
+            // (same realm, other applications) would be accepted here.
+            if self
+                .auth
+                .audience
+                .as_deref()
+                .is_none_or(|audience| audience.trim().is_empty())
+            {
+                messages.push("auth.audience must be configured in production".to_string());
+            }
+            if self
+                .auth
+                .jwks_url
+                .as_deref()
+                .is_some_and(|jwks_url| !jwks_url.trim().is_empty() && !is_https_url(jwks_url))
+            {
+                messages.push("auth.jwks_url must use https in production".to_string());
+            }
+            // PLAN-0012 release hardening: production log streams are machine
+            // parsed; the human-readable text default would break ingestion.
+            if !self
+                .observability
+                .log_format
+                .trim()
+                .eq_ignore_ascii_case("json")
+            {
+                messages.push("observability.log_format must be json in production".to_string());
+            }
+            // Wildcard CORS is a development convenience only (see the
+            // wildcard default in `config/default.toml`); production
+            // origins must be enumerated explicitly.
             if self.server.cors_origins.iter().any(|origin| origin == "*") {
                 messages.push("server.cors_origins must not contain * in production".to_string());
             }
+        } else if self.auth.issuer_url.trim().is_empty() {
+            // Without dev auth the only authentication path is OIDC; a missing
+            // issuer would leave the API unreachable-by-design (fail closed).
+            messages
+                .push("auth.issuer_url must be configured when dev auth is disabled".to_string());
         }
         if messages.is_empty() {
             Ok(())
@@ -314,6 +364,14 @@ const fn default_acquire_timeout_secs() -> u64 {
     10
 }
 
+fn default_log_format() -> String {
+    "text".to_string()
+}
+
+/// True when the URL carries an explicit `https://` scheme (case-insensitive).
+fn is_https_url(value: &str) -> bool {
+    value.trim().to_ascii_lowercase().starts_with("https://")
+}
 fn default_service_name() -> String {
     "business-api".to_string()
 }
@@ -350,8 +408,11 @@ mod tests {
             },
             storage: StorageConfig::default(),
             auth: AuthConfig {
-                issuer_url: String::new(),
+                // Dev auth is disabled in this fixture, so OIDC must be
+                // configured for validation to pass (fail-closed rule).
+                issuer_url: "https://identity.example.test/realms/test".to_string(),
                 audience: None,
+                jwks_url: None,
                 dev_secret: None,
                 dev_auth_enabled: false,
                 dev_permissions: BTreeSet::new(),
@@ -367,6 +428,16 @@ mod tests {
     #[test]
     fn api_configuration_does_not_require_storage_or_messaging() {
         assert!(valid_config().validate().is_ok());
+    }
+
+    #[test]
+    fn development_allows_wildcard_cors_default() {
+        // `config/default.toml` ships the wildcard CORS default and the
+        // multi-process E2E harness boots with `ENV=development`; only
+        // production enumerates origins, so this must keep validating.
+        let mut config = valid_config();
+        config.server.cors_origins = vec!["*".to_string()];
+        assert!(config.validate().is_ok());
     }
 
     #[test]
@@ -413,5 +484,90 @@ mod tests {
             unreachable!();
         };
         assert!(error.to_string().contains("max_connections"));
+    }
+
+    /// A production config that satisfies every production auth rule
+    /// (PLAN-0012 release hardening): https issuer, non-empty audience,
+    /// https jwks override.
+    fn production_config() -> BusinessApiConfig {
+        let mut config = valid_config();
+        config.env = RuntimeEnvironment::Production;
+        config.auth.issuer_url = "https://identity.example.test/realms/prod".to_string();
+        config.auth.audience = Some("business-api".to_string());
+        config.auth.jwks_url = Some("https://identity.example.test/realms/prod/certs".to_string());
+        config.observability.log_format = "json".to_string();
+        config
+    }
+
+    #[test]
+    fn production_auth_passes_with_https_and_audience() {
+        assert!(production_config().validate().is_ok());
+    }
+
+    #[test]
+    fn production_rejects_missing_or_blank_audience() {
+        for audience in [None, Some("   ".to_string())] {
+            let mut config = production_config();
+            config.auth.audience = audience;
+            let Err(error) = config.validate() else {
+                unreachable!();
+            };
+            assert!(error
+                .to_string()
+                .contains("auth.audience must be configured in production"));
+        }
+    }
+
+    #[test]
+    fn production_rejects_plaintext_issuer_url() {
+        let mut config = production_config();
+        config.auth.issuer_url = "http://identity.example.test/realms/prod".to_string();
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error
+            .to_string()
+            .contains("auth.issuer_url must use https in production"));
+    }
+
+    #[test]
+    fn production_rejects_plaintext_jwks_url() {
+        let mut config = production_config();
+        config.auth.jwks_url = Some("http://identity.example.test/realms/prod/certs".to_string());
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error
+            .to_string()
+            .contains("auth.jwks_url must use https in production"));
+    }
+
+    #[test]
+    fn production_requires_json_log_format() {
+        for log_format in ["", "  ", "text", "syslog"] {
+            let mut config = production_config();
+            config.observability.log_format = log_format.to_string();
+            let Err(error) = config.validate() else {
+                unreachable!();
+            };
+            assert!(
+                error
+                    .to_string()
+                    .contains("observability.log_format must be json in production"),
+                "log_format {log_format:?} must be rejected in production"
+            );
+        }
+        let mut config = production_config();
+        config.observability.log_format = " JSON ".to_string();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn production_rejects_wildcard_scheme_audience_only_issuer_with_https() {
+        // Discovery-based setups (no jwks_url override) remain valid; only an
+        // explicitly configured plaintext jwks_url fails the transport rule.
+        let mut config = production_config();
+        config.auth.jwks_url = None;
+        assert!(config.validate().is_ok());
     }
 }

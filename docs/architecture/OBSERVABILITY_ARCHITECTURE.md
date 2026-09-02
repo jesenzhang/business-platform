@@ -382,3 +382,46 @@ tenant-scoped processing audit table. Metrics distinguish retry/backoff,
 reclaim, heartbeat loss, stale-fence rejection, and graceful-drain duration;
 audit details remain structured and never contain object keys, raw text, lease
 tokens, prompts, credentials, or database URLs.
+
+## 21. 实现状态（v0.1 候选，PLAN-0012）
+
+日志：
+
+- `observability::LogFormat`（text/json）在四个进程启动时 fail-fast 解析；
+  生产环境配置校验强制 `log_format = "json"`（回归测试覆盖拒绝
+  `text`/空值/未知值）。开发默认 text。
+- HTTP 请求 ID 由 tower-http request-id 贯穿 API；`x-request-id` 复用为
+  ProcessingJob 的 `correlation_id`（无 header 时生成 UUIDv7）。
+
+关联传播（migration 018/008）：
+
+- `correlation_id`（≤64 字符）持久化在 `document_processing_jobs` 与
+  `document_ai_tasks`，AI Task 在 enqueue 时继承；worker claim/失败日志携带
+  `correlation_id`；统一审计把可解析为 UUID 的值写入 `correlation_id` 列，
+  原始字符串始终写入 `trace_id` 列。原始文本、storage key、签名 URL、prompt、
+  lease token、数据库 URL 不进入公共 DTO 或日志。
+
+指标端点：
+
+- `business-api`：公共端口 `GET /metrics`（Prometheus 文本），
+  `http_requests_total{method,status}`、`http_request_duration_seconds{method}`
+  （method 归一到固定集合 GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD/OTHER）、
+  `auth_failures_total{reason}`。
+- `business-worker` / `ai-worker`：无 HTTP 业务面，按
+  `observability.metrics_addr`（生产必填、fail-closed）在内部地址暴露
+  `GET /metrics`，共享 `observability::metrics` 安装实现。指标：
+  `processing_job_queue_wait_seconds`、`processing_job_attempts_total{outcome}`、
+  `processing_step_dispositions_total{disposition}`、
+  `processing_leases_reclaimed_total`、`processing_lease_lost_total`、
+  `ai_task_queue_wait_seconds`、`ai_task_duration_seconds`、
+  `ai_tasks_total{outcome}`、`ai_task_dispositions_total{disposition}`、
+  `ai_provider_request_seconds{outcome}`、`ai_provider_rate_limited_total`、
+  `ai_provider_server_error_total`、`ai_leases_reclaimed_total`、
+  `ai_lease_lost_total`。
+- 标签值全部为代码内枚举的 `&'static str`；tenant id、document/job/task id、
+  correlation id、路径、provider 正文/模型输出一律禁止作为标签。
+- 最小抓取配置与 Dashboard：`deploy/observability/prometheus.yml`、
+  `deploy/observability/grafana-dashboard.json`。
+
+NOT RUN（v0.1 本地）：真实 Prometheus/Grafana 栈抓取与告警演练属预生产
+（M5 预生产演练）范围；本地无对应基础设施，未执行。

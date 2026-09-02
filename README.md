@@ -4,60 +4,67 @@
 
 ## 当前状态
 
-仓库处于初始骨架阶段：
+处于 PLAN-0012 预生产候选（v0.1 candidate）阶段，首个垂直切片为 Document Intelligence：
 
-- 已建立 Rust Workspace、应用进程和领域 crate 边界；
-- `business-api` 已具备基础配置加载、PostgreSQL 连接和健康检查；
-- 对象存储、消息、可观测性和共享类型已有初始接口；
-- 业务领域、Worker、Migration、Agent Adapter 仍以占位实现为主；
-- 当前实现不能视为可生产运行版本。
+- `business-api`：真实 OIDC/JWT 认证（JWKS/issuer/audience 校验，生产 fail-closed）、文档上传/列表/处理链路、审计与 Outbox；`/metrics` Prometheus 端点。
+- `business-worker` / `ai-worker`：固定管道 `ValidateSource → DetectType → ExtractText → ExtractFields → ValidateCandidate → AwaitReview` 的持久化执行（lease/fence/重试/恢复）、审计哈希链；生产 JSON 日志与 worker `/metrics` 端点（`observability.metrics_addr`）。
+- AI 提取：`ai-worker` 通过 vendored `jarvis-model-provider`（ADR-0023）接真实 LLM，429/5xx/超时具有界重试与 `Retry-After` 钳制；`deterministic` 模式保留为离线降级与测试路径。
+- `agent-adapter`：只读 MCP 工具白名单，经 typed client 调用 Business API，不直连数据库。
+- `migration`：PostgreSQL 迁移工具（manifest 校验）；SQLite 仅本地单进程。
+- 尚未交付：Document Search（Deferred）、PLAN-0006 Workspace、通用 Workflow/Analytics Runtime；这些不在 v0.1 范围。
 
-实现评审见 [`docs/reviews/2026-07-30-initial-implementation-review.md`](docs/reviews/2026-07-30-initial-implementation-review.md)。
+v0.1 完成审计与逐项 PASS/NOT RUN 记录见 `docs/plans/current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md` 与 `docs/reports/`。
 
 ## 权威文档
 
 文档入口为 [`docs/README.md`](docs/README.md)。核心文档包括：
 
-- 总体架构：[`企业AI业务平台与智能助手总体架构方案_v2.md`](企业AI业务平台与智能助手总体架构方案_v2.md)
-- 基础设施开发验证：[`企业AI业务平台基础设施开发验证与预生产方案_v1.md`](企业AI业务平台基础设施开发验证与预生产方案_v1.md)
+- 架构状态：[`docs/architecture/ARCHITECTURE_STATUS.md`](docs/architecture/ARCHITECTURE_STATUS.md)
 - 代码架构规范：[`docs/architecture/CODE_ARCHITECTURE.md`](docs/architecture/CODE_ARCHITECTURE.md)
+- 持久化处理架构：[`docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md`](docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md)
+- 部署架构：[`docs/architecture/DEPLOYMENT_ARCHITECTURE.md`](docs/architecture/DEPLOYMENT_ARCHITECTURE.md)
+- 可观测性：[`docs/architecture/OBSERVABILITY_ARCHITECTURE.md`](docs/architecture/OBSERVABILITY_ARCHITECTURE.md)
+- 安全架构：[`docs/architecture/SECURITY_ARCHITECTURE.md`](docs/architecture/SECURITY_ARCHITECTURE.md)
+- 运维 Runbook：[`docs/operations/RUNBOOK.md`](docs/operations/RUNBOOK.md)
 - Rust 编码规范：[`docs/standards/RUST_CODING_STANDARD.md`](docs/standards/RUST_CODING_STANDARD.md)
-- 文档管理规范：[`docs/governance/DOCUMENT_MANAGEMENT.md`](docs/governance/DOCUMENT_MANAGEMENT.md)
 
 ## Workspace
 
 ```text
 apps/
-  business-api       对外业务 API
-  business-worker    业务工作流与领域事件 Worker
-  ai-worker          AI 异步任务 Worker
-  agent-adapter      可选 Agent/MCP 接入
+  business-api       对外业务 API（OIDC 认证、/metrics）
+  business-worker    文档处理管道 Worker（lease/fence、/metrics）
+  ai-worker          AI 提取任务 Worker（model-provider、/metrics）
+  agent-adapter      可选 Agent/MCP 只读接入
+  governance-worker  完整性/治理发现 Worker
   migration          数据库迁移工具
 
 crates/
-  shared-kernel      最小化、稳定的跨领域基础类型
-  identity/...       领域模块
-  workflow           工作流抽象
-  ai-application     AI 应用能力
-  agent-integration  Agent 集成模型
-  object-storage     对象存储适配
+  document*          文档管理与持久化处理（含 postgres/sqlite 适配器）
+  identity/...       身份与租户
+  object-storage     对象存储适配（local/S3）
   messaging          事件与 Outbox
-  observability      可观测性
+  observability      日志格式、tracing 与共享 Prometheus /metrics 端点
+  business-api-client / public-api-contracts / agent-integration  契约与 typed client
 ```
 
 ## 本地开发
 
-当前代码需要 PostgreSQL 配置才能启动 `business-api`。本地 PostgreSQL、MinIO 和 NATS 的目标环境与验证策略见基础设施方案。
+必需依赖：Rust 1.94+；本地开发可用 SQLite + local storage，无需外部服务。
+契约测试依赖 PostgreSQL/MinIO 的测试标记为 `#[ignore]`，CI 以 `--include-ignored` 运行。
 
 常用质量门禁：
 
 ```bash
 cargo fmt --all -- --check
+cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace
+cargo test --workspace --all-features
+powershell -File scripts/check-architecture.ps1
+powershell -File scripts/check-openapi.ps1
 ```
 
-在数据库迁移、对象存储和集成测试基座完成前，上述命令不足以证明基础设施行为正确。
+可观测性：三个服务进程暴露 Prometheus 文本端点——`business-api` 在自身公共端口 `/metrics`；两个 worker 在 `observability.metrics_addr`（生产必填，开发默认关闭）。抓取配置与最小 Dashboard 见 `deploy/observability/`。备份/恢复演练：`deploy/operations/drill-backup-restore.sh`。
 
 ## 开发约束
 
@@ -67,5 +74,6 @@ cargo test --workspace
 4. AI 输出是候选结果，写入业务数据前必须经过确定性校验。
 5. PostgreSQL 是权威业务状态；对象存储保存文件本体。
 6. 初期采用模块化单体，只有出现明确运行边界时才拆微服务。
+7. 指标标签只允许代码内枚举的有界值；tenant/document/correlation/路径/模型输出不得进入标签。
 
 面向编码 Agent 的执行要求见 [`AGENTS.md`](AGENTS.md)。

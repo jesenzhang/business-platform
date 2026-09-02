@@ -252,11 +252,13 @@ fn test_router_with_storage(
             service_name: "test".to_string(),
             otlp_endpoint: None,
             log_level: "info".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
+            jwks_url: None,
             dev_secret: Some(Secret::new(SECRET.to_string())),
             dev_auth_enabled: true,
             dev_permissions: BTreeSet::new(),
@@ -287,6 +289,7 @@ fn test_router_with_storage(
             dev_user_id: Some(Uuid::parse_str(USER_A).expect("user fixture")),
             dev_subject: Some("document-test-user".to_string()),
             dev_roles: BTreeSet::new(),
+            oidc: None,
         },
         &config.server,
     )

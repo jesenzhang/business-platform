@@ -73,6 +73,9 @@ pub struct AiWorkerConfig {
 /// The API key and base URL are never logged or exposed through DTOs
 /// (ADR-0023). The base URL must resolve to HTTPS or loopback HTTP, which is
 /// validated at provider build time by `check-architecture`/`ProviderFactory`.
+/// Plaintext HTTP to RFC1918 addresses additionally requires the explicit
+/// `allow_private_http` opt-in, which stays fail-closed (default off) in every
+/// environment.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiProviderConfig {
     #[serde(default)]
@@ -91,6 +94,12 @@ pub struct AiProviderConfig {
     pub request_timeout_secs: u64,
     #[serde(default)]
     pub max_output_tokens: Option<u32>,
+    /// Explicit opt-in to plaintext HTTP against RFC1918 intranet endpoints
+    /// (`EndpointPolicy::TrustedPrivateHttp`). Loopback HTTP and HTTPS remain
+    /// allowed without this flag. Default false so a non-TLS base URL fails
+    /// closed at provider build time.
+    #[serde(default)]
+    pub allow_private_http: bool,
 }
 
 impl Default for AiProviderConfig {
@@ -104,6 +113,7 @@ impl Default for AiProviderConfig {
             api_key: None,
             request_timeout_secs: default_request_timeout_secs(),
             max_output_tokens: None,
+            allow_private_http: false,
         }
     }
 }
@@ -146,6 +156,13 @@ pub struct ObservabilityConfig {
     pub log_level: String,
     #[serde(default)]
     pub otlp_endpoint: Option<String>,
+    /// `text` (development default) or `json` (preproduction/production).
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
+    /// Prometheus scrape listen address serving `GET /metrics`
+    /// (PLAN-0012 T4.2). Required in production.
+    #[serde(default)]
+    pub metrics_addr: Option<String>,
 }
 
 impl Default for ObservabilityConfig {
@@ -153,6 +170,8 @@ impl Default for ObservabilityConfig {
         Self {
             log_level: default_log_level(),
             otlp_endpoint: None,
+            log_format: default_log_format(),
+            metrics_addr: None,
         }
     }
 }
@@ -206,6 +225,28 @@ impl AiWorkerConfig {
         if self.env == RuntimeEnvironment::Production && self.database.url.is_none() {
             return Err("production AI Worker requires a database URL".to_string());
         }
+        // PLAN-0012 release hardening: production log streams are machine
+        // parsed; the human-readable text default would break ingestion.
+        if self.env == RuntimeEnvironment::Production
+            && !self
+                .observability
+                .log_format
+                .trim()
+                .eq_ignore_ascii_case("json")
+        {
+            return Err("observability.log_format must be json in production".to_string());
+        }
+        // PLAN-0012 T4.2: production workers must expose a scrape endpoint,
+        // otherwise the AI latency/queue/429 signals are operationally dark.
+        if self.env == RuntimeEnvironment::Production
+            && self
+                .observability
+                .metrics_addr
+                .as_deref()
+                .is_none_or(|addr| addr.trim().is_empty())
+        {
+            return Err("observability.metrics_addr must be configured in production".to_string());
+        }
         if self.ai_provider.mode == AiProviderMode::Real {
             if self.ai_provider.model.trim().is_empty() {
                 return Err("real AI provider requires a non-empty model".to_string());
@@ -250,6 +291,9 @@ const fn default_heartbeat_interval() -> i64 {
 const fn default_poll_interval() -> u64 {
     500
 }
+fn default_log_format() -> String {
+    "text".to_string()
+}
 fn default_log_level() -> String {
     "info".to_string()
 }
@@ -261,4 +305,71 @@ fn default_region() -> String {
 }
 const fn default_max_content_bytes() -> usize {
     16 * 1024 * 1024
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A production config that satisfies every other production rule, so a
+    /// failure isolates the log-format check (PLAN-0012 release hardening).
+    fn production_config() -> AiWorkerConfig {
+        AiWorkerConfig {
+            env: RuntimeEnvironment::Production,
+            database: DatabaseConfig {
+                backend: WorkerDatabaseBackend::Postgres,
+                url: Some(
+                    SecretUrl::parse("postgres://db.example.test/business")
+                        .unwrap_or_else(|_| unreachable!()),
+                ),
+            },
+            storage: WorkerStorageConfig {
+                base_dir: Some("data/objects".to_string()),
+                ..WorkerStorageConfig::default()
+            },
+            worker_id: "ai-worker-test".to_string(),
+            concurrency: 1,
+            lease_duration_secs: 30,
+            heartbeat_interval_secs: 10,
+            poll_interval_millis: 500,
+            max_content_bytes: 1024,
+            test_task_delay_millis: 0,
+            observability: ObservabilityConfig {
+                log_format: "json".to_string(),
+                metrics_addr: Some("127.0.0.1:9465".to_string()),
+                ..ObservabilityConfig::default()
+            },
+            ai_provider: AiProviderConfig::default(),
+        }
+    }
+
+    #[test]
+    fn production_requires_metrics_addr() {
+        let mut config = production_config();
+        config.observability.metrics_addr = None;
+        assert_eq!(
+            config.validate().err().as_deref(),
+            Some("observability.metrics_addr must be configured in production")
+        );
+        config.observability.metrics_addr = Some("   ".to_string());
+        assert!(config.validate().is_err());
+        config.observability.metrics_addr = Some("127.0.0.1:9465".to_string());
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn production_requires_json_log_format() {
+        let mut config = production_config();
+        assert!(config.validate().is_ok());
+        for log_format in ["", "  ", "text", "syslog"] {
+            config.observability.log_format = log_format.to_string();
+            assert_eq!(
+                config.validate().err().as_deref(),
+                Some("observability.log_format must be json in production"),
+                "log_format {log_format:?} must be rejected in production"
+            );
+        }
+        config.observability.log_format = " JSON ".to_string();
+        assert!(config.validate().is_ok());
+    }
 }

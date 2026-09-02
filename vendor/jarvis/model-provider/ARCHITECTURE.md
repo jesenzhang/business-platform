@@ -45,7 +45,7 @@ The dependency direction is one-way:
 jarvis-model-provider
   └─ standalone Rust types, codecs, HTTP/SSE transport, and provider facts
 
-jarvis-plugins / Jarvis Runtime
+jarvis-adapters / Jarvis Runtime
   └─ depends on the provider crate and owns application/runtime policy
 ```
 
@@ -147,27 +147,132 @@ Completion-generated continuation state does not enter normalized `Message`
 content. In particular, `response_id`, `previous_response_id`, output-item
 identity, Responses encrypted reasoning blobs, Anthropic signatures, and
 Anthropic redacted payloads are never emitted as normalized response message
-fields. `ReasoningContent` contains only normalized text, a redacted marker,
-and the provider-neutral `ReasoningPortability` classification. A
+fields. `ReasoningContent` contains normalized text, a redacted marker, the
+provider-neutral `ReasoningPortability` classification, and — only for
+provider-bound blocks — a non-secret `ContinuationRef`. It never contains
+signatures, encrypted payloads, or raw redacted-thinking bodies. A
 `ProviderBound` marker requires a matching typed sidecar; losing that sidecar
 cannot turn the block back into ordinary replayable history.
 
 `Completion.continuation` and `StreamEvent::Continuation` carry typed
 `ProviderContinuation` sidecars. The current implementation admits Anthropic
 Messages and OpenAI Responses continuations, each with provider, API, and
-model identity:
+model identity.
 
-- Anthropic reasoning signatures and redacted payloads are held in an
-  `AnthropicMessagesContinuation` and consumed only when the normalized
-  history contains matching `ProviderBound` blocks;
+Conversation Truth is not Provider Native Continuation State: the normalized
+history is the portable record of what was said, while the sidecar holds the
+provider-native facts needed to keep talking to one specific provider. The two
+are deliberately kept apart, and server coverage is deliberately not the same
+thing as stateless manual replay:
 
-- provider-retained/stateful responses use `response_id` as the next request's
-  `previous_response_id`;
-- ephemeral/stateless responses replay the required encrypted reasoning items
-  as Responses input objects;
-- stateful state is classified `ProviderBound`;
-- encrypted stateless state is classified `SensitiveNonDurable` and is not
-  converted into ordinary history text.
+```text
+                        ProviderContinuation
+
+                 ┌─────────────┴─────────────┐
+                 │                           │
+             Stateful                    Stateless
+                 │                           │
+        ServerStoredPrefix             ManualReplay
+                 │                           │
+        ContinuationScope        anchored replay segments
+                 │                           │
+         trim covered prefix       walk full history
+                 │                  substitute exact assistant
+                 │                  output projections
+                 ▼                           ▼
+              suffix                  complete wire history
+```
+
+- **Stateful** (`ProviderBound` durability): the provider retains a verified
+  conversation prefix identified by `previous_response_id`.
+  `AnthropicMessagesContinuation` and stateful
+  `OpenAiResponsesContinuation` keep that coverage in a `ContinuationScope`
+  (covered count + prefix digest + boundary identity). Request encoding
+  validates the covered prefix and transmits only the uncovered suffix;
+  edited, forked, or shortened covered history fails before dispatch.
+
+- **Stateless** (`SensitiveNonDurable` durability): store=false / ephemeral
+  Responses retain nothing. The provider retains no conversation prefix, so
+  complete required historical user/tool input always remains in the wire
+  input; there is no blanket prefix trimming. Provider-native assistant
+  outputs are substituted through anchored `OpenAiResponsesReplaySegment`s:
+  each segment binds an ordered list of typed `OpenAiResponsesReplayItem`s
+  (reasoning items — encrypted or portable —, function calls, and assistant
+  messages) to the exact sequence-sensitive `HistoryMessageId` of the
+  normalized assistant message it reproduces.
+
+### Sequence-sensitive history identity
+
+`HistoryMessageId` is a domain-separated chain digest over normalized
+content, not a content-only digest:
+
+```text
+id(n) = SHA256("jarvis-model-provider/history-message/v1",
+               id(n-1), canonical(message(n)))
+```
+
+The chain runs over non-System conversation messages in order (System
+messages are request-level instructions and stay outside the conversation
+coverage boundary). Consequences:
+
+1. **Identity is derived from the exact normalized history prefix, not from
+   message content alone.** Identical messages at different history points
+   receive different identities.
+2. **Any earlier edit, insert, delete, or reorder invalidates every
+   downstream identity** — including anchors bound to untouched messages,
+   because their prefix changed.
+3. The identity is deterministic, non-secret, safe to log and persist,
+   independent of provider-native encrypted payloads, and stable across
+   serialization/recovery.
+
+`history_message_ids(messages)` is the single authoritative source of
+history identity. Replay validation, wire encoding, and completion decoding
+all derive anchors through it; new assistant outputs anchor through their
+chain position in `history + [assistant]`, computed from the exact prepared
+request history on both streaming and non-streaming paths. Duplicate
+anchors are impossible for distinct occurrences: two identical normalized
+assistants bind two different segments, each resolving by identity rather
+than collection position.
+
+### Complete output projection
+
+`ReplaySegment.items` is the complete ordered projection of one provider
+output: if the model emitted reasoning, then a function call, then more
+reasoning, then a message, the segment holds exactly those four items in
+that order. Portable reasoning summaries produce replay items just like
+encrypted ones; only the payload differs (`encrypted_content` present with
+a continuation reference versus absent without one). Stateless manual replay
+therefore never silently drops a portable summary that the anchored
+assistant still carries.
+
+Validation enforces projection consistency: a deterministic provider-neutral
+projection of each segment's items is compared against its anchored
+normalized assistant message — text, reasoning summary text with redaction
+state, tool-call id/name/canonical arguments, part count, and order.
+Provider-native-only fields (`item_id`, `encrypted_content`) are excluded
+from projection equality but remain validated separately. A segment that
+does not reproduce its anchored assistant fails closed before dispatch.
+
+### Fail-closed protocol encoding
+
+Protocol encoding fails closed: malformed continuation state — missing
+segments for provider-bound reasoning, stale anchors after edit/insert/
+delete/reorder, duplicate or foreign segments, deserialized state that
+bypasses constructor validation — produces typed
+`ProviderErrorKind::InvalidRequest` errors at `FailurePhase::BeforeDispatch`.
+No ordinary protocol path requires panic-based caller discipline; callers
+never need to run validation first to avoid a panic (running validation
+first remains recommended for earlier diagnostics).
+
+Stateful server coverage (previous_response_id) remains distinct from
+stateless manual replay: stateful continuations keep `ContinuationScope`
+coverage and no segments, stateless continuations keep segments and claim
+no server coverage. All stateless Responses continuations are conservatively
+classified `SensitiveNonDurable`; correctness outranks persistence
+optimimization even when a continuation happens to carry only portable
+reasoning. Streaming and non-streaming decoding produce equivalent
+segmentation; both paths anchor only after the final normalized assistant
+message is known, so an interrupted stream can never mint a valid segment.
 
 Validation requires the continuation provider, API, and model to match the
 target request. Wrong-protocol or wrong-provider reuse fails before dispatch.
@@ -201,5 +306,12 @@ Stable consumer-facing types are `ModelSpec`, `CompletionRequest`, `Message`,
 JSON structs and SSE parser state remain private to protocol modules. New
 continuation and dialect enums are `non_exhaustive` so adding another protocol
 or dialect does not require every consumer to understand provider wire detail.
-The crate remains one package; the internal module boundary is the
-extensibility seam.
+`CompletionRequest` and `ReasoningConfig` are also `#[non_exhaustive]`: future
+optional request/reasoning fields do not become immediate source-breaking
+changes for external consumers, which construct through `CompletionRequest::new`
+plus the `with_*` builders (`with_tools`, `with_temperature`,
+`with_max_output_tokens`, `with_top_p`, `with_tool_choice`, `with_reasoning`,
+`with_retention`, `with_output_constraint`, `with_continuation`) and
+`ReasoningConfig::enabled`/`disabled` plus its builders. Serialized wire
+compatibility is unchanged by the Rust construction surface. The crate remains
+one package; the internal module boundary is the extensibility seam.

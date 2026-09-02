@@ -37,3 +37,9 @@ criterion/
 perf.data
 perf.data.old
 flamegraph.svg
+
+node_modules/
+
+apps/business-console/dist/
+
+apps/business-console/test-results/

@@ -12,6 +12,7 @@ serde = { workspace = true }
 chrono = { workspace = true }
 runtime-config = { workspace = true }
 observability = { workspace = true }
+metrics = { workspace = true }
 document-processing = { path = "../../crates/document-processing" }
 document-processing-postgres = { path = "../../crates/document-processing-postgres" }
 document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }

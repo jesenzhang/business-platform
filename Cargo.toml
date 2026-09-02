@@ -94,6 +94,13 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlit
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 
+# OIDC/JWT authentication (PLAN-0012 M3)
+jsonwebtoken = "9"
+
+# Metrics (PLAN-0012 T4.2)
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.17", default-features = false }
+
 # TLS
 rustls = "0.23"
 

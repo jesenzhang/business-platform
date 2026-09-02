@@ -10,8 +10,12 @@
 //!
 //! Contract guarantees (ADR-0023):
 //! - Provider errors map onto the bounded `ExtractionError` variants so the
-//!   existing AI-task retry/classification semantics are reused; rate-limit,
-//!   timeout and 5xx become retryable `AiProviderUnavailable`.
+//!   existing AI-task retry/classification semantics are reused: timeout and
+//!   5xx become retryable `AiProviderUnavailable`; rate-limit becomes
+//!   `AiProviderRateLimited` carrying the provider's pacing hint (capped by
+//!   the retry policy); credential rejection becomes the non-retryable
+//!   `AiProviderRejected`; invalid-request stays permanent via
+//!   `AiInvalidResponse`.
 //! - Provider/raw responses never enter logs, DTOs or the returned candidate
 //!   beyond the parsed `CandidatePayload`; credentials never cross this module.
 
@@ -62,7 +66,9 @@ impl ModelBackedExtractor {
     ///
     /// Only reachable when `mode == real`; configuration validation already
     /// requires a non-empty API key. Unsupported API names and non-conformant
-    /// base URLs fail here before any request is dispatched.
+    /// base URLs fail here before any request is dispatched. Plaintext HTTP to
+    /// RFC1918 addresses requires the explicit `allow_private_http` opt-in;
+    /// HTTPS and loopback HTTP are always accepted.
     pub fn from_config(config: &AiProviderConfig) -> anyhow::Result<Self> {
         let api_key = config
             .api_key
@@ -75,12 +81,22 @@ impl ModelBackedExtractor {
             "anthropic" | "anthropic_messages" => Api::AnthropicMessages,
             other => anyhow::bail!("unsupported AI provider api: {other}"),
         };
+        let endpoint_policy = if config.allow_private_http {
+            tracing::warn!(
+                "AI provider endpoint policy is trusted-private-http: plaintext \
+                 intranet transport; credentials, prompts and model responses \
+                 are not encrypted in transit"
+            );
+            jarvis_model_provider::providers::EndpointPolicy::TrustedPrivateHttp
+        } else {
+            jarvis_model_provider::providers::EndpointPolicy::SecureOrLoopback
+        };
         let provider_id = ProviderId::new(config.provider_id.clone())
             .map_err(|message| anyhow::anyhow!("invalid AI provider id: {message}"))?;
         let provider = ProviderFactory::build(ProviderConfig {
             api_key,
             base_url: config.base_url.as_ref().map(|url| url.expose().to_string()),
-            endpoint_policy: jarvis_model_provider::providers::EndpointPolicy::SecureOrLoopback,
+            endpoint_policy,
             request_timeout: Duration::from_secs(config.request_timeout_secs),
             provider_id,
             api,
@@ -108,11 +124,24 @@ impl DocumentFieldExtractor for ModelBackedExtractor {
         );
         completion_request.temperature = Some(0.0);
         completion_request.max_output_tokens = self.max_output_tokens;
-        let completion = self
-            .provider
-            .complete(completion_request)
-            .await
-            .map_err(|error| map_provider_error(&error))?;
+        let started = std::time::Instant::now();
+        let completion = self.provider.complete(completion_request).await;
+        crate::metrics::record_provider_request(
+            started.elapsed().as_secs_f64(),
+            completion.is_ok(),
+        );
+        if let Some(status) = completion
+            .as_ref()
+            .err()
+            .and_then(|error| error.http_status)
+        {
+            if status == 429 {
+                crate::metrics::record_provider_rate_limited();
+            } else if (500..=599).contains(&status) {
+                crate::metrics::record_provider_server_error();
+            }
+        }
+        let completion = completion.map_err(|error| map_provider_error(&error))?;
         let payload = parse_payload(&completion.message.text_value(), &request)?;
         ExtractionCandidate::new(
             request.tenant_id,
@@ -151,12 +180,25 @@ Do not include any prose or code fence around the JSON.";
 
 /// Translate a provider failure into the bounded extraction error, preserving
 /// the AI-task retry classification without leaking provider body text.
+///
+/// Retry semantics (PLAN-0012 release hardening):
+/// - `RateLimit` keeps the provider's `Retry-After` hint on
+///   `AiProviderRateLimited`; the retry policy in `retry::classify_failure`
+///   clamps it. The hint must never be dropped.
+/// - `Timeout`/`Unavailable` remain transient `AiProviderUnavailable` and use
+///   the platform backoff ladder.
+/// - `Authentication` is a configuration fault: `AiProviderRejected` is
+///   permanent and must not be retried as a transient error.
+/// - `InvalidRequest` and protocol faults stay permanent `AiInvalidResponse`.
 fn map_provider_error(error: &ProviderError) -> ExtractionError {
     match error.kind {
-        ProviderErrorKind::Authentication
-        | ProviderErrorKind::RateLimit
-        | ProviderErrorKind::Timeout
-        | ProviderErrorKind::Unavailable => ExtractionError::AiProviderUnavailable,
+        ProviderErrorKind::RateLimit => ExtractionError::AiProviderRateLimited {
+            retry_after: error.retry_after,
+        },
+        ProviderErrorKind::Timeout | ProviderErrorKind::Unavailable => {
+            ExtractionError::AiProviderUnavailable
+        }
+        ProviderErrorKind::Authentication => ExtractionError::AiProviderRejected,
         ProviderErrorKind::Aborted => ExtractionError::Cancelled,
         ProviderErrorKind::InvalidRequest
         | ProviderErrorKind::Serialization
@@ -233,12 +275,14 @@ fn parse_payload(
 #[cfg(test)]
 mod tests {
     use super::{map_provider_error, ModelBackedExtractor};
+    use crate::config::{AiProviderConfig, AiProviderMode};
     use document_processing::{DocumentFieldExtractor, ExtractionError, ExtractionRequest};
     use jarvis_model_provider::providers::{MockProvider, ScriptedProvider};
     use jarvis_model_provider::{
         AssistantMessage, Completion, CompletionMetadata, FailurePhase, ProviderError,
         ProviderErrorKind, StopReason, StreamEvent,
     };
+    use runtime_config::{Secret, SecretUrl};
     use std::sync::Arc;
     use uuid::Uuid;
 
@@ -279,13 +323,55 @@ mod tests {
     }
 
     #[test]
-    fn err_kind_maps_rate_limit_to_unavailable() {
+    fn err_kind_maps_rate_limit_to_rate_limited_without_hint() {
         let error = map_provider_error(&ProviderError::new(
             ProviderErrorKind::RateLimit,
             FailurePhase::AfterDispatch,
             "rate limited",
         ));
-        assert_eq!(error, ExtractionError::AiProviderUnavailable);
+        assert_eq!(
+            error,
+            ExtractionError::AiProviderRateLimited { retry_after: None }
+        );
+    }
+
+    #[test]
+    fn err_kind_preserves_rate_limit_retry_after_hint() {
+        let error = map_provider_error(
+            &ProviderError::new(
+                ProviderErrorKind::RateLimit,
+                FailurePhase::AfterDispatch,
+                "rate limited",
+            )
+            .with_retry_after(std::time::Duration::from_secs(11)),
+        );
+        assert_eq!(
+            error,
+            ExtractionError::AiProviderRateLimited {
+                retry_after: Some(std::time::Duration::from_secs(11)),
+            }
+        );
+    }
+
+    #[test]
+    fn err_kind_maps_authentication_to_permanent_rejection() {
+        let error = map_provider_error(&ProviderError::new(
+            ProviderErrorKind::Authentication,
+            FailurePhase::BeforeDispatch,
+            "bad credentials",
+        ));
+        assert_eq!(error, ExtractionError::AiProviderRejected);
+        assert_eq!(error.code(), "ai_provider_rejected");
+    }
+
+    #[test]
+    fn err_kind_maps_invalid_request_to_invalid_response() {
+        let error = map_provider_error(&ProviderError::new(
+            ProviderErrorKind::InvalidRequest,
+            FailurePhase::BeforeDispatch,
+            "bad request",
+        ));
+        assert_eq!(error, ExtractionError::AiInvalidResponse);
     }
 
     #[test]
@@ -347,7 +433,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn provider_rate_limit_and_retry_after_is_mapped_to_retry() {
+    async fn provider_rate_limit_end_to_end_preserves_retry_after_hint() {
         let error = ProviderError::new(
             ProviderErrorKind::RateLimit,
             FailurePhase::AfterDispatch,
@@ -362,7 +448,30 @@ mod tests {
         let extractor = ModelBackedExtractor::new(Arc::new(provider), "test-model".into());
         match extractor.extract(request("text")).await {
             Ok(_) => unreachable!("expected rate-limit failure"),
-            Err(error) => assert_eq!(error, ExtractionError::AiProviderUnavailable),
+            Err(error) => assert_eq!(
+                error,
+                ExtractionError::AiProviderRateLimited {
+                    retry_after: Some(std::time::Duration::from_secs(7)),
+                }
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_authentication_end_to_end_is_permanent_rejection() {
+        let error = ProviderError::new(
+            ProviderErrorKind::Authentication,
+            FailurePhase::BeforeDispatch,
+            "invalid api key",
+        );
+        let provider = scripted_provider(vec![
+            Ok(StreamEvent::Start { model: "m".into() }),
+            Err(error),
+        ]);
+        let extractor = ModelBackedExtractor::new(Arc::new(provider), "test-model".into());
+        match extractor.extract(request("text")).await {
+            Ok(_) => unreachable!("expected authentication failure"),
+            Err(error) => assert_eq!(error, ExtractionError::AiProviderRejected),
         }
     }
 
@@ -382,5 +491,100 @@ mod tests {
             Ok(_) => unreachable!("expected abort failure"),
             Err(error) => assert_eq!(error, ExtractionError::Cancelled),
         }
+    }
+
+    fn provider_config(base_url: &str, allow_private_http: bool) -> AiProviderConfig {
+        AiProviderConfig {
+            mode: AiProviderMode::Real,
+            provider_id: "smoke".to_string(),
+            model: "test-model".to_string(),
+            api: "openai_completions".to_string(),
+            base_url: Some(
+                SecretUrl::parse(base_url)
+                    .unwrap_or_else(|error| unreachable!("valid base url: {error}")),
+            ),
+            api_key: Some(Secret::new("dummy".to_string())),
+            request_timeout_secs: 120,
+            max_output_tokens: Some(512),
+            allow_private_http,
+        }
+    }
+
+    #[test]
+    fn from_config_rejects_plaintext_private_http_by_default() {
+        let result = ModelBackedExtractor::from_config(&provider_config(
+            "http://192.168.1.10:8080/v1",
+            false,
+        ));
+        let Err(error) = result else {
+            unreachable!("plaintext RFC1918 endpoint must fail closed without opt-in")
+        };
+        assert!(error.to_string().contains("failed to build AI provider"));
+    }
+
+    #[test]
+    fn from_config_accepts_private_http_with_explicit_opt_in() {
+        ModelBackedExtractor::from_config(&provider_config("http://192.168.1.10:8080/v1", true))
+            .unwrap_or_else(|error| unreachable!("opt-in private http must build: {error}"));
+    }
+
+    #[test]
+    fn from_config_still_rejects_unknown_api() {
+        let mut config = provider_config("http://192.168.1.10:8080/v1", true);
+        config.api = "unknown_api".to_string();
+        let result = ModelBackedExtractor::from_config(&config);
+        let Err(error) = result else {
+            unreachable!("unknown api name must fail closed")
+        };
+        assert!(error.to_string().contains("unsupported AI provider api"));
+    }
+
+    /// PLAN-0012 T2.5 manual smoke against a real OpenAI-compatible endpoint.
+    ///
+    /// Ignored by default because it requires a reachable model endpoint. Run
+    /// locally with:
+    ///
+    /// ```text
+    /// AI_SMOKE_BASE_URL=http://<host>:<port>/v1 \
+    /// cargo test -p ai-worker --all-features real_provider_smoke -- --ignored --nocapture
+    /// ```
+    ///
+    /// `AI_SMOKE_MODEL` (default `qwen3_vl`) and `AI_SMOKE_API_KEY` (default
+    /// `dummy`) are optional. The endpoint address is intentionally read from
+    /// the environment so no intranet URL is committed to the repository.
+    #[tokio::test]
+    #[ignore = "requires a reachable intranet model provider; run manually with --ignored"]
+    async fn real_provider_smoke_extracts_candidate() -> Result<(), Box<dyn std::error::Error>> {
+        let base_url = std::env::var("AI_SMOKE_BASE_URL")
+            .map_err(|_| "set AI_SMOKE_BASE_URL to run the real provider smoke")?;
+        let model = std::env::var("AI_SMOKE_MODEL").unwrap_or_else(|_| "qwen3_vl".to_string());
+        let api_key = std::env::var("AI_SMOKE_API_KEY").unwrap_or_else(|_| "dummy".to_string());
+        let mut config = provider_config(&base_url, true);
+        config.model = model;
+        config.api_key = Some(Secret::new(api_key));
+        // Reasoning-style deployments (e.g. qwen3 served via vLLM) spend output
+        // budget on hidden reasoning before emitting the final JSON; keep the
+        // budget generous so the answer is not truncated to an empty payload.
+        config.max_output_tokens = Some(4096);
+        let Ok(extractor) = ModelBackedExtractor::from_config(&config) else {
+            unreachable!("smoke config must build");
+        };
+        let sample = "MEMORANDUM\n\nTo: All staff\nFrom: Operations\nDate: 2026-08-29\n\
+Subject: Quarterly facility maintenance window\n\nThe data center will undergo \
+power maintenance from 2026-09-05 to 2026-09-06. Services may be degraded.\n";
+        let candidate = match extractor.extract(request(sample)).await {
+            Ok(candidate) => candidate,
+            Err(error) => return Err(format!("real provider smoke failed: {error:?}").into()),
+        };
+        println!(
+            "smoke ok: document_type={} title={:?} language={:?} fields={} warnings={}",
+            candidate.payload.document_type,
+            candidate.payload.title,
+            candidate.payload.language,
+            candidate.payload.fields.len(),
+            candidate.payload.warnings.len(),
+        );
+        assert!(!candidate.payload.document_type.trim().is_empty());
+        Ok(())
     }
 }

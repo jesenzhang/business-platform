@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-08-25
+> 最后更新：2026-08-30
 > 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
 > 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
 > 集成方式：local solo fast-forward，无 PR
@@ -133,6 +133,67 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > Integrated / Archived（implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`）。
 > 本里程碑仅文档收尾，未修改业务代码、Cargo.toml、迁移或 openapi.json。PLAN-0012
 > 为当前唯一 Active 计划，M1（model-provider 集成决策与 ADR-0023）可从干净起点启动。
+
+> 2026-08-30: PLAN-0012 M2 全部完成（T2.1–T2.5）。vendored jarvis-model-provider
+> 快照升级至上游 `af9fbe7`（0.3.0-dev.1，无本地魔改）；新增 fail-closed 的
+> `allow_private_http` 配置映射上游 `EndpointPolicy::TrustedPrivateHttp`，默认仍为
+> HTTPS-or-loopback 拒绝语义。真实 provider smoke 通过（内网 vLLM qwen3_vl，
+> OpenAI-compatible；提取 title/language/fields/warnings 正常，证据见 ADR-0023
+> 第 7/8 节）。全仓 fmt/check/clippy/test --no-fail-fast 与
+> check-architecture.ps1 PASS；agent-adapter 上游失败测试在本机沙箱存在经基线
+> 复现确认的既有 flake（连接 `127.0.0.1:9` 被代答 -32003），单包隔离通过，由 CI
+> 覆盖。PLAN-0012 剩余：M3（真实认证）、M4（预生产环境与可观测性）、M5（v0.1
+> 发布审计）。
+
+> 2026-08-30: PLAN-0012 M3 核心完成（T3.1/T3.2/T3.4）+ T4.4。Business API 生产
+> 认证落地：`OidcValidator`（`apps/business-api/src/oidc.rs`）经 issuer JWKS 验证
+> Bearer JWT（OIDC discovery 默认、`auth.jwks_url` 覆盖、TTL 缓存、未知 kid 即时
+> 刷新），强制 exp/iss/aud（可配 audience），仅 ES256/RS256；dev auth 关闭时
+> `auth.issuer_url` 由配置校验强制；JWKS 故障 fail-closed；声明 `tenant_id`/
+> `user_id`/`management_permissions`/`roles` 映射到既有 TenantContext/
+> ManagementPermission，未识别权限不授予。13 例契约测试覆盖有效/过期/错
+> audience/错 issuer/篡改/未知 kid/缺失或 nil tenant/JWKS 故障/alg=none 与声明
+> 映射。CLI/MCP bearer token 已参数化，无需改动。CI 新增 `security` job
+> （cargo-audit/gitleaks/trivy），本地 NOT RUN 由 GitHub CI 首跑验证。T3.3
+> （IdP demo compose + console 登录）按计划风险缓解后置。全仓门禁：fmt/check/
+> clippy/test --no-fail-fast（495 pass / 0 fail）与 check-architecture.ps1 PASS。
+> PLAN-0012 剩余：T3.3、T4.1/T4.2/T4.3/T4.5、M5 发布审计。
+
+> 2026-08-30 (2): PLAN-0012 T4.1/T4.3/T4.5 完成。可观测性：`observability::LogFormat`
+> （text/json fail-fast），四个进程统一 `log_format` 配置，JSON 单行日志可供
+> 预生产采集。备份/恢复：`deploy/operations/drill-backup-restore.sh` 一体化演练
+> 脚本（seed→pg_dump/mc mirror→恢复到 `*_restore`→行数/表数/对象 roundtrip 校验），
+> 本机执行 NOT RUN（无本地 PostgreSQL/MinIO）。Runbook v0.1：`docs/operations/
+> RUNBOOK.md`（部署/就绪/升级/回滚/备份/故障处置/安全基线/已知缺口）。
+
+> 2026-08-30 (3): PLAN-0012 T4.2 v0.1 完成。`business-api` 新增公共 `/metrics`
+> Prometheus 文本端点（metrics-exporter-prometheus，无全局标签泄漏；标签有界：
+> method + 数值 status、认证失败 reason 类别），`http_requests_total`、
+> `http_request_duration_seconds`、`auth_failures_total` 已接入；契约测试验证
+> 端点公开性与计数器出现。worker 侧吞吐/租约/AI 时延指标与 dashboard 配置为
+> 后续批次。PLAN-0012 剩余：T3.3（IdP compose + console 登录）、M5 发布审计
+> （T4.2 worker 指标与 T4.3 演练首跑在 M5 一并收口）。
+
+> 2026-09-02: PLAN-0012 发布加固批次（v0.1 候选）完成代码面收口。
+> ① 备份演练脚本重写：seed 标记先于备份并校验 checksum/size、唯一安全
+> drill 子目录、恢复到唯一 restore bucket、从恢复目标验证、trap 清理、
+> 禁止对未验证 BACKUP_DIR 执行删除（本机执行 NOT RUN：无 docker/psql/
+> pg_dump/mc，由 CI service containers 补跑）。② OIDC 生产加固：
+> audience 必填、issuer/jwks HTTPS-only、JWKS/discovery 不跟随重定向、
+> 生产 transport fail-closed，真实 OIDC principal 跨租户契约测试。
+> ③ AI Provider 重试语义：429 保留并钳制 Retry-After、Timeout/5xx 平台
+> backoff、Authentication/InvalidRequest 不重试，端到端 ProviderError→
+> disposition 测试，核心层无 provider 类型。④ 可观测性：生产强制 JSON
+> 日志（三进程 fail-closed + 回归测试）、`x-request-id`→correlation_id
+> 贯穿 Job/AI Task/审计/worker 日志（migration 018/SQLite 008）、HTTP
+> method 归一到固定集合、worker `/metrics`（`observability.metrics_addr`
+> 生产必填）新增吞吐/排队/lease 丢失与回收/重试 disposition/AI 时延/
+> 429/5xx 指标（标签全部代码枚举，无 tenant/文档/路径/模型输出），
+> `deploy/observability/` 提供 Prometheus 抓取配置与最小 Grafana
+> dashboard。⑤ 稳定性：agent-adapter 固定端口 flake 测试替换为进程内
+> stub server（连接拒绝/上游 5xx/协议错误/正常返回四态）。
+> PLAN-0012 剩余：T3.3 后置、M5 发布审计（性能 smoke、预生产全链路
+> 演练、v0.1 tag）。
 
 ## 1. 当前权威结论
 

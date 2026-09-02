@@ -35,9 +35,17 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
+    let log_format =
+        observability::LogFormat::parse(&config.observability.log_format).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unsupported observability.log_format: {}",
+                config.observability.log_format
+            )
+        })?;
     let _guard = observability::init_tracing(
         &config.observability.service_name,
         &config.observability.log_level,
+        log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
 
@@ -187,6 +195,29 @@ async fn main() -> anyhow::Result<()> {
         storage: Some(StorageServices { objects: storage }),
     });
 
+    // PLAN-0012 M3: the OIDC validator is built whenever an issuer is
+    // configured. Dev-mode requests take the static-token path and never touch
+    // it; with dev auth disabled it is the only authentication boundary, and
+    // config validation guarantees a non-empty issuer at that point.
+    let oidc = if config.auth.issuer_url.trim().is_empty() {
+        None
+    } else {
+        tracing::info!(
+            issuer = %config.auth.issuer_url,
+            "OIDC JWT validation enabled"
+        );
+        // Production identity material must not travel over plaintext HTTP:
+        // the validator re-checks every fetched URL under this policy.
+        Some(std::sync::Arc::new(
+            business_api::oidc::OidcValidator::with_transport_policy(
+                config.auth.issuer_url.clone(),
+                config.auth.audience.clone(),
+                config.auth.jwks_url.clone(),
+                config.env == runtime_config::RuntimeEnvironment::Production,
+            ),
+        ))
+    };
+
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled: config.auth.dev_auth_enabled,
         dev_secret: config
@@ -207,7 +238,12 @@ async fn main() -> anyhow::Result<()> {
         dev_user_id: config.auth.dev_user_id,
         dev_subject: config.auth.dev_subject.clone(),
         dev_roles: config.auth.dev_roles.clone(),
+        oidc,
     };
+
+    // PLAN-0012 T4.2: install the Prometheus recorder before serving; the
+    // /metrics endpoint renders from the installed handle.
+    business_api::metrics::install_metrics();
 
     let app = routes::create_router(state, auth_config, &config.server);
 

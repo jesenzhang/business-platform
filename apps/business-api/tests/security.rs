@@ -109,11 +109,13 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             service_name: "business-api-test".to_string(),
             otlp_endpoint: None,
             log_level: "off".to_string(),
+            log_format: "text".to_string(),
         },
         storage: StorageConfig::default(),
         auth: AuthConfig {
             issuer_url: String::new(),
             audience: None,
+            jwks_url: None,
             dev_secret: Some(Secret::new(DEV_SECRET.to_string())),
             dev_auth_enabled,
             dev_permissions: BTreeSet::new(),
@@ -152,6 +154,7 @@ fn test_router_with_permissions(
         dev_user_id: Some(DEV_USER_ID),
         dev_subject: Some("security-test-user".to_string()),
         dev_roles: BTreeSet::new(),
+        oidc: None,
     };
     create_router(state, auth_config, &config.server)
 }

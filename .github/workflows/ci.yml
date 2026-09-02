@@ -6,6 +6,7 @@ on:
       - main
       - "feat/PLAN-*"
       - "codex/plan-0008-*"
+      - "codex/plan-0012-*"
   pull_request:
     branches:
       - main
@@ -62,6 +63,37 @@ jobs:
         run: |
           ./scripts/check-architecture.ps1
           ./scripts/check-openapi.ps1
+
+  security:
+    name: Security scanning (cargo-audit, gitleaks, trivy)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: cargo-audit (RustSec advisories)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit --deny warnings
+      - name: gitleaks (secret detection)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: trivy (filesystem vulnerability scan)
+        # Direct pinned release download instead of trivy-action: the
+        # action's installer failed silently (exit 1, no diagnostics) when
+        # the release asset fetch broke, which made the gate undiagnosable.
+        run: |
+          set -euo pipefail
+          TRIVY_VERSION=0.74.0
+          curl -fsSL --retry 3 \
+            -o /tmp/trivy.tgz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          tar -xzf /tmp/trivy.tgz -C /tmp trivy
+          /tmp/trivy version
+          /tmp/trivy fs --scanners vuln --severity CRITICAL,HIGH \
+            --ignore-unfixed --exit-code 1 .
 
   frontend:
     name: Frontend checks
@@ -192,6 +224,20 @@ jobs:
           cargo test -p business-worker --all-features
           cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1
           bash scripts/test-postgres-minio-multiprocess.sh
+      - name: Backup/restore drill selftest (path guards, cleanup ownership)
+        run: DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh
+      - name: Install MinIO client
+        run: |
+          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x /usr/local/bin/mc
+          mc --version
+      - name: Backup/restore drill (PostgreSQL + MinIO, unique drill-owned targets)
+        env:
+          MC_ALIAS_HOST: http://127.0.0.1:9000
+          MC_ROOT_USER: minioadmin
+          MC_ROOT_PASSWORD: minioadmin
+          BUCKET: business-platform
+        run: bash deploy/operations/drill-backup-restore.sh
       - name: Architecture and diff checks
         shell: pwsh
         run: |

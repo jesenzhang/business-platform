@@ -8,6 +8,15 @@ cors_origins = []
 [auth]
 # Fail-closed: static dev token auth must never be enabled in production.
 dev_auth_enabled = false
+# PLAN-0012 M3: production authentication is OIDC/JWT. The issuer URL and a
+# non-empty audience are mandatory in production (config validation fails
+# otherwise), and issuer_url / jwks_url must use https. The validator never
+# follows redirects on discovery or JWKS fetches. Tokens are verified against
+# the issuer JWKS (discovery by default, or set auth.jwks_url explicitly for
+# IdPs without discovery), with exp/iss/aud enforced.
+# issuer_url = "https://identity.example.com/realms/production"
+# audience = "business-api"
+# jwks_url = "https://identity.example.com/realms/production/protocol/openid-connect/certs"
 
 [database]
 backend = "postgres"
@@ -19,4 +28,14 @@ enabled = true
 
 [observability]
 log_level = "info"
+# PLAN-0012 T4.5: production log output is JSON for machine ingestion; config
+# validation rejects the human-readable text default in production.
+log_format = "json"
+# PLAN-0012 T4.2: workers expose Prometheus /metrics on this internal address;
+# production validation requires it. `business-api` serves /metrics on its own
+# public port and ignores this key. When business-worker and ai-worker share a
+# host, override per process, e.g.
+# BUSINESS_WORKER__OBSERVABILITY__METRICS_ADDR=127.0.0.1:9464
+# AI_WORKER__OBSERVABILITY__METRICS_ADDR=127.0.0.1:9465
+metrics_addr = "0.0.0.0:9464"
 # otlp_endpoint = "http://otel-collector:4317"

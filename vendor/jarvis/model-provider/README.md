@@ -4,7 +4,7 @@ Standalone Rust library for model protocol work. Other agent systems can depend
 on this crate without taking a Jarvis Runtime dependency.
 
 Published package name: `jarvis-model-provider`. Rust import: `jarvis_model_provider`.
-Source lives in the Jarvis workspace at `crates/model-provider`.
+Source lives in the Jarvis workspace at `crates/jarvis-model-provider`.
 
 ```toml
 [dependencies]
@@ -237,14 +237,15 @@ final output. Grammar is represented for capability negotiation and currently
 rejected by all three transports; it is never compiled by this crate. The
 current matrix is intentionally conservative:
 
-The new fields are optional on the serialized contract. Existing Rust callers
-that use public struct literals must add `constraint: None` to `ToolSpec` and
-`output_constraint: None` and `continuation: None` to `CompletionRequest`, and
-`continuation: None` to `Completion`, and `portability` to
-`ReasoningContent`; `ToolSpec::new`,
-`ToolSpec::with_constraint`, `CompletionRequest::new`, and
-`CompletionRequest::with_output_constraint` / `with_continuation` avoid that
-literal migration.
+The optional fields are part of the serialized contract, so existing persisted
+data keeps decoding. Rust callers should construct through
+`CompletionRequest::new` plus the `with_*` builders (`with_tools`,
+`with_temperature`, `with_max_output_tokens`, `with_top_p`, `with_tool_choice`,
+`with_reasoning`, `with_retention`, `with_output_constraint`,
+`with_continuation`) and `ReasoningConfig::enabled`/`disabled` plus its
+builders: both structs are `#[non_exhaustive]` for the V1 freeze, so future
+optional provider fields do not become immediate source-breaking changes and
+struct literals no longer compile across the boundary.
 
 Provider-bound Anthropic reasoning is constructed with an
 `AnthropicMessagesContinuation`; its signature and redacted payload are not
@@ -325,15 +326,43 @@ history for a subsequent request without pretending that the interrupted
 stream was a completed response.
 
 Provider-native continuation state is kept beside, not inside, normalized
-messages. `ReasoningContent` contains only normalized text, a redacted marker,
-and the provider-neutral `ReasoningPortability` classification; Anthropic
-signatures and redacted payloads live in `AnthropicMessagesContinuation`.
-`Completion.continuation` and `StreamEvent::Continuation` expose the typed
-`ProviderContinuation`; OpenAI Responses state carries provider/API/model
-identity, uses `previous_response_id` for retained responses, and replays
-encrypted reasoning items for ephemeral responses. Continuation durability is
-classified for the owning Runtime (`ProviderBound` or
-`SensitiveNonDurable` here); the crate does not persist, retry, or recover it.
+messages. `ReasoningContent` contains normalized text, a redacted marker, and
+the provider-neutral `ReasoningPortability` classification (plus only a
+non-secret `ContinuationRef` on provider-bound blocks); Anthropic signatures
+and redacted payloads live in `AnthropicMessagesContinuation`, never in the
+message. `Completion.continuation` and `StreamEvent::Continuation` expose the
+typed `ProviderContinuation`. Continuation durability is classified for the
+owning Runtime (`ProviderBound` or `SensitiveNonDurable` here); the crate does
+not persist, retry, or recover it.
+
+Two continuation modes are explicitly different semantics:
+
+- **Stateful** — the provider retains a verified history prefix.
+  `previous_response_id` names that server coverage; request encoding trims
+  only the covered prefix and transmits the uncovered suffix. Conversation
+  Truth is not Provider Native Continuation State, and server coverage is not
+  stateless replay.
+
+- **Stateless** (`store: false`) — the provider retains nothing. The complete
+  required historical user/tool input stays in the wire input; provider-native
+  assistant outputs are substituted through anchored
+  `OpenAiResponsesReplaySegment`s whose `HistoryMessageId` anchors bind typed
+  replay items to exact assistant history entries by identity, not position.
+  Anchors are sequence-sensitive chain identities over the normalized history
+  prefix: identical content at different positions binds different segments,
+  and any earlier edit, insert, delete, or reorder invalidates downstream
+  anchors. Segments carry the complete ordered provider output projection —
+  encrypted and portable reasoning alike — so stateless replay preserves what
+  the model actually emitted. Edited, missing, duplicated, extra, or
+  projection-mismatched segments fail before dispatch, never through a panic.
+  Streaming and non-streaming decoding produce equivalent segmentation.
+
+The current Jarvis Runtime policy keeps process-local continuation state
+scoped to one active Turn: a completed final-answer Turn releases its slot,
+a fresh non-steering user Turn starts a new provider-native branch, and a
+restart with missing process-local state fails closed. The standalone
+provider library itself does not impose that lifetime; it reports durability
+so an owning application can choose longer-lived designs.
 
 Auth resolution order: the configured credential store (including an
 application-supplied OAuth refresh strategy), then environment API keys. The

@@ -1,0 +1,28 @@
+# Minimal Prometheus scrape configuration for PLAN-0012 T4.2.
+#
+# Every target exposes `GET /metrics` rendered from the shared
+# `metrics-exporter-prometheus` recorder. Label discipline is enforced in
+# code: no tenant ids, document ids, correlation ids, paths, or model output
+# appear on any series (see OBSERVABILITY_ARCHITECTURE.md).
+#
+# Adjust `targets` for your topology: in the reference deployment
+# `business-api` serves on :3000 and each worker binds its
+# `observability.metrics_addr` (defaults: business-worker :9464,
+# ai-worker :9465).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: business-api
+    static_configs:
+      - targets: ["business-api:3000"]
+
+  - job_name: business-worker
+    static_configs:
+      - targets: ["business-worker:9464"]
+
+  - job_name: ai-worker
+    static_configs:
+      - targets: ["ai-worker:9465"]

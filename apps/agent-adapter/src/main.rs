@@ -56,9 +56,17 @@ async fn main() -> anyhow::Result<()> {
     if config.auth.bearer_token.trim().is_empty() {
         anyhow::bail!("MCP bearer token must be configured")
     }
+    let log_format =
+        observability::LogFormat::parse(&config.observability.log_format).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unsupported observability.log_format: {}",
+                config.observability.log_format
+            )
+        })?;
     let _guard = observability::init_tracing(
         "agent-adapter",
         &config.observability.log_level,
+        log_format,
         config.observability.otlp_endpoint.as_deref(),
     )?;
     let client = BusinessApiClient::new(ClientConfig::new(
@@ -414,37 +422,115 @@ mod tests {
         assert!(!authorized(&forged, "mcp-demo-token"));
     }
 
-    #[tokio::test]
-    async fn upstream_failure_is_reported_without_fake_business_data() {
-        let client = BusinessApiClient::new(
-            ClientConfig::new("http://127.0.0.1:9", "business-token")
-                .unwrap_or_else(|_| unreachable!()),
+    #[test]
+    fn api_5xx_is_reported_as_upstream_unavailable() {
+        let error = ClientError::Api {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            code: "upstream_error".to_string(),
+            message: "unavailable".to_string(),
+            trace_id: None,
+        };
+        assert!(is_upstream_unavailable(&error));
+        assert!(!is_upstream_unavailable(&ClientError::Api {
+            status: StatusCode::FORBIDDEN,
+            code: "forbidden".to_string(),
+            message: "denied".to_string(),
+            trace_id: None,
+        }));
+    }
+
+    /// Start an in-process stub of the Business API overview endpoint so the
+    /// upstream-failure mapping is exercised deterministically (PLAN-0012
+    /// release hardening: no dependency on host ports or firewall state).
+    async fn spawn_overview_stub(status: StatusCode, body: &'static str) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        let addr = listener.local_addr().unwrap_or_else(|_| unreachable!());
+        let app = Router::new().fallback(move || async move { (status, body) });
+        tokio::spawn(async move {
+            let _unused = axum::serve(listener, app).await;
+        });
+        format!("http://{addr}")
+    }
+
+    fn client_for(base_url: String) -> BusinessApiClient {
+        BusinessApiClient::new(
+            ClientConfig::new(base_url, "business-token").unwrap_or_else(|_| unreachable!()),
         )
-        .unwrap_or_else(|_| unreachable!());
-        let response = call_tool(
+        .unwrap_or_else(|_| unreachable!())
+    }
+
+    async fn call_overview(client: BusinessApiClient) -> RpcResponse {
+        call_tool(
             client,
             json!("1"),
             json!({"name":"operations.overview","arguments":{}}),
         )
-        .await;
+        .await
+    }
+
+    #[tokio::test]
+    async fn connection_closed_before_response_is_reported_without_fake_business_data() {
+        // Transport-failure coverage through a socket the test fully owns:
+        // every connection is accepted and dropped without a response, so
+        // the client always fails with `ClientError::Transport` (→ -32001).
+        // OS-level "connection refused" semantics cannot be relied on here:
+        // released ephemeral ports can be rebound by sibling stubs, and
+        // connecting to port 0 has been observed to reach a responder when
+        // the full workspace suite runs.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        let addr = listener.local_addr().unwrap_or_else(|_| unreachable!());
+        tokio::spawn(async move {
+            while let Ok((stream, _peer)) = listener.accept().await {
+                drop(stream);
+            }
+        });
+        let response = call_overview(client_for(format!("http://{addr}"))).await;
         assert_eq!(response.error.map(|error| error.code), Some(-32001));
         assert!(response.result.is_none());
     }
-}
 
-#[test]
-fn api_5xx_is_reported_as_upstream_unavailable() {
-    let error = ClientError::Api {
-        status: StatusCode::SERVICE_UNAVAILABLE,
-        code: "upstream_error".to_string(),
-        message: "unavailable".to_string(),
-        trace_id: None,
-    };
-    assert!(is_upstream_unavailable(&error));
-    assert!(!is_upstream_unavailable(&ClientError::Api {
-        status: StatusCode::FORBIDDEN,
-        code: "forbidden".to_string(),
-        message: "denied".to_string(),
-        trace_id: None,
-    }));
+    #[tokio::test]
+    async fn upstream_5xx_is_reported_without_fake_business_data() {
+        let base_url = spawn_overview_stub(
+            StatusCode::SERVICE_UNAVAILABLE,
+            r#"{"success":false,"code":"upstream_error","message":"Business API request failed","request_id":"stub"}"#,
+        )
+        .await;
+        let response = call_overview(client_for(base_url)).await;
+        // A structured `Api` error from the client always maps to -32003;
+        // only transport/malformed faults use -32001.
+        assert_eq!(response.error.map(|error| error.code), Some(-32003));
+        assert!(response.result.is_none());
+    }
+
+    #[tokio::test]
+    async fn protocol_error_is_reported_without_fake_business_data() {
+        let base_url =
+            spawn_overview_stub(StatusCode::OK, "this is not the agreed JSON envelope").await;
+        let response = call_overview(client_for(base_url)).await;
+        assert_eq!(response.error.map(|error| error.code), Some(-32001));
+        assert!(response.result.is_none());
+    }
+
+    #[tokio::test]
+    async fn healthy_upstream_response_passes_through() {
+        let body = r#"{"success":true,"data":{"document_total":7,"document_created_today":2,
+            "processing_by_status":{"queued":1,"running":1,"waiting_for_ai":0,
+            "waiting_for_review":1,"succeeded":4,"failed":0,"cancelled":0,"rejected":0},
+            "review_pending":1,"unresolved_findings":0,"recent_jobs":[],
+            "recent_audit_events":[]}}"#;
+        let base_url = spawn_overview_stub(StatusCode::OK, body).await;
+        let response = call_overview(client_for(base_url)).await;
+        assert!(response.error.is_none());
+        let result = response.result.unwrap_or_else(|| unreachable!());
+        let structured = result
+            .get("structuredContent")
+            .cloned()
+            .unwrap_or(Value::Null);
+        assert_eq!(structured["document_total"], json!(7));
+    }
 }

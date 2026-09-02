@@ -1,0 +1,14 @@
+# cargo-audit configuration (PLAN-0012 release hardening).
+#
+# RUSTSEC-2023-0071 (rsa: Marvin attack, RSA PKCS#1 v1.5 timing side-channel)
+#   * `rsa` enters Cargo.lock only through sqlx's optional `mysql` driver
+#     feature (sqlx -> sqlx-mysql -> rsa). The workspace sqlx dependency in
+#     the root Cargo.toml enables only `postgres` and `sqlite`, so the crate
+#     is never compiled or linked into any artifact of this repository:
+#     `cargo tree -i rsa@0.9.10 --target all` resolves to nothing.
+#   * RustSec lists "No fixed upgrade is available!" for this advisory.
+#   * Re-review and remove this entry when a fixed `rsa` release exists,
+#     when upstream sqlx drops the dependency, or if any future build
+#     enables a code path that actually compiles `rsa`.
+[advisories]
+ignore = ["RUSTSEC-2023-0071"]
