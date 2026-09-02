@@ -39,3 +39,5 @@ perf.data.old
 flamegraph.svg
 
 node_modules/
+
+apps/business-console/dist/
