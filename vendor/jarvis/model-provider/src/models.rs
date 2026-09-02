@@ -1330,7 +1330,12 @@ mod tests {
 
     /// Bind a loopback-free RFC1918 fixture address for tests that exercise
     /// the `TrustedPrivateHttp` endpoint policy, which rejects loopback.
-    async fn private_fixture_listener() -> TcpListener {
+    ///
+    /// Returns `None` when the host exposes no RFC1918 interface (for example
+    /// hosted CI runners with loopback-only networking); callers must then
+    /// skip the test rather than fail, because the policy under test cannot
+    /// be exercised without a bindable private address.
+    async fn private_fixture_listener() -> Option<TcpListener> {
         for variable in ["COMPUTERNAME", "HOSTNAME"] {
             let Some(hostname) = std::env::var_os(variable) else {
                 continue;
@@ -1348,17 +1353,19 @@ mod tests {
                         || (first == 172 && (16..=31).contains(&second))
                         || (first == 192 && second == 168)
                     {
-                        return TcpListener::bind(std::net::SocketAddr::new(
-                            std::net::IpAddr::V4(ip),
-                            0,
-                        ))
-                        .await
-                        .unwrap();
+                        return Some(
+                            TcpListener::bind(std::net::SocketAddr::new(
+                                std::net::IpAddr::V4(ip),
+                                0,
+                            ))
+                            .await
+                            .unwrap(),
+                        );
                     }
                 }
             }
         }
-        panic!("TrustedPrivateHttp test requires one local RFC1918 interface");
+        None
     }
 
     async fn fixture_with_response(
@@ -1905,7 +1912,10 @@ mod tests {
 
     #[tokio::test]
     async fn profile_connection_uses_profile_endpoint_and_auth_contract() {
-        let listener = private_fixture_listener().await;
+        let Some(listener) = private_fixture_listener().await else {
+            eprintln!("skipping: host exposes no RFC1918 interface for TrustedPrivateHttp");
+            return;
+        };
         let address = listener.local_addr().unwrap();
         let base_url = format!("http://{address}/v1");
         let (request_sender, request_receiver) = tokio::sync::oneshot::channel();
@@ -2294,7 +2304,10 @@ mod tests {
 
     #[tokio::test]
     async fn trusted_private_http_catalog_rejects_redirects() {
-        let redirect_listener = private_fixture_listener().await;
+        let Some(redirect_listener) = private_fixture_listener().await else {
+            eprintln!("skipping: host exposes no RFC1918 interface for TrustedPrivateHttp");
+            return;
+        };
         let redirect_address = redirect_listener.local_addr().unwrap();
         let target_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let target_address = target_listener.local_addr().unwrap();
