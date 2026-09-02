@@ -280,13 +280,18 @@ impl BusinessApiConfig {
             {
                 messages.push("auth.audience must be configured in production".to_string());
             }
-            if self
-                .auth
-                .jwks_url
-                .as_deref()
-                .is_some_and(|jwks_url| !jwks_url.trim().is_empty() && !is_https_url(jwks_url))
-            {
-                messages.push("auth.jwks_url must use https in production".to_string());
+            // PLAN-0012 release closure: a configured-but-blank override is a
+            // silent misconfiguration — `Some(" ")` suppresses OIDC discovery
+            // and every JWKS fetch would fail at runtime, so production must
+            // reject it at startup instead of shipping an auth-broken API.
+            if let Some(jwks_url) = self.auth.jwks_url.as_deref() {
+                if jwks_url.trim().is_empty() {
+                    messages.push(
+                        "auth.jwks_url must not be blank when configured in production".to_string(),
+                    );
+                } else if !is_https_url(jwks_url) {
+                    messages.push("auth.jwks_url must use https in production".to_string());
+                }
             }
             // PLAN-0012 release hardening: production log streams are machine
             // parsed; the human-readable text default would break ingestion.
@@ -540,6 +545,22 @@ mod tests {
         assert!(error
             .to_string()
             .contains("auth.jwks_url must use https in production"));
+    }
+
+    #[test]
+    fn production_rejects_blank_jwks_url() {
+        // A blank override suppresses discovery and breaks every JWKS fetch at
+        // runtime (PLAN-0012 release closure), so it must fail at startup.
+        for jwks_url in [Some(String::new()), Some("   ".to_string())] {
+            let mut config = production_config();
+            config.auth.jwks_url = jwks_url;
+            let Err(error) = config.validate() else {
+                unreachable!();
+            };
+            assert!(error
+                .to_string()
+                .contains("auth.jwks_url must not be blank when configured in production"));
+        }
     }
 
     #[test]

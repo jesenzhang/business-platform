@@ -2,7 +2,7 @@
 
 > 文档类型：Operations Runbook
 > 状态：Draft（PLAN-0012 T4.5）
-> 最后更新：2026-08-30
+> 最后更新：2026-09-02
 > 适用范围：business-api、business-worker、ai-worker、governance-worker、agent-adapter、business-console、PostgreSQL、对象存储（S3/MinIO）
 
 ## 1. 部署拓扑与进程
@@ -23,8 +23,9 @@
 1. PostgreSQL 与对象存储先于应用启动；
 2. `business-api` 启动即执行 fail-fast 配置校验，配置错误立即退出（exit 1），不允许带错误配置运行；
 3. 就绪判定：`GET /health/ready` 返回 200 才可挂流量；`/health/live` 只反映进程活性；
-4. 认证要求（PLAN-0012 M3）：
-   - 生产必须配置 `auth.issuer_url`（dev auth 关闭时强制），可选 `auth.audience` 与 `auth.jwks_url`；
+4. 认证要求（PLAN-0012 M3 + 发布收口）：
+   - 生产必须配置 HTTPS 的 `auth.issuer_url`；`auth.audience` 生产必填（缺失或纯空白直接启动失败），防止同 issuer 其他应用的 token 被接受；
+   - `auth.jwks_url` 可选：不配置则走 OIDC discovery；一旦配置必须为 HTTPS 且不得为空白/纯空白（空白值会抑制 discovery 并使每次 JWKS 拉取失败，配置校验在启动时 fail-closed 拒绝）；
    - IdP 不可达时 API 拒绝业务请求但 `/health/*` 不受影响——这是 fail-closed 预期行为，不是故障。
 
 ## 3. 升级流程
@@ -65,12 +66,13 @@
 
 - 所有进程配置校验 fail-fast；生产禁止 dev 认证、本地存储、`*` CORS；
 - 密钥/URL 经 `runtime-config` Secret/SecretUrl 承载，渲染时自动脱敏；
-- 安全扫描（cargo-audit/gitleaks/trivy）在 CI `security` job 强制；
+- 安全扫描（cargo-audit/gitleaks/trivy）在 CI `security` job 强制；trivy 与演练用 MinIO `mc` 均为固定版本 + 显式维护的 SHA-256 校验，校验失败在下载后、执行前立即中止（维护策略见 `.github/workflows/ci.yml` 注释）；
 - 生产 AI provider endpoint 默认只允许 HTTPS 或 loopback；内网明文 HTTP 需显式 `ai_provider.allow_private_http = true` 并承担传输风险。
 
 ## 8. 已知缺口（v0.1）
 
 - WAL/PITR 与自动备份调度尚未建立（当前为手动/演练脚本）；
-- 备份恢复演练真实执行与真实 Prometheus/Grafana 栈抓取待预生产首跑（脚本与配置已落地）；
+- 备份/恢复演练已在 CI `integration` job 的真实 PostgreSQL/MinIO service containers 上执行（pinned `mc` + checksum 校验，2026-09-02 起）；真实预生产栈上的演练与 Prometheus/Grafana 抓取、dashboard、标签基数验证待预生产首跑（配置在 `deploy/observability/`）；
+- 预生产验收（20 并发性能 smoke、真实 IdP/model-provider 全链路、v0.1 tag）见 `docs/reports/PLAN-0012-COMPLETION-AUDIT.md`：因当前环境无 staging/真实凭据，标记 BLOCKED/NOT RUN；
 - IdP demo compose 与 console 登录流程（T3.3）后置；
 - 性能/容量基线（M5 T5.1）尚未建立。

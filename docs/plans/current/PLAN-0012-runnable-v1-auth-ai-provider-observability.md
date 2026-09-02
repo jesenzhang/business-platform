@@ -210,6 +210,38 @@ M0 ──→ M1 ──→ M2 ──┬──→ M5 (v0.1)
    确定性 stub server（连接拒绝/上游 5xx/协议错误/正常返回）；全仓
    `cargo test --workspace --all-features` 连续两次通过。
 
+## Release Closure（2026-09-02，`codex/plan-0012-release-closure`）
+
+审阅修复与发布验证收口（证据见 `docs/reports/PLAN-0012-COMPLETION-AUDIT.md`
+的 Release Closure 修订节）：
+
+1. **CI 工具供应链**（`0f1405d`）：trivy `0.74.0` 与演练用 MinIO mc
+   `RELEASE.2025-08-13T08-35-41Z` 固定为不可变 GitHub release 资产；SHA-256
+   显式维护、下载后/执行前校验，不匹配立即中止。
+2. **ai-worker 指标语义**（`c0e54e2`）：`TaskOutcome::Succeeded` 仅在
+   `complete_ai_and_resume` 持久成功后记录；fence/持久化失败记录
+   `lease_unproven` + lease lost，每次 attempt 恰好一个最终 outcome；
+   CountingRecorder 回归测试覆盖三分支（red→green 验证）。
+3. **测试环境隔离**（`c8a54bd`）：business-api-client 代理测试保存并恢复
+   原始 `*_PROXY` 变量，进程级互斥避免与其他环境变量测试竞争。
+4. **配置 fail-closed**（`b8e952a`）：生产拒绝空白/纯空白 `auth.jwks_url`
+   （空白会抑制 discovery 并使每次 JWKS 拉取失败），新增配置测试。
+5. **文档同步**：RUNBOOK（生产 audience 必填、jwks_url 空白拒绝、CI 演练
+   与工具校验状态、缺口清单更新）、`ARCHITECTURE_STATUS.md`、完成审计。
+
+Slice B 全仓门禁 PASS：`cargo fmt --all -- --check`、
+`cargo check --workspace --all-targets --all-features`、`cargo clippy
+--workspace --all-targets --all-features -- -D warnings`、`cargo test
+--workspace --all-features`、`scripts/check-architecture.ps1`、
+`scripts/check-openapi.ps1`、`DRILL_SELFTEST=1
+bash deploy/operations/drill-backup-restore.sh`。
+
+Slice C（预生产验收：真实 IdP/model-provider + PostgreSQL + 对象存储 +
+Prometheus/Grafana、20 并发性能 smoke、全链路演练、指标抓取/标签基数验证）：
+当前工作区无 staging 环境与真实凭据，**BLOCKED / NOT RUN**，不得以
+fake/stub/本地测试替代验收证据。T5.1/T5.2 保持未验收状态；v0.1 tag 与
+PLAN-0012 归档在 Slice C PASS、变更合入 main 且 Main CI 全绿之前不执行。
+
 ## 完成定义
 
 全部里程碑完成且各自验收 PASS 或带原因 NOT RUN；预生产环境可完成
