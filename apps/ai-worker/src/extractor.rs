@@ -10,8 +10,12 @@
 //!
 //! Contract guarantees (ADR-0023):
 //! - Provider errors map onto the bounded `ExtractionError` variants so the
-//!   existing AI-task retry/classification semantics are reused; rate-limit,
-//!   timeout and 5xx become retryable `AiProviderUnavailable`.
+//!   existing AI-task retry/classification semantics are reused: timeout and
+//!   5xx become retryable `AiProviderUnavailable`; rate-limit becomes
+//!   `AiProviderRateLimited` carrying the provider's pacing hint (capped by
+//!   the retry policy); credential rejection becomes the non-retryable
+//!   `AiProviderRejected`; invalid-request stays permanent via
+//!   `AiInvalidResponse`.
 //! - Provider/raw responses never enter logs, DTOs or the returned candidate
 //!   beyond the parsed `CandidatePayload`; credentials never cross this module.
 
@@ -163,12 +167,25 @@ Do not include any prose or code fence around the JSON.";
 
 /// Translate a provider failure into the bounded extraction error, preserving
 /// the AI-task retry classification without leaking provider body text.
+///
+/// Retry semantics (PLAN-0012 release hardening):
+/// - `RateLimit` keeps the provider's `Retry-After` hint on
+///   `AiProviderRateLimited`; the retry policy in `retry::classify_failure`
+///   clamps it. The hint must never be dropped.
+/// - `Timeout`/`Unavailable` remain transient `AiProviderUnavailable` and use
+///   the platform backoff ladder.
+/// - `Authentication` is a configuration fault: `AiProviderRejected` is
+///   permanent and must not be retried as a transient error.
+/// - `InvalidRequest` and protocol faults stay permanent `AiInvalidResponse`.
 fn map_provider_error(error: &ProviderError) -> ExtractionError {
     match error.kind {
-        ProviderErrorKind::Authentication
-        | ProviderErrorKind::RateLimit
-        | ProviderErrorKind::Timeout
-        | ProviderErrorKind::Unavailable => ExtractionError::AiProviderUnavailable,
+        ProviderErrorKind::RateLimit => ExtractionError::AiProviderRateLimited {
+            retry_after: error.retry_after,
+        },
+        ProviderErrorKind::Timeout | ProviderErrorKind::Unavailable => {
+            ExtractionError::AiProviderUnavailable
+        }
+        ProviderErrorKind::Authentication => ExtractionError::AiProviderRejected,
         ProviderErrorKind::Aborted => ExtractionError::Cancelled,
         ProviderErrorKind::InvalidRequest
         | ProviderErrorKind::Serialization
@@ -293,13 +310,55 @@ mod tests {
     }
 
     #[test]
-    fn err_kind_maps_rate_limit_to_unavailable() {
+    fn err_kind_maps_rate_limit_to_rate_limited_without_hint() {
         let error = map_provider_error(&ProviderError::new(
             ProviderErrorKind::RateLimit,
             FailurePhase::AfterDispatch,
             "rate limited",
         ));
-        assert_eq!(error, ExtractionError::AiProviderUnavailable);
+        assert_eq!(
+            error,
+            ExtractionError::AiProviderRateLimited { retry_after: None }
+        );
+    }
+
+    #[test]
+    fn err_kind_preserves_rate_limit_retry_after_hint() {
+        let error = map_provider_error(
+            &ProviderError::new(
+                ProviderErrorKind::RateLimit,
+                FailurePhase::AfterDispatch,
+                "rate limited",
+            )
+            .with_retry_after(std::time::Duration::from_secs(11)),
+        );
+        assert_eq!(
+            error,
+            ExtractionError::AiProviderRateLimited {
+                retry_after: Some(std::time::Duration::from_secs(11)),
+            }
+        );
+    }
+
+    #[test]
+    fn err_kind_maps_authentication_to_permanent_rejection() {
+        let error = map_provider_error(&ProviderError::new(
+            ProviderErrorKind::Authentication,
+            FailurePhase::BeforeDispatch,
+            "bad credentials",
+        ));
+        assert_eq!(error, ExtractionError::AiProviderRejected);
+        assert_eq!(error.code(), "ai_provider_rejected");
+    }
+
+    #[test]
+    fn err_kind_maps_invalid_request_to_invalid_response() {
+        let error = map_provider_error(&ProviderError::new(
+            ProviderErrorKind::InvalidRequest,
+            FailurePhase::BeforeDispatch,
+            "bad request",
+        ));
+        assert_eq!(error, ExtractionError::AiInvalidResponse);
     }
 
     #[test]
@@ -361,7 +420,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn provider_rate_limit_and_retry_after_is_mapped_to_retry() {
+    async fn provider_rate_limit_end_to_end_preserves_retry_after_hint() {
         let error = ProviderError::new(
             ProviderErrorKind::RateLimit,
             FailurePhase::AfterDispatch,
@@ -376,7 +435,30 @@ mod tests {
         let extractor = ModelBackedExtractor::new(Arc::new(provider), "test-model".into());
         match extractor.extract(request("text")).await {
             Ok(_) => unreachable!("expected rate-limit failure"),
-            Err(error) => assert_eq!(error, ExtractionError::AiProviderUnavailable),
+            Err(error) => assert_eq!(
+                error,
+                ExtractionError::AiProviderRateLimited {
+                    retry_after: Some(std::time::Duration::from_secs(7)),
+                }
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_authentication_end_to_end_is_permanent_rejection() {
+        let error = ProviderError::new(
+            ProviderErrorKind::Authentication,
+            FailurePhase::BeforeDispatch,
+            "invalid api key",
+        );
+        let provider = scripted_provider(vec![
+            Ok(StreamEvent::Start { model: "m".into() }),
+            Err(error),
+        ]);
+        let extractor = ModelBackedExtractor::new(Arc::new(provider), "test-model".into());
+        match extractor.extract(request("text")).await {
+            Ok(_) => unreachable!("expected authentication failure"),
+            Err(error) => assert_eq!(error, ExtractionError::AiProviderRejected),
         }
     }
 

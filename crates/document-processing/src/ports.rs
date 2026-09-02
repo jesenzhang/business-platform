@@ -129,6 +129,19 @@ pub struct ClassifiedProcessingFailure {
     pub disposition: ProcessingFailureDisposition,
 }
 
+/// Platform-wide cap applied to a provider-supplied `Retry-After` pacing hint
+/// (PLAN-0012 release hardening). A hostile or misconfigured upstream must
+/// not be able to park a durable task indefinitely, so workers clamp the
+/// hint before turning it into a [`ProcessingFailureDisposition::Retry`].
+pub const MAX_PROVIDER_RETRY_AFTER_SECS: i64 = 300;
+
+/// Clamp a provider pacing hint to `1..=MAX_PROVIDER_RETRY_AFTER_SECS` seconds.
+#[must_use]
+pub fn capped_provider_retry_after(hint: std::time::Duration) -> Duration {
+    let secs = i64::try_from(hint.as_secs()).unwrap_or(i64::MAX);
+    Duration::seconds(secs.clamp(1, MAX_PROVIDER_RETRY_AFTER_SECS))
+}
+
 #[derive(Debug, Clone)]
 pub struct CompleteAiTaskCommand {
     pub tenant_id: Uuid,

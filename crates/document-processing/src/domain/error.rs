@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -54,6 +56,19 @@ pub enum ExtractionError {
     InvalidTextEncoding,
     #[error("AI provider is unavailable")]
     AiProviderUnavailable,
+    /// The provider rejected our credentials/authorization. This is a
+    /// configuration fault, not a transient outage: retrying identically
+    /// cannot succeed, so classification must fail the task permanently.
+    #[error("AI provider rejected the request")]
+    AiProviderRejected,
+    /// The provider rate limited the request. `retry_after` carries the
+    /// provider's own pacing hint when it supplied one; the retry policy
+    /// clamps it before use. Provider types never cross this boundary.
+    #[error("AI provider rate limited the request")]
+    AiProviderRateLimited {
+        /// Server-suggested pacing hint, when the provider supplied one.
+        retry_after: Option<Duration>,
+    },
     #[error("AI provider returned an invalid response")]
     AiInvalidResponse,
     #[error("candidate validation failed")]
@@ -76,6 +91,8 @@ impl ExtractionError {
             Self::ContentTooLarge => "content_too_large",
             Self::InvalidTextEncoding => "invalid_text_encoding",
             Self::AiProviderUnavailable => "ai_provider_unavailable",
+            Self::AiProviderRejected => "ai_provider_rejected",
+            Self::AiProviderRateLimited { .. } => "ai_provider_rate_limited",
             Self::AiInvalidResponse => "ai_invalid_response",
             Self::CandidateValidationFailed => "candidate_validation_failed",
             Self::LeaseLost => "lease_lost",

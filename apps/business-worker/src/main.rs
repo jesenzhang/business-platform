@@ -647,6 +647,22 @@ async fn process_step(
 
 fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedProcessingFailure {
     let disposition = match error {
+        ExtractionError::AiProviderRateLimited { retry_after } => {
+            // Honour the provider pacing hint when present (platform-capped),
+            // otherwise fall back to this worker's own backoff ladder.
+            let backoff = retry_after.map_or_else(
+                || {
+                    let backoff_secs = match attempt_count {
+                        0 => 1,
+                        1 => 5,
+                        _ => 30,
+                    };
+                    chrono::Duration::seconds(backoff_secs)
+                },
+                document_processing::ports::capped_provider_retry_after,
+            );
+            ProcessingFailureDisposition::Retry { backoff }
+        }
         ExtractionError::AiProviderUnavailable | ExtractionError::Internal => {
             let backoff_secs = match attempt_count {
                 0 => 1,
@@ -659,6 +675,10 @@ fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedPr
         }
         ExtractionError::Cancelled => ProcessingFailureDisposition::Cancelled,
         ExtractionError::LeaseLost => ProcessingFailureDisposition::LeaseLost,
+        // Everything else — including `AiProviderRejected` (a configuration
+        // fault that a retry would repeat) and invalid responses — is
+        // permanent. The deterministic local extractor never emits the AI
+        // provider variants, but the table stays consistent with `ai-worker`.
         _ => ProcessingFailureDisposition::Permanent,
     };
     ClassifiedProcessingFailure {

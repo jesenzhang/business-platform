@@ -6,6 +6,7 @@
 
 mod config;
 mod extractor;
+mod retry;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -18,8 +19,8 @@ use chrono::Utc;
 use config::{AiProviderMode, AiWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
-    AiTask, ClassifiedProcessingFailure, CompleteAiTaskCommand, ExecutionFence,
-    ProcessingExecutionUnitOfWork, ProcessingFailureDisposition, ProcessingJobQuery,
+    AiTask, CompleteAiTaskCommand, ExecutionFence, ProcessingExecutionUnitOfWork,
+    ProcessingJobQuery,
 };
 use document_processing::{
     DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionError, ExtractionRequest,
@@ -27,6 +28,7 @@ use document_processing::{
 };
 use extractor::ModelBackedExtractor;
 use object_storage::{LocalStorageClient, ObjectKey, ObjectStorageClient, S3Client, StorageError};
+use retry::classify_failure;
 use tokio::sync::oneshot;
 use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::sleep;
@@ -431,29 +433,6 @@ async fn process_task(
         Err(error) => {
             tracing::warn!(tenant_id = %task.tenant_id, task_id = %task.id, failure_code = error.code(), "AI task failed without a provable lease; state transition skipped");
         }
-    }
-}
-
-fn classify_failure(error: &ExtractionError, attempt_count: i32) -> ClassifiedProcessingFailure {
-    let disposition = match error {
-        ExtractionError::AiProviderUnavailable | ExtractionError::Internal => {
-            let backoff_secs = match attempt_count {
-                1 => 1,
-                2 => 5,
-                _ => 30,
-            };
-            ProcessingFailureDisposition::Retry {
-                backoff: chrono::Duration::seconds(backoff_secs),
-            }
-        }
-        ExtractionError::LeaseLost => ProcessingFailureDisposition::LeaseLost,
-        ExtractionError::Cancelled => ProcessingFailureDisposition::Cancelled,
-        _ => ProcessingFailureDisposition::Permanent,
-    };
-    ClassifiedProcessingFailure {
-        code: error.code().to_string(),
-        message: None,
-        disposition,
     }
 }
 

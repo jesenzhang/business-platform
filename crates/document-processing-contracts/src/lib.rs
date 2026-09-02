@@ -37,6 +37,8 @@ pub fn safe_failure_code(code: &str) -> &str {
         | "content_too_large"
         | "invalid_text_encoding"
         | "ai_provider_unavailable"
+        | "ai_provider_rejected"
+        | "ai_provider_rate_limited"
         | "ai_invalid_response"
         | "candidate_validation_failed"
         | "lease_lost"
@@ -59,6 +61,14 @@ mod tests {
         assert_eq!(
             safe_failure_code("unsupported_content_type"),
             "unsupported_content_type"
+        );
+        assert_eq!(
+            safe_failure_code("ai_provider_rejected"),
+            "ai_provider_rejected"
+        );
+        assert_eq!(
+            safe_failure_code("ai_provider_rate_limited"),
+            "ai_provider_rate_limited"
         );
     }
 }
