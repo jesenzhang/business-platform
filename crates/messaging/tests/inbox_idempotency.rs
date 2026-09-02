@@ -15,7 +15,7 @@ async fn setup_pool() -> sqlx::PgPool {
         .expect("failed to connect to PostgreSQL")
 }
 
-/// `CREATE TABLE IF NOT EXISTS` is not concurrency safe in PostgreSQL: two
+/// `CREATE TABLE IF NOT EXISTS` is not concurrency safe in `PostgreSQL`: two
 /// parallel sessions can pass the existence check together and one fails on
 /// the duplicate. Tests in this binary run on parallel threads, so the schema
 /// setup happens exactly once per test process.
