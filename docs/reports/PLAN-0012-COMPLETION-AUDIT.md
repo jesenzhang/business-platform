@@ -241,8 +241,11 @@ environment was not blocked this time: `pwsh -NoProfile` resolved
 | `pwsh -NoProfile -File scripts/check-openapi.ps1` | PASS |
 | `DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh` | PASS (`[drill selftest] PASS`, exit 0) |
 
-Remote corroboration on this branch's pushed SHA (GitHub Architecture
-Fitness job and full CI) is appended below once the runs complete.
+Remote corroboration: GitHub CI run `33656338653` on `8fd46de` —
+**success**, all 10 jobs green, including **Architecture Fitness**,
+Format/Check/Clippy (Rust 1.94.1), Unit tests, PostgreSQL + MinIO + E2E
+contracts, CLI and MCP contracts, Security scanning (cargo-audit, gitleaks,
+trivy), Frontend checks, and Frontend Playwright smoke.
 
 ### Slice C — preproduction acceptance: still BLOCKED / NOT RUN
 
