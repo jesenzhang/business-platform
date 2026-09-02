@@ -348,6 +348,28 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .await?;
         transaction.commit().await?;
     }
+    let applied = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(version), 0) FROM document_processing_migrations",
+    )
+    .fetch_one(pool)
+    .await?;
+    if applied < 8 {
+        let mut transaction = pool.begin().await?;
+        sqlx::raw_sql(include_str!(
+            "../migrations/008_processing_correlation_propagation.sql"
+        ))
+        .execute(&mut *transaction)
+        .await?;
+        sqlx::query(
+            "INSERT INTO document_processing_migrations (version, checksum, applied_at) VALUES (?1, ?2, ?3)",
+        )
+        .bind(8_i64)
+        .bind(include_bytes!("../migrations/008_processing_correlation_propagation.sql").as_slice())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+    }
     ensure_revision1_finding_columns(pool).await?;
     Ok(())
 }
@@ -546,6 +568,7 @@ struct JobRow {
     created_by: String,
     created_at: String,
     updated_at: String,
+    correlation_id: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
@@ -593,9 +616,11 @@ struct AiTaskRow {
     fence_version: i64,
     lease_expires_at: Option<String>,
     output_candidate_id: Option<String>,
+    correlation_id: Option<String>,
+    created_at: String,
 }
 
-const AI_TASK_COLUMNS: &str = "id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, lease_owner, lease_token, fence_version, lease_expires_at, output_candidate_id";
+const AI_TASK_COLUMNS: &str = "id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, lease_owner, lease_token, fence_version, lease_expires_at, output_candidate_id, created_at, correlation_id";
 
 #[allow(clippy::needless_pass_by_value)]
 fn map_sql_error(error: sqlx::Error) -> ProcessingRepositoryError {
@@ -664,7 +689,8 @@ fn to_job(row: JobRow) -> Result<ProcessingJob, ProcessingRepositoryError> {
         row.fence_version,
         lease,
     )
-    .map_err(|_| ProcessingRepositoryError::Failed)?;
+    .map_err(|_| ProcessingRepositoryError::Failed)?
+    .with_correlation_id(row.correlation_id);
     if let Some(revision_id) = row.document_revision_id {
         job.bind_document_revision(parse_uuid(&revision_id)?)
             .map_err(|_| ProcessingRepositoryError::Failed)?;
@@ -678,7 +704,7 @@ async fn load_job(
     job_id: Uuid,
 ) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
     let row = sqlx::query_as::<_, JobRow>(
-        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND id = ?2",
+        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE tenant_id = ?1 AND id = ?2",
     )
     .bind(tenant_id.to_string())
     .bind(job_id.to_string())
@@ -693,7 +719,7 @@ async fn load_job_by_id(
     job_id: Uuid,
 ) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
     let row = sqlx::query_as::<_, JobRow>(
-        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE id = ?1",
+        "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE id = ?1",
     )
     .bind(job_id.to_string())
     .fetch_optional(&mut *connection)
@@ -773,7 +799,7 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
             .await
             .map_err(map_sql_error)?;
         let existing = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE tenant_id = ?1 AND document_id = ?2 AND request_key = ?3",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE tenant_id = ?1 AND document_id = ?2 AND request_key = ?3",
         )
         .bind(job.tenant_id().to_string())
         .bind(job.document_id().to_string())
@@ -796,7 +822,7 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
             return Ok(existing);
         }
         let result = sqlx::query(
-            "INSERT INTO document_processing_jobs (id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?12, ?13, ?14, ?15)",
+            "INSERT INTO document_processing_jobs (id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?12, ?13, ?14, ?15, ?16)",
         )
         .bind(job.id().to_string())
         .bind(job.tenant_id().to_string())
@@ -813,6 +839,7 @@ impl ProcessingJobCommandPort for SqliteProcessingStore {
         .bind(job.created_by().to_string())
         .bind(job.created_at().to_rfc3339())
         .bind(job.updated_at().to_rfc3339())
+        .bind(job.correlation_id().map(str::to_owned))
         .execute(&mut *connection)
         .await;
         if let Err(error) = result {
@@ -927,7 +954,7 @@ impl ProcessingJobClaimPort for SqliteProcessingStore {
             .await
             .map_err(map_sql_error)?;
         let row = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE status = 'queued' AND cancel_requested_at IS NULL AND next_attempt_at <= ?1 AND (lease_expires_at IS NULL OR lease_expires_at <= ?1) ORDER BY created_at, id LIMIT 1",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE status = 'queued' AND cancel_requested_at IS NULL AND next_attempt_at <= ?1 AND (lease_expires_at IS NULL OR lease_expires_at <= ?1) ORDER BY created_at, id LIMIT 1",
         )
         .bind(now.to_rfc3339())
         .fetch_optional(&mut *connection)
@@ -1002,7 +1029,7 @@ impl ProcessingJobClaimPort for SqliteProcessingStore {
     async fn reclaim_expired(&self, now: DateTime<Utc>) -> Result<u64, ProcessingRepositoryError> {
         let mut connection = self.pool.acquire().await.map_err(map_sql_error)?;
         let rows = sqlx::query_as::<_, JobRow>(
-            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= ?1",
+            "SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= ?1",
         )
         .bind(now.to_rfc3339())
         .fetch_all(&mut *connection)
@@ -1428,13 +1455,15 @@ fn to_ai_task(row: AiTaskRow) -> Result<AiTask, ProcessingRepositoryError> {
             .output_candidate_id
             .map(|value| parse_uuid(&value))
             .transpose()?,
+        correlation_id: row.correlation_id,
+        created_at: parse_time(&row.created_at)?,
     })
 }
 
 #[async_trait]
 impl AiTaskPort for SqliteProcessingStore {
     async fn enqueue(&self, task: &AiTask) -> Result<(), ProcessingRepositoryError> {
-        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'queued', ?5, ?6, ?7, ?8, 0, ?9, ?9) ON CONFLICT(tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
+        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at, correlation_id) VALUES (?1, ?2, ?3, ?4, 'queued', ?5, ?6, ?7, ?8, 0, ?9, ?9, ?10) ON CONFLICT(tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
             .bind(task.id.to_string())
             .bind(task.tenant_id.to_string())
             .bind(task.job_id.to_string())
@@ -1443,6 +1472,7 @@ impl AiTaskPort for SqliteProcessingStore {
             .bind(task.attempt_count)
             .bind(task.max_attempts)
             .bind(Utc::now().to_rfc3339())
+            .bind(task.correlation_id.clone())
             .execute(&self.pool)
             .await
             .map_err(map_sql_error)?;
@@ -1590,7 +1620,7 @@ impl AiTaskPort for SqliteProcessingStore {
     }
 }
 
-const JOB_COLUMNS: &str = "id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at";
+const JOB_COLUMNS: &str = "id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id";
 
 struct ImmediateSqliteConnection {
     inner: PoolConnection<Sqlite>,
@@ -1780,9 +1810,10 @@ async fn insert_unified_audit(
         action,
         resource,
         Uuid::now_v7(),
+        job.correlation_id()
+            .and_then(|value| Uuid::parse_str(value).ok()),
         None,
-        None,
-        None,
+        job.correlation_id().map(str::to_owned),
         None,
         result,
         None,
@@ -2278,6 +2309,8 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             fence_version: 0,
             lease_expires_at: None,
             output_candidate_id: None,
+            correlation_id: job.correlation_id().map(str::to_owned),
+            created_at: now,
         };
         save_job_fenced(&mut connection, &job, expected, fence, now).await?;
         write_step_completed(
@@ -2304,7 +2337,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
-        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'queued', ?5, 0, ?6, ?7, 0, ?7, ?7) ON CONFLICT(tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
+        sqlx::query("INSERT INTO document_ai_tasks (id, tenant_id, job_id, step_kind, status, input_artifact_id, attempt_count, max_attempts, next_attempt_at, fence_version, created_at, updated_at, correlation_id) VALUES (?1, ?2, ?3, ?4, 'queued', ?5, 0, ?6, ?7, 0, ?7, ?7, ?8) ON CONFLICT(tenant_id, job_id, step_kind, attempt_count) DO NOTHING")
             .bind(task.id.to_string())
             .bind(task.tenant_id.to_string())
             .bind(task.job_id.to_string())
@@ -2312,6 +2345,7 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             .bind(&task.input_artifact_id)
             .bind(task.max_attempts)
             .bind(now.to_rfc3339())
+            .bind(task.correlation_id.clone())
             .execute(&mut *connection)
             .await
             .map_err(map_sql_error)?;

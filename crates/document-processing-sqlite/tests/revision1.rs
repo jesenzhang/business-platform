@@ -59,12 +59,18 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         3,
         Utc::now(),
     )
-    .unwrap_or_else(|_| unreachable!());
+    .unwrap_or_else(|_| unreachable!())
+    .with_correlation_id(Some("req-revision1-0001".to_string()));
     store.create(&job).await.unwrap_or_else(|_| unreachable!());
     let claimed = ProcessingJobClaimPort::claim_next(&store, "business-test", Utc::now(), 60)
         .await
         .unwrap_or_else(|_| unreachable!())
         .unwrap_or_else(|| unreachable!());
+    assert_eq!(
+        claimed.job.correlation_id(),
+        Some("req-revision1-0001"),
+        "correlation id must round-trip through the jobs table"
+    );
     let fence = ExecutionFence::new(
         "business-test",
         claimed.lease_token.clone(),
@@ -118,6 +124,27 @@ async fn revision_one_uow_commits_fixed_pipeline_and_review_atomically() {
         .await
         .unwrap_or_else(|_| unreachable!())
         .unwrap_or_else(|| unreachable!());
+    assert_eq!(
+        claimed_task.correlation_id.as_deref(),
+        Some("req-revision1-0001"),
+        "AI task must inherit the job correlation id through the ai_tasks table"
+    );
+    assert!(
+        claimed_task.created_at <= Utc::now(),
+        "AI task created_at must be persisted for queue-wait measurement"
+    );
+    let audit_trace: Option<String> = sqlx::query_scalar(
+        "SELECT trace_id FROM audit_events WHERE tenant_id = ?1 ORDER BY stream_sequence DESC LIMIT 1",
+    )
+    .bind(tenant.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap_or_else(|_| unreachable!());
+    assert_eq!(
+        audit_trace.as_deref(),
+        Some("req-revision1-0001"),
+        "audit rows must carry the job correlation id as trace context"
+    );
     let candidate = DeterministicLocalExtractor
         .extract(ExtractionRequest {
             tenant_id: tenant,

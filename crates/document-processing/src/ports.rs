@@ -184,6 +184,10 @@ pub struct AiTask {
     pub fence_version: i64,
     pub lease_expires_at: Option<DateTime<Utc>>,
     pub output_candidate_id: Option<Uuid>,
+    /// Request/correlation identity inherited from the owning job, for logs.
+    pub correlation_id: Option<String>,
+    /// Enqueue instant of the task row; the worker derives queue-wait from it.
+    pub created_at: DateTime<Utc>,
 }
 
 #[async_trait]

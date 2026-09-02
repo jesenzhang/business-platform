@@ -340,7 +340,7 @@ async fn process_task(
         return;
     };
     let fence = ExecutionFence::new(config.worker_id.clone(), token, task.fence_version);
-    tracing::info!(task_id = %task.id, job_id = %task.job_id, step = %task.step_kind, fence = task.fence_version, "AI task claimed");
+    tracing::info!(task_id = %task.id, job_id = %task.job_id, step = %task.step_kind, fence = task.fence_version, correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task claimed");
     let heartbeat = LeaseHeartbeatGuard::start(
         Arc::clone(&services.execution),
         task.tenant_id,
@@ -414,7 +414,7 @@ async fn process_task(
             tracing::error!(tenant_id = %task.tenant_id, task_id = %task.id, "AI task result discarded because lease state was not proven");
         }
         Err(error) if heartbeat_stopped && !heartbeat_lost => {
-            tracing::warn!(task_id = %task.id, failure_code = error.code(), "AI task failed");
+            tracing::warn!(task_id = %task.id, failure_code = error.code(), correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task failed");
             if let Err(persistence_error) = services
                 .execution
                 .fail_ai_task(
@@ -431,7 +431,7 @@ async fn process_task(
             }
         }
         Err(error) => {
-            tracing::warn!(tenant_id = %task.tenant_id, task_id = %task.id, failure_code = error.code(), "AI task failed without a provable lease; state transition skipped");
+            tracing::warn!(tenant_id = %task.tenant_id, task_id = %task.id, failure_code = error.code(), correlation_id = task.correlation_id.as_deref().unwrap_or("-"), "AI task failed without a provable lease; state transition skipped");
         }
     }
 }

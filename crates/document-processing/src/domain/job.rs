@@ -232,6 +232,10 @@ pub struct ProcessingJob {
     updated_at: DateTime<Utc>,
     fence_version: i64,
     lease: Option<LeaseState>,
+    /// Request/correlation identity of the enqueueing call (e.g. the
+    /// originating `X-Request-Id`). Carried into AI tasks, audit records and
+    /// worker logs; never a secret and never derived from document content.
+    correlation_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -287,6 +291,7 @@ impl ProcessingJob {
             updated_at: now,
             fence_version: 0,
             lease: None,
+            correlation_id: None,
         })
     }
 
@@ -487,7 +492,26 @@ impl ProcessingJob {
             updated_at,
             fence_version,
             lease,
+            correlation_id: None,
         })
+    }
+
+    /// Attach the request/correlation identity of the enqueueing call. Used
+    /// by the enqueue composition root and by persistence adapters when
+    /// rehydrating the stored column. Blank values normalize to absent and
+    /// values are capped at 64 characters — the same bound as the column.
+    #[must_use]
+    pub fn with_correlation_id(mut self, correlation_id: Option<String>) -> Self {
+        self.correlation_id = correlation_id.and_then(|value| {
+            let trimmed = value.trim();
+            (!trimmed.is_empty()).then(|| trimmed.chars().take(64).collect())
+        });
+        self
+    }
+
+    #[must_use]
+    pub fn correlation_id(&self) -> Option<&str> {
+        self.correlation_id.as_deref()
     }
 
     #[must_use]

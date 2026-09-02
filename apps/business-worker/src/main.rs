@@ -271,7 +271,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     };
                     if let Some(claimed) = claimed {
-                        tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, "processing job claimed");
+                        tracing::info!(job_id = %claimed.job.id(), document_id = %claimed.job.document_id(), step = %claimed.job.current_step(), fence = claimed.fence_version, correlation_id = claimed.job.correlation_id().unwrap_or("-"), "processing job claimed");
                         let services_for_task = Arc::clone(&services);
                         let source_for_task = Arc::clone(&source);
                         let config_for_task = config.clone();
@@ -379,7 +379,7 @@ async fn process_claimed(
         } else if !heartbeat_stopped || heartbeat_lost {
             tracing::error!(tenant_id = %job.tenant_id(), job_id = %job.id(), step = %step, "processing step result discarded because lease state was not proven");
         }
-        tracing::warn!(job_id = %job.id(), step = %step, failure_code = error.code(), "processing job step failed");
+        tracing::warn!(job_id = %job.id(), step = %step, failure_code = error.code(), correlation_id = job.correlation_id().unwrap_or("-"), "processing job step failed");
     } else if !heartbeat_lost
         && heartbeat_stopped
         && job.status() == document_processing::ProcessingJobStatus::Running
