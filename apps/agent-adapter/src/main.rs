@@ -472,14 +472,11 @@ mod tests {
 
     #[tokio::test]
     async fn connection_refused_is_reported_without_fake_business_data() {
-        // Bind then drop an ephemeral listener so the port deterministically
-        // refuses connections instead of guessing a fixed host port.
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap_or_else(|_| unreachable!());
-        let addr = listener.local_addr().unwrap_or_else(|_| unreachable!());
-        drop(listener);
-        let response = call_overview(client_for(format!("http://{addr}"))).await;
+        // Port 0 can never host a listener (bind port 0 only means
+        // "ephemeral"), so connecting deterministically fails at the
+        // transport layer — unlike a released ephemeral port, which a
+        // concurrent test could rebind and turn this into a race.
+        let response = call_overview(client_for("http://127.0.0.1:0".to_string())).await;
         assert_eq!(response.error.map(|error| error.code), Some(-32001));
         assert!(response.result.is_none());
     }
