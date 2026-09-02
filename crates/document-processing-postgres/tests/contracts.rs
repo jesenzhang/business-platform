@@ -134,8 +134,15 @@ async fn postgres_processing_contract_claims_and_restarts() {
         .create(&recovery_job)
         .await
         .unwrap_or_else(|_| unreachable!());
+    // Fenced job writes are additionally checked against the database wall
+    // clock (`lease_expires_at > CURRENT_TIMESTAMP`), so the crashed worker's
+    // virtual lease must stay ahead of real time until the start/complete
+    // steps below finish: 10s sits well above any realistic execution time of
+    // this test while reclaim below (now + 11s) still observes the lease as
+    // expired and stays under the concurrent-claim job's 30s lease, which
+    // `reclaim_expired` must leave untouched.
     let first = store
-        .claim_next("crashed-worker", now, 1)
+        .claim_next("crashed-worker", now, 10)
         .await
         .unwrap_or_else(|_| unreachable!())
         .unwrap_or_else(|| unreachable!());
@@ -165,7 +172,7 @@ async fn postgres_processing_contract_claims_and_restarts() {
         )
         .await
         .unwrap_or_else(|_| unreachable!());
-    let reclaimed_at = now + Duration::seconds(2);
+    let reclaimed_at = now + Duration::seconds(11);
     assert_eq!(store.reclaim_expired(reclaimed_at).await.unwrap_or(0), 1);
     let second = store
         .claim_next("recovery-worker", reclaimed_at, 30)
@@ -204,6 +211,14 @@ async fn postgres_processing_contract_claims_and_restarts() {
     sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
         .bind(tenant)
         .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    // The shared test database also backs the outbox reliability contracts,
+    // whose claim/recovery statements scan `outbox_events` table-wide. Delete
+    // this test's events so a later target's worker cannot claim them.
+    sqlx::query("DELETE FROM outbox_events WHERE tenant_id = $1")
+        .bind(tenant.to_string())
         .execute(&pool)
         .await
         .unwrap_or_else(|_| unreachable!());
@@ -291,6 +306,11 @@ async fn postgres_processing_contract_reclaims_expired_ai_task() {
     sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
         .bind(tenant)
         .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("DELETE FROM outbox_events WHERE tenant_id = $1")
+        .bind(tenant.to_string())
         .execute(&pool)
         .await
         .unwrap_or_else(|_| unreachable!());
@@ -656,6 +676,11 @@ async fn postgres_processing_revision_one_uow_is_atomic_and_replayable() {
     sqlx::query("DELETE FROM documents WHERE tenant_id = $1 AND id = $2")
         .bind(tenant)
         .bind(document)
+        .execute(&pool)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    sqlx::query("DELETE FROM outbox_events WHERE tenant_id = $1")
+        .bind(tenant.to_string())
         .execute(&pool)
         .await
         .unwrap_or_else(|_| unreachable!());
