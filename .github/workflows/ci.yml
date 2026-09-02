@@ -6,6 +6,7 @@ on:
       - main
       - "feat/PLAN-*"
       - "codex/plan-0008-*"
+      - "codex/plan-0012-*"
   pull_request:
     branches:
       - main
@@ -217,6 +218,20 @@ jobs:
           cargo test -p business-worker --all-features
           cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1
           bash scripts/test-postgres-minio-multiprocess.sh
+      - name: Backup/restore drill selftest (path guards, cleanup ownership)
+        run: DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh
+      - name: Install MinIO client
+        run: |
+          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x /usr/local/bin/mc
+          mc --version
+      - name: Backup/restore drill (PostgreSQL + MinIO, unique drill-owned targets)
+        env:
+          MC_ALIAS_HOST: http://127.0.0.1:9000
+          MC_ROOT_USER: minioadmin
+          MC_ROOT_PASSWORD: minioadmin
+          BUCKET: business-platform
+        run: bash deploy/operations/drill-backup-restore.sh
       - name: Architecture and diff checks
         shell: pwsh
         run: |
