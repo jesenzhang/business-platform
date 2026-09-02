@@ -174,6 +174,27 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 后续批次。PLAN-0012 剩余：T3.3（IdP compose + console 登录）、M5 发布审计
 > （T4.2 worker 指标与 T4.3 演练首跑在 M5 一并收口）。
 
+> 2026-09-02: PLAN-0012 发布加固批次（v0.1 候选）完成代码面收口。
+> ① 备份演练脚本重写：seed 标记先于备份并校验 checksum/size、唯一安全
+> drill 子目录、恢复到唯一 restore bucket、从恢复目标验证、trap 清理、
+> 禁止对未验证 BACKUP_DIR 执行删除（本机执行 NOT RUN：无 docker/psql/
+> pg_dump/mc，由 CI service containers 补跑）。② OIDC 生产加固：
+> audience 必填、issuer/jwks HTTPS-only、JWKS/discovery 不跟随重定向、
+> 生产 transport fail-closed，真实 OIDC principal 跨租户契约测试。
+> ③ AI Provider 重试语义：429 保留并钳制 Retry-After、Timeout/5xx 平台
+> backoff、Authentication/InvalidRequest 不重试，端到端 ProviderError→
+> disposition 测试，核心层无 provider 类型。④ 可观测性：生产强制 JSON
+> 日志（三进程 fail-closed + 回归测试）、`x-request-id`→correlation_id
+> 贯穿 Job/AI Task/审计/worker 日志（migration 018/SQLite 008）、HTTP
+> method 归一到固定集合、worker `/metrics`（`observability.metrics_addr`
+> 生产必填）新增吞吐/排队/lease 丢失与回收/重试 disposition/AI 时延/
+> 429/5xx 指标（标签全部代码枚举，无 tenant/文档/路径/模型输出），
+> `deploy/observability/` 提供 Prometheus 抓取配置与最小 Grafana
+> dashboard。⑤ 稳定性：agent-adapter 固定端口 flake 测试替换为进程内
+> stub server（连接拒绝/上游 5xx/协议错误/正常返回四态）。
+> PLAN-0012 剩余：T3.3 后置、M5 发布审计（性能 smoke、预生产全链路
+> 演练、v0.1 tag）。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；

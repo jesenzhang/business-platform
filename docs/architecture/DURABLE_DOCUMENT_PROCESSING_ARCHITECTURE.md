@@ -142,3 +142,31 @@ tasks; a lost fence fails closed. Business workers dispatch exactly one
 `current_step` per claim and drain in-flight work on shutdown. Migration 011
 and SQLite migration 002 add tenant/state/lease constraints, AI attempt
 uniqueness, and processing audit records without changing published history.
+
+## 10. Provider retry semantics and correlation (v0.1, PLAN-0012)
+
+Retry classification for AI-provider failures is fixed and tested end to end
+(`ProviderError` → `ExtractionError` → `ProcessingFailureDisposition`):
+
+- `RateLimit` (HTTP 429) keeps the provider `Retry-After` hint; the platform
+  clamps it to a capped delay (`capped_provider_retry_after`) before the AI
+  task is retried. Dropping the hint is a defect.
+- `Timeout`/`Unavailable` (including provider 5xx) are transient and use the
+  platform backoff ladder.
+- `Authentication` is a configuration fault and maps to a permanent
+  rejection; `InvalidRequest`/protocol faults are permanent. Neither is
+  retried as transient.
+- `Aborted` maps to cancelled. Provider error kinds never enter core-layer
+  types; mapping stays in the ai-worker composition root.
+
+Correlation: a ProcessingJob may carry a bounded `correlation_id` (≤ 64
+chars, sourced from `x-request-id` or generated); AI tasks inherit it at
+enqueue (migration 018 / SQLite 008), worker logs emit it, and the unified
+audit records it as `trace_id` (and as `correlation_id` when UUID-parseable).
+It is diagnostic context only — never an authorization input and never
+logged with raw text, keys, prompts, or lease tokens.
+
+Worker runtime metrics (queue wait, attempt throughput by bounded outcome,
+dispositions, lease loss/reclaim, provider latency, 429/5xx) are exposed on
+each worker's `observability.metrics_addr` in production, with
+code-enumerated label values only. See OBSERVABILITY_ARCHITECTURE section 21.

@@ -349,12 +349,18 @@ development；生产配置对开发认证 fail-closed。
 Business API 已落地 OIDC/JWT 认证（PLAN-0012 T3.1/T3.2）：
 
 - 验证路径：Bearer JWT 的签名通过 issuer JWKS 验证（默认 OIDC discovery 解析
-  `jwks_uri`，可用 `auth.jwks_url` 显式覆盖），`exp`/`iss` 强制校验，
-  `auth.audience` 配置后校验 `aud`；JWKS 结果带 TTL 缓存，未知 `kid` 触发即时
+  `jwks_uri`，可用 `auth.jwks_url` 显式覆盖），`exp`/`iss` 强制校验，`aud`
+  在配置了 `auth.audience` 时校验；JWKS 结果带 TTL 缓存，未知 `kid` 触发即时
   刷新（支持 key rotation）。
+- 生产加固（PLAN-0012 release hardening）：生产配置必须配置非空
+  `auth.audience`（否则同 issuer 其他应用的 token 可被接受）；
+  `auth.issuer_url` 与 `auth.jwks_url` 必须为 HTTPS；JWKS/discovery 拉取
+  使用 `Policy::none` 不跟随重定向（302 视为失败），生产传输策略对明文端点
+  fail-closed。均有配置回归测试与 OIDC 契约测试覆盖。
 - fail-closed：仅允许 ES256/RS256（`alg=none` 在 key 查找前拒绝）；dev auth
   关闭时 `auth.issuer_url` 必须配置（配置校验强制）；JWKS 不可达时请求被拒绝
-  而不是绕过验证；所有认证失败对客户端表现为无细节的 401。
+  而不是绕过验证；所有认证失败对客户端表现为无细节的 401。跨租户拒绝由真实
+  OIDC principal（非 dev header）的契约测试验证。
 - 声明映射：`tenant_id`（UUID、非 nil）与 `user_id`（缺省回落 `sub`）必须存在；
   `management_permissions` 声明映射既有 ManagementPermission 集合，未识别的
   权限串一律不授予；`roles` 原样保留。声明不得来自请求头。

@@ -239,7 +239,10 @@ Handler 应保持薄：
 - 在 Handler 中调用 LLM/OCR；
 - 在 Handler 中决定领域权限。
 
-当前 `AppState` 直接公开 `PgPool` 属于过渡实现。目标状态应注入用例接口或应用服务集合。
+`AppState` 现状已符合该目标：它只持有按用例分组的小服务集合
+（`DocumentServices`/`ProcessingServices`/`GovernanceServices`/`StorageServices`
+及 `ReadinessProbe` 端口），全部以 `Arc<dyn ...>` 注入；数据库连接池不再出现在
+`AppState` 中，只封装在 readiness 探针等基础设施适配器内部（PLAN-0012 复核）。
 
 ## 5. 依赖方向
 
@@ -338,7 +341,12 @@ shared-kernel → Axum/SQLx
 - Local Adapter 必须阻止绝对路径和 `..` 路径穿越；
 - 异步代码不直接执行阻塞式 `std::fs`。
 
-当前 `S3Client` 未实现签名和真实预签名 URL，只能视为 Stub；当前 LocalStorage key 未做安全规范化，不能接收不可信 key。
+`S3Client` 现为 `aws-sdk-s3` 实现（真实 SigV4 签名、presign、流式
+body，PLAN-0012 复核确认，此前"Stub"描述作废）。`ObjectKey::new` 在构造点强制
+安全不变量（拒绝 `..`、绝对路径、UNC、盘符、NUL、空段并限长）；
+`LocalStorageClient` canonicalize base dir 并对解析后的父目录做
+`verify_under_root` 逃逸校验（明确记录 TOCTOU 边界：hostile input 用 MinIO）。
+租户/资源/版本 key 约束由 Document Management 的 key 生成规则负责。
 
 ## 8. 配置架构
 
@@ -470,8 +478,8 @@ Prepare → Preview → Confirm → Execute
 - [ ] Infrastructure 类型不向上泄漏；
 - [ ] `shared-kernel` 保持纯净和最小；
 - [ ] UI、Worker、OpenAPI 和 Agent 复用应用服务；
-- [ ] 对象存储使用真实 S3 签名实现；
-- [ ] Local Storage 不存在路径穿越；
+- [x] 对象存储使用真实 S3 签名实现（`aws-sdk-s3`，PLAN-0012 复核）；
+- [x] Local Storage 不存在路径穿越（`ObjectKey` 构造校验 + `verify_under_root`，PLAN-0012 复核）；
 - [ ] Outbox 支持多 Worker 安全处理；
 - [ ] 生产 CORS、错误和 Secret 行为安全；
 - [ ] 关键依赖具有真实集成测试。

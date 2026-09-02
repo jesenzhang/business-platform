@@ -377,3 +377,31 @@ MCP 可独立停止，Business API/worker 不依赖它们继续运行。
 Demo 使用显式开发身份和 deterministic local extractor，仅由 development
 配置启用。生产配置仍必须使用 PostgreSQL、对象存储和非开发认证；Demo 的
 固定 token、端口和数据卷不得作为生产部署默认值。
+
+## 21. 实现状态（v0.1 候选，PLAN-0012）
+
+运行时配置 fail-closed 规则（进程 `validate()` + 回归测试强制）：
+
+- `business-api`（生产）：OIDC `issuer_url` 必须为 HTTPS；`audience` 非空；
+  `jwks_url` 若覆盖必须为 HTTPS；不跟随重定向；`observability.log_format`
+  必须为 `json`。
+- `business-worker` / `ai-worker`（生产）：`observability.log_format` 必须为
+  `json`；`observability.metrics_addr` 必填（非空）。`ai-worker` 额外要求
+  PostgreSQL、real 模式非空 model/API key。
+- `config/production.toml` 提供 `metrics_addr` 默认 `0.0.0.0:9464`；同机
+  多 worker 时用进程前缀环境变量覆盖（如
+  `AI_WORKER__OBSERVABILITY__METRICS_ADDR=127.0.0.1:9465`）。
+
+指标抓取拓扑：`business-api` 在公共端口 `:3000/metrics`；worker 在各自
+`metrics_addr` 的 `/metrics`，属内部端口，不得直接暴露公网（经防火墙或仅
+Prometheus 可达网络）。参考配置 `deploy/observability/prometheus.yml` 与
+最小 Dashboard `deploy/observability/grafana-dashboard.json`。
+
+备份/恢复演练：`deploy/operations/drill-backup-restore.sh`
+（seed 标记先于备份写入并校验 checksum/size → `pg_dump` + MinIO mirror →
+恢复到唯一 `*_restore` 目标 → 从恢复目标验证 → trap 清理，禁止对未验证的
+`BACKUP_DIR` 执行删除）。脚本可在 CI/预生产运行。
+
+NOT RUN（v0.1 本地）：备份恢复演练实际执行、Staging/预生产部署演练——
+本地无 PostgreSQL/MinIO/docker；由 CI（service containers）与 M5 预生产
+演练补跑，条件见 PLAN-0012 完成审计。

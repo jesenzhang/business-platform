@@ -113,7 +113,7 @@
 
 | 任务 | 内容 | 预估 | 状态 |
 |---|---|---|---|
-| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h | ✅（2026-08-30，`apps/business-api/src/oidc.rs`；ES256/RS256 allow-list、JWKS TTL 缓存 + 未知 kid 即时刷新、discovery 默认 + `auth.jwks_url` 覆盖、dev auth 关闭时 issuer_url 强制） |
+| T3.1 | OIDC/JWT 验证：JWKS 拉取与缓存、issuer/audience/exp 校验、fail-closed（生产无 IdP 配置即拒绝） | 4h | ✅（2026-08-30，`apps/business-api/src/oidc.rs`；ES256/RS256 allow-list、JWKS TTL 缓存 + 未知 kid 即时刷新、discovery 默认 + `auth.jwks_url` 覆盖、dev auth 关闭时 issuer_url 强制；2026-09-02 生产加固：audience 必填、issuer/jwks HTTPS-only、JWKS/discovery 不跟随重定向、生产 transport fail-closed，配置回归 + 契约测试覆盖） |
 | T3.2 | 租户/权限映射：JWT 声明→TenantContext/ManagementPermission；401/403/跨租户 not-found 契约测试 | 3h | ✅（13 例契约测试 `tests/oidc_auth.rs`：有效/过期/错 audience/错 issuer/篡改签名/未知 kid/缺失或 nil tenant/JWKS 故障/alg=none 全 401，声明映射断言） |
 | T3.3 | demo compose 增加 IdP（Keycloak 或等价轻量方案）+ console 登录流程 + token 刷新 | 3h | ⬜ 后置（按本计划风险缓解：JWKS 静态验证最小闭环已落地，IdP 完整接入后置） |
 | T3.4 | CLI/MCP token 传递适配与测试 | 2h | ✅（CLI `--token` 与 agent-adapter bearer 配置均已参数化，真实 JWT 直接可用，无代码改动） |
@@ -123,8 +123,8 @@
 | 任务 | 内容 | 预估 | 状态 |
 |---|---|---|---|
 | T4.1 | observability crate 落地：结构化 JSON 日志 + 请求 ID 贯穿 API/Worker | 4h | ✅（2026-08-30：`observability::LogFormat`（text/json，启动 fail-fast 解析），四个进程 config 增 `log_format`；请求 ID 已由 tower-http request-id 贯穿 API） |
-| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h | ◐ v0.1 完成（2026-08-30：`business-api` 公共 `/metrics` Prometheus 文本端点 + `http_requests_total`/`http_request_duration_seconds`/`auth_failures_total` 有界标签指标，14 例契约测试含指标断言）；worker 侧吞吐/租约/AI 时延指标与 dashboard 配置后置（独立批次） |
-| T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h | ◐ 脚本落地（`deploy/operations/drill-backup-restore.sh`：seed→备份→恢复到 `*_restore`→行数/对象/一致性校验）；本机演练执行 NOT RUN（无本地 PostgreSQL/MinIO），预生产首跑待 M5 |
+| T4.2 | `/metrics` 暴露（处理任务吞吐、租约、AI 时延/失败率）+ 基础 dashboard 配置 | 3h | ✅（2026-08-30：`business-api` 公共 `/metrics` Prometheus 文本端点 + `http_requests_total`/`http_request_duration_seconds`/`auth_failures_total` 有界标签指标，14 例契约测试含指标断言；2026-09-02 发布加固补齐：worker `/metrics`（`observability.metrics_addr` 生产必填 fail-closed）新增排队等待、吞吐（bounded outcome）、lease 丢失/回收、重试 disposition、AI 任务/Provider 时延、429/5xx 指标；HTTP method 归一固定集合；`x-request-id`→correlation_id 贯穿 Job/AI Task/审计/worker 日志（migration 018/SQLite 008）；生产强制 JSON 日志回归测试；`deploy/observability/` Prometheus 抓取配置 + 最小 Grafana dashboard。标签全部代码枚举，无 tenant/文档/路径/模型输出。真实 Prometheus/Grafana 栈抓取为预生产项，本地 NOT RUN） |
+| T4.3 | 备份/恢复演练脚本（PostgreSQL pg_dump/restore + MinIO mirror）+ 演练记录 | 3h | ◐ 脚本落地（2026-09-02 加固重写：seed 标记先于备份并校验 checksum/size、唯一安全 drill 子目录、恢复到唯一 `*_restore` bucket、从恢复目标验证、trap 清理、禁止对未验证 `BACKUP_DIR` 执行删除；CI 可运行）；本机演练执行 NOT RUN（无本地 PostgreSQL/MinIO/docker），预生产首跑待 M5 |
 | T4.4 | 安全扫描接入 CI：cargo-audit / gitleaks / trivy（当前持续 NOT RUN 的缺口） | 2h | ✅（2026-08-30 新增 `security` CI job：cargo-audit --deny warnings、gitleaks-action、trivy fs CRITICAL/HIGH；本地执行 NOT RUN，由 GitHub CI 首跑验证） |
 | T4.5 | Runbook 初版：部署、升级、回滚、故障处置 | 2h | ✅（2026-08-30：`docs/operations/RUNBOOK.md` v0.1，含已知缺口清单） |
 
@@ -187,6 +187,28 @@ M0 ──→ M1 ──→ M2 ──┬──→ M5 (v0.1)
 - 回滚：认证回退 dev token（配置开关）；AI 提取回退 deterministic（配置
   开关）；移除 model-provider 依赖只需还原 ai-worker 组合根与 Cargo.toml。
   不回滚既有迁移，不删除业务事实。
+
+## 发布加固（2026-09-02，v0.1 候选收口批次）
+
+在 M2–M4 基础上，为消除 v0.1 发布阻断项执行以下加固（均有回归测试）：
+
+1. **备份演练脚本重写**：`BACKUP_DIR` 未验证禁止删除；唯一安全 drill 子目录；
+   seed 标记先于备份写入并校验 checksum/size；恢复到唯一 restore bucket 并
+   从恢复目标验证；trap 清理；CI 可运行。
+2. **OIDC 信任边界**：生产 audience 必填；issuer/jwks HTTPS-only；
+   JWKS/discovery 禁止重定向；真实 OIDC principal 跨租户拒绝契约测试；
+   JWKS 不可达 fail-closed。
+3. **AI Provider 重试语义**：`ProviderError.retry_after` 不丢失（429 钳制后
+   采用）；Timeout/5xx 平台 backoff；Authentication/InvalidRequest 永久化；
+   ProviderError→disposition 端到端测试；核心层零 provider 类型。
+4. **可观测性**：三进程生产 JSON 日志 fail-closed + 回归测试；request/correlation
+   ID 贯穿 ProcessingJob/AI Task/Audit/Worker 日志（migration 018/008）；
+   HTTP method 固定集合归一；worker 指标（吞吐/排队/lease/重试/AI 时延/429/5xx）
+   + `deploy/observability/` Prometheus + 最小 dashboard；不使用 tenant_id、
+   文档正文、路径、模型响应或其他高基数/敏感标签。
+5. **测试稳定性**：agent-adapter 固定端口（127.0.0.1:9）flake 替换为进程内
+   确定性 stub server（连接拒绝/上游 5xx/协议错误/正常返回）；全仓
+   `cargo test --workspace --all-features` 连续两次通过。
 
 ## 完成定义
 
