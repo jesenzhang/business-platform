@@ -288,6 +288,16 @@ impl BusinessApiConfig {
             {
                 messages.push("auth.jwks_url must use https in production".to_string());
             }
+            // PLAN-0012 release hardening: production log streams are machine
+            // parsed; the human-readable text default would break ingestion.
+            if !self
+                .observability
+                .log_format
+                .trim()
+                .eq_ignore_ascii_case("json")
+            {
+                messages.push("observability.log_format must be json in production".to_string());
+            }
         } else if self.auth.issuer_url.trim().is_empty() {
             // Without dev auth the only authentication path is OIDC; a missing
             // issuer would leave the API unreachable-by-design (fail closed).
@@ -472,6 +482,7 @@ mod tests {
         config.auth.issuer_url = "https://identity.example.test/realms/prod".to_string();
         config.auth.audience = Some("business-api".to_string());
         config.auth.jwks_url = Some("https://identity.example.test/realms/prod/certs".to_string());
+        config.observability.log_format = "json".to_string();
         config
     }
 
@@ -516,6 +527,26 @@ mod tests {
         assert!(error
             .to_string()
             .contains("auth.jwks_url must use https in production"));
+    }
+
+    #[test]
+    fn production_requires_json_log_format() {
+        for log_format in ["", "  ", "text", "syslog"] {
+            let mut config = production_config();
+            config.observability.log_format = log_format.to_string();
+            let Err(error) = config.validate() else {
+                unreachable!();
+            };
+            assert!(
+                error
+                    .to_string()
+                    .contains("observability.log_format must be json in production"),
+                "log_format {log_format:?} must be rejected in production"
+            );
+        }
+        let mut config = production_config();
+        config.observability.log_format = " JSON ".to_string();
+        assert!(config.validate().is_ok());
     }
 
     #[test]

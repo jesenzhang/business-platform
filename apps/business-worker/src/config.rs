@@ -156,6 +156,17 @@ impl BusinessWorkerConfig {
         if self.env == RuntimeEnvironment::Production && self.test_step_delay_millis != 0 {
             return Err("test_step_delay_millis must be zero in production".to_string());
         }
+        // PLAN-0012 release hardening: production log streams are machine
+        // parsed; the human-readable text default would break ingestion.
+        if self.env == RuntimeEnvironment::Production
+            && !self
+                .observability
+                .log_format
+                .trim()
+                .eq_ignore_ascii_case("json")
+        {
+            return Err("observability.log_format must be json in production".to_string());
+        }
         Ok(())
     }
 }
@@ -209,6 +220,20 @@ mod tests {
         config.ai_mode = AiMode::Inline;
         config.concurrency = 2;
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn production_requires_json_log_format() {
+        let mut config = BusinessWorkerConfig {
+            env: RuntimeEnvironment::Production,
+            ..BusinessWorkerConfig::default_for_test()
+        };
+        assert_eq!(
+            config.validate().err().as_deref(),
+            Some("observability.log_format must be json in production")
+        );
+        config.observability.log_format = "JSON".to_string();
+        assert!(config.validate().is_ok());
     }
 
     impl BusinessWorkerConfig {

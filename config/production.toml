@@ -28,4 +28,7 @@ enabled = true
 
 [observability]
 log_level = "info"
+# PLAN-0012 T4.5: production log output is JSON for machine ingestion; config
+# validation rejects the human-readable text default in production.
+log_format = "json"
 # otlp_endpoint = "http://otel-collector:4317"

@@ -48,15 +48,41 @@ pub async fn metrics_handler() -> impl IntoResponse {
     )
 }
 
+/// Map an HTTP method onto the fixed, bounded metric label set
+/// (PLAN-0012 T4.2 hardening). `http::Method` accepts arbitrary extension
+/// methods, so the raw string must never reach a Prometheus label; anything
+/// outside the known set collapses to `OTHER`.
+#[must_use]
+pub fn normalize_method(method: &axum::http::Method) -> &'static str {
+    use axum::http::Method;
+    if method == Method::GET {
+        "GET"
+    } else if method == Method::POST {
+        "POST"
+    } else if method == Method::PUT {
+        "PUT"
+    } else if method == Method::PATCH {
+        "PATCH"
+    } else if method == Method::DELETE {
+        "DELETE"
+    } else if method == Method::OPTIONS {
+        "OPTIONS"
+    } else if method == Method::HEAD {
+        "HEAD"
+    } else {
+        "OTHER"
+    }
+}
+
 /// Record one completed request with bounded labels (method, status).
 pub async fn track_requests(request: Request, next: Next) -> axum::response::Response {
-    let method = request.method().as_str().to_owned();
+    let method = normalize_method(request.method());
     let started = std::time::Instant::now();
     let response = next.run(request).await;
     let status = response.status();
     metrics::counter!(
         "http_requests_total",
-        "method" => method.clone(),
+        "method" => method,
         "status" => status.as_u16().to_string(),
     )
     .increment(1);
@@ -66,6 +92,36 @@ pub async fn track_requests(request: Request, next: Next) -> axum::response::Res
     )
     .record(started.elapsed().as_secs_f64());
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_method;
+    use axum::http::Method;
+
+    #[test]
+    fn known_methods_map_to_their_names() {
+        for (method, expected) in [
+            (Method::GET, "GET"),
+            (Method::POST, "POST"),
+            (Method::PUT, "PUT"),
+            (Method::PATCH, "PATCH"),
+            (Method::DELETE, "DELETE"),
+            (Method::OPTIONS, "OPTIONS"),
+            (Method::HEAD, "HEAD"),
+        ] {
+            assert_eq!(normalize_method(&method), expected);
+        }
+    }
+
+    #[test]
+    fn extension_methods_collapse_to_other() {
+        // A client-chosen verb must never become its own label value.
+        let murder = Method::from_bytes(b"MURDER").unwrap_or_else(|_| unreachable!());
+        assert_eq!(normalize_method(&murder), "OTHER");
+        let trace = Method::from_bytes(b"TRACE").unwrap_or_else(|_| unreachable!());
+        assert_eq!(normalize_method(&trace), "OTHER");
+    }
 }
 
 /// Record one authentication rejection with a bounded reason class.

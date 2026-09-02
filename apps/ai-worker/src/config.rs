@@ -220,6 +220,17 @@ impl AiWorkerConfig {
         if self.env == RuntimeEnvironment::Production && self.database.url.is_none() {
             return Err("production AI Worker requires a database URL".to_string());
         }
+        // PLAN-0012 release hardening: production log streams are machine
+        // parsed; the human-readable text default would break ingestion.
+        if self.env == RuntimeEnvironment::Production
+            && !self
+                .observability
+                .log_format
+                .trim()
+                .eq_ignore_ascii_case("json")
+        {
+            return Err("observability.log_format must be json in production".to_string());
+        }
         if self.ai_provider.mode == AiProviderMode::Real {
             if self.ai_provider.model.trim().is_empty() {
                 return Err("real AI provider requires a non-empty model".to_string());
@@ -278,4 +289,56 @@ fn default_region() -> String {
 }
 const fn default_max_content_bytes() -> usize {
     16 * 1024 * 1024
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A production config that satisfies every other production rule, so a
+    /// failure isolates the log-format check (PLAN-0012 release hardening).
+    fn production_config() -> AiWorkerConfig {
+        AiWorkerConfig {
+            env: RuntimeEnvironment::Production,
+            database: DatabaseConfig {
+                backend: WorkerDatabaseBackend::Postgres,
+                url: Some(
+                    SecretUrl::parse("postgres://db.example.test/business")
+                        .unwrap_or_else(|_| unreachable!()),
+                ),
+            },
+            storage: WorkerStorageConfig {
+                base_dir: Some("data/objects".to_string()),
+                ..WorkerStorageConfig::default()
+            },
+            worker_id: "ai-worker-test".to_string(),
+            concurrency: 1,
+            lease_duration_secs: 30,
+            heartbeat_interval_secs: 10,
+            poll_interval_millis: 500,
+            max_content_bytes: 1024,
+            test_task_delay_millis: 0,
+            observability: ObservabilityConfig {
+                log_format: "json".to_string(),
+                ..ObservabilityConfig::default()
+            },
+            ai_provider: AiProviderConfig::default(),
+        }
+    }
+
+    #[test]
+    fn production_requires_json_log_format() {
+        let mut config = production_config();
+        assert!(config.validate().is_ok());
+        for log_format in ["", "  ", "text", "syslog"] {
+            config.observability.log_format = log_format.to_string();
+            assert_eq!(
+                config.validate().err().as_deref(),
+                Some("observability.log_format must be json in production"),
+                "log_format {log_format:?} must be rejected in production"
+            );
+        }
+        config.observability.log_format = " JSON ".to_string();
+        assert!(config.validate().is_ok());
+    }
 }
