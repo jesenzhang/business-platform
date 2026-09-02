@@ -471,12 +471,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connection_refused_is_reported_without_fake_business_data() {
-        // Port 0 can never host a listener (bind port 0 only means
-        // "ephemeral"), so connecting deterministically fails at the
-        // transport layer — unlike a released ephemeral port, which a
-        // concurrent test could rebind and turn this into a race.
-        let response = call_overview(client_for("http://127.0.0.1:0".to_string())).await;
+    async fn connection_closed_before_response_is_reported_without_fake_business_data() {
+        // Transport-failure coverage through a socket the test fully owns:
+        // every connection is accepted and dropped without a response, so
+        // the client always fails with `ClientError::Transport` (→ -32001).
+        // OS-level "connection refused" semantics cannot be relied on here:
+        // released ephemeral ports can be rebound by sibling stubs, and
+        // connecting to port 0 has been observed to reach a responder when
+        // the full workspace suite runs.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        let addr = listener.local_addr().unwrap_or_else(|_| unreachable!());
+        tokio::spawn(async move {
+            while let Ok((stream, _peer)) = listener.accept().await {
+                drop(stream);
+            }
+        });
+        let response = call_overview(client_for(format!("http://{addr}"))).await;
         assert_eq!(response.error.map(|error| error.code), Some(-32001));
         assert!(response.result.is_none());
     }

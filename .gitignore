@@ -37,3 +37,5 @@ criterion/
 perf.data
 perf.data.old
 flamegraph.svg
+
+node_modules/
