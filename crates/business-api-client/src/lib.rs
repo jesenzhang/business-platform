@@ -380,24 +380,97 @@ mod tests {
         addr.to_string()
     }
 
+    /// Serializes every test that mutates the process-global environment in
+    /// this binary. The proxy variables are consumed at client-construction
+    /// time, so an unrelated env-sensitive test must not observe or race with
+    /// the mutation window.
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Saves the original proxy-related environment variables and restores
+    /// them exactly on drop, so a failing assertion cannot leak the test's
+    /// `*_PROXY` values into the process environment for later tests.
+    struct ProxyEnvGuard {
+        saved: Vec<(&'static str, Option<std::ffi::OsString>)>,
+    }
+
+    const PROXY_ENV_KEYS: [&str; 4] = ["HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+
+    impl ProxyEnvGuard {
+        fn point_proxies_at(proxy: &str) -> Self {
+            let saved = PROXY_ENV_KEYS
+                .iter()
+                .map(|key| (*key, std::env::var_os(key)))
+                .collect();
+            for key in PROXY_ENV_KEYS {
+                std::env::set_var(key, format!("http://{proxy}"));
+            }
+            Self { saved }
+        }
+    }
+
+    impl Drop for ProxyEnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in &self.saved {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
+
+    // The lock is deliberately held across the awaited request so the request
+    // executes strictly inside this test's env mutation window; a concurrent
+    // env-sensitive test can neither observe nor flip the variables mid-test.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn requests_never_route_through_environment_proxies() {
         // A proxy-aware client would reach the 503 responder configured via
         // `*_PROXY` instead of the 200 responder at the API base URL.
+        // Lock first so the mutation/restore window is exclusive, then restore
+        // via the guard on every exit path (including assertion panics).
+        let _env_guard = env_lock();
         let api = spawn_http_responder("HTTP/1.1 200 OK", br#"{"status":"ready"}"#);
         let proxy = spawn_http_responder("HTTP/1.1 503 Service Unavailable", b"");
-        for (key, value) in [
-            ("HTTP_PROXY", format!("http://{proxy}")),
-            ("http_proxy", format!("http://{proxy}")),
-            ("ALL_PROXY", format!("http://{proxy}")),
-            ("all_proxy", format!("http://{proxy}")),
-        ] {
-            std::env::set_var(key, value);
-        }
+        let _proxies = ProxyEnvGuard::point_proxies_at(&proxy);
         let config = ClientConfig::new(format!("http://{api}"), "test-token")
             .unwrap_or_else(|_| unreachable!());
         let client = BusinessApiClient::new(config).unwrap_or_else(|_| unreachable!());
         let ready = client.status().await;
         assert!(ready.is_ok(), "expected direct API response, got {ready:?}");
+    }
+
+    #[tokio::test]
+    async fn proxy_environment_is_restored_after_the_client_construction_window() {
+        // Regression for the env pollution itself: after the guarded test's
+        // pattern completes, the original (absent) proxy environment must be
+        // observable again, proving save/restore rather than leak.
+        let _env_guard = env_lock();
+        let had_before: Vec<bool> = PROXY_ENV_KEYS
+            .iter()
+            .map(|k| std::env::var_os(k).is_some())
+            .collect();
+        {
+            let _proxies = ProxyEnvGuard::point_proxies_at("127.0.0.1:1");
+            for key in PROXY_ENV_KEYS {
+                assert!(
+                    std::env::var_os(key).is_some(),
+                    "{key} must be set inside the guard"
+                );
+            }
+        }
+        let had_after: Vec<bool> = PROXY_ENV_KEYS
+            .iter()
+            .map(|k| std::env::var_os(k).is_some())
+            .collect();
+        assert_eq!(
+            had_before, had_after,
+            "proxy environment must be exactly restored"
+        );
     }
 }
