@@ -124,8 +124,9 @@ Slice C (preproduction acceptance) status.
 | --- | --- |
 | Base | `main@899dd3c` |
 | Branch | `codex/plan-0012-release-closure` |
-| Fix commits | `0f1405d` (CI pinning/checksums), `c0e54e2` (Succeeded-after-persist), `c8a54bd` (proxy env isolation), `b8e952a` (blank jwks_url rejection), docs sync (this amendment + RUNBOOK/ARCHITECTURE_STATUS/plan) |
-| Branch CI | to be recorded below once the push run completes |
+| Fix commits | `0f1405d` (CI pinning/checksums), `c0e54e2` (Succeeded-after-persist), `c8a54bd` (proxy env isolation), `b8e952a` (blank jwks_url rejection), docs sync `ef72c0b` (this amendment + RUNBOOK/ARCHITECTURE_STATUS/plan) |
+| Branch CI (push) | run `33635752037` on `ef72c0b` — **success**, all 10 jobs (includes Security scanning with the pinned+checksum-verified trivy/mc and the real PostgreSQL/MinIO drill) |
+| Branch CI (pull request) | run `33635788279` — first attempt failed in the multiprocess E2E “ai-worker crash recovery” phase (the phase poll missed the ~1s `waiting_for_ai`+`running` window on a loaded runner; the identical SHA had just passed on the push run). Re-run of the failed job on the same SHA: **success**, all jobs. No code path of this branch touches that timing; recorded as a runner-timing flake, not a regression. |
 
 ### Slice A — review fixes
 
