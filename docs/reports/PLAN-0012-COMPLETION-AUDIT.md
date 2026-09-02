@@ -133,7 +133,7 @@ Slice C (preproduction acceptance) status.
 | # | Fix | Evidence |
 | --- | --- | --- |
 | A1 | CI pins trivy `0.74.0` and MinIO `mc RELEASE.2025-08-13T08-35-41Z` to immutable GitHub release assets; SHA-256 checksums explicitly maintained in the workflow with a documented bump policy; verification runs after download and before execution, and any mismatch aborts the step (`sha256sum --check` + explicit `exit 1`) | `0f1405d` (`.github/workflows/ci.yml`); checksums cross-checked against upstream `checksums.txt`/`.sha256sum` release assets |
-| A2 | ai-worker records `TaskOutcome::Succeeded` only after `complete_ai_and_resume` returns success; a fenced or persistence-failed completion records `lease_unproven` + lease-lost instead, so every attempt emits exactly one final outcome | `c0e54e2`: in-process counting `metrics::Recorder` regression tests over all three completion outcomes (durable success / fenced / persistence-failed); red→green verified by temporarily re-introducing the early-`Succeeded` bug (the fenced and persistence-failure tests failed, then passed again after restoring the fix) |
+| A2 | ai-worker records `TaskOutcome::Succeeded` only after `complete_ai_and_resume` returns success; a `LeaseLost` (fenced) completion records `lease_unproven` + lease-lost, while `Unavailable`/`Failed`/other persistence errors record `failed` without touching the lease-lost counter, so every attempt emits exactly one final outcome (error attribution refined by `0809f83` in the 2026-09-03 Final Review amendment below) | `c0e54e2` + `0809f83`: in-process counting `metrics::Recorder` regression tests over all three completion outcomes (durable success / fenced / persistence-failed), each asserting the exact per-scenario counters and the exactly-one-final-outcome invariant; red→green verified for both the original early-`Succeeded` bug and the pre-refinement lease-loss over-attribution |
 | A3 | The proxy test saves and restores the original `HTTP_PROXY`/`http_proxy`/`ALL_PROXY`/`all_proxy` values (RAII guard) and serializes environment mutation behind a process-wide mutex, eliminating global env pollution and races with other env-var tests | `c8a54bd`: restore-exactness test (`proxy_environment_is_restored_after_the_client_construction_window`) + original no-proxy behaviour test under the guard |
 | A4 | Production config rejects blank/whitespace-only `auth.jwks_url` (a blank override would suppress OIDC discovery and fail every JWKS fetch — fail-closed at startup instead) | `b8e952a` (`apps/business-api/src/config.rs`): `production_rejects_blank_jwks_url` covers `Some("")` and `Some("   ")`; existing https/no-override tests retained |
 | A5 | RUNBOOK, `ARCHITECTURE_STATUS.md`, PLAN-0012 and this audit now reflect actual status (production audience mandatory, blank `jwks_url` rejected, CI-executed drill and pinned/verified CI tools, Slice C blocked state) | docs sync commit on this branch |
@@ -182,3 +182,86 @@ is **not archived**, and `docs/plans/README.md` is **not** updated for
 archival. Merging did not discharge the Slice C evidence requirement; the
 tag/archive trigger is a staging run of the Slice C items with this audit
 amended by their real evidence.
+
+## Amendment — Final Review (2026-09-03, branch `codex/plan-0012-slice-c-staging`)
+
+This amendment records the final-review fix to the ai-worker completion
+metric attribution and the re-executed Slice B gate battery on top of
+`main@a673c44`. It supersedes the A2 attribution wording above (A2 was
+updated in place to the final semantics); it does not restate the previous
+amendments.
+
+### Identity
+
+| Identity | Value |
+| --- | --- |
+| Base | `main@a673c44` (post-PR #9 state) |
+| Branch | `codex/plan-0012-slice-c-staging` |
+| Fix commit | `0809f83` (completion error attribution refinement) |
+| Docs sync | this amendment + `ARCHITECTURE_STATUS.md` (header integration mode corrected to PR #9 / GitHub PR merge; metric wording) + PLAN-0012 Release Closure item 2 |
+| Execution window | 2026-09-02T16:00Z–16:40Z (UTC), this workspace |
+
+### Slice A — final-review fix (`0809f83`)
+
+`complete_ai_and_resume` completion-boundary attribution in
+`apps/ai-worker/src/main.rs`:
+
+| Completion result | Before | After (`0809f83`) |
+| --- | --- | --- |
+| `Ok(_)` (durable persist) | `succeeded` | `succeeded` (unchanged) |
+| `Err(LeaseLost)` | `lease_unproven` + `ai_lease_lost_total` | `lease_unproven` + `ai_lease_lost_total` (unchanged) |
+| `Err(Unavailable / Failed / other persistence error)` | `lease_unproven` + `ai_lease_lost_total` (over-attributed lease loss) | `failed`, `ai_lease_lost_total` untouched |
+
+Every attempt still records exactly one final `ai_tasks_total` outcome.
+Regression tests assert per scenario: fenced → succeeded=0,
+lease_unproven=1, failed=0, lease_lost=1; persistence failure → failed=1,
+lease_unproven=0, lease_lost=0; durable success → succeeded=1, others 0;
+each asserts `succeeded + lease_unproven + failed == 1`.
+
+Evidence: `cargo test -p ai-worker --all-features` — 31 passed, 0 failed.
+Red→green: temporarily reverting the `Err(_)` arm to the pre-refinement
+attribution made
+`completion_persistence_failure_records_failed_without_lease_loss` fail
+(“a persistence error other than LeaseLost is a failed outcome” — left=0,
+right=1); restoring `0809f83` returned all three tests to green.
+
+### Slice B — local gate battery (Windows, Git Bash, pwsh 7, this workspace)
+
+All executed on this branch after `0809f83`; all PASS. The PowerShell
+environment was not blocked this time: `pwsh -NoProfile` resolved
+(PowerShell 7) and both scripts executed natively.
+
+| Gate | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | PASS |
+| `cargo check --workspace --all-targets --all-features` | PASS (only cargo's incremental hard-link filesystem notice; not a code lint) |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | PASS |
+| `cargo test --workspace --all-features` | PASS — 131 `test result: ok` lines, 0 failures, exit 0 |
+| `pwsh -NoProfile -File scripts/check-architecture.ps1` | PASS (Cargo metadata architecture fitness + OpenAPI contract + architecture fitness) |
+| `pwsh -NoProfile -File scripts/check-openapi.ps1` | PASS |
+| `DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh` | PASS (`[drill selftest] PASS`, exit 0) |
+
+Remote corroboration on this branch's pushed SHA (GitHub Architecture
+Fitness job and full CI) is appended below once the runs complete.
+
+### Slice C — preproduction acceptance: still BLOCKED / NOT RUN
+
+Environment re-probe on this workspace (2026-09-02T16:3xZ UTC): `docker`,
+`psql`, `pg_dump`, `mc` binaries all absent from `PATH`; no
+`deploy/staging/` configuration exists in the repository; no real IdP
+audience/issuer or model-provider credentials are configured
+(`AI_SMOKE_BASE_URL`, OIDC issuer/client, provider keys unset;
+`TEST_POSTGRESQL_URL`/`TEST_POSTGRESQL_RESTORED_URL` are local
+contract-test harness variables, not staging access). Per the mandate —
+缺少 staging 或真实凭据时保持 BLOCKED/NOT RUN，不得用 fake/stub 替代 — the
+Slice C table in the Release Closure amendment stands unchanged: real-stack
+provisioning, 20-concurrent smoke metrics, full-chain rehearsal, and live
+Prometheus/Grafana/cardinality verification remain BLOCKED, and the
+evidence row remains PENDING for whoever executes the staging run.
+
+### Release decision (unchanged)
+
+Slice A fix and Slice B gates are complete on this branch; Slice C still
+cannot pass here. The conditional final actions remain unmet on Slice C
+alone: `v0.1` tag **withheld**, PLAN-0012 **not archived**,
+`docs/plans/README.md` **not** updated for archival.

@@ -218,10 +218,13 @@ M0 ──→ M1 ──→ M2 ──┬──→ M5 (v0.1)
 1. **CI 工具供应链**（`0f1405d`）：trivy `0.74.0` 与演练用 MinIO mc
    `RELEASE.2025-08-13T08-35-41Z` 固定为不可变 GitHub release 资产；SHA-256
    显式维护、下载后/执行前校验，不匹配立即中止。
-2. **ai-worker 指标语义**（`c0e54e2`）：`TaskOutcome::Succeeded` 仅在
-   `complete_ai_and_resume` 持久成功后记录；fence/持久化失败记录
-   `lease_unproven` + lease lost，每次 attempt 恰好一个最终 outcome；
-   CountingRecorder 回归测试覆盖三分支（red→green 验证）。
+2. **ai-worker 指标语义**（`c0e54e2`，最终审阅由 `0809f83` 细化）：
+   `TaskOutcome::Succeeded` 仅在 `complete_ai_and_resume` 持久成功后记录；
+   `ProcessingRepositoryError::LeaseLost`（fence）记录 `lease_unproven` +
+   lease lost，Unavailable/Failed 等其他持久化错误记录 `failed` 且不增加
+   lease lost；每次 attempt 恰好一个最终 outcome；CountingRecorder 回归测试
+   对 fenced / persistence failure / durable success 三场景逐项断言计数器
+   （red→green 验证）。
 3. **测试环境隔离**（`c8a54bd`）：business-api-client 代理测试保存并恢复
    原始 `*_PROXY` 变量，进程级互斥避免与其他环境变量测试竞争。
 4. **配置 fail-closed**（`b8e952a`）：生产拒绝空白/纯空白 `auth.jwks_url`
