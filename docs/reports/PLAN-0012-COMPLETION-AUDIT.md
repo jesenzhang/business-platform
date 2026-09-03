@@ -1,7 +1,7 @@
 # PLAN-0012 Completion Audit
 
 Document ID: REPORT-PLAN-0012-COMPLETION-AUDIT  
-Status: Final (amended 2026-09-03 — real IdP issuer acceptance, see final section)  
+Status: Final (release executed 2026-09-03 — v0.1 tagged, plan archived; see final section)  
 Date: 2026-09-02  
 Scope: PLAN-0012 release-hardening completion verification on branch
 `codex/plan-0012-release-hardening` (20 commits `3d90765..f2c1e0b` over `main`).
@@ -529,3 +529,24 @@ Every Slice C row is now PASS on real components (staging stack
 final clause only: merge to `main`, Main CI green — then and only then
 `v0.1` tag, PLAN-0012 archive, plans README sync. `v0.1` remains
 **withheld** pending that decision.
+
+## Release executed (2026-09-03)
+
+All mandate conditions are met and the conditional final actions were
+executed:
+
+1. Slice A/B/C: all PASS (engineering gates + staging real-stack
+   acceptance + real-IdP production-auth acceptance — amendments above).
+2. Merge: PR #10 (`codex/plan-0012-slice-c-staging`) merged to `main` as
+   `2383651`; PR checks 20/20 SUCCESS; Main CI run `33705531597` — all
+   jobs success.
+3. Tag: annotated `v0.1` created on `2383651` and pushed.
+4. Archive: PLAN-0012 moved to `docs/plans/archive/2026/` with an archive
+   record (deferred T3.3 recorded honestly); `docs/plans/README.md`
+   updated (current list now only PLAN-0006 Proposed).
+
+Residual operational notes (not release-blocking, recorded in the IdP
+amendment caveats): production Auth0 tenants should deliver `roles` via
+the RBAC API and guard Action injection by audience; production
+deployments must run from a working directory without the repo's dev
+`config/` files (the fail-closed `dev_secret` rule rejects otherwise).

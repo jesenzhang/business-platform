@@ -2,7 +2,7 @@
 
 文档 ID：PLAN-0012
 版本：0.1
-状态：Active / local solo fast-forward
+状态：Integrated / Archived
 日期：2026-08-25
 责任边界：Document Intelligence（AI Provider 适配）、Business API（认证）、平台可观测性与预生产环境
 前置计划：PLAN-0001～PLAN-0005、PLAN-0008～PLAN-0011 已 Integrated；PLAN-0007 Active（本计划 M0 收尾归档）
@@ -258,3 +258,19 @@ v0.1 tag 与 PLAN-0012 归档仍按授权约束执行：待本分支
 全部里程碑完成且各自验收 PASS 或带原因 NOT RUN；预生产环境可完成
 "登录→上传→真实 AI 提取→Review→备份恢复"全链路演练并有记录；安全扫描
 CI job 生效；v0.1 tag 存在且指向通过 Main CI 的提交；PLAN-0012 归档。
+
+## 归档记录（2026-09-03）
+
+- 完成定义逐项满足：Slice A/B/C 全部 PASS（含 2026-09-02 staging 真实栈
+  与 2026-09-03 真实 Auth0 IdP 生产认证验收，逐项证据见
+  `docs/reports/PLAN-0012-COMPLETION-AUDIT.md` 各 amendment 与
+  `F:\Workspace\business-platform-staging\evidence\01`–`20`）；
+- Slice C 变更经 PR #10 合入 main（merge `2383651`），Main CI run
+  `33705531597` 全绿；
+- `v0.1` annotated tag 指向 `2383651`；
+- 后置项按原计划保留：T3.3（demo compose + console 登录流程）继续后置，
+  生产 IdP 接入由真实 Auth0 验收替代其验收意图，Keycloak demo compose
+  如有需要另立计划；
+- 遗留操作注记（见审计 caveat）：生产 Auth0 需以 RBAC API 下发 `roles`、
+  Action 应加 audience guard；生产部署必须从不含 repo dev 配置文件的
+  工作目录启动。
