@@ -241,10 +241,17 @@ bash deploy/operations/drill-backup-restore.sh`。
 
 Slice C（预生产验收：真实 IdP/model-provider + PostgreSQL + 对象存储 +
 Prometheus/Grafana、20 并发性能 smoke、全链路演练、指标抓取/标签基数验证）：
-当前工作区无 staging 环境与真实凭据，**BLOCKED / NOT RUN**，不得以
-fake/stub/本地测试替代验收证据。T5.1/T5.2 保持未验收状态；变更已合入
-main（PR #9，merge `eb62451`，Main CI `33637882962` 全绿），但 v0.1 tag 与
-PLAN-0012 归档在 Slice C 于预生产环境 PASS 之前不执行。
+**PASS（2026-09-02 staging 真实栈 + 2026-09-03 真实 IdP）**，无 fake/stub
+替代。staging 侧：本机 PostgreSQL 18 + MinIO + 内网 vLLM 真实推理 +
+Prometheus/Grafana，全链路（上传→真实提取→Review→崩溃恢复→备份恢复）、
+20 并发 smoke×2、抓取/仪表盘/标签基数逐项 PASS；IdP 侧：经用户授权自助注册
+Auth0 租户，production 模式 business-api 以真实 issuer/audience/JWKS
+discovery 启动，E2E 12/12 PASS（真实 JWT 授权、refresh、6 项 401 负例）、
+8 项生产 fail-closed 启动负例全部拒绝，含 authorization_code+PKCE 浏览器
+流程。证据目录 `F:\Workspace\business-platform-staging\evidence\`（`01`–`20`），
+逐项记录见 Completion Audit 的 Slice C 两次 amendment。T5.1/T5.2 已验收。
+v0.1 tag 与 PLAN-0012 归档仍按授权约束执行：待本分支
+（`codex/plan-0012-slice-c-staging`）合入 main 且 Main CI 全绿后进行。
 
 ## 完成定义
 

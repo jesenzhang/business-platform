@@ -1,7 +1,7 @@
 # PLAN-0012 Completion Audit
 
 Document ID: REPORT-PLAN-0012-COMPLETION-AUDIT  
-Status: Final (amended 2026-09-02 — Release Closure, see final section)  
+Status: Final (amended 2026-09-03 — real IdP issuer acceptance, see final section)  
 Date: 2026-09-02  
 Scope: PLAN-0012 release-hardening completion verification on branch
 `codex/plan-0012-release-hardening` (20 commits `3d90765..f2c1e0b` over `main`).
@@ -420,6 +420,9 @@ re-run's outcome is recorded in the branch CI history.
   BLOCKED: "option A" parameters (issuer/audience/client/test accounts)
   were never supplied. Dev-auth mode covered every downstream scenario
   but is not a substitute under the mandate's no-substitution rule.
+  > Superseded: a real Auth0 tenant was provisioned with user consent and
+  > the production-mode IdP leg passed 12/12; see the following amendment
+  > "Slice C IdP leg: real OIDC issuer acceptance".
 - The resource window in `14` mixes load with contract diagnostics, and
   PostgreSQL process CPU is unsampled; the water levels above must be
   quoted with that caveat.
@@ -439,3 +442,90 @@ on real components, with the single IdP leg BLOCKED pending parameters.
 The mandate's final gate remains: merge to `main` + Main CI green before
 `v0.1` tag / PLAN-0012 archive / plans README update. `v0.1` remains
 **withheld**.
+
+## Amendment — Slice C IdP leg: real OIDC issuer acceptance (2026-09-03)
+
+The BLOCKED IdP leg above is resolved by this amendment. Under explicit
+user authorization ("我没有Auth0 的账号，你可以自己申请一个，然后测试吗")
+a genuine Auth0 tenant was registered and the production-mode
+`business-api` was accepted end-to-end against it. No fake or stub stood
+in for the issuer at any point.
+
+### Identity and provisioning
+
+| Item | Value |
+| --- | --- |
+| IdP | Auth0 tenant `dev-lcjop6qfgzt7dc8v.us.auth0.com` (dev region), account self-registered by the agent with user consent on 2026-09-03 |
+| OIDC application | `business-platform-smoke`, client id `igvLedqzvOSAinFmEi8Mo3zQHrkoWKzS`, authorization_code + PKCE(S256) + refresh_token + ROP(password, test-only) |
+| API / audience | `https://business-platform.test/api` (HS256 signing app disabled-path unused; tenant signs RS256; JWKS via OIDC discovery) |
+| Test subject | `smoke.user@business-platform.test` → `sub auth0\|6a98c2522c88bf714c69f9c4` |
+| Claim injection | Auth0 Post Login Action `identity-claims` (id `ff1b7184-0afe-435b-9ebd-c3833b1a0f51`, deployed v7), activated via trigger binding `77da4f7a-d83a-40c5-aeae-ad4ea6f81281`, injects `tenant_id`, `user_id`, `management_permissions` into the access token |
+
+Secrets (Auth0 account/client credentials, smoke password, database
+password) live only in `F:\Workspace\business-platform-staging\secrets.env`
+and process environment — nothing was committed or written to evidence.
+
+### Production-mode launch and a fail-closed discovery
+
+`business-api` was launched with `ENV=production`, `issuer_url=https://dev-lcjop6qfgzt7dc8v.us.auth0.com/`,
+`audience=https://business-platform.test/api`, JWKS via discovery, `log_format=json`,
+explicit non-wildcard CORS, PostgreSQL 18 + MinIO. Health: `/health/live`
+200, `/health/ready` 200 (`migrations: compatible`).
+
+Operational finding (real, not a defect): the config loader
+(`crates/runtime-config/src/loader.rs`) also merges `config/default.toml`
+from the **working directory**, and the repo's default file carries
+`auth.dev_secret = "dev-only-secret"` for developer convenience. A
+production instance started from the repository root is therefore
+rejected — `auth.dev_secret must be absent in production` — which is the
+fail-closed rule doing its job. Production deployments must run from a
+working directory without repo dev config (the acceptance instance ran
+from an empty `prod-run` directory with a full env matrix).
+
+### E2E acceptance — 12/12 PASS (evidence `20-prod-e2e.raw`)
+
+`tools/prod-e2e-acceptance.py`, 2026-09-03T01:2xZ: ROP login returned
+access/refresh/id tokens with the injected claims; `GET /api/v1/documents`
+200 with real tenant rows (e.g. `smoke.txt`);
+`GET /api/v1/admin/audit-events` 200 driven purely by the injected
+`management_permissions` claim; `refresh_token` grant returned a new
+access token which was accepted again. Negatives, all 401: no token;
+tampered signature; `id_token` as bearer (audience mismatch);
+HS256 token forged with the repo dev secret; `alg=none` token; wrong
+issuer. Earlier artifacts cover the standard browser flow:
+`20-idp-authcode-token.raw` (authorization_code + PKCE via
+`localhost:8765` redirect + consent incl. offline access),
+`20-idp-refresh-test.raw`, `20-idp-token-with-claims.raw` (claims proof).
+
+### Startup fail-closed matrix — 8/8 rejected, rc=1 (evidence `20-failclosed-*.log`)
+
+With an otherwise-valid production env matrix, each single violation was
+refused at startup with a field-oriented message: dev auth enabled +
+secret + dev identity (3 messages); `dev_secret` alone; empty issuer;
+http(scheme) issuer; `cors_origins=*`; `log_format=text`; blank audience;
+`storage.backend=local`.
+
+### Caveats (honest)
+
+- `roles` is a reserved Auth0 claim and `setCustomClaim('roles', …)` is
+  silently ignored; the validator treats `roles` as optional and
+  authorization here is driven by `management_permissions`, so the flow
+  is complete, but a production Auth0 setup should deliver real roles via
+  the RBAC (Roles) API instead.
+- The Action injects claims without an audience guard:
+  `event.accessToken.aud` proved unreadable for the ROP flow in this
+  tenant, and the guard silently skipped injection when present.
+  Acceptable for a single-API test tenant; production Actions must guard
+  by audience — recorded as an operational note, not a product gap.
+- The ROP(password) grant is test-convenience; the acceptance additionally
+  proved the browser authorization_code + PKCE flow end-to-end.
+- Claim values (tenant `aaaaaaaa-…`, user `11111111-…`) deliberately match
+  the existing staging data so the real PostgreSQL data set was exercised.
+
+### Slice C status after this amendment
+
+Every Slice C row is now PASS on real components (staging stack
+2026-09-02 + real IdP 2026-09-03). The remaining gate is the mandate's
+final clause only: merge to `main`, Main CI green — then and only then
+`v0.1` tag, PLAN-0012 archive, plans README sync. `v0.1` remains
+**withheld** pending that decision.
