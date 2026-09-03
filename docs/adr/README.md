@@ -48,6 +48,7 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0021`](ADR-0021-business-application-packaging-and-published-extension-points.md) | Business Application Packaging and Published Extension Points | Accepted | 稳定 package、贡献、扩展点、兼容性和移除计划 |
 | [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Accepted | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
 | [`ADR-0023`](ADR-0023-ai-worker-model-provider-dependency.md) | ai-worker 的 model-provider 依赖与可替换性边界 | Accepted | vendored path（CI 私有仓库不可达）、reqwest TLS 并集代价、密钥边界、DocumentFieldExtractor 可替换、隔离门禁 |
+| [`ADR-0024`](ADR-0024-authentication-externalized-authorization-internal.md) | 认证外置与授权内置 | Accepted | 平台不实现凭证签发；外部 OIDC IdP 认证 + 平台内租户/权限/审计授权；私有化交付捆绑开源 IdP；服务身份独立 |
 
 ## 4. ADR-0003 的完整 Baseline
 

@@ -4,7 +4,7 @@
 > 修订二：M2 落地 `ModelBackedExtractor` 提取器实现与契约测试）  
 > 日期：2026-08-25  
 > 决策所有者：Document Intelligence（AI Provider 适配）、平台可观测性  
-> 关联文档：[PLAN-0012](../plans/current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)、
+> 关联文档：[PLAN-0012](../plans/archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)、
 > [DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE](./DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md)、
 > [DEPLOYMENT_ARCHITECTURE](./DEPLOYMENT_ARCHITECTURE.md)  
 > 替代：无  
