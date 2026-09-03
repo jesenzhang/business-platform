@@ -13,7 +13,7 @@
 - `migration`：PostgreSQL 迁移工具（manifest 校验）；SQLite 仅本地单进程。
 - 尚未交付：Document Search（Deferred）、PLAN-0006 Workspace、通用 Workflow/Analytics Runtime；这些不在 v0.1 范围。
 
-v0.1 完成审计与逐项 PASS/NOT RUN 记录见 `docs/plans/current/PLAN-0012-runnable-v1-auth-ai-provider-observability.md` 与 `docs/reports/`。
+v0.1 完成审计与逐项 PASS/NOT RUN 记录见 `docs/plans/archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md` 与 `docs/reports/`。
 
 ## 权威文档
 
