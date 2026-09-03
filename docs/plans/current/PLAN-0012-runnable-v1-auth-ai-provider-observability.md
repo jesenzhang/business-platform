@@ -218,10 +218,13 @@ M0 ──→ M1 ──→ M2 ──┬──→ M5 (v0.1)
 1. **CI 工具供应链**（`0f1405d`）：trivy `0.74.0` 与演练用 MinIO mc
    `RELEASE.2025-08-13T08-35-41Z` 固定为不可变 GitHub release 资产；SHA-256
    显式维护、下载后/执行前校验，不匹配立即中止。
-2. **ai-worker 指标语义**（`c0e54e2`）：`TaskOutcome::Succeeded` 仅在
-   `complete_ai_and_resume` 持久成功后记录；fence/持久化失败记录
-   `lease_unproven` + lease lost，每次 attempt 恰好一个最终 outcome；
-   CountingRecorder 回归测试覆盖三分支（red→green 验证）。
+2. **ai-worker 指标语义**（`c0e54e2`，最终审阅由 `0809f83` 细化）：
+   `TaskOutcome::Succeeded` 仅在 `complete_ai_and_resume` 持久成功后记录；
+   `ProcessingRepositoryError::LeaseLost`（fence）记录 `lease_unproven` +
+   lease lost，Unavailable/Failed 等其他持久化错误记录 `failed` 且不增加
+   lease lost；每次 attempt 恰好一个最终 outcome；CountingRecorder 回归测试
+   对 fenced / persistence failure / durable success 三场景逐项断言计数器
+   （red→green 验证）。
 3. **测试环境隔离**（`c8a54bd`）：business-api-client 代理测试保存并恢复
    原始 `*_PROXY` 变量，进程级互斥避免与其他环境变量测试竞争。
 4. **配置 fail-closed**（`b8e952a`）：生产拒绝空白/纯空白 `auth.jwks_url`
@@ -238,10 +241,17 @@ bash deploy/operations/drill-backup-restore.sh`。
 
 Slice C（预生产验收：真实 IdP/model-provider + PostgreSQL + 对象存储 +
 Prometheus/Grafana、20 并发性能 smoke、全链路演练、指标抓取/标签基数验证）：
-当前工作区无 staging 环境与真实凭据，**BLOCKED / NOT RUN**，不得以
-fake/stub/本地测试替代验收证据。T5.1/T5.2 保持未验收状态；变更已合入
-main（PR #9，merge `eb62451`，Main CI `33637882962` 全绿），但 v0.1 tag 与
-PLAN-0012 归档在 Slice C 于预生产环境 PASS 之前不执行。
+**PASS（2026-09-02 staging 真实栈 + 2026-09-03 真实 IdP）**，无 fake/stub
+替代。staging 侧：本机 PostgreSQL 18 + MinIO + 内网 vLLM 真实推理 +
+Prometheus/Grafana，全链路（上传→真实提取→Review→崩溃恢复→备份恢复）、
+20 并发 smoke×2、抓取/仪表盘/标签基数逐项 PASS；IdP 侧：经用户授权自助注册
+Auth0 租户，production 模式 business-api 以真实 issuer/audience/JWKS
+discovery 启动，E2E 12/12 PASS（真实 JWT 授权、refresh、6 项 401 负例）、
+8 项生产 fail-closed 启动负例全部拒绝，含 authorization_code+PKCE 浏览器
+流程。证据目录 `F:\Workspace\business-platform-staging\evidence\`（`01`–`20`），
+逐项记录见 Completion Audit 的 Slice C 两次 amendment。T5.1/T5.2 已验收。
+v0.1 tag 与 PLAN-0012 归档仍按授权约束执行：待本分支
+（`codex/plan-0012-slice-c-staging`）合入 main 且 Main CI 全绿后进行。
 
 ## 完成定义
 

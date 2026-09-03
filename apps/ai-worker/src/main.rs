@@ -21,7 +21,7 @@ use config::{AiProviderMode, AiWorkerConfig, WorkerDatabaseBackend};
 use document::domain::DocumentRepository;
 use document_processing::ports::{
     AiTask, CompleteAiTaskCommand, ExecutionFence, ProcessingExecutionUnitOfWork,
-    ProcessingJobQuery,
+    ProcessingJobQuery, ProcessingRepositoryError,
 };
 use document_processing::{
     DeterministicLocalExtractor, DocumentFieldExtractor, ExtractionError, ExtractionRequest,
@@ -421,20 +421,25 @@ async fn process_task(
                 candidate,
             };
             // PLAN-0012 release closure: `succeeded` is recorded only after the
-            // fenced completion has durably persisted. When the completion is
-            // fenced or fails to persist, this attempt never became a durable
-            // success — its single final outcome is `lease_unproven`, so every
-            // attempt contributes exactly one `ai_tasks_total` increment.
+            // fenced completion has durably persisted. A lease-lost completion
+            // is lease-unproven and increments `ai_lease_lost_total`; any other
+            // persistence error is `failed` and must not inflate the lease-loss
+            // signal. Every attempt contributes exactly one `ai_tasks_total`
+            // increment.
             match services
                 .execution
                 .complete_ai_and_resume(completion, Utc::now())
                 .await
             {
                 Ok(_) => metrics::record_task_outcome(metrics::TaskOutcome::Succeeded),
-                Err(error) => {
+                Err(ProcessingRepositoryError::LeaseLost) => {
                     metrics::record_task_outcome(metrics::TaskOutcome::LeaseUnproven);
                     metrics::record_lease_lost();
-                    tracing::warn!(task_id = %task.id, error = %error, "AI task completion was fenced or failed to persist; attempt did not complete durably");
+                    tracing::warn!(task_id = %task.id, "AI task completion was fenced; attempt did not complete durably");
+                }
+                Err(error) => {
+                    metrics::record_task_outcome(metrics::TaskOutcome::Failed);
+                    tracing::warn!(task_id = %task.id, error = %error, "AI task completion failed to persist; attempt did not complete durably");
                 }
             }
         }
@@ -528,9 +533,11 @@ mod tests {
 
     /// Regression tests for the AI-task completion boundary (PLAN-0012 release
     /// closure): `ai_tasks_total{outcome="succeeded"}` must be recorded only
-    /// after `complete_ai_and_resume` durably persisted the fenced completion,
-    /// and every attempt must contribute exactly one final outcome — fencing
-    /// or persistence failure may not double-count or succeed-count the run.
+    /// after `complete_ai_and_resume` durably persisted the fenced completion;
+    /// a `LeaseLost` completion is `lease_unproven` and increments
+    /// `ai_lease_lost_total`, while any other persistence error is `failed`
+    /// without touching the lease-loss counter. Every attempt must contribute
+    /// exactly one final outcome.
     mod completion_outcome {
         use std::collections::BTreeMap;
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1090,20 +1097,26 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn fenced_completion_records_exactly_one_non_success_outcome() {
+        async fn fenced_completion_records_exactly_one_lease_unproven_outcome() {
             let tally = drive_attempt(CompletionOutcome::Fenced).await;
             assert_eq!(
                 tally.succeeded, 0,
                 "a fenced completion must not count as succeeded"
             );
             assert_eq!(
-                tally.lease_unproven + tally.failed,
+                tally.succeeded + tally.lease_unproven + tally.failed,
                 1,
                 "the attempt must record exactly one final outcome"
             );
-            assert_eq!(tally.lease_unproven, 1);
+            assert_eq!(
+                tally.lease_unproven, 1,
+                "a fenced completion is lease-unproven"
+            );
             assert_eq!(tally.failed, 0);
-            assert_eq!(tally.lease_lost, 1);
+            assert_eq!(
+                tally.lease_lost, 1,
+                "a fenced completion must increment the lease-loss counter"
+            );
             assert_eq!(tally.complete_calls, 1);
             assert_eq!(tally.fail_calls, 0);
             let completion = tally
@@ -1114,20 +1127,29 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn completion_persistence_failure_records_exactly_one_non_success_outcome() {
+        async fn completion_persistence_failure_records_failed_without_lease_loss() {
             let tally = drive_attempt(CompletionOutcome::PersistenceFailed).await;
             assert_eq!(
                 tally.succeeded, 0,
                 "a completion that failed to persist must not count as succeeded"
             );
             assert_eq!(
-                tally.lease_unproven + tally.failed,
+                tally.succeeded + tally.lease_unproven + tally.failed,
                 1,
                 "the attempt must record exactly one final outcome"
             );
-            assert_eq!(tally.lease_unproven, 1);
-            assert_eq!(tally.failed, 0);
-            assert_eq!(tally.lease_lost, 1);
+            assert_eq!(
+                tally.failed, 1,
+                "a persistence error other than LeaseLost is a failed outcome"
+            );
+            assert_eq!(
+                tally.lease_unproven, 0,
+                "a persistence error other than LeaseLost is not lease-unproven"
+            );
+            assert_eq!(
+                tally.lease_lost, 0,
+                "a persistence error other than LeaseLost must not inflate the lease-loss counter"
+            );
             assert_eq!(tally.complete_calls, 1);
             assert_eq!(tally.fail_calls, 0);
         }
@@ -1138,6 +1160,11 @@ mod tests {
             assert_eq!(
                 tally.succeeded, 1,
                 "a durably persisted completion must count exactly once as succeeded"
+            );
+            assert_eq!(
+                tally.succeeded + tally.lease_unproven + tally.failed,
+                1,
+                "the attempt must record exactly one final outcome"
             );
             assert_eq!(tally.lease_unproven, 0);
             assert_eq!(tally.failed, 0);

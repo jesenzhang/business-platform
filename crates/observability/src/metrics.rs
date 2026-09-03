@@ -14,6 +14,17 @@ use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
+/// Fixed bucket boundaries (seconds) for every `*_seconds` duration metric.
+///
+/// `metrics-exporter-prometheus` renders unconfigured histograms as
+/// client-side summaries whose quantiles are approximate and unreliable; the
+/// versioned dashboard queries `histogram_quantile(..._bucket)` instead, so
+/// duration metrics must be exposed as proper Prometheus histograms. The set
+/// spans sub-millisecond API work to multi-minute AI task durations.
+const DURATION_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0,
+];
+
 /// Install the global Prometheus recorder exactly once and keep the render
 /// handle for the `/metrics` endpoint.
 ///
@@ -26,6 +37,11 @@ static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 pub fn install_metrics() -> &'static PrometheusHandle {
     METRICS_HANDLE.get_or_init(|| {
         PrometheusBuilder::new()
+            .set_buckets_for_metric(
+                metrics_exporter_prometheus::Matcher::Suffix("_seconds".to_string()),
+                DURATION_BUCKETS,
+            )
+            .expect("duration bucket configuration must be valid")
             .install_recorder()
             .expect("prometheus recorder must install exactly once")
     })
@@ -81,6 +97,24 @@ mod tests {
         assert!(
             body.contains("observability_metrics_selftest_total"),
             "rendered exposition must contain recorded counters"
+        );
+    }
+
+    #[test]
+    fn duration_histograms_render_as_bucketed_prometheus_histograms() {
+        // The versioned dashboard resolves p50/p95 via
+        // `histogram_quantile(..._bucket)`; an unconfigured exporter would
+        // render these as summary quantiles instead and the panels go blank.
+        install_metrics();
+        metrics::histogram!("observability_selftest_duration_seconds").record(0.3);
+        let body = render();
+        assert!(
+            body.contains("observability_selftest_duration_seconds_bucket{le=\"0.5\"} 1"),
+            "duration metrics must expose explicit histogram buckets"
+        );
+        assert!(
+            !body.contains("observability_selftest_duration_seconds{quantile="),
+            "duration metrics must not degrade to client-side summary quantiles"
         );
     }
 }

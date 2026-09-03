@@ -1,10 +1,10 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-02
+> 最后更新：2026-09-03
 > 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
 > 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
-> 集成方式：local solo fast-forward，无 PR
+> 集成方式：PR #9 / GitHub PR merge
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -199,10 +199,11 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 完成审阅修复与全仓验证。① CI 供应链：trivy 0.74.0 与演练用 MinIO mc
 > RELEASE.2025-08-13T08-35-41Z 固定为不可变 GitHub release 资产，SHA-256
 > 显式维护、下载后执行前校验，不匹配立即中止（维护策略注释在 ci.yml）。
-> ② ai-worker：`TaskOutcome::Succeeded` 移至 fenced completion 持久成功之后，
-> completion 被 fence 或持久化失败改记 `lease_unproven` + lease lost，保证每
-> attempt 恰好一个最终 outcome（进程内 CountingRecorder 回归测试，red→green
-> 验证）。③ business-api-client 代理测试保存/恢复代理环境变量并以进程级
+> ② ai-worker：`TaskOutcome::Succeeded` 移至 fenced completion 持久成功之后；
+> completion 被 fence（`LeaseLost`）改记 `lease_unproven` + lease lost，
+> Unavailable/Failed 等其他持久化错误改记 `failed` 且不增加 lease lost
+> （最终归属由 2026-09-03 条目 `0809f83` 收口），保证每 attempt 恰好一个最终
+> outcome（进程内 CountingRecorder 回归测试，red→green 验证）。③ business-api-client 代理测试保存/恢复代理环境变量并以进程级
 > 互斥串行化，消除全局环境污染与并行竞争。④ 生产配置 fail-closed 拒绝
 > 空白/纯空白 `auth.jwks_url`（新增配置测试）。⑤ RUNBOOK/本状态/计划/完成
 > 审计同步。Slice B 门禁全 PASS：fmt/check/clippy `-D warnings`/test
@@ -213,6 +214,17 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > BLOCKED/NOT RUN，不以 fake/stub 替代证据。变更已合入 main（PR #9，
 > merge `eb62451`，Main CI `33637882962` 全绿），但 v0.1 tag 与 PLAN-0012
 > 归档继续推迟，唯一未决条件为 Slice C 在预生产环境以真实证据 PASS。
+
+> 2026-09-03: PLAN-0012 最终审阅修复（`codex/plan-0012-slice-c-staging`，
+> `0809f83`）：细化 ai-worker completion 边界的持久化错误归属——
+> `complete_ai_and_resume` 成功记 `succeeded`；`ProcessingRepositoryError::LeaseLost`
+> 记 `lease_unproven` + `ai_lease_lost_total`；Unavailable/Failed 及其他持久化
+> 错误记 `failed` 且不增加 `ai_lease_lost_total`。进程内 CountingRecorder 回归
+> 测试对 fenced / persistence failure / durable success 三场景逐项断言计数器，
+> 并断言每 attempt 最终 outcome 总数恒为 1。页头集成方式据 PR #9 事实修正为
+> GitHub PR merge。Slice B 门禁结果与 Slice C 状态记录于完成审计；Slice C
+> （预生产验收）因本工作区无 staging 与真实凭据仍 BLOCKED/NOT RUN，不以
+> fake/stub 替代证据。
 
 ## 1. 当前权威结论
 
