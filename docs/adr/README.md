@@ -49,6 +49,7 @@ ADR-0004-rust-msrv-toolchain.md
 | [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Accepted | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
 | [`ADR-0023`](ADR-0023-ai-worker-model-provider-dependency.md) | ai-worker 的 model-provider 依赖与可替换性边界 | Accepted | vendored path（CI 私有仓库不可达）、reqwest TLS 并集代价、密钥边界、DocumentFieldExtractor 可替换、隔离门禁 |
 | [`ADR-0024`](ADR-0024-authentication-externalized-authorization-internal.md) | 认证外置与授权内置 | Accepted | 平台不实现凭证签发；外部 OIDC IdP 认证 + 平台内租户/权限/审计授权；私有化交付捆绑开源 IdP；服务身份独立 |
+| [`ADR-0025`](ADR-0025-provider-neutral-object-storage-and-rustfs-evaluation.md) | Provider-Neutral Object Storage and RustFS Evaluation | Proposed | 保持 S3/对象存储边界供应商无关；RustFS 1.0.0 仅作为候选后端，先完成跨 MinIO/RustFS 契约与恢复验证再决定替换 |
 
 ## 4. ADR-0003 的完整 Baseline
 
