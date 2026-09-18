@@ -207,10 +207,65 @@ impl BootstrapComposition {
         config: &BootstrapAdministratorConfig,
         dev_user_id: Uuid,
     ) -> Result<Option<BootstrapOutcome>, BootstrapError> {
+        let outcome = self.run_dev_steps(config, dev_user_id).await;
+        // Metric parity with `run_production`: every outcome class —
+        // including early Config/ConfigStale exits — is recorded exactly
+        // once here, never inline in the step runner.
+        match &outcome {
+            Ok(Some(BootstrapOutcome::Executed)) => {
+                record_bootstrap_outcome(BootstrapMetricOutcome::Executed);
+            }
+            Ok(Some(BootstrapOutcome::NoOp)) => {
+                record_bootstrap_outcome(BootstrapMetricOutcome::NoOp);
+            }
+            Ok(None | Some(BootstrapOutcome::Failed)) => {}
+            Err(error) => record_bootstrap_outcome(outcome_metric_for_error(error)),
+        }
+        outcome
+    }
+
+    async fn run_dev_steps(
+        &self,
+        config: &BootstrapAdministratorConfig,
+        dev_user_id: Uuid,
+    ) -> Result<Option<BootstrapOutcome>, BootstrapError> {
         if !config.enabled {
             return Ok(None);
         }
-        config.validate().map_err(BootstrapError::Config)?;
+        // Dev-mode validation mirrors `BootstrapAdministratorConfig::validate`
+        // except for the https-issuer rule: that guard protects operator
+        // configuration of the production issuer, while the dev issuer is
+        // the fixed compile-time `urn:business-api:dev-auth` constant
+        // (preflight §5) that the dev resolver also derives. Calling the
+        // shared `validate()` here would reject the locked constant and
+        // crash every dev/demo startup.
+        let issuer_trimmed = config.issuer.trim();
+        if issuer_trimmed != DEV_AUTH_ISSUER
+            || issuer_trimmed.len() > identity::domain::MAX_EXTERNAL_ISSUER_LEN
+        {
+            return Err(BootstrapError::Config(
+                "dev-auth bootstrap issuer must be the fixed dev issuer constant".to_string(),
+            ));
+        }
+        if config.tenant_id.is_nil() {
+            return Err(BootstrapError::Config(
+                "dev-auth tenant_id must not be nil".to_string(),
+            ));
+        }
+        let subject_trimmed = config.subject.trim();
+        if subject_trimmed.is_empty()
+            || subject_trimmed.len() > identity::domain::MAX_EXTERNAL_SUBJECT_LEN
+            || subject_trimmed.contains('\0')
+        {
+            return Err(BootstrapError::Config(
+                "dev-auth subject must be non-empty".to_string(),
+            ));
+        }
+        if config.version < 1 {
+            return Err(BootstrapError::Config(
+                "dev-auth version must be >= 1".to_string(),
+            ));
+        }
         if dev_user_id.is_nil() {
             return Err(BootstrapError::Config(
                 "dev-auth user id must not be nil".to_string(),
@@ -233,7 +288,6 @@ impl BootstrapComposition {
                             if entry.config_digest != digest {
                                 return Err(BootstrapError::ConfigStale);
                             }
-                            record_bootstrap_outcome(BootstrapMetricOutcome::NoOp);
                             return Ok(Some(BootstrapOutcome::NoOp));
                         }
                         std::cmp::Ordering::Greater => {
@@ -272,13 +326,11 @@ impl BootstrapComposition {
                         Utc::now(),
                     )
                     .await;
-                record_bootstrap_outcome(outcome_metric_for_error(&error));
                 return Err(error);
             }
         };
         self.record(config, &issuer, &subject, &digest, outcome, Utc::now())
             .await?;
-        record_bootstrap_outcome(BootstrapMetricOutcome::Executed);
         Ok(Some(outcome))
     }
 
@@ -368,7 +420,12 @@ impl BootstrapComposition {
                 recorded_at: now,
             })
             .await
-            .map_err(map_store_error)?;
+            .map_err(|error| match error {
+                // Mirror the production use case: non-`Unavailable` ledger
+                // write failures surface as the generic `Failed` class.
+                IdentityStoreError::Unavailable => BootstrapError::Unavailable,
+                _ => BootstrapError::Failed,
+            })?;
         Ok(())
     }
 }

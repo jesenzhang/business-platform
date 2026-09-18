@@ -301,6 +301,12 @@ async fn main() -> anyhow::Result<()> {
         if dev_subject.trim().is_empty() {
             anyhow::bail!("dev auth bootstrap requires a non-blank dev subject");
         }
+        // Version is pinned at 1 for dev mode: changing dev tenant or
+        // subject afterwards fails closed as `ConfigStale` (startup error,
+        // no silent re-bind). Recovery in a throwaway dev database: delete
+        // the `platform_bootstrap_executions` row for the dev principal
+        // (or start a fresh database). Never reuse a dev ledger in a real
+        // environment.
         let bootstrap_config = dev_auth_bootstrap_config(dev_tenant_id, dev_subject, 1);
         bootstrap
             .run_dev_auth(&bootstrap_config, dev_user_id)

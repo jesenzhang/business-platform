@@ -61,11 +61,11 @@ organization-postgres = { workspace = true }
 organization-sqlite = { workspace = true }
 policy-postgres = { workspace = true }
 policy-sqlite = { workspace = true }
-identity-authorization-contracts = { workspace = true }
 
 [dev-dependencies]
 identity = { workspace = true, features = ["testing"] }
 policy = { workspace = true, features = ["testing"] }
+identity-authorization-contracts = { workspace = true }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 async-trait = { workspace = true }

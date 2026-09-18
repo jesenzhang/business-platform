@@ -137,7 +137,7 @@ pub struct AppState {
     pub storage: Option<StorageServices>,
     /// PLAN-0013 Stage 7 platform authorization services. `None` is a
     /// fail-closed misconfiguration: every protected request is rejected
-    /// with a retryable 503 rather than bypassing identity resolution.
+    /// with 403 rather than bypassing identity resolution.
     pub access: Option<AccessServices>,
 }
 
