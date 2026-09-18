@@ -474,6 +474,9 @@ function Assert-MigrationManifest([string]$MigrationDirectory, [string]$Manifest
 Assert-MigrationManifest "migrations" "migrations/MANIFEST.sha256"
 Assert-MigrationManifest "crates/document-sqlite/migrations" "crates/document-sqlite/migrations/MANIFEST.sha256"
 Assert-MigrationManifest "crates/document-processing-sqlite/migrations" "crates/document-processing-sqlite/migrations/MANIFEST.sha256"
+Assert-MigrationManifest "crates/identity-sqlite/migrations" "crates/identity-sqlite/migrations/MANIFEST.sha256"
+Assert-MigrationManifest "crates/organization-sqlite/migrations" "crates/organization-sqlite/migrations/MANIFEST.sha256"
+Assert-MigrationManifest "crates/policy-sqlite/migrations" "crates/policy-sqlite/migrations/MANIFEST.sha256"
 
 foreach ($required in @(
     "docs/README.md",
