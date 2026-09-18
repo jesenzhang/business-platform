@@ -140,6 +140,10 @@ inertness), `plan_0008_postgres_minio.rs`.
   this plan's management plane: `identity.read, identity.membership.update,
   organization.read, organization.manage, policy.role.read, policy.role.manage,
   policy.binding.read, policy.binding.manage, policy.explain`.
+  Implementation adds a tenth IAM key `identity.user.manage` (see the
+  reconciliation note in `crates/policy/src/catalog.rs`): disable/enable
+  user is platform-level authority and must stay distinguishable from
+  membership updates in audit.
   Stable-key collision at seed ⇒ fail closed (unique constraint, startup
   seed validation rejects duplicates). Unknown permission at decision time ⇒
   DENY.
