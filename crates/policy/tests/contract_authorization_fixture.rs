@@ -3,14 +3,14 @@
 //! Contract domain code.
 //!
 //! It proves the shape a future Contract (or any business module) slice
-//! consumes today: reserved catalog keys + RoleBindings + ResourceScope
+//! consumes today: reserved catalog keys + `RoleBindings` + `ResourceScope`
 //! decide access; business handlers pass a `ResourceTarget` and never
 //! parse roles. Requirements pinned here (plan §15):
 //!
-//! - a `contract.read` RoleBinding authorizes contract resources only
+//! - a `contract.read` `RoleBinding` authorizes contract resources only
 //!   within its tenant and scope;
 //! - a cross-tenant binding fixture fails closed (plan §15 rule 5);
-//! - reserved keys are bindable through RoleBindings but unreachable via
+//! - reserved keys are bindable through `RoleBindings` but unreachable via
 //!   the governance compat claim bridge;
 //! - revocation takes effect on the very next decision.
 
@@ -25,7 +25,7 @@ use policy::application::{
     AuthorizationContext, Authorize, BindRole, BindRoleCommand, ManagementCompatGrant,
     ResourceTarget, RevokeRoleBinding, RevokeRoleBindingCommand,
 };
-use policy::domain::{DecisionReason, ResourceScope, RoleDefinition, ValidityWindow};
+use policy::domain::{DecisionReason, ResourceScope, RoleDefinition};
 use policy::ports::SubjectStatus;
 use policy::testing::FakePolicyPorts;
 
