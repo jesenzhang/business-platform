@@ -37,6 +37,7 @@ plans/
 - [`archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)：`Completed / Rehearsal Closed / Archived`，read-only、隔离 rehearsal；production migration `NOT GRANTED`。
 - [`archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md`](archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：`Integrated`，模块隔离、语义契约和纯 Rust 确定性 compiler。
 - [`archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md`](archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：`Integrated / Archived`，纯 Rust Business Application Packaging、typed contributions、Published Extension Point、SemVer、deterministic compiler/dry-plan、synthetic fixtures 和 Architecture Fitness；Main `ed870acfe165756632c0519bb181fd5dcf8a11cd`，Main CI `32213985080`。
+- [`archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md`](archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：`Integrated / Archived`，v0.1 预生产发布：外部 OIDC IdP 生产认证（ADR-0024）、vendored model-provider 集成（ADR-0023）、可观测性与备份恢复演练；Slice C 以真实 staging 栈与真实 Auth0 IdP 验收（E2E 12/12 + fail-closed 矩阵 8/8）；完成审计 `docs/reports/PLAN-0012-COMPLETION-AUDIT.md`；merge `2383651`（PR #10），Main CI `33705531597`，`v0.1` tag 指向 `2383651`；T3.3（Keycloak demo compose）按计划后置。
 
 ## 归档
 
