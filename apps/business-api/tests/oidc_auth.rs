@@ -27,7 +27,7 @@ use business_api::config::ServerConfig;
 use business_api::oidc::OidcValidator;
 use business_api::routes::create_router;
 use business_api::state::{
-    AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
+    AccessServices, AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
 };
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
@@ -236,6 +236,7 @@ where
         governance: None,
         readiness: ports,
         storage: None,
+        access: Some(test_access()),
     });
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled: false,
@@ -700,4 +701,30 @@ async fn oidc_principal_cannot_read_foreign_tenant_document() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
+}
+
+/// Minimal working `AccessServices` for authenticated non-governance tests:
+/// the resolver auto-provisions the test principal on first contact, which
+/// is all the documents/storage routes need (the governance guard itself is
+/// covered in `security.rs`).
+fn test_access() -> AccessServices {
+    let stores = identity::testing::FakeIdentityStores::new();
+    let policy = policy::testing::FakePolicyPorts::new();
+    let subject = Arc::new(
+        business_api::platform_authorization::IdentitySubjectStatusBridge::new(Arc::new(
+            identity::application::TenantAccessChecker::new(Arc::clone(&stores.query)),
+        )),
+    );
+    AccessServices {
+        resolve: Arc::new(identity::application::ResolveAuthenticatedUser::new(
+            Arc::clone(&stores.resolve),
+        )),
+        authorize: Arc::new(policy::application::Authorize::new(
+            Arc::clone(&policy.query),
+            subject,
+            Arc::clone(&policy.org),
+        )),
+        compat_enabled: true,
+        oidc_issuer: ISSUER.to_string(),
+    }
 }

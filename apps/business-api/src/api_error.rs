@@ -19,6 +19,11 @@ pub struct ErrorBody {
 pub struct ApiError {
     pub error: AppError,
     pub trace_id: Option<String>,
+    /// PLAN-0013 §5: fail-closed store-unavailable responses use HTTP 503
+    /// (retryable), which no existing `AppError` variant maps to. The
+    /// variant still drives the public error code; this override only
+    /// changes the status line.
+    pub status_override: Option<StatusCode>,
 }
 
 impl ApiError {
@@ -27,6 +32,7 @@ impl ApiError {
         Self {
             error: AppError::Validation(message.into()),
             trace_id: None,
+            status_override: None,
         }
     }
 
@@ -38,6 +44,22 @@ impl ApiError {
                 id: id.into(),
             },
             trace_id: None,
+            status_override: None,
+        }
+    }
+
+    /// Fail-closed `503 Service Unavailable` for authorization-path store
+    /// failures (PLAN-0013 §5/§10). The client-visible message is generic;
+    /// the underlying cause is only ever logged.
+    #[must_use]
+    pub fn service_unavailable(service: &str) -> Self {
+        Self {
+            error: AppError::ExternalService {
+                service: service.to_owned(),
+                message: "service temporarily unavailable".to_owned(),
+            },
+            trace_id: None,
+            status_override: Some(StatusCode::SERVICE_UNAVAILABLE),
         }
     }
 
@@ -50,7 +72,7 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let status = match &self.error {
+        let status = self.status_override.unwrap_or(match &self.error {
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::NotFound { .. } => StatusCode::NOT_FOUND,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
@@ -59,7 +81,7 @@ impl IntoResponse for ApiError {
             AppError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             AppError::ExternalService { .. } => StatusCode::BAD_GATEWAY,
             AppError::Internal(_) | AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        };
+        });
         let internal = matches!(self.error, AppError::Internal(_) | AppError::Database(_));
         if internal {
             tracing::error!(
@@ -94,6 +116,7 @@ impl From<AppError> for ApiError {
         Self {
             error,
             trace_id: None,
+            status_override: None,
         }
     }
 }

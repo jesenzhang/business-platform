@@ -7,11 +7,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
-    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
-    ServerConfig, StorageConfig,
+    AuthConfig, BootstrapAdminConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig,
+    ObservabilityConfig, ServerConfig, StorageConfig,
 };
 use business_api::routes;
-use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe};
+use business_api::state::{AccessServices, AppState, DocumentServices, PostgresReadinessProbe};
 use document::application::CreateDocumentMetadata;
 use http_body_util::BodyExt;
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
@@ -74,6 +74,8 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
             dev_user_id: Some(Uuid::parse_str(USER_ID).expect("user fixture")),
             dev_subject: Some("postgres-document-test-user".to_string()),
             dev_roles: BTreeSet::new(),
+            management_permission_compat_enabled: true,
+            bootstrap: BootstrapAdminConfig::default(),
         },
     };
     let unit_of_work = Arc::new(document_postgres::PostgresCreateDocumentUnitOfWork::new(
@@ -93,6 +95,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
         governance: None,
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
         storage: None,
+        access: Some(test_access()),
     });
     routes::create_router(
         state,
@@ -279,4 +282,30 @@ async fn document_http_flow_is_atomic_idempotent_and_tenant_scoped() {
         .execute(&pool)
         .await
         .expect("cleanup outbox");
+}
+
+/// Minimal working `AccessServices` for authenticated non-governance tests:
+/// the resolver auto-provisions the test principal on first contact, which
+/// is all the documents/storage routes need (the governance guard itself is
+/// covered in `security.rs`).
+fn test_access() -> AccessServices {
+    let stores = identity::testing::FakeIdentityStores::new();
+    let policy = policy::testing::FakePolicyPorts::new();
+    let subject = Arc::new(
+        business_api::platform_authorization::IdentitySubjectStatusBridge::new(Arc::new(
+            identity::application::TenantAccessChecker::new(Arc::clone(&stores.query)),
+        )),
+    );
+    AccessServices {
+        resolve: Arc::new(identity::application::ResolveAuthenticatedUser::new(
+            Arc::clone(&stores.resolve),
+        )),
+        authorize: Arc::new(policy::application::Authorize::new(
+            Arc::clone(&policy.query),
+            subject,
+            Arc::clone(&policy.org),
+        )),
+        compat_enabled: true,
+        oidc_issuer: String::new(),
+    }
 }

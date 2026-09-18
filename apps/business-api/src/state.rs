@@ -9,7 +9,9 @@ use document::query::{DocumentDetailQuery, DocumentListQuery};
 use document_processing::ports::{
     CandidateQuery, ProcessingExecutionUnitOfWork, ProcessingJobQuery, ProcessingStepQuery,
 };
+use identity::application::ResolveAuthenticatedUser;
 use object_storage::ObjectStorageClient;
+use policy::application::Authorize;
 use runtime_governance::IntegrityScanPort;
 use sqlx::PgPool;
 
@@ -27,6 +29,25 @@ pub struct ProcessingServices {
     pub candidate_queries: Arc<dyn CandidateQuery>,
     pub step_queries: Arc<dyn ProcessingStepQuery>,
     pub execution: Arc<dyn ProcessingExecutionUnitOfWork>,
+}
+
+/// Identity/Policy authorization services injected by the composition
+/// root (PLAN-0013 Stage 7). Handlers and middleware call these
+/// application use cases directly; no handler receives stores or
+/// implements authorization rules.
+#[derive(Clone)]
+pub struct AccessServices {
+    /// Identity resolve-or-provision use case (write-on-read).
+    pub resolve: Arc<ResolveAuthenticatedUser>,
+    /// Policy default-DENY evaluation use case.
+    pub authorize: Arc<Authorize>,
+    /// Locked compat bridge flag (`auth.management_permission_compat_enabled`).
+    /// When false, the middleware carries an empty compat grant set and
+    /// only `RoleBindings` can grant.
+    pub compat_enabled: bool,
+    /// Configured OIDC issuer; the resolver namespace for OIDC-authenticated
+    /// requests (dev-auth uses the fixed `urn:business-api:dev-auth`).
+    pub oidc_issuer: String,
 }
 
 /// Management-only governance ports.  Handlers receive typed ports rather
@@ -114,6 +135,10 @@ pub struct AppState {
     pub governance: Option<GovernanceServices>,
     pub readiness: Arc<dyn ReadinessProbe>,
     pub storage: Option<StorageServices>,
+    /// PLAN-0013 Stage 7 platform authorization services. `None` is a
+    /// fail-closed misconfiguration: every protected request is rejected
+    /// with a retryable 503 rather than bypassing identity resolution.
+    pub access: Option<AccessServices>,
 }
 
 pub struct PostgresReadinessProbe {

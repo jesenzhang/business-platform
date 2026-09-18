@@ -2,14 +2,24 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use anyhow::Context;
+
 use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
+use business_api::bootstrap::{dev_auth_bootstrap_config, BootstrapComposition};
 use business_api::config::{BusinessApiConfig, DatabaseBackend, StorageBackend};
+use business_api::platform_authorization::{IdentitySubjectStatusBridge, OrganizationScopeBridge};
 use business_api::routes;
 use business_api::state::{
-    AppState, DocumentServices, GovernanceServices, PostgresReadinessProbe, ReadinessProbe,
-    SqliteReadinessProbe, StorageServices,
+    AccessServices, AppState, DocumentServices, GovernanceServices, PostgresReadinessProbe,
+    ReadinessProbe, SqliteReadinessProbe, StorageServices,
 };
+use identity::application::{
+    BootstrapAdministratorConfig, ResolveAuthenticatedUser, TenantAccessChecker,
+};
+use identity::ports::{BootstrapLedgerPort, IdentityCommandPort, IdentityResolvePort};
 use object_storage::{LocalStorageClient, ObjectStorageClient, S3Client};
+use policy::application::Authorize;
+use policy::ports::{OrganizationScopePort, PolicyCommandPort, PolicyQueryPort, SubjectStatusPort};
 
 type PersistenceAdapters = (
     Arc<dyn document::ports::CreateDocumentUnitOfWork>,
@@ -21,7 +31,21 @@ type PersistenceAdapters = (
     Arc<dyn document_processing::ports::ProcessingStepQuery>,
     Arc<dyn document_processing::ports::ProcessingExecutionUnitOfWork>,
     GovernanceServices,
+    AccessAdapters,
 );
+
+/// Raw identity/policy/organization ports for the platform-authorization
+/// composition (PLAN-0013 §5/§7). The use cases are constructed from these
+/// exactly once, after the backend match.
+struct AccessAdapters {
+    resolve: Arc<dyn IdentityResolvePort>,
+    command: Arc<dyn IdentityCommandPort>,
+    ledger: Arc<dyn BootstrapLedgerPort>,
+    subject: Arc<dyn SubjectStatusPort>,
+    org_scope: Arc<dyn OrganizationScopePort>,
+    policy_query: Arc<dyn PolicyQueryPort>,
+    policy_command: Arc<dyn PolicyCommandPort>,
+}
 
 #[tokio::main]
 #[allow(clippy::too_many_lines)]
@@ -76,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
         processing_step_queries,
         processing_execution,
         governance,
+        access_adapters,
     ): PersistenceAdapters = match config.database.backend {
         DatabaseBackend::Postgres => {
             let pool = sqlx::postgres::PgPoolOptions::new()
@@ -86,6 +111,32 @@ async fn main() -> anyhow::Result<()> {
                 ))
                 .connect(config.database.url.expose())
                 .await?;
+            // PLAN-0013: the identity/authorization tables (019) live in the
+            // same catalog; like `governance-worker`, the API applies the
+            // embedded catalog at startup (idempotent).
+            runtime_migration::MIGRATOR
+                .run(&pool)
+                .await
+                .context("apply runtime migrations")?;
+            let identity_store =
+                Arc::new(identity_postgres::PostgresIdentityStore::new(pool.clone()));
+            let organization_store = Arc::new(
+                organization_postgres::PostgresOrganizationStore::new(pool.clone()),
+            );
+            let policy_store = Arc::new(policy_postgres::PostgresPolicyStore::new(pool.clone()));
+            let access = AccessAdapters {
+                resolve: identity_store.resolve_port(),
+                command: identity_store.command_port(),
+                ledger: identity_store.ledger_port(),
+                subject: Arc::new(IdentitySubjectStatusBridge::new(Arc::new(
+                    TenantAccessChecker::new(identity_store.query_port()),
+                ))),
+                org_scope: Arc::new(OrganizationScopeBridge::new(
+                    organization_store.query_port(),
+                )),
+                policy_query: policy_store.query_port(),
+                policy_command: policy_store.command_port(),
+            };
             let processing_store = Arc::new(
                 document_processing_postgres::PostgresProcessingStore::new(pool.clone()),
             );
@@ -125,6 +176,7 @@ async fn main() -> anyhow::Result<()> {
                     repair_handlers,
                     audit_queries: audit_store,
                 },
+                access,
             )
         }
         DatabaseBackend::Sqlite => {
@@ -134,6 +186,29 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
             document_processing_sqlite::run_migrations(&pool).await?;
+            // Each adapter owns its migrations through an independent
+            // version catalog, so all schemas coexist in the local file.
+            identity_sqlite::run_migrations(&pool).await?;
+            organization_sqlite::run_migrations(&pool).await?;
+            policy_sqlite::run_migrations(&pool).await?;
+            let identity_store = Arc::new(identity_sqlite::SqliteIdentityStore::new(pool.clone()));
+            let organization_store = Arc::new(organization_sqlite::SqliteOrganizationStore::new(
+                pool.clone(),
+            ));
+            let policy_store = Arc::new(policy_sqlite::SqlitePolicyStore::new(pool.clone()));
+            let access = AccessAdapters {
+                resolve: identity_store.resolve_port(),
+                command: identity_store.command_port(),
+                ledger: identity_store.ledger_port(),
+                subject: Arc::new(IdentitySubjectStatusBridge::new(Arc::new(
+                    TenantAccessChecker::new(identity_store.query_port()),
+                ))),
+                org_scope: Arc::new(OrganizationScopeBridge::new(
+                    organization_store.query_port(),
+                )),
+                policy_query: policy_store.query_port(),
+                policy_command: policy_store.command_port(),
+            };
             let processing_store = Arc::new(
                 document_processing_sqlite::SqliteProcessingStore::new(pool.clone()),
             );
@@ -171,11 +246,92 @@ async fn main() -> anyhow::Result<()> {
                     repair_handlers,
                     audit_queries: audit_store,
                 },
+                access,
             )
         }
     };
 
     tracing::info!(backend = ?config.database.backend, "Database connection established");
+
+    // Install the Prometheus recorder before bootstrap so startup bootstrap
+    // outcomes are counted (installation is an idempotent `OnceLock`).
+    business_api::metrics::install_metrics();
+
+    // PLAN-0013 Stage 7: the platform-authorization use cases. Both
+    // backends compose identically; only the adapter types differed.
+    let access_services = AccessServices {
+        resolve: Arc::new(ResolveAuthenticatedUser::new(Arc::clone(
+            &access_adapters.resolve,
+        ))),
+        authorize: Arc::new(Authorize::new(
+            Arc::clone(&access_adapters.policy_query),
+            Arc::clone(&access_adapters.subject),
+            Arc::clone(&access_adapters.org_scope),
+        )),
+        compat_enabled: config.auth.management_permission_compat_enabled,
+        oidc_issuer: config.auth.issuer_url.clone(),
+    };
+    tracing::info!(
+        compat_enabled = access_services.compat_enabled,
+        "platform authorization composed (compat bridge = server-trusted claim grants, bounded to the seven governance keys)"
+    );
+
+    // PLAN-0013 §7: startup-only bootstrap; HTTP never triggers it and no
+    // request surface can enable it. Mode selection is server-side:
+    // dev-auth deployments (production-forbidden by config validation) get
+    // the dev-principal bootstrap; everything else uses the explicit
+    // `[auth.bootstrap]` section.
+    let bootstrap = BootstrapComposition::new(
+        Arc::clone(&access_adapters.resolve),
+        Arc::clone(&access_adapters.command),
+        Arc::clone(&access_adapters.ledger),
+        Arc::clone(&access_adapters.policy_query),
+        Arc::clone(&access_adapters.policy_command),
+        Arc::clone(&access_adapters.subject),
+        Arc::clone(&access_adapters.org_scope),
+    );
+    if config.auth.dev_auth_enabled {
+        let (Some(dev_tenant_id), Some(dev_user_id), Some(dev_subject)) = (
+            config.auth.dev_tenant_id,
+            config.auth.dev_user_id,
+            config.auth.dev_subject.clone(),
+        ) else {
+            anyhow::bail!("dev auth bootstrap requires the configured dev identity");
+        };
+        if dev_subject.trim().is_empty() {
+            anyhow::bail!("dev auth bootstrap requires a non-blank dev subject");
+        }
+        let bootstrap_config = dev_auth_bootstrap_config(dev_tenant_id, dev_subject, 1);
+        bootstrap
+            .run_dev_auth(&bootstrap_config, dev_user_id)
+            .await
+            .map_err(|error| anyhow::anyhow!("dev-auth bootstrap failed: {error}"))?;
+    } else if config.auth.bootstrap.enabled {
+        // Config validation already requires explicit values when enabled;
+        // this destructure is defensive, not the gate.
+        let (Some(tenant_id), Some(issuer), Some(subject)) = (
+            config.auth.bootstrap.tenant_id,
+            config.auth.bootstrap.issuer.clone(),
+            config.auth.bootstrap.subject.clone(),
+        ) else {
+            anyhow::bail!("auth.bootstrap is enabled but incomplete");
+        };
+        let bootstrap_config = BootstrapAdministratorConfig {
+            enabled: true,
+            tenant_id,
+            issuer,
+            subject,
+            version: config.auth.bootstrap.version,
+        };
+        match bootstrap.run_production(&bootstrap_config).await {
+            Ok(Some(outcome)) => {
+                tracing::info!(?outcome, "bootstrap administrator ensured");
+            }
+            Ok(None) => {}
+            Err(error) => return Err(anyhow::anyhow!("bootstrap administrator failed: {error}")),
+        }
+    }
+
     let state = Arc::new(AppState {
         documents: DocumentServices {
             create: Arc::new(document::application::CreateDocumentMetadata::new(
@@ -193,6 +349,7 @@ async fn main() -> anyhow::Result<()> {
         governance: Some(governance),
         readiness,
         storage: Some(StorageServices { objects: storage }),
+        access: Some(access_services),
     });
 
     // PLAN-0012 M3: the OIDC validator is built whenever an issuer is

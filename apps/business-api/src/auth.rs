@@ -147,6 +147,14 @@ impl AuthenticatedPrincipal {
         self.authentication_type
     }
 
+    /// The server-trusted governance grant set. PLAN-0013 §5: this is the
+    /// only compat-bridge input the platform authorization middleware may
+    /// carry into `Authorize`; token `roles` never reach an evaluator.
+    #[must_use]
+    pub fn management_permissions(&self) -> &BTreeSet<ManagementPermission> {
+        &self.permissions
+    }
+
     #[must_use]
     pub fn has_permission(&self, permission: &str) -> bool {
         ManagementPermission::from_str(permission)

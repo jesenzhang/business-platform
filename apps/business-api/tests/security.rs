@@ -17,9 +17,10 @@ use business_api::config::{
     AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
     ServerConfig, StorageConfig,
 };
+use business_api::platform_authorization::IdentitySubjectStatusBridge;
 use business_api::routes::create_router;
 use business_api::state::{
-    AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
+    AccessServices, AppState, DocumentServices, ReadinessProbe, ReadinessReport, ReadinessStatus,
 };
 use document::ports::{
     ApplicationPortError, CreateDocumentResult, CreateDocumentUnitOfWork, PersistNewDocument,
@@ -28,6 +29,12 @@ use document::query::{
     DocumentDetailQuery, DocumentDetailView, DocumentListFilter, DocumentListPage,
     DocumentListQuery, DocumentListRequest, QueryError,
 };
+use identity::application::{ResolveAuthenticatedUser, TenantAccessChecker};
+use identity::domain::{MembershipSource, PlatformUser, TenantMembership};
+use identity::testing::FakeIdentityStores;
+use policy::application::Authorize;
+use policy::domain::{ResourceScope, RoleBinding, RoleDefinition, ValidityWindow};
+use policy::testing::FakePolicyPorts;
 use runtime_config::{RuntimeEnvironment, Secret, SecretUrl};
 use tower::ServiceExt;
 
@@ -123,17 +130,74 @@ fn test_config(dev_auth_enabled: bool, cors_origins: Vec<String>) -> BusinessApi
             dev_user_id: Some(DEV_USER_ID),
             dev_subject: Some("security-test-user".to_string()),
             dev_roles: BTreeSet::new(),
+            management_permission_compat_enabled: true,
+            bootstrap: business_api::config::BootstrapAdminConfig::default(),
         },
     }
+}
+
+/// A `policy.org` stand-in for governance routes: Tenant-scoped bindings
+/// never consult the organization bridge, and an empty store fails closed.
+fn access_kit(compat_enabled: bool) -> (AccessServices, Arc<FakeIdentityStores>, FakePolicyPorts) {
+    let stores = Arc::new(FakeIdentityStores::new());
+    // Seed the dev-auth principal as an Active platform user with an
+    // Active membership of the dev tenant (the request-path resolver
+    // adopts the claimed id on first contact).
+    let now = chrono::Utc::now();
+    stores.seed_user(PlatformUser::create(DEV_USER_ID, now).expect("test user fixture"));
+    stores.seed_membership(
+        TenantMembership::join(
+            uuid::Uuid::now_v7(),
+            DEV_TENANT_ID,
+            DEV_USER_ID,
+            MembershipSource::Admin,
+            now,
+        )
+        .expect("test membership fixture"),
+    );
+    let policy = FakePolicyPorts::new();
+    let subject = Arc::new(IdentitySubjectStatusBridge::new(Arc::new(
+        TenantAccessChecker::new(Arc::clone(&stores.query)),
+    )));
+    (
+        AccessServices {
+            resolve: Arc::new(ResolveAuthenticatedUser::new(Arc::clone(&stores.resolve))),
+            authorize: Arc::new(Authorize::new(
+                Arc::clone(&policy.query),
+                subject,
+                Arc::clone(&policy.org),
+            )),
+            compat_enabled,
+            oidc_issuer: String::new(),
+        },
+        stores,
+        policy,
+    )
 }
 
 fn test_router_with_permissions(
     dev_auth_enabled: bool,
     dev_permissions: BTreeSet<ManagementPermission>,
 ) -> axum::Router {
+    test_router_with_access(dev_auth_enabled, dev_permissions, true, |_, _| {})
+}
+
+/// Kit-aware builder: `configure` can suspend the membership, seed a role
+/// binding, retire a catalog entry, etc. before the router is built.
+fn test_router_with_access<F>(
+    dev_auth_enabled: bool,
+    dev_permissions: BTreeSet<ManagementPermission>,
+    compat_enabled: bool,
+    configure: F,
+) -> axum::Router
+where
+    F: FnOnce(&FakeIdentityStores, &FakePolicyPorts),
+{
     let config = test_config(dev_auth_enabled, vec!["*".to_string()]);
     let ports = Arc::new(EmptyPorts);
-    let state = Arc::new(AppState {
+    let (access, stores, policy) = access_kit(compat_enabled);
+    configure(&stores, &policy);
+    let mut state = AppState {
         documents: DocumentServices {
             create: Arc::new(document::application::CreateDocumentMetadata::new(
                 ports.clone(),
@@ -145,7 +209,10 @@ fn test_router_with_permissions(
         governance: None,
         readiness: ports,
         storage: None,
-    });
+        access: None,
+    };
+    state.access = Some(access);
+    let state = Arc::new(state);
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled,
         dev_secret: Some(DEV_SECRET.to_string()),
@@ -295,5 +362,138 @@ async fn execute_permission_cannot_approve_repair() {
         .body(Body::from(r#"{"note":"approve","expected_version":0}"#))
         .expect("request must build");
     let status = status_of(router, request).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-0013 Stage 7: compat bridge parity, RoleBinding path, overrides.
+// ---------------------------------------------------------------------------
+
+/// BEFORE (fixed `ManagementPermission` check) vs AFTER (Policy `Authorize`
+/// with the compat bridge): a server-trusted dev-config grant on a
+/// governance route passes the guard while the platform membership is
+/// Active, and lands on the governance boundary (502: `governance: None`
+/// in this test state, exactly as before the migration).
+#[tokio::test]
+async fn compat_claim_grant_passes_guard_when_bridge_enabled() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::IntegrityRead);
+    let router = test_router_with_access(true, permissions, true, |_, _| {});
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+}
+
+/// With the bridge disabled the same claim grant decides nothing: the
+/// evaluator falls through to `RoleBindings` and denies (403). This is the
+/// flag's entire purpose and must stay behaviorally observable.
+#[tokio::test]
+async fn compat_flag_off_denies_claim_only_grant() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::IntegrityRead);
+    let router = test_router_with_access(true, permissions, false, |_, _| {});
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// `RoleBinding` is the primary path and must work with the bridge OFF: an
+/// active tenant-role binding for `integrity.read` reaches the governance
+/// boundary (502) without any claim grant.
+#[tokio::test]
+async fn role_binding_grant_works_with_compat_flag_off() {
+    let router = test_router_with_access(true, BTreeSet::new(), false, |stores, policy| {
+        let _ = stores;
+        let now = chrono::Utc::now();
+        let role = RoleDefinition::create_tenant_role(
+            uuid::Uuid::now_v7(),
+            DEV_TENANT_ID,
+            "integrity-readers",
+            "Integrity readers",
+            now,
+        )
+        .expect("test role fixture");
+        let role_id = role.role_id();
+        policy.seed_role(role, &["integrity.read"]);
+        policy.seed_binding(
+            RoleBinding::create(
+                uuid::Uuid::now_v7(),
+                DEV_TENANT_ID,
+                DEV_USER_ID,
+                role_id,
+                ResourceScope::Tenant,
+                ValidityWindow {
+                    effective_at: now,
+                    expires_at: None,
+                },
+                now,
+            )
+            .expect("test binding fixture"),
+        );
+    });
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+}
+
+/// Suspended membership overrides even a compat grant (deny on the very
+/// next request, unexpired token or not).
+#[tokio::test]
+async fn suspended_membership_overrides_claim_grant() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::IntegrityRead);
+    let router = test_router_with_access(true, permissions, true, |stores, _| {
+        stores.suspend_membership(DEV_TENANT_ID, DEV_USER_ID);
+    });
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// A disabled platform user overrides even a compat grant.
+#[tokio::test]
+async fn disabled_user_overrides_claim_grant() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::IntegrityRead);
+    let router = test_router_with_access(true, permissions, true, |stores, _| {
+        let now = chrono::Utc::now();
+        let mut user = PlatformUser::create(DEV_USER_ID, now).expect("test user fixture");
+        user.disable(now).expect("disable fixture");
+        stores.seed_user(user);
+    });
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/integrity/findings", DEV_SECRET, true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// A retired catalog permission denies even with a compat grant: the
+/// catalog-existence check is locked before the bridge in the evaluator.
+#[tokio::test]
+async fn retired_permission_denies_claim_grant() {
+    let mut permissions = BTreeSet::new();
+    permissions.insert(ManagementPermission::AuditRead);
+    let router = test_router_with_access(true, permissions, true, |_, policy| {
+        policy.retire_permission("audit.read");
+    });
+    let status = status_of(
+        router,
+        authorized_get("/api/v1/admin/audit-events", DEV_SECRET, true),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
