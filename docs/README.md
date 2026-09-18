@@ -29,6 +29,7 @@
 | Enterprise AI Workspace | [`architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md`](architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md) | Baseline | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 边界 |
 | 质量属性 | [`architecture/QUALITY_ATTRIBUTE_SCENARIOS.md`](architecture/QUALITY_ATTRIBUTE_SCENARIOS.md) | Baseline | 性能、可用性、安全、恢复和容量验收 |
 | 安全架构 | [`architecture/SECURITY_ARCHITECTURE.md`](architecture/SECURITY_ARCHITECTURE.md) | Baseline | 身份、租户、授权、文件、AI 和 Agent 安全 |
+| Identity & Authorization | [`architecture/IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md`](architecture/IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md) | Baseline | 外部 OIDC 后的平台用户、Tenant Membership、Organization、Role/Permission/RoleBinding、Resource Scope 与 Policy Decision |
 | 部署架构 | [`architecture/DEPLOYMENT_ARCHITECTURE.md`](architecture/DEPLOYMENT_ARCHITECTURE.md) | Baseline | 进程、网络、环境、发布和扩缩容 |
 | 可观测性 | [`architecture/OBSERVABILITY_ARCHITECTURE.md`](architecture/OBSERVABILITY_ARCHITECTURE.md) | Baseline | 日志、指标、追踪、审计和告警 |
 | Runtime Audit | [`architecture/RUNTIME_AUDIT_ARCHITECTURE.md`](architecture/RUNTIME_AUDIT_ARCHITECTURE.md) | Baseline profile | 统一审计模型、原子写入和查询 |
@@ -80,6 +81,8 @@
 
 - [`adr/ADR-0021-business-application-packaging-and-published-extension-points.md`](adr/ADR-0021-business-application-packaging-and-published-extension-points.md)：Accepted，Business Application Packaging、Contribution 和 Published Extension Point。
 - [`adr/ADR-0022-inter-module-communication-and-business-collaboration.md`](adr/ADR-0022-inter-module-communication-and-business-collaboration.md)：Accepted，跨模块通信、一致性和 Process Manager/Saga。
+- [`adr/ADR-0023-ai-worker-model-provider-dependency.md`](adr/ADR-0023-ai-worker-model-provider-dependency.md)：Accepted，ai-worker model-provider 可替换性与依赖边界。
+- [`adr/ADR-0024-authentication-externalized-authorization-internal.md`](adr/ADR-0024-authentication-externalized-authorization-internal.md)：Accepted，人员认证/凭证外置到 OIDC IdP，平台内部拥有租户、业务授权和审计。
 
 ## 6. 文档目录
 
@@ -136,61 +139,37 @@ reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md
 architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
 adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
 reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md
+reference/EVER_GAUZY_REFERENCE_ANALYSIS.md
 ```
 
 禁止从数据库表、Handler、消息 Topic、Prompt、Skill 文件或 SDK 直接推导业务边界。
 
 ## 9. 当前实施
 
-- 当前执行计划：PLAN-0007（Active，local solo fast-forward）；PLAN-0011（Integrated / Archived，Main `ed870ac`，Main CI `32213985080`）
-- PLAN-0010 Integrated / Archived：plans/archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md（candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成于 `origin/main` 基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
-- PLAN-0011 Integrated / Archived：plans/archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md（ADR-0021/0022 已 Accepted；纯 contract/compiler/dry-plan/fitness foundation 已集成；runtime/具体业务模块仍不在本计划范围）
-- PLAN-0009 Completed / Rehearsal Closed / Archived：plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md（原始完成 `f09d2a5`；production migration `NOT GRANTED`）
-- 保持未实现：plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md（Proposed / NOT ACTIVE）
-- 已归档：[`plans/archive/2026/PLAN-0001-foundation-hardening.md`](plans/archive/2026/PLAN-0001-foundation-hardening.md)（`Integrated`）
-- 已归档：[`plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md`](plans/archive/2026/PLAN-0002-foundation-integrity-and-closeout.md)（`Integrated`）
-- 已归档：[`plans/archive/2026/PLAN-0003-persistence-query-architecture.md`](plans/archive/2026/PLAN-0003-persistence-query-architecture.md)（`Integrated`）
-- 已归档：[`plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md`](plans/archive/2026/PLAN-0004-durable-document-processing-mvp.md)（`Integrated`，main `12454709a88fde16f7769af27a75e79c4bc0981a`，Main CI `30868701290`）
-- 已归档：[`plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md`](plans/archive/2026/PLAN-0005-runtime-audit-integrity-repair.md)（`Integrated`，main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI `31026047403`，Feature CI `31021778597`）
-- 已归档：[`plans/archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md`](plans/archive/2026/PLAN-0008-document-lifecycle-revision-and-evidence-foundation.md)（`Integrated`，main `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`，Main CI `31353409550`）
-- 已归档：[`plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md`](plans/archive/2026/PLAN-0009-c-legacy-contract-and-document-migration-rehearsal.md)（`Completed / Rehearsal Closed`，原始完成 `f09d2a5`，production migration `NOT GRANTED`）
-- 实时架构状态：[`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md)
-- 初始审查：[`reviews/2026-07-30-initial-implementation-review.md`](reviews/2026-07-30-initial-implementation-review.md)
-- PLAN-0001 实施审查：[`reviews/2026-07-30-plan-0001-implementation-review.md`](reviews/2026-07-30-plan-0001-implementation-review.md)
-- AI Workspace 差距审查：[`reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md`](reviews/2026-08-06-cloudflare-os-and-enterprise-ai-workspace-gap-review.md)
-- Cloudflare OS 参考分析：[`reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](reference/CLOUDFLARE_OS_REFERENCE_ANALYSIS.md)
-- Canner/WrenAI 参考分析：[`reference/WRENAI_REFERENCE_ANALYSIS.md`](reference/WRENAI_REFERENCE_ANALYSIS.md)
-- Twenty 参考分析：[`reference/TWENTY_REFERENCE_ANALYSIS.md`](reference/TWENTY_REFERENCE_ANALYSIS.md)
-- Odoo 参考分析：[`reference/ODOO_REFERENCE_ANALYSIS.md`](reference/ODOO_REFERENCE_ANALYSIS.md)
-- Frappe/ERPNext 参考分析：[`reference/FRAPPE_ERPNEXT_REFERENCE_ANALYSIS.md`](reference/FRAPPE_ERPNEXT_REFERENCE_ANALYSIS.md)
-- Business Application Platform 综合参考：[`reference/BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md`](reference/BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md)
-- 企业业务领域 Baseline：[`architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`](architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md)
-- 企业业务领域参考项目：[`reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](reference/BUSINESS_DOMAIN_REFERENCE_PROJECTS.md)
+截至 2026-09-18：
 
-Phase 1 Foundation Integrity、Phase 2 Persistence and Query Hardening、
-Phase 3 First Durable Business Flow 与 Phase 4 Runtime Governance Foundation
-均已完成。PLAN-0002 至 PLAN-0005 均采用 local solo fast-forward 且不创建 PR；
-PLAN-0005 集成 SHA 为 `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`，Main CI run
-`31026047403` 已通过真实 PostgreSQL/MinIO、E2E 与架构门禁。Runtime Audit、
-Integrity Finding、Controlled Repair、Repair Ledger 与 Lease/Fence Recovery
-已集成并归档；Windows PostgreSQL/MinIO 保持 NOT RUN。
+- v0.1 已发布：PLAN-0012 Integrated / Archived，annotated tag v0.1 → 2383651；真实 PostgreSQL + MinIO + vLLM + Prometheus/Grafana 与真实 Auth0 production-mode 验收已记录在完成审计。
+- 发布后供应链修复已进入 main：rustls 0.23.45 清除 RUSTSEC-2026-0285；MinIO/mc 镜像从已下线的 Docker Hub 仓库迁移到 quay.io。
+- 当前身份认证是可运行实现；完整用户/组织/角色/业务权限管理尚未实现。crates/identity 与 crates/organization 仍是骨架，Management API 目前依赖固定 ManagementPermission。
+- 当前下一候选是 [PLAN-0013 Identity and Authorization Foundation](plans/current/PLAN-0013-identity-and-authorization-foundation.md)，状态 Proposed / NEXT CANDIDATE。
+- [PLAN-0006 Enterprise AI Workspace](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md) 已更新为 Revision 1 / Proposed / BLOCKED，必须等待 PLAN-0013 与首个 Contract 真实垂直切片集成。
+- 下一业务里程碑在 PLAN-0013 后创建 Contract Business Vertical Slice：Contract List/Detail → Document Revision → AI Extract/Evidence → Review → Apply Candidate → Contract Version Update。
+- Business Application Platform 的 package/contribution/compiler/dry-plan foundation 已实现，但 Module Registry、安装执行器、Marketplace、动态插件 Runtime 尚未实现。
+- Analytics/Visualization 只有 Baseline；Knowledge/RAG/通用 Workflow/Generated App Runtime 尚未形成生产实现。
+- 外部参考增加 Ever Gauzy，重点吸收 tenant-aware runtime binding、Provider definition/binding、Compiled Tool Catalog + per-turn resolution；其内部 OAuth issuer 与 AGPL runtime/code 不采用。
 
-Enterprise AI Workspace、Agent Capability、Observation 和 Artifact 边界已形成 Baseline，
-但对应运行代码尚未实现。PLAN-0006 为 `Proposed / NOT ACTIVE`，不得被表述为 Active 或已开始编码。
+当前优先顺序：
 
-平台原生 Analytics/Visualization Baseline 已由 ADR-0017 建立，但运行时实现尚未开始。
-后续应通过独立计划依次交付分析投影基座、指标语义层、Analytics Query Service、声明式
-Dashboard/Report 和受控 Agent 分析技能；本入口仍保持总体架构文件的稳定 `_v2.md` 路径，
-其内部版本已更新为 v2.2。
+~~~text
+PLAN-0013 Identity / Authorization
+  -> Contract Business Vertical Slice
+  -> Knowledge/Evidence Projection（按业务需要）
+  -> PLAN-0006 Revision 1 Workspace / Agent
+  -> Controlled Write ActionPlan
+  -> Analytics / Approval / Finance / Legal
+~~~
 
-Business Module Isolation 与 Semantic Contract 已由 ADR-0020 和独立专题 Baseline 建立。
-本轮只交付纯 Rust manifest/semantic compiler 基础、冲突校验和架构 Fitness Functions；不
-引入 WrenAI/Python/数据库/任意 SQL，不移动现有 business crates，不实现 Registry、Query
-Service、模块安装或 C legacy 生产 ACL。
-
-ADR-0019 已接受目标业务领域组合和跨部门协作边界，但不自动激活新业务实现。Party、
-Document Revision、Legal、Finance、Business Assurance、People & Performance 应分别通过
-后续 Plan 进入实现，并优先用一个合同 → 法务 → 审批 → 财务核对 → 正式报告的真实垂直切片验证架构。
+近期不优先：通用 Workflow Designer、动态 WASM/Node/Python 插件、Marketplace、Generated App Sandbox、自建 OAuth Server、自建 RAG 引擎。
 
 ## 10. 合并后的后续任务规则
 
