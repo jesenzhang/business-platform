@@ -375,7 +375,12 @@ impl Engine {
                 // Subtree use is scope use: a disabled bound unit stops
                 // granting (same rule as the exact branch), and a disabled
                 // unit hosting the resource stops being addressable — the
-                // walk fails closed at both ends.
+                // walk fails closed at both ends. Intermediate units on the
+                // path are deliberately not re-validated per decision:
+                // re-activating an intermediate node must not silently
+                // re-open authority that the endpoint rule already
+                // controls, and a mid-tree disable is handled where the
+                // organization surfaces it (membership/staffing rules).
                 let bound_active = self
                     .org
                     .unit_is_active(ctx.tenant_id, *org_unit_id)

@@ -731,6 +731,13 @@ async fn mid_evaluation_store_failures_deny_internally() {
             .unwrap_or_else(|_| unreachable!());
         assert!(!decision.allowed);
         assert_eq!(decision.reason, DecisionReason::DenyInternal);
+        // One-shot semantics: the very next evaluation must succeed again,
+        // proving the injected bit was consumed, not made sticky.
+        let recovery = engine
+            .check(&ctx, "document.read", None)
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        assert!(recovery.allowed, "injected fault must be one-shot");
     }
     // The organization bridge failing mid-scope-match also denies
     // internally (the scope branch must not silently mismatch-and-continue
@@ -753,6 +760,11 @@ async fn mid_evaluation_store_failures_deny_internally() {
         .await
         .unwrap_or_else(|_| unreachable!());
     assert_eq!(decision.reason, DecisionReason::DenyInternal);
+    let recovery = engine2
+        .check(&ctx2, "document.read", Some(&in_child))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert!(recovery.allowed, "subtree fault injection is one-shot");
 }
 
 #[tokio::test]

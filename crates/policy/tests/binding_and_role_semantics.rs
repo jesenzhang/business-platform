@@ -341,6 +341,50 @@ async fn set_permissions_iam_addition_requires_unbound_actor() {
 }
 
 #[tokio::test]
+async fn set_permissions_guard_ignores_out_of_window_bindings() {
+    let ports = setup();
+    seed_role(&ports, iam_role_id(), "iam", &["document.read"]);
+    // The binding row is active but its validity window ended long ago, so
+    // it grants nothing at decision time; the window-aware guard must agree
+    // and let the actor add a management key to that role.
+    ports.seed_binding(
+        RoleBinding::create(
+            id(30),
+            tenant_a(),
+            subject_user(),
+            iam_role_id(),
+            ResourceScope::Tenant,
+            ValidityWindow {
+                effective_at: ts(1000),
+                expires_at: Some(ts(2000)),
+            },
+            ts(1000),
+        )
+        .unwrap_or_else(|_| unreachable!()),
+    );
+    let setter = SetRolePermissions::new(Arc::clone(&ports.command), Arc::clone(&ports.query));
+    let outcome = setter
+        .execute(SetRolePermissionsCommand {
+            tenant_id: tenant_a(),
+            role_id: iam_role_id(),
+            permission_keys: vec![
+                "document.read".to_string(),
+                "policy.role.manage".to_string(),
+            ],
+            expected_version: 1,
+            actor_user_id: subject_user(),
+            idempotency_key: None,
+            reason: None,
+        })
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(outcome.role.version().value(), 2);
+    assert!(outcome
+        .permission_keys
+        .contains(&"policy.role.manage".to_string()));
+}
+
+#[tokio::test]
 async fn system_roles_reject_every_mutation_surface() {
     let ports = setup();
     let system_id = system_bootstrap_role_id();

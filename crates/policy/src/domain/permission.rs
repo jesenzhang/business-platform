@@ -62,7 +62,8 @@ pub struct PermissionDefinition {
     /// owning context consumes the key.
     reserved: bool,
     /// Retired keys (catalog rows kept for audit resolution) evaluate as
-    /// `DenyUnknownPermission`; they can never be re-granted.
+    /// `DenyUnknownPermission`. A role may still list a retired key in
+    /// its permission set, but that row can never produce an allow.
     active: bool,
 }
 

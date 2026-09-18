@@ -164,7 +164,9 @@ impl BindRole {
                 .await?;
         }
 
-        // Per-user binding cap (write-side spam guard).
+        // Advisory per-user cap for early, friendly rejection; the
+        // authoritative race-free check runs inside the store commit
+        // (ports contract rule 8).
         if existing_bindings
             .iter()
             .filter(|binding| binding.is_active())
