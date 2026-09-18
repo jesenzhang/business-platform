@@ -1,9 +1,10 @@
 # Enterprise AI Workspace 与 Agent Capability 架构
 
 > 文档 ID：ARCH-AIWS-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
 > 生效日期：2026-08-06  
+> 最近修订：2026-09-18  
 > 适用范围：业务网站内置助手、企业 AI 门户、Agent Runtime、Skill、Context、Artifact、Capability、Model Gateway 和未来 Generated App
 
 ## 1. 目的
@@ -72,7 +73,7 @@ User Authority
                            ▼
 ┌──────────────── Enterprise AI Workspace ─────────────────┐
 │ Workspace / Conversation / Thread / Turn                 │
-│ Skill Registry / Context Registry / Tool Registry        │
+│ Skill/Context assets / Compiled Agent Tool Catalog      │
 │ Assistant UI / Artifact / Blueprint / Collaboration      │
 └──────────────────────────┬───────────────────────────────┘
                            ▼
@@ -150,7 +151,7 @@ Enterprise AI Workspace 是平台能力层，不新增合同、审批等业务 B
 
 ### 4.3 Policy 与 Identity
 
-Identity and Access 继续拥有 Principal、Delegation Grant 和认证会话。Policy 继续拥有通用授权机制。
+外部 OIDC IdP 按 ADR-0024 拥有人员登录、凭证签发、MFA、session/refresh；Business Platform 的 Identity and Access 拥有 PlatformUser、TenantMembership、平台 Principal 与委托引用，Policy 拥有 Role/Permission/ResourceScope 和通用授权判定。具体模型以 `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 为准。
 
 新增的 Capability Grant 是 Policy 与 Agent Integration 的协作模型：
 
@@ -182,9 +183,12 @@ Identity and Access 继续拥有 Principal、Delegation Grant 和认证会话。
 
 ### 4.5 Model Gateway
 
-属于 AI Application 平台能力，拥有：
+属于 AI Application 平台能力。Provider 静态定义与租户运行绑定必须分离，推荐边界为 `ProviderDefinition + TenantProviderBinding + SecretRef`；Secret material 留在批准的 Secret adapter/store 中，tenant mutable binding 不改变 provider definition identity。
 
-- Model Registry；
+拥有：
+
+- Model Registry / ProviderDefinition；
+- TenantProviderBinding；
 - routing policy；
 - provider health；
 - quota/budget；
@@ -271,7 +275,28 @@ Context 至少区分：
 
 当前页面 Context 只提供资源引用，例如 `contract:C10086@version17`。租户和权限必须由服务端受信身份重新解析。
 
-### 5.4 Capability Grant
+### 5.4 Compiled Agent Tool Catalog 与运行时解析
+
+Business Module 的 Agent Contribution 在 package/compile time 声明稳定 Tool identity、input/output schema、Published Query/Command target、risk class、required permission、Capability template、confirmation policy 与 contract digest。
+
+~~~text
+Agent Contribution
+  -> deterministic compile
+  -> Compiled Agent Tool Catalog
+  -> per-turn resolution
+       tenant enabled state
+       current principal / Policy decision
+       task Capability Grant
+       resource classification
+       provider/model availability
+  -> Resolved Tool Set
+~~~
+
+Tool/Provider identity collision、unknown target 或 ownership ambiguity 必须 deterministic fail closed，不得由加载顺序决定。运行时 tenant binding 可以启用/禁用能力，但不能修改 compiled identity/digest。
+
+Embedded Assistant、MCP、CLI/API 对同一业务 capability 只能做 transport/context/schema adaptation，必须引用相同 Published Application Contract，不得复制业务规则。
+
+### 5.5 Capability Grant
 
 ```text
 CapabilityGrant
@@ -300,7 +325,7 @@ CapabilityGrant
 6. Grant 过期、撤销、主体变化或策略变化时 fail-closed；
 7. 关键业务执行仍重新检查业务状态和资源版本。
 
-### 5.5 Observation
+### 5.6 Observation
 
 Observation 记录 Agent 或 Generated App 读取了什么资源和哪种分类，而不是无条件保存完整敏感内容。
 
@@ -318,7 +343,7 @@ Observation
 └── artifact_links
 ```
 
-### 5.6 Derived Access Requirement
+### 5.7 Derived Access Requirement
 
 Artifact 的访问要求来自自身分享策略与来源数据约束的合取：
 
@@ -331,7 +356,7 @@ Artifact Access
 
 分享时必须重新授权。若无法证明查看者有权访问来源数据，默认拒绝或生成经过明确脱敏的新 Artifact 版本。
 
-### 5.7 Tool Invocation
+### 5.8 Tool Invocation
 
 ```text
 ToolInvocation
@@ -666,9 +691,9 @@ User → Workspace → AgentRun → Turn → ToolInvocation
 9. Sandbox 代码不得进入核心业务进程；
 10. Agent Runtime 可替换契约通过 Fake/Contract Test。
 
-## 19. 与 Cloudflare OS 的关系
+## 19. 与参考项目的关系
 
-Cloudflare OS 是参考项目，不是本架构的运行依赖。
+Cloudflare OS 与 Ever Gauzy 都是参考项目，不是本架构的运行依赖。Cloudflare OS 主要提供 Workspace/Capability/Observation/Generated App 边界参考；Ever Gauzy 主要提供 tenant runtime binding、multi-provider AI、embedded assistant、per-turn tool resolution 与 MCP 多入口的产品化参考。Ever Gauzy 的 AGPL 代码/Schema/UI 不复制，其内部 OAuth credential issuer 因 ADR-0024 明确拒绝。
 
 采用其：
 
