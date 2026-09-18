@@ -3,6 +3,7 @@
 > 文档类型：Baseline
 > 状态：Accepted baseline; PLAN-0011 Integrated
 > 日期：2026-08-19
+> 最近修订：2026-09-18
 > 适用范围：Platform Core、Business Module、Application Packaging、Contribution、跨模块协作与生命周期
 
 ## 1. 目标
@@ -81,6 +82,8 @@ UI、Agent、Semantic、Policy 和 Extension contribution 必须属于同一个 
 ### Agent Contribution
 
 模块声明 typed query tool、approved action tool、Context/Skill 或 capability requirement。每个 Agent contribution 带 classification，target 只允许 Query、Command 或 approved published Capability。Agent Tool 只能调用公开 Application API/Query/Command，授权由 Platform Policy/Capability Grant 决定；模块声明不等于授予权限。Agent 不得访问数据库、schema、private repository 或任意 HTTP/SQL/Shell。
+
+Agent contribution 必须进入 deterministic compile，形成稳定的 Compiled Agent Tool Catalog。编译期至少固定 tool/contribution/module identity、input/output schema、Published target、risk class、required permissions、Capability template、confirmation policy 和 contract digest；运行时再按 tenant enabled state、当前 principal/Policy、task Capability、resource classification 和 provider availability 解析 Resolved Tool Set。重复 ID、ownership collision、unknown target fail closed，不得由注册顺序决定。Compiled definition 与 tenant runtime binding 是不同状态。
 
 ### Semantic Contribution
 
@@ -211,4 +214,7 @@ module-extension  consumes A's published extension point
 - ADR-0020 继续拥有 Business Module Isolation 与纯 Rust compiler 基础；
 - ADR-0021 负责 Business Application Packaging/Published Extension Point（Accepted）；
 - ADR-0022 负责 Inter-Module Communication/Saga（Accepted）；
-- 不引入第二 Durable Task Runtime，不修改 PLAN-0009 已完成归档状态，不激活 PLAN-0006。
+- ADR-0024 负责 authentication externalized / authorization internalized；人员 credential/session 不进入 Platform Core；
+- Identity/Authorization 具体平台模型由 `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 约束；
+- PLAN-0006 Revision 1 只能在 Identity/Authorization 与真实 Contract Published Contract 已集成后激活；
+- 不引入第二 Durable Task Runtime，不修改 PLAN-0009 已完成归档状态。

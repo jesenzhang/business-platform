@@ -1,9 +1,10 @@
 # 服务端后端架构清单与执行契约
 
 > 文档 ID：ARCH-MANIFEST-001
-> 版本：1.2
+> 版本：1.3
 > 状态：Baseline
 > 生效日期：2026-08-08
+> 最近修订：2026-09-18
 > 适用范围：所有服务端设计、计划、代码、测试、部署与审查任务
 
 ## 1. 目的
@@ -20,6 +21,7 @@
 + 接口、事件与集成契约
 + 长时任务与流程协调
 + Enterprise AI Workspace 与 Agent Capability
++ 身份、组织、角色与业务授权
 + 安全、质量属性与可运维性
 + 部署、可观测性与演进治理
 + 自动化架构适配门禁
@@ -39,6 +41,7 @@
 | Enterprise AI Workspace | `ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md` | Workspace、Skill、Context、Capability、Observation、Artifact 和 Generated App 如何与业务平台分层 |
 | 质量属性 | `QUALITY_ATTRIBUTE_SCENARIOS.md` | 性能、可用性、恢复、安全目标 |
 | 安全架构 | `SECURITY_ARCHITECTURE.md` | 身份、租户、授权和数据保护 |
+| 身份与业务授权 | `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` | 外部 OIDC 之后的平台用户映射、Tenant Membership、Organization、Role/Permission/Resource Scope 与 Policy Decision |
 | 部署架构 | `DEPLOYMENT_ARCHITECTURE.md` | 进程、节点、环境与扩缩容 |
 | 可观测性 | `OBSERVABILITY_ARCHITECTURE.md` | 日志、指标、追踪和审计 |
 | Runtime Audit | `RUNTIME_AUDIT_ARCHITECTURE.md` | 统一 AuditEvent、原子写入和查询验证 |
@@ -87,6 +90,16 @@ BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md
 ADR-0021-business-application-packaging-and-published-extension-points.md
 ADR-0022-inter-module-communication-and-business-collaboration.md
 ```
+
+涉及用户、租户成员、组织、角色、Permission、RoleBinding、Resource Scope 或业务授权的任务，必须同时遵守：
+
+~~~text
+IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md
+SECURITY_ARCHITECTURE.md
+../adr/ADR-0024-authentication-externalized-authorization-internal.md
+~~~
+
+外部 IdP 只负责人员认证与凭证签发；Business Platform 内部业务授权不能由未映射的 IdP role/group 或客户端 header 直接决定。
 
 涉及 AI Workspace、Agent、Skill、Context、Tool、Capability、Observation、Artifact、Blueprint、Model Gateway 或 Generated App 的任务，必须同时遵守：
 
@@ -173,6 +186,10 @@ Workspace、Conversation、Skill、Context、Observation、Artifact 和 Generate
 ### 4.15 跨部门历史结论使用 Reference + Snapshot
 
 跨上下文 Case、审计、核对、绩效和正式报告必须保存稳定资源引用、资源版本和必要的不可变 Snapshot。只保存当前外键不足以证明历史结论依据。
+
+### 4.16 认证外置、业务授权内置
+
+人员凭证、登录、MFA、refresh/session 归外部 OIDC IdP；平台只验证受信身份。平台内部必须拥有 PlatformUser/TenantMembership、Role/Permission/Resource Scope 与可审计 Policy Decision。Agent Capability 是当前用户权限的更窄委托，不能代替基础授权。
 
 ## 5. 新任务架构准入
 

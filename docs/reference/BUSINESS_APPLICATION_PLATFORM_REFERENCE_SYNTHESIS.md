@@ -1,8 +1,8 @@
 # Business Application Platform Reference Synthesis
 
-> 文档类型：Reference synthesis / architecture input
-> 检查日期：2026-08-12
-> 参考项目：Twenty、Odoo、Frappe Framework/ERPNext、Cloudflare OS、WrenAI
+> 文档类型：Reference synthesis / architecture input  
+> 检查日期：2026-09-12  
+> 参考项目：Twenty、Odoo、Frappe Framework/ERPNext、Cloudflare OS、WrenAI、Ever Gauzy  
 > 许可证边界：只吸收源码可观察的架构机制；不复制代码、Schema、UI 资产或运行时依赖
 
 ## 1. 证据与方法
@@ -21,8 +21,9 @@
 | ERPNext | `frappe/erpnext` | `develop` | `ca1b03cd4647b1968f74256070c4d3453614d408` | 2026-08-12 | GitHub API GPL-3.0；不复制代码 |
 | Cloudflare OS | `cloudflare/cloudflare-os` | `main` | `213ea6aa0a0e29d91d72832dcc9871432c1e01c5` | 2026-08-12 | Apache-2.0；参考 only，不成为 runtime dependency |
 | WrenAI | `Canner/WrenAI` | `main` | `ec85b1e1589ad2b6981d08df1f6b2ad29ae5b902` | 2026-08-12 | GitHub API NOASSERTION；现有分析记录路径许可证映射，直接复用需逐路径核验 |
+| Ever Gauzy | `ever-co/ever-gauzy` | `develop` | `33e3c09f303a08baef376bb9fde0aba1a057e77a` | 2026-09-12 | AGPL-3.0；只做架构/产品机制研究，不复制代码、Schema、UI 或引入 production runtime |
 
-## 2. 五个项目各自回答什么问题
+## 2. 六个项目各自回答什么问题
 
 | 参考 | 高价值机制 | 不能直接搬入的边界 |
 |---|---|---|
@@ -31,6 +32,7 @@
 | Frappe/ERPNext | DocType metadata、Custom Field、hooks/override、fixtures、permissions/workflow/events、app install/migrate、自动 REST | schema/runtime metadata 取代领域模型、运行时任意扩展、弱 compile-time ownership、跨 app hooks 隐式耦合 |
 | Cloudflare OS | Workspace、Gadget、Blueprint、Gatekeeper、Capability、Observation、Generated App boundary、分享时再授权 | AI Workspace 取代业务权威、任意网络/代码/数据库访问、供应商 runtime 进入 Platform Core |
 | WrenAI | semantic model、context、source→compiled artifact、结构化校验、受控 query planning | Python/SQL/MCP/Schema exposure、Analytics 取得业务事实权威、第二语义模型 |
+| Ever Gauzy | Headless Business Platform、tenant-aware Plugin Registry、AI Provider/BYOK、Embedded AI Chat、per-turn Tool Resolution、MCP multi-client surface | process-wide mutable registry、load-order ownership、内部 OAuth credential issuer、AGPL 代码复用、runtime metadata 取代 compiled contract |
 
 ## 3. 最终模型
 
@@ -49,7 +51,7 @@ Business Module
 
 ### 3.1 Platform Core
 
-**FACT/INFERENCE**：Twenty/Frappe/Odoo 证明宿主可以提供稳定 manifest、registry、生命周期和 contribution 接口；Cloudflare OS 证明 capability gateway、workspace 和 observation 可以作为平台能力；WrenAI 证明 source-to-compiled semantic artifact 可被结构化校验。
+**FACT/INFERENCE**：Twenty/Frappe/Odoo 证明宿主可以提供稳定 manifest、registry、生命周期和 contribution 接口；Cloudflare OS 证明 capability gateway、workspace 和 observation 可以作为平台能力；WrenAI 证明 source-to-compiled semantic artifact 可被结构化校验；Ever Gauzy 进一步证明 tenant-scoped plugin configuration、multi-provider AI、embedded assistant 与 MCP 外部访问可以作为同一 Business Platform 上的产品化能力。
 
 **PROJECT DECISION**：Platform Core 只拥有通用 capability、身份/租户/Policy、registry/compiler、事件与 durable execution primitives、UI/Agent host 和审计；不得知道 Contract、Finance、Legal、HR、CRM 或 C-specific 名称。添加新业务模块只新增其 package/contract，不改 Platform Core。
 
@@ -57,13 +59,19 @@ Business Module
 
 Business Module 按业务能力、统一语言、不变量和数据所有权划分，不按表、页面、topic 或 plugin 划分。它拥有正式业务事实、状态机、Application Command/Query、Domain Event、事务、版本、幂等、迁移和公开契约。模块之间只能以公开 Application API、Integration Event、ResourceRef、Projection、Snapshot、Published Extension Point 协作。
 
+Ever Gauzy 的大量业务模块和 Headless API 说明“多业务产品 + 多客户端”可以共享统一平台能力，但其具体 ORM entity 与领域关系不是本项目的 ownership 依据。
+
 ### 3.3 Metadata
 
 Metadata 适合描述稳定 ID、展示标签、导航、列表/详情区域、简单扩展槽位、权限需求、语义声明、版本和依赖。它不是业务事实数据库，不得定义或绕过 Aggregate 不变量。避免“万能 Object + Field + JSON”：简单展示扩展可 metadata 化，复杂状态、金额、审批、版本、证据和跨对象不变量必须回到 DDD Domain。
 
+Ever Gauzy 的 `PluginTenant` 证明 tenant runtime enablement/configuration 本身是有价值的平台模型，但这些 mutable runtime settings 不能反向改变 compiled ownership、contract digest 或正式 Domain 不变量。
+
 ### 3.4 Semantic Contract
 
 Semantic Contract 只描述可公开分析含义：Dataset、Projection、Field、Relationship、Measure、Metric、Dimension、Filter Policy 和 Lineage。它与 DDD Domain、Extension Metadata 共享 Module Identity，但不是其替代。唯一语义权威仍是 ADR-0017/ADR-0020；Analytics 只拥有 compiled registry input、projection 和 query execution metadata。
+
+Ever Gauzy 固定提交的 README 仅能证明部署使用 Cube 作为 Reports/Dashboards/Analytics 的 Semantic Layer；不足以证明 Cube 是其所有指标的唯一权威。因此该事实只加强“semantic execution engine 应可替换”的结论，不改变本项目的 Semantic Contract ownership。
 
 ## 4. UI、Agent 与 Semantic contribution
 
@@ -82,21 +90,99 @@ Contract-like Module Identity
 - **Semantic**：声明分析含义与公开 projection；不产生正式写入；不暴露任意 SQL/schema。
 - **Policy**：模块声明要求，不自授权限；高风险动作仍 Prepare→Preview→Confirm→Execute。
 
-## 5. 跨业务引用、扩展与一致性
+### 4.1 Ever Gauzy 对 Agent contribution 的新增证据
 
-### 5.1 A 如何安全引用 B
+Ever Gauzy `AiChatToolRegistry` 将 tool contribution 分成“静态注册 + 每 turn 动态解析”，并把 tenant、organization、user、employee、caller authorization 作为请求上下文快照传给 tool factory；mutating tool 必须进入 `requireApproval`，坏 factory 被隔离，不影响其他 contribution。
+
+这支持本项目把 Agent Contribution 进一步具体化为：
+
+```text
+Compile time
+  stable tool id / schema / target / risk / capability / version
+        ↓
+Compiled Agent Tool Catalog
+        ↓
+Invocation time
+  tenant enabled state / delegated principal / authorization
+  task capability grant / classification / policy / provider availability
+        ↓
+Resolved Tool Set
+```
+
+Gauzy 的“earlier registration wins”不采用；tool/provider identity collision 在本项目必须 deterministic fail closed，不能由加载顺序决定。
+
+## 5. AI Provider 与 Tenant Binding
+
+Ever Gauzy 的 AI Chat 插件将 Provider plugin 与 tenant BYOK credential 分离。固定提交中可观察到：Provider definition 由独立 plugin 注册；tenant credential 保存 provider id、encrypted API key、custom base URL、enabled/default provider、default model 及 voice model preference。
+
+这支持 Model Gateway 后续采用三分模型：
+
+```text
+ProviderDefinition
+- stable provider identity
+- capabilities / discovery contract / compatibility
+
+TenantProviderBinding
+- enabled
+- endpoint/routing/default model preference
+- quota/budget/policy references
+
+SecretRef
+- credential reference
+- secret material remains in approved secret adapter/store
+```
+
+**PROJECT DECISION remains unchanged**：Provider registry/config 不拥有业务事实，供应商 SDK/secret 不进入 Domain；实际类型/API 需未来 Model Gateway ADR/Plan 决定。
+
+## 6. Embedded Chat、MCP、CLI 的共用能力
+
+Ever Gauzy 同时提供 embedded AI Chat 与共享 MCP package；MCP README 说明工具通过 Gauzy API 工作，可被 standalone app 和 Electron app 使用。
+
+该实现加强以下架构约束：
+
+```text
+Business Capability
+      ↓
+Published Application Query / Command
+      ↓
+Shared typed tool contract
+   ┌─────────┬──────────┬─────────┐
+   │ Chat    │ MCP      │ CLI/API │
+   └─────────┴──────────┴─────────┘
+```
+
+不同 surface 只负责 protocol/context/schema adaptation，不能重新实现业务规则。
+
+## 7. Authentication / Authorization 边界
+
+Ever Gauzy `packages/auth/src/lib/mcp/index.ts` 自己实现 OAuth 2.0 Authorization Server，包括 authorization code + PKCE、client credentials、refresh token、JWT access token、user authentication/consent。
+
+这一部分在 business-platform 明确 **Reject**，因为 Accepted ADR-0024 已决定：
+
+```text
+credential issuance / login / refresh / MFA → external OIDC IdP
+claim validation / tenant / authorization    → business-platform
+```
+
+未来 MCP remote access 应作为标准 OIDC/OAuth protected resource / relying party 接入，而不是因为 MCP 需要 OAuth 就把 credential issuer 带回 Platform Core。
+
+## 8. 跨业务引用、扩展与一致性
+
+### 8.1 A 如何安全引用 B
 
 按目的选择：当前状态用 Published Query；需要立即决策用 Owner Command；事实通知用 versioned Integration Event；持久关系用 ResourceRef；历史解释用 Reference + immutable Snapshot；列表/报表用 Published Projection。绝不使用 private FK、repository 或跨模块 SQL JOIN。
 
-### 5.2 A 如何扩展 B
+### 8.2 A 如何扩展 B
 
 只有 B 主动发布 `PublishedExtensionPoint`，A 才能提交 `ExtensionContribution`。Extension Point 的 owner、consumer、stable ID、schema/version、classification、authorization、lifecycle、dependency 和 removal semantics 必须可编译验证。B 删除仍被使用的 point 必须 `BlockedRemoval`；不能 silent break。
 
-### 5.3 跨模块事务与 Saga
+Ever Gauzy AI Chat attachment 保存后发布事件、Docs Plugin 可选订阅的模式，是“可选 consumer 不反向侵入 producer”的正向证据；本项目实现时仍必须使用 Published Integration Event、Outbox/Inbox、Owner Application Use Case 和幂等约束。
+
+### 8.3 跨模块事务与 Saga
 
 单 Owner 本地事务强一致；跨 Owner 使用 Outbox→Integration Event→幂等 consumer/Saga→下一步 Owner Command。Saga 拥有业务过程状态；Durable Task 拥有 Job/Step/Lease/Fence/Retry/Recovery。补偿是新的业务动作，人工审批通过 Owner Application Use Case，不能用技术 Job Completed 推导业务完成。
 
-## 6. 安装、升级、禁用和移除
+## 9. 安装、升级、禁用和移除
 
 ```text
 source declarations
@@ -110,33 +196,59 @@ source declarations
 
 Dry Plan 支持 Add/Upgrade/Disable/Enable/Remove Module、Contribution 变更、Extension Point 变更、Dependency/Compatibility Change、BlockedRemoval 和 Conflict。Module removal 只移除能力注册/代码组合；`Uninstalled != Data Purged`。Purge 必须是独立授权、保留、审计、验证和恢复流程。
 
-必须 compile-time/pure compiler validation 的内容：stable ID、duplicate/ownership collision、dependency graph/cycle、SemVer ranges、unknown reference、private reference、extension owner、semantic ownership、canonical ordering/digest。可以 runtime registry 的内容：当前 enabled state、tenant grants、freshness/watermark、lease/attempt、projection instance 和 audit evidence；其状态不能改变编译规则或成为业务事实权威。
+必须 compile-time/pure compiler validation 的内容：stable ID、duplicate/ownership collision、dependency graph/cycle、SemVer ranges、unknown reference、private reference、extension owner、semantic ownership、canonical ordering/digest。可以 runtime registry 的内容：当前 enabled state、tenant grants、provider binding、freshness/watermark、lease/attempt、projection instance 和 audit evidence；其状态不能改变编译规则或成为业务事实权威。
 
-## 7. 五项目机制的 Adopt/Adapt/Reject/Defer
+Ever Gauzy 的 `PluginTenant` 进一步支持“compiled definition 与 tenant runtime binding 分离”，但其 runtime JSON configuration 不成为本项目 contract compiler 的替代。
+
+## 10. 六项目机制的 Adopt / Adapt / Reject / Defer
 
 | 机制 | 处理 |
 |---|---|
 | manifest、stable ID、source→compile、SemVer、dry plan、typed contribution | Adopt |
+| Headless Business APIs、多产品 shell 共享 Application capability | Adopt |
+| Provider definition 与 tenant provider binding 分离 | Adopt model split；具体 Secret/Model Gateway 类型后续决定 |
+| per-turn requesting-user context、tool factory failure isolation、mutating tool approval marker | Adopt concept |
 | Custom Object/Field、Relation、Front Component、Role、Logic Function、Gadget/Blueprint、semantic Context | Adapt 为 Published Extension Point、host-controlled UI、Policy requirement、Artifact/Capability、唯一 Semantic Contract |
+| Ever Gauzy process-wide Provider/Tool Registry | Adapt 为 deterministic compiled catalog + runtime resolution |
+| PluginTenant | Adapt 为 package identity 不变的 tenant runtime binding/grant/config |
+| Chat attachment event → Docs plugin | Adapt 为 versioned Integration Event + Outbox/Inbox + Owner Use Case |
 | private schema mutation、shared mutable object、arbitrary SQL/DB tool、metadata-only domain、uninstall purge、Platform Core 特权业务 | Reject |
-| dynamic native/WASM/Node/Python plugin、Marketplace、remote registry、Generated App sandbox、完整 Agent Runtime、Wren runtime | Defer |
+| load-order 决定 Tool/Provider ownership | Reject |
+| platform 内部 OAuth/OIDC credential issuer | Reject；ADR-0024 已决定认证外置 |
+| dynamic native/WASM/Node/Python plugin、Marketplace、remote registry、Generated App sandbox、完整 Agent Runtime、Wren runtime、Cube execution engine | Defer |
 
-## 8. Synthetic multi-business proof
+## 11. Synthetic multi-business proof
 
 未来 `module-a/module-b/module-extension` 必须验证：独立安装、公开 Query/Event/ResourceRef/Projection、Extension Point 合法贡献通过；private model/repository/FK 失败；重复/乱序事件可重放；Snapshot 保留历史；删除 extension 不改变 A；A 被 B 依赖时 remove blocked；输入注册顺序置换后 compiled manifest/digest/plan 完全一致；Platform Core 对 fixture 业务知识为零。
 
-这只是 PLAN-0011 的验收设计，不重开 PLAN-0009，不继续 C production migration，不激活 PLAN-0006。
+Agent/Provider runtime 实现后还应追加：
 
-## 9. 结论
+- tool/provider 注册顺序置换不改变 compiled catalog；
+- duplicate stable id fail closed；
+- tenant disable 不改变 definition digest；
+- caller 无权限时 tool 不进入 resolved set；
+- capability grant 缩小时 resolved set 单调缩小；
+- mutating tool 无 confirmation policy 时 compile/runtime 拒绝；
+- Embedded Chat/MCP/CLI 的同一 capability 指向相同 Application Contract；
+- external IdP token 验证失败时 MCP fail closed，平台自身不签发人员 credential。
 
-五个项目共同支持“声明→校验→编译/注册→生命周期”的平台化方向，但没有任何一个可直接成为本项目的 Domain、运行时或边界规范。最终收敛模型是：
+这些是后续实现验收输入，不重开已归档计划。
+
+## 12. 结论
+
+六个项目共同支持“声明→校验→编译/注册→生命周期”的平台化方向。Ever Gauzy 额外提供了一个重要的生产形态证据：通用 Business Platform 可以在不放弃 Headless API 的情况下增加 tenant-aware plugin configuration、multi-provider AI、embedded assistant 和 MCP 外部入口。
+
+但没有任何一个参考项目可直接成为本项目的 Domain、运行时或边界规范。最终收敛模型保持：
 
 ```text
 DDD Domain != Extension Metadata != Semantic Contract
 Platform Core = business-neutral capabilities and contracts
 Business Module = authoritative business capability + controlled contributions
 Cross-module collaboration = Published Contract/Event/Ref/Projection/Extension Point
+Compiled catalog != Tenant runtime binding
+Agent Tool definition != Runtime capability grant
 Module removal != data purge
+Authentication issuance != Platform authorization
 ```
 
-正式决策进入 `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`、Accepted ADR-0021 和 Accepted ADR-0022；外部 reference 只作为可追溯事实输入。
+正式决策仍以 `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`、`ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md`、Accepted ADR-0021/ADR-0022/ADR-0024 为准；外部 reference 只作为可追溯事实输入。
