@@ -180,7 +180,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
       minio:
-        image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+        # Docker Hub `minio/minio` repository was removed (anonymous pulls
+        # 404/denied as of 2026-09-18); the same immutable RELEASE tag is
+        # served from Quay. Do not "restore" the docker.io reference.
+        image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
@@ -202,7 +205,7 @@ jobs:
       - run: cargo --version
       - name: Create private MinIO test bucket
         run: |
-          docker run --network host --rm --entrypoint /bin/sh minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
+          docker run --network host --rm --entrypoint /bin/sh quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
       - name: Apply migrations
         run: cargo run -p migration -- --backend postgres up
       - name: Run real infrastructure and E2E tests

@@ -1,10 +1,10 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-03
-> 当前阶段：Architecture Foundation Convergence — document foundation, PLAN-0011 foundation and PLAN-0007 external-access demo integrated; PLAN-0009 Rehearsal Closed; PLAN-0012 Active
-> 当前计划：PLAN-0012 Active；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived；PLAN-0006 Proposed / NOT ACTIVE
-> 集成方式：PR #9 / GitHub PR merge
+> 最后更新：2026-09-18
+> 当前阶段：v0.1 released — PLAN-0012 Integrated / Archived（`v0.1` tag → `2383651`）；ADR-0024 身份边界 Accepted；PLAN-0009 Rehearsal Closed；下一候选为 PLAN-0006
+> 当前计划：PLAN-0006 Proposed / NOT ACTIVE（`plans/current` 唯一条目）；PLAN-0012 Integrated / Archived；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived
+> 集成方式：PR #12 / GitHub PR merge
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -226,6 +226,27 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > （预生产验收）因本工作区无 staging 与真实凭据仍 BLOCKED/NOT RUN，不以
 > fake/stub 替代证据。
 
+> 2026-09-03: PLAN-0012 Slice C 真实预生产验收通过并发布 v0.1。staging 真实栈
+> （PostgreSQL 18 + MinIO + 内网 vLLM 真实推理 + Prometheus/Grafana）全链路
+> 上传→真实提取→Review→崩溃恢复→备份恢复、20 并发 smoke×2、抓取/仪表盘/
+> 标签基数逐项 PASS（含直方图 buckets 修复 `ac58991` 与契约套件隔离确定性
+> 修复 `d0076e0`/`3ab22dd`）；真实 Auth0 租户 production 模式 E2E 12/12 PASS、
+> 8 项 fail-closed 启动负例全部拒绝。逐项证据与 caveat 见完成审计两次
+> amendment（`docs/reports/PLAN-0012-COMPLETION-AUDIT.md`）。PR #10 合入 main
+> （merge `2383651`），Main CI `33705531597` 全绿后执行发布：`v0.1` annotated
+> tag 指向 `2383651`，PLAN-0012 归档至 `docs/plans/archive/2026/`，T3.3
+> （Keycloak demo compose）按计划后置。ADR-0024（认证外置、授权内置）经
+> PR #12 Accepted。
+
+> 2026-09-18: 发布后文档同步修正（纯文档，无代码/迁移/契约变更）：
+> ① `docs/plans/README.md` 归档清单补记 PLAN-0012 条目（归档提交当时仅更新了
+> current 列表）；② 本文头部此前停留在"PLAN-0012 Active"，现更正为 v0.1 已
+> 发布、PLAN-0012 Integrated / Archived，当前计划仅 PLAN-0006
+> （Proposed / NOT ACTIVE）；③ §7 补 PLAN-0012 判定行并修正外部扫描门禁表述
+> （cargo-audit/gitleaks/trivy 已入 CI security job 并 PASS，run
+> `33617370509`；cargo-deny/syft/grype/osv-scanner 仍未接入）；④ ADR 索引补记
+> ADR-0006/0007 为历史跳号（仓库历史从未创建，不得复用）。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
@@ -346,8 +367,10 @@ Enterprise AI Workspace 现状：
   仍处于骨架阶段；Runtime Governance 的统一 Audit、Integrity 与 Repair
   能力已由 PLAN-0005 收敛并集成；平台原生 Analytics/Visualization 架构 Baseline 已建立，运行时实现尚未开始；
 - API/Event 契约尚未全部形成可生成 Schema；
-- 质量属性尚未形成完整性能和容量证据；
-- 生产 Runbook 尚未完成；
+- 质量属性尚未形成完整性能和容量证据（staging 20 并发 smoke 已实测并记录，
+  生产形态容量证据尚无）；
+- Runbook v0.1 已交付（`docs/operations/RUNBOOK.md`，PLAN-0012 M4）；生产数据
+  演练与生产 observability 在线验证仍待真实生产访问；
 - Enterprise AI Workspace 仅有文档设计，没有运行证据。
 
 ## 3.1 总体架构第 19 章后续路线
@@ -457,7 +480,7 @@ API/Event 契约：已形成 Baseline，Schema 尚待全面落地
 代码骨架：已存在
 分层依赖：部分符合
 基础设施隔离：部分符合
-自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；PLAN-0011 business application/compiler/dry-plan/fitness gates PASS；外部 cargo-audit/cargo-deny/gitleaks/trivy/syft/grype/osv-scanner 在当前环境 NOT RUN；Agent 门禁待 PLAN-0006
+自动化架构门禁：已实现基础，本地与 GitHub Actions 均 PASS；PLAN-0010 module/semantic gates PASS；PLAN-0011 business application/compiler/dry-plan/fitness gates PASS；cargo-audit/gitleaks/trivy 已入 CI security job 并 PASS（run 33617370509；本机 NOT RUN）；cargo-deny/syft/grype/osv-scanner 未接入；Agent 门禁待 PLAN-0006
 PLAN-0001：Integrated / Archived
 PLAN-0002：Integrated / Archived
 PLAN-0003：Integrated / Archived
@@ -471,6 +494,8 @@ PLAN-0007：Integrated / Archived（Business Console、Public REST Contract、CL
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
 PLAN-0010：Integrated / Archived（Business Module Isolation + Semantic Contract；candidate `7997a501528bf12ae7846a9dc278fe4fce65a467`；已集成基线 `ad35c3c172cf19c97366c38ae8340852f3b6365c`）
 PLAN-0011：Integrated / Archived（Business Application Packaging and Contribution；Candidate/Main `ed870acfe165756632c0519bb181fd5dcf8a11cd`；Feature CI `32210387950`；Main CI `32213985080`；ADR-0021/0022 Accepted）
+PLAN-0012：Integrated / Archived（v0.1 预生产发布：外部 OIDC IdP 生产认证（ADR-0024）、vendored model-provider（ADR-0023）、可观测性与备份恢复演练；Slice C 真实 staging 栈 + 真实 Auth0 IdP 验收 E2E 12/12、fail-closed 负例 8/8；merge `2383651`（PR #10），Main CI `33705531597`；`v0.1` tag → `2383651`；T3.3 Keycloak demo compose 后置；完成审计 `docs/reports/PLAN-0012-COMPLETION-AUDIT.md`）
+v0.1 release：已发布（annotated tag `v0.1` → `2383651`；生产数据演练与 observability 在线验证仍需真实生产访问，见完成审计 NOT RUN 表）
 Business Application Platform：Baseline（由 PLAN-0011 建立 packaging/contribution/compiler/dry-plan foundation；runtime/具体业务模块未实现）
 ```
 
