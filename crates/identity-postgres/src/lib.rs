@@ -335,7 +335,8 @@ async fn external_subjects_for(
     user_id: Uuid,
 ) -> Result<Vec<(String, String)>, IdentityStoreError> {
     let rows = sqlx::query_as::<_, (String, String)>(
-        "SELECT issuer, subject FROM external_identities WHERE user_id = $1 ORDER BY issuer, subject",
+        "SELECT issuer, subject FROM external_identities WHERE user_id = $1
+         ORDER BY issuer COLLATE \"C\", subject COLLATE \"C\"",
     )
     .bind(user_id)
     .fetch_all(&mut *conn)
@@ -355,7 +356,7 @@ async fn lock_idempotency(
     tenant_id: Uuid,
     key: &str,
 ) -> Result<(), IdentityStoreError> {
-    let guard = format!("{operation}|{tenant_id}|{key}");
+    let guard = format!("identity:{operation}|{tenant_id}|{key}");
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
         .bind(guard)
         .execute(&mut *conn)
@@ -576,7 +577,7 @@ impl IdentityResolvePort for PostgresIdentityStore {
         let mut transaction = self.pool.begin().await.map_err(map_sqlx_error)?;
         // Serialize concurrent first-contact provisioning for this exact
         // external key (the audit chain writer takes its own tenant lock).
-        let guard = format!("resolve|{}|{}", command.issuer, command.subject);
+        let guard = format!("identity:resolve|{}|{}", command.issuer, command.subject);
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
             .bind(guard)
             .execute(&mut *transaction)

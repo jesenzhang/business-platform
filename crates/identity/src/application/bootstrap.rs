@@ -38,6 +38,14 @@ use super::resolve::EXTERNAL_IDENTITY_NAMESPACE;
 /// Role the bootstrap service binds (owned by Policy; stable key).
 pub const BOOTSTRAP_ROLE_STABLE_KEY: &str = "system.bootstrap-admin";
 
+/// Audit actor identity for bootstrap mutations. Adapters persist the
+/// audit actor as a UUID and fail closed on non-UUID actors, so this must
+/// be a canonical, deterministic UUID shared by every bootstrap run.
+#[must_use]
+pub fn bootstrap_service_actor() -> Uuid {
+    Uuid::new_v5(&EXTERNAL_IDENTITY_NAMESPACE, b"bootstrap-service")
+}
+
 /// Server-side bootstrap configuration (mirrors `[auth.bootstrap]`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BootstrapAdministratorConfig {
@@ -232,7 +240,7 @@ impl BootstrapAdministrator {
 
         let now = Utc::now();
         let audit = MutationContext {
-            actor_id: "bootstrap-service".to_string(),
+            actor_id: bootstrap_service_actor().to_string(),
             actor_kind: MutationActorKind::Bootstrap,
             operation_id: Uuid::now_v7(),
             trace_id: None,
@@ -247,16 +255,20 @@ impl BootstrapAdministrator {
             Ok(()) => BootstrapOutcome::Executed,
             Err(error) => {
                 // Best-effort durable failure record; the deployment must
-                // react to a Failed ledger row.
-                self.record(
-                    config,
-                    &issuer,
-                    &subject,
-                    &digest,
-                    BootstrapOutcome::Failed,
-                    Utc::now(),
-                )
-                .await?;
+                // react to a Failed ledger row. If the ledger write itself
+                // fails, the original execution cause still surfaces — the
+                // missing ledger row is itself an alertable anomaly, and
+                // masking the real cause would break diagnosis.
+                let _ = self
+                    .record(
+                        config,
+                        &issuer,
+                        &subject,
+                        &digest,
+                        BootstrapOutcome::Failed,
+                        Utc::now(),
+                    )
+                    .await;
                 return Err(error);
             }
         };
@@ -517,7 +529,7 @@ mod tests {
                     format!("{}\u{1f}{}", cfg.issuer, cfg.subject).as_bytes(),
                 ),
                 audit: MutationContext {
-                    actor_id: "test".to_string(),
+                    actor_id: bootstrap_service_actor().to_string(),
                     actor_kind: MutationActorKind::User,
                     operation_id: Uuid::now_v7(),
                     trace_id: None,

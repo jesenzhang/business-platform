@@ -403,8 +403,11 @@ async fn fetch_permission_keys(
     conn: &mut sqlx::PgConnection,
     role_id: Uuid,
 ) -> Result<Vec<String>, PolicyStoreError> {
+    // `COLLATE "C"` pins byte order so the ordering matches the `SQLite`
+    // (BINARY) adapter and Rust `Ord` used by convergence checks.
     let keys = sqlx::query_scalar::<_, String>(
-        "SELECT permission_key FROM role_permissions WHERE role_id = $1 ORDER BY permission_key",
+        "SELECT permission_key FROM role_permissions WHERE role_id = $1
+         ORDER BY permission_key COLLATE \"C\"",
     )
     .bind(role_id)
     .fetch_all(&mut *conn)
@@ -1249,7 +1252,8 @@ impl PolicyQueryPort for PostgresPolicyStore {
 
     async fn list_permissions(&self) -> Result<Vec<PermissionDefinition>, PolicyStoreError> {
         let rows = sqlx::query_as::<_, PermissionRow>(
-            "SELECT stable_key, description, reserved, active FROM permission_definitions ORDER BY stable_key",
+            "SELECT stable_key, description, reserved, active FROM permission_definitions
+             ORDER BY stable_key COLLATE \"C\"",
         )
         .fetch_all(&self.pool)
         .await
@@ -1270,7 +1274,8 @@ impl PolicyQueryPort for PostgresPolicyStore {
 
     async fn list_roles(&self, tenant_id: Uuid) -> Result<Vec<RoleDefinition>, PolicyStoreError> {
         let sql = format!(
-            "SELECT {ROLE_COLUMNS} FROM roles WHERE tenant_id = $1 OR tenant_id IS NULL ORDER BY stable_key"
+            "SELECT {ROLE_COLUMNS} FROM roles WHERE tenant_id = $1 OR tenant_id IS NULL
+             ORDER BY stable_key COLLATE \"C\""
         );
         let rows = sqlx::query_as::<_, RoleRow>(&sql)
             .bind(tenant_id)

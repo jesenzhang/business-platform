@@ -11,12 +11,10 @@ mod queries;
 mod resolve;
 mod user_status;
 
-pub use access::{
-    TenantAccess, TenantAccessChecker, TenantAccessError, TenantAccessReason,
-};
+pub use access::{TenantAccess, TenantAccessChecker, TenantAccessError, TenantAccessReason};
 pub use bootstrap::{
-    BootstrapAdministrator, BootstrapAdministratorConfig, BootstrapBindingError,
-    BootstrapBindingPort, BootstrapError, BOOTSTRAP_ROLE_STABLE_KEY,
+    bootstrap_service_actor, BootstrapAdministrator, BootstrapAdministratorConfig,
+    BootstrapBindingError, BootstrapBindingPort, BootstrapError, BOOTSTRAP_ROLE_STABLE_KEY,
 };
 pub use membership::{
     ChangeTenantMembershipStatus, ChangeTenantMembershipStatusCommand,

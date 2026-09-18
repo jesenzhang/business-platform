@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
 
 CREATE INDEX IF NOT EXISTS ix_tenant_memberships_tenant_joined
     ON tenant_memberships (tenant_id, joined_at DESC, membership_id DESC);
+CREATE INDEX IF NOT EXISTS ix_tenant_memberships_tenant_status
+    ON tenant_memberships (tenant_id, status);
 
 CREATE TABLE IF NOT EXISTS identity_idempotency (
     tenant_id TEXT NOT NULL,

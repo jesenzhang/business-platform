@@ -161,6 +161,15 @@ fn check_poisoned(state: &State) -> Result<(), IdentityStoreError> {
     Ok(())
 }
 
+/// Real adapters persist the audit actor as a UUID and fail closed on
+/// non-UUID actors before any write. The fake enforces the same rule so
+/// the contract suite can pin it across all dialects.
+fn check_audit_actor(audit: &MutationContext) -> Result<(), IdentityStoreError> {
+    Uuid::parse_str(&audit.actor_id)
+        .map(|_| ())
+        .map_err(|_| IdentityStoreError::Failed)
+}
+
 fn record_audit(
     state: &mut State,
     action: &str,
@@ -265,6 +274,7 @@ impl IdentityResolvePort for FakeResolve {
     ) -> Result<ResolvedPrincipal, IdentityStoreError> {
         let mut state = self.state.lock().map_err(|_| IdentityStoreError::Failed)?;
         check_poisoned(&state)?;
+        check_audit_actor(&command.audit)?;
         provision_user_locked(
             &mut state,
             &command.issuer,
@@ -341,6 +351,7 @@ impl IdentityCommandPort for FakeCommand {
     ) -> Result<MembershipCommitOutcome, IdentityStoreError> {
         let mut state = self.state.lock().map_err(|_| IdentityStoreError::Failed)?;
         check_poisoned(&state)?;
+        check_audit_actor(&command.audit)?;
 
         let target_user_id = match &command.target {
             MembershipTarget::UserId(user_id) => {
@@ -427,6 +438,7 @@ impl IdentityCommandPort for FakeCommand {
     ) -> Result<MembershipCommitOutcome, IdentityStoreError> {
         let mut state = self.state.lock().map_err(|_| IdentityStoreError::Failed)?;
         check_poisoned(&state)?;
+        check_audit_actor(&command.audit)?;
 
         let fingerprint = membership_fingerprint(
             command.tenant_id,
@@ -501,6 +513,7 @@ impl IdentityCommandPort for FakeCommand {
     ) -> Result<UserCommitOutcome, IdentityStoreError> {
         let mut state = self.state.lock().map_err(|_| IdentityStoreError::Failed)?;
         check_poisoned(&state)?;
+        check_audit_actor(&command.audit)?;
 
         let fingerprint = format!(
             "{}|{:?}|{}",
@@ -770,7 +783,7 @@ mod tests {
 
     fn mutation_context() -> MutationContext {
         MutationContext {
-            actor_id: "actor".to_string(),
+            actor_id: Uuid::now_v7().to_string(),
             actor_kind: MutationActorKind::User,
             operation_id: Uuid::now_v7(),
             trace_id: None,

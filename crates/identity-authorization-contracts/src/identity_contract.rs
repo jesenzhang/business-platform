@@ -37,6 +37,7 @@ pub async fn verify_identity_contract(ports: &IdentityContractPorts) -> Result<(
     verify_user_status(&cx, ports).await?;
     verify_listings(&cx, ports).await?;
     verify_ledger(&cx, ports).await?;
+    verify_actor_validation(&cx, ports).await?;
     Ok(())
 }
 
@@ -769,5 +770,100 @@ async fn verify_ledger(cx: &Contract, ports: &IdentityContractPorts) -> Result<(
         latest.config_version == 2,
         "latest must surface the newest recorded execution",
     )?;
+    Ok(())
+}
+
+/// Audit actors are persisted as UUIDs; adapters must fail closed on
+/// non-UUID actors without persisting anything. Bootstrap service actors
+/// rely on this rule being pinned by the suite rather than implicit.
+async fn verify_actor_validation(
+    cx: &Contract,
+    ports: &IdentityContractPorts,
+) -> Result<(), String> {
+    let mut bad_audit = cx.mutation();
+    bad_audit.actor_id = "bootstrap-service".to_string();
+
+    let rejected = ResolvePrincipalCommit {
+        audit: bad_audit.clone(),
+        ..cx.resolve_commit("subject-actor-validation", None)
+    };
+    let result = ports.resolve.resolve_or_provision(rejected).await;
+    if !matches!(result, Err(IdentityStoreError::Failed)) {
+        return Err(format!(
+            "provision with non-UUID actor: expected Failed, got {result:?}"
+        ));
+    }
+    if ports
+        .query
+        .find_user_by_external_identity(&cx.issuer, "subject-actor-validation")
+        .await
+        .map_err(|error| format!("actor probe: {error:?}"))?
+        .is_some()
+    {
+        return Err("provision with non-UUID actor persisted a user".to_string());
+    }
+
+    // Against an existing user, command ports must also fail closed and
+    // must not mutate state: the legitimate transition still succeeds at
+    // its original version afterwards.
+    let resolved = ports
+        .resolve
+        .resolve_or_provision(cx.resolve_commit("subject-actor-target", None))
+        .await
+        .map_err(|error| format!("provision target user: {error:?}"))?;
+    let user = resolved.user.user_id();
+
+    let rejected_membership = CreateMembershipCommit {
+        audit: bad_audit.clone(),
+        ..cx.create_membership(
+            cx.tenant_b,
+            user,
+            Some("actor-validation-membership"),
+            10_000,
+        )
+    };
+    let result = ports.command.create_membership(rejected_membership).await;
+    if !matches!(result, Err(IdentityStoreError::Failed)) {
+        return Err(format!(
+            "membership with non-UUID actor: expected Failed, got {result:?}"
+        ));
+    }
+    if ports
+        .query
+        .get_membership(cx.tenant_b, user)
+        .await
+        .map_err(|error| format!("membership probe: {error:?}"))?
+        .is_some()
+    {
+        return Err("membership with non-UUID actor persisted a row".to_string());
+    }
+
+    let rejected_disable = ChangeUserStatusCommit {
+        audit: bad_audit,
+        ..cx.change_user(
+            user,
+            UserLifecycleStatus::Disabled,
+            1,
+            Some("actor-validation-disable"),
+            10_001,
+        )
+    };
+    let result = ports.command.change_user_status(rejected_disable).await;
+    if !matches!(result, Err(IdentityStoreError::Failed)) {
+        return Err(format!(
+            "user disable with non-UUID actor: expected Failed, got {result:?}"
+        ));
+    }
+    ports
+        .command
+        .change_user_status(cx.change_user(
+            user,
+            UserLifecycleStatus::Disabled,
+            1,
+            Some("actor-validation-disable"),
+            10_002,
+        ))
+        .await
+        .map_err(|error| format!("post-check disable with UUID actor: {error:?}"))?;
     Ok(())
 }

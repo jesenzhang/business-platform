@@ -89,7 +89,9 @@ pub const PLATFORM_AUDIT_TENANT: Uuid = Uuid::from_bytes([
 /// (never from client-supplied identity headers).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutationContext {
-    /// Actor identity written to the unified audit trail.
+    /// Actor identity written to the unified audit trail. Must be a
+    /// canonical UUID string: adapters persist it as the audit actor UUID
+    /// and fail closed (`IdentityStoreError::Failed`) on anything else.
     pub actor_id: String,
     /// Actor classification for the audit trail.
     pub actor_kind: MutationActorKind,

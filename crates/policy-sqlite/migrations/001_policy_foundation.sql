@@ -77,9 +77,11 @@ CREATE TABLE IF NOT EXISTS role_bindings (
 );
 
 CREATE INDEX IF NOT EXISTS ix_role_bindings_tenant_user
-    ON role_bindings (tenant_id, user_id);
+    ON role_bindings (tenant_id, user_id, status);
 CREATE INDEX IF NOT EXISTS ix_role_bindings_tenant_role
     ON role_bindings (tenant_id, role_id);
+CREATE INDEX IF NOT EXISTS ix_role_permissions_permission_key
+    ON role_permissions (permission_key, role_id);
 
 CREATE TABLE IF NOT EXISTS policy_idempotency (
     tenant_id TEXT NOT NULL,

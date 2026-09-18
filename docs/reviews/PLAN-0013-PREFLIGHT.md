@@ -96,7 +96,7 @@ inertness), `plan_0008_postgres_minio.rs`.
 | Bounded Context | Crate | Owns tables |
 |---|---|---|
 | identity-management | `crates/identity` (+`identity-{postgres,sqlite}`) | `platform_users`, `external_identities`, `tenant_memberships`, `platform_bootstrap_executions`* |
-| organization | `crates/organization` (+`organization-{postgres,sqlite}`) | `organization_units`, `organization_memberships` |
+| organization | `crates/organization` (+`organization-{postgres,sqlite}`) | `organization_units`, `organization_members` (implemented name; earlier drafts of this document said `organization_memberships`) |
 | policy | `crates/policy` (+`policy-{postgres,sqlite}`) | `permission_definitions`, `role_definitions`, `role_permissions`, `role_bindings` |
 
 \* bootstrap ledger is written only by the bootstrap application service.
@@ -319,12 +319,20 @@ existing local/demo flow. SQLite adapters implement the same contract suite.
   tenant: (tenant_id,stable_key)), `role_permissions(role_id,permission_key)`,
   `organization_units` parent FK same-tenant enforced in domain (FK on id +
   trigger-free domain check + cross-tenant read filter),
-  `organization_memberships(tenant_id,user_id,org_unit_id,membership_type)`,
+  `organization_members(tenant_id,user_id,org_unit_id,membership_type)`
+  (implemented table name),
   `role_bindings(tenant_id,user_id,role_id) where status='active'` partial
   unique not required (multiple bindings allowed; hot-path indexes:
   `role_bindings(tenant_id,user_id,status)` incl. effective/expiry,
   `role_permissions(permission_key,role_id)`, memberships by (tenant_id,status),
   users list keyset (created_at,id)). version BIGINT default 1, updated_at.
+  Revision note: the three hot-path indexes above are implemented exactly as
+  locked; `PostgreSQL` string `ORDER BY`s additionally pin `COLLATE "C"` so
+  row order matches the `SQLite` (BINARY) adapter and Rust `Ord` byte order.
+  Audit actors (`MutationContext.actor_id`) are pinned contract-wide as
+  canonical UUID strings: adapters fail closed (`Failed`) on anything else,
+  so the bootstrap service actor is the deterministic UUIDv5
+  `EXTERNAL_IDENTITY_NAMESPACE`-scoped id, never a literal name.
   Seed inserts (permissions + 2 system roles + their RolePermissions) with
   ON CONFLICT DO NOTHING.
 - SQLite: `crates/{identity,organization,policy}-sqlite/migrations/001_*.sql`
