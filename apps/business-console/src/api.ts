@@ -1,4 +1,4 @@
-import type { ApiEnvelope, AuditEvent, Candidate, Document, IntegrityFinding, OperationsOverview, Page, ProcessingJob, ReviewDecision, ReviewResult } from './contracts'
+import type { AdminUser, ApiEnvelope, AuditEvent, Candidate, Document, ExplainView, IntegrityFinding, MembershipView, OperationsOverview, OrganizationMemberView, OrganizationUnitView, Page, PermissionView, ProcessingJob, ReviewDecision, ReviewResult, RoleBindingView, RoleView, ScopeView } from './contracts'
 
 const baseUrl = (import.meta.env.VITE_BUSINESS_API_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 const defaultToken = import.meta.env.VITE_BUSINESS_API_TOKEN ?? 'dev-only-secret'
@@ -64,3 +64,57 @@ export const submitReview = (jobId: string, decision: ReviewDecision, candidateV
   headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
   body: JSON.stringify({ decision, candidate_version: candidateVersion, comment }),
 })
+
+// --- PLAN-0013 Identity & Authorization management (Stage 9) ---
+const idempotencyHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  'Idempotency-Key': crypto.randomUUID(),
+})
+
+const postJson = <T>(path: string, body: unknown) =>
+  apiFetch<T>(path, { method: 'POST', headers: idempotencyHeaders(), body: JSON.stringify(body) })
+
+export const listAdminUsers = (limit = 50, cursor?: string | null) =>
+  apiFetch<Page<AdminUser>>(`/api/v1/admin/users?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+export const getAdminUser = (userId: string) => apiFetch<AdminUser>(`/api/v1/admin/users/${userId}`)
+
+export const listTenantMemberships = (limit = 50, cursor?: string | null) =>
+  apiFetch<Page<MembershipView>>(`/api/v1/admin/tenant-memberships?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+export const createTenantMembership = (body: { user_id?: string; issuer?: string; subject?: string; reason?: string }) =>
+  postJson<MembershipView>('/api/v1/admin/tenant-memberships', body)
+export const suspendMembership = (userId: string, expectedVersion: number) =>
+  postJson<MembershipView>(`/api/v1/admin/tenant-memberships/${userId}/suspend`, { expected_version: expectedVersion })
+export const reactivateMembership = (userId: string, expectedVersion: number) =>
+  postJson<MembershipView>(`/api/v1/admin/tenant-memberships/${userId}/reactivate`, { expected_version: expectedVersion })
+
+export const listPermissions = () => apiFetch<PermissionView[]>('/api/v1/admin/permissions')
+export const listRoles = () => apiFetch<RoleView[]>('/api/v1/admin/roles')
+export const getRole = (roleId: string) => apiFetch<RoleView>(`/api/v1/admin/roles/${roleId}`)
+export const createRole = (body: { stable_key: string; display_name: string; permission_keys: string[] }) => postJson<RoleView>('/api/v1/admin/roles', body)
+export const updateRole = (roleId: string, body: { display_name?: string; status?: string; expected_version: number }) =>
+  apiFetch<RoleView>(`/api/v1/admin/roles/${roleId}`, { method: 'PATCH', headers: idempotencyHeaders(), body: JSON.stringify(body) })
+export const setRolePermissions = (roleId: string, permissionKeys: string[], expectedVersion: number) =>
+  apiFetch<RoleView>(`/api/v1/admin/roles/${roleId}/permissions`, { method: 'PUT', headers: idempotencyHeaders(), body: JSON.stringify({ permission_keys: permissionKeys, expected_version: expectedVersion }) })
+
+export const listRoleBindings = (userId?: string) =>
+  apiFetch<RoleBindingView[]>(`/api/v1/admin/role-bindings${userId ? `?user_id=${userId}` : ''}`)
+export const createRoleBinding = (body: { user_id: string; role_id: string; scope: ScopeView; effective_at?: string; expires_at?: string }) =>
+  postJson<RoleBindingView>('/api/v1/admin/role-bindings', body)
+export const revokeRoleBinding = (bindingId: string, expectedVersion: number) =>
+  postJson<RoleBindingView>(`/api/v1/admin/role-bindings/${bindingId}/revoke`, { expected_version: expectedVersion })
+
+export const listOrganizationUnits = () => apiFetch<OrganizationUnitView[]>('/api/v1/admin/organization-units')
+export const listUnitMembers = (unitId: string) => apiFetch<OrganizationMemberView[]>(`/api/v1/admin/organization-units/${unitId}/members`)
+export const createOrganizationUnit = (body: { parent_id?: string | null; unit_type: string; name: string }) =>
+  postJson<OrganizationUnitView>('/api/v1/admin/organization-units', body)
+export const updateOrganizationUnit = (unitId: string, body: { name?: string; status?: string; expected_version: number }) =>
+  apiFetch<OrganizationUnitView>(`/api/v1/admin/organization-units/${unitId}`, { method: 'PATCH', headers: idempotencyHeaders(), body: JSON.stringify(body) })
+export const moveOrganizationUnit = (unitId: string, newParentId: string | null, expectedVersion: number) =>
+  postJson<OrganizationUnitView>(`/api/v1/admin/organization-units/${unitId}/move`, { new_parent_id: newParentId, expected_version: expectedVersion })
+export const addUnitMember = (unitId: string, userId: string, membershipType: string) =>
+  postJson<OrganizationMemberView>(`/api/v1/admin/organization-units/${unitId}/members/${userId}`, { membership_type: membershipType })
+export const removeUnitMember = (unitId: string, userId: string, membershipType: string, expectedVersion: number) =>
+  apiFetch<OrganizationMemberView>(`/api/v1/admin/organization-units/${unitId}/members/${userId}?membership_type=${membershipType}&expected_version=${expectedVersion}`, { method: 'DELETE', headers: idempotencyHeaders() })
+
+export const explainDecision = (body: { user_id: string; permission: string; resource?: { kind?: string; resource_id?: string; org_unit_id?: string } }) =>
+  postJson<ExplainView>('/api/v1/admin/authorization/explain', body)

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components'
+import { BindingsPage, ExplainPage, IdentitiesPage, OrganizationPage, RolesPage } from './iam-pages'
 import { AuditPage, CandidatePage, DashboardPage, DocumentDetailPage, DocumentsPage, FindingsPage, ProcessingPage, RepairsPage } from './pages'
 
 export default function App() {
@@ -14,6 +15,11 @@ export default function App() {
       <Route path="findings" element={<FindingsPage />} />
       <Route path="repairs" element={<RepairsPage />} />
       <Route path="audit" element={<AuditPage />} />
+      <Route path="identities" element={<IdentitiesPage />} />
+      <Route path="roles" element={<RolesPage />} />
+      <Route path="bindings" element={<BindingsPage />} />
+      <Route path="organization" element={<OrganizationPage />} />
+      <Route path="explain" element={<ExplainPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>

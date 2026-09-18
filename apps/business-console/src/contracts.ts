@@ -94,3 +94,103 @@ export type OperationsOverview = {
 }
 
 export type ReviewDecision = 'accepted' | 'rejected'
+
+// --- PLAN-0013 Identity & Authorization management surface (Stage 9) ---
+
+export type AdminUser = {
+  user_id: string
+  status: string
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export type MembershipView = {
+  membership_id: string
+  user_id: string
+  status: string
+  joined_at: string
+  suspended_at?: string | null
+  source: string
+  version: number
+}
+
+export type PermissionView = {
+  key: string
+  description: string
+  reserved: boolean
+  active: boolean
+}
+
+export type RoleView = {
+  role_id: string
+  tenant_id?: string | null
+  stable_key: string
+  display_name: string
+  status: string
+  system: boolean
+  permission_keys: string[]
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export type ScopeView =
+  | { scope: 'tenant' }
+  | { scope: 'org_unit'; org_unit_id: string; include_subtree: boolean }
+  | { scope: 'resource_type'; resource_kind: string }
+  | { scope: 'resource'; resource_kind: string; resource_id: string }
+
+export type RoleBindingView = {
+  binding_id: string
+  user_id: string
+  role_id: string
+  scope: ScopeView
+  status: string
+  effective_at: string
+  expires_at?: string | null
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export type OrganizationUnitView = {
+  unit_id: string
+  parent_id?: string | null
+  unit_type: string
+  name: string
+  status: string
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export type OrganizationMemberView = {
+  membership_id: string
+  user_id: string
+  unit_id: string
+  membership_type: string
+  status: string
+  joined_at: string
+  deactivated_at?: string | null
+  version: number
+}
+
+export type ExplainEvaluation = {
+  binding_id: string
+  role_id: string
+  binding_active: boolean
+  within_validity: boolean
+  role_grants_permission: boolean
+  outcome: string
+}
+
+export type ExplainView = {
+  allowed: boolean
+  reason: string
+  matched_binding?: string | null
+  matched_permission?: string | null
+  matched_scope?: ScopeView | null
+  policy_reference: string
+  evaluations: ExplainEvaluation[]
+}
