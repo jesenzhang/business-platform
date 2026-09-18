@@ -5,12 +5,19 @@
 //! this tenant". What the caller may *do* is decided by the Policy context.
 
 mod access;
+mod bootstrap;
 mod membership;
 mod queries;
 mod resolve;
 mod user_status;
 
-pub use access::{TenantAccess, TenantAccessChecker, TenantAccessReason};
+pub use access::{
+    TenantAccess, TenantAccessChecker, TenantAccessError, TenantAccessReason,
+};
+pub use bootstrap::{
+    BootstrapAdministrator, BootstrapAdministratorConfig, BootstrapBindingError,
+    BootstrapBindingPort, BootstrapError, BOOTSTRAP_ROLE_STABLE_KEY,
+};
 pub use membership::{
     ChangeTenantMembershipStatus, ChangeTenantMembershipStatusCommand,
     ChangeTenantMembershipStatusError, CreateMembershipTarget, CreateTenantMembership,
@@ -22,6 +29,7 @@ pub use queries::{
 };
 pub use resolve::{
     ResolveAuthenticatedUser, ResolveAuthenticatedUserCommand, ResolveCallerError, ResolvedCaller,
+    EXTERNAL_IDENTITY_NAMESPACE,
 };
 pub use user_status::{ChangeUserStatus, ChangeUserStatusCommand, ChangeUserStatusError};
 

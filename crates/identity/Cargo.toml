@@ -19,6 +19,8 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
+# Canonical SHA-256 digest of the bootstrap configuration (application rule).
+sha2 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

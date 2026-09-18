@@ -73,6 +73,17 @@ pub enum IdentityStoreError {
     Failed,
 }
 
+/// Synthetic tenant scope used to record **user-level** identity audit
+/// events (`identity.user.provisioned`, `identity.external_identity.linked`,
+/// `identity.user.enabled/disabled`). Those events are tenant-less by design
+/// (a platform user spans all tenants), while `AuditEvent` requires a
+/// non-nil tenant for its per-tenant hash chain. This deterministic id
+/// (`UUIDv5(URL, "identity-platform-audit-scope")`) keeps such events in
+/// their own verifiable chain instead of polluting any real tenant trail.
+pub const PLATFORM_AUDIT_TENANT: Uuid = Uuid::from_bytes([
+    0x21, 0x8c, 0xf9, 0xc5, 0xe4, 0x62, 0x5e, 0xdc, 0xbe, 0xd8, 0xfb, 0x22, 0xb8, 0xf2, 0xab, 0x3d,
+]);
+
 /// Who performed a mutation and how it should be audited. The composition
 /// root / delivery layer fills this from the authenticated request context
 /// (never from client-supplied identity headers).
