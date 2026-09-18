@@ -10,6 +10,19 @@
 -- NOTHING keeps replays harmless); system role ids are UUIDv5 over
 -- "policy-system-role:<stable-key>" in the URL namespace.
 
+-- Legacy collision rename ----------------------------------------------
+-- `001_initial.sql` (the original PLAN-0001 demo schema) reserved
+-- `roles`/`role_permissions` (with companions `permissions`/`user_roles`)
+-- under demo-era definitions incompatible with the Policy-context
+-- tables below. No shipped code reads the legacy set (verified across
+-- apps/ and crates/). Rename rather than drop so any environment that
+-- holds demo rows keeps them recoverable.
+
+ALTER TABLE IF EXISTS role_permissions RENAME TO v0_demo_role_permissions;
+ALTER TABLE IF EXISTS user_roles RENAME TO v0_demo_user_roles;
+ALTER TABLE IF EXISTS roles RENAME TO v0_demo_roles;
+ALTER TABLE IF EXISTS permissions RENAME TO v0_demo_permissions;
+
 -- identity-management ------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS platform_users (
