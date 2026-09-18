@@ -863,12 +863,22 @@ dependencies = [
  "document-sqlite",
  "futures-util",
  "http-body-util",
+ "identity",
+ "identity-authorization-contracts",
+ "identity-postgres",
+ "identity-sqlite",
  "jsonwebtoken",
  "metrics",
  "metrics-exporter-prometheus",
  "object-storage",
  "observability",
+ "organization",
+ "organization-postgres",
+ "organization-sqlite",
  "p256",
+ "policy",
+ "policy-postgres",
+ "policy-sqlite",
  "public-api-contracts",
  "reqwest",
  "runtime-config",
@@ -2363,6 +2373,55 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "identity-authorization-contracts"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "identity",
+ "organization",
+ "policy",
+ "uuid",
+]
+
+[[package]]
+name = "identity-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-postgres",
+ "chrono",
+ "identity",
+ "identity-authorization-contracts",
+ "runtime-migration",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "identity-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-sqlite",
+ "chrono",
+ "identity",
+ "identity-authorization-contracts",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
  "thiserror 2.0.20",
  "tokio",
  "uuid",
@@ -2704,6 +2763,9 @@ dependencies = [
  "anyhow",
  "document-processing-sqlite",
  "document-sqlite",
+ "identity-sqlite",
+ "organization-sqlite",
+ "policy-sqlite",
  "runtime-config",
  "runtime-migration",
  "serde",
@@ -3067,6 +3129,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "organization-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-postgres",
+ "chrono",
+ "identity-authorization-contracts",
+ "organization",
+ "runtime-migration",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "organization-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-sqlite",
+ "chrono",
+ "identity-authorization-contracts",
+ "organization",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3276,6 +3375,43 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "policy-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-postgres",
+ "chrono",
+ "identity-authorization-contracts",
+ "policy",
+ "runtime-migration",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "policy-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "audit",
+ "audit-sqlite",
+ "chrono",
+ "identity-authorization-contracts",
+ "policy",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
  "thiserror 2.0.20",
  "tokio",
  "uuid",

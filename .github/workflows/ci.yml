@@ -216,6 +216,13 @@ jobs:
           cargo test -p document-processing-postgres --test contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p document-persistence-contracts --all-features
           cargo test -p document-postgres --test query_contracts --all-features -- --include-ignored --test-threads=1
+          cargo test -p identity-authorization-contracts --all-features
+          cargo test -p identity-sqlite --all-features --tests
+          cargo test -p organization-sqlite --all-features --tests
+          cargo test -p policy-sqlite --all-features --tests
+          cargo test -p identity-postgres --test contract --all-features -- --include-ignored --test-threads=1
+          cargo test -p organization-postgres --test contract --all-features -- --include-ignored --test-threads=1
+          cargo test -p policy-postgres --test contract --all-features -- --include-ignored --test-threads=1
           cargo test -p runtime-migration --all-features
           cargo test -p audit --all-features
           cargo test -p data-integrity --all-features

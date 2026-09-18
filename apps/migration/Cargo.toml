@@ -19,6 +19,9 @@ runtime-config = { workspace = true }
 runtime-migration = { workspace = true }
 document-sqlite = { workspace = true }
 document-processing-sqlite = { path = "../../crates/document-processing-sqlite" }
+identity-sqlite = { workspace = true }
+organization-sqlite = { workspace = true }
+policy-sqlite = { workspace = true }
 
 [dev-dependencies]
 uuid = { workspace = true }
