@@ -1,6 +1,6 @@
 # PLAN-0013: Identity and Authorization Foundation
 
-> Status: Active (PLAN-0013 implementation in progress on branch `feat/PLAN-0013-identity-authorization-foundation`; Completion Definition unchanged)  
+> Status: Accepted Candidate (implementation complete on branch `feat/PLAN-0013-identity-authorization-foundation`, CI green at `f3a7544`; completion audit `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`; not merged to main, awaiting independent review and explicit integration instruction)  
 > Revision: 0  
 > Date: 2026-09-18  
 > Owner: Platform Foundation / Identity & Policy  
