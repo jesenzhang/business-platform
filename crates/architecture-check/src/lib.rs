@@ -146,7 +146,7 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
         // business domains.
         if matches!(
             architecture.context_name(),
-            Some("identity-management") | Some("organization") | Some("policy")
+            Some("identity-management" | "organization" | "policy")
         ) {
             for dependency in [
                 "contract",
