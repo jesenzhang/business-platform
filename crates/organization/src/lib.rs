@@ -1,7 +1,17 @@
-//! 组织架构管理领域
+//! Minimal Organization bounded context for authorization scoping
+//! (PLAN-0013).
 //!
-//! 负责部门、岗位、组织层级结构等组织架构管理功能。
+//! Owns only what policy needs: an `OrganizationUnit` tree (same-tenant
+//! parents, no cycles) and `OrganizationMembership` links. This is **not** an
+//! HR system: no positions, jobs, salary, performance, or attendance.
 //!
-//! 本模块遵循 DDD 分层：domain / application / infrastructure / api
+//! DDD layering: `domain` (entities + invariants), `application` (use cases
+//! over ports), `ports` (persistence contracts). Adapters live in
+//! `organization-postgres` / `organization-sqlite`.
 
-// TODO: 阶段二实现
+pub mod application;
+pub mod domain;
+pub mod ports;
+
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
