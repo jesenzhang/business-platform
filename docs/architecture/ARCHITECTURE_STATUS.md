@@ -247,6 +247,22 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > `33617370509`；cargo-deny/syft/grype/osv-scanner 仍未接入）；④ ADR 索引补记
 > ADR-0006/0007 为历史跳号（仓库历史从未创建，不得复用）。
 
+> 2026-09-18: CI 供应链/可用性修复两项（PR #14，merge `732ee1d`，
+> Main CI `35304693307` 全绿）。① rustls 0.23.43 → 0.23.45 清除
+> RUSTSEC-2026-0285（TLS 1.3 握手消息跨加密级别接受，CVSS 5.3，
+> 2026-09-14 发布；上次 Main 全绿为 09-03，属新增命中），同线补丁升级，
+> 本机全仓 `cargo check --workspace --all-targets` 与
+> `cargo test --workspace --all-features`（131 套件 ok / 540 tests）PASS；
+> ② Docker Hub `minio/minio`/`minio/mc` 镜像仓库已整体下线（Hub API 404，
+> 非匿名限流；E2E job 连续两轮在 Initialize containers 阶段复现），CI
+> service、`scripts/test-postgres-minio-multiprocess.sh` 与
+> `deploy/{docker-compose.yml,dev,demo}` 全部迁移至 quay.io，所用每个 tag
+> 均经 Quay v2 API 匿名 token 校验 manifest 存在（200）；compose 的
+> `mc:2024-06-13T21-20-15Z` 未在 Quay 发布（404），改用 CI 已验证的
+> `2024-06-12T14-34-03Z`。`mc` 二进制下载（GitHub release + SHA-256 固定）
+> 不受影响。PR 合并需修改 `.github/workflows` 时须经具备 `workflow` scope
+> 的通道推送（当前 gh OAuth token 无该 scope，本次经 SSH 推送）。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
