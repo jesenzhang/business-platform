@@ -92,7 +92,8 @@ pub struct BindingEvaluation {
     pub binding_active: bool,
     /// Whether the validity window covers the decision instant.
     pub within_validity: bool,
-    /// Whether the bound role exists (in tenant or system) and is active.
+    /// Whether evaluation reached the grant path: the bound role was
+    /// visible and active *and* its permission set contains the key.
     pub role_grants_permission: bool,
     /// Outcome for this candidate.
     pub outcome: DecisionReason,

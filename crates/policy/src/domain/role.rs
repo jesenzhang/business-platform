@@ -116,6 +116,11 @@ impl RoleDefinition {
             return Err(PolicyDomainError::InvalidIdentity);
         }
         validate_role_stable_key(stable_key)?;
+        // The `system.` namespace belongs to the migration-seeded global
+        // roles; a tenant look-alike is namespace confusion at best.
+        if stable_key.trim().starts_with("system.") {
+            return Err(PolicyDomainError::InvalidStableKey(stable_key.to_string()));
+        }
         let display_name = validate_display_name(display_name)?;
         Ok(Self {
             role_id,

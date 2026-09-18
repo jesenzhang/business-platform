@@ -14,7 +14,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::MAX_ROLE_PERMISSIONS;
+use crate::application::{
+    MAX_BINDINGS_PER_TENANT, MAX_BINDINGS_PER_USER, MAX_ROLES_PER_TENANT, MAX_ROLE_PERMISSIONS,
+};
 use crate::catalog;
 use crate::domain::{
     PermissionDefinition, PermissionKey, RehydrateRoleDefinition, ResourceScope, RoleBinding,
@@ -44,6 +46,16 @@ enum StoredOutcome {
     Binding(RoleBinding),
 }
 
+/// Fault-injection bits. `FAULT_POISON` kills every port call; the rest
+/// are one-shot per-method failures so tests can pin the exact
+/// mid-evaluation store-failure paths (global poison short-circuits at
+/// the first port call and would mask everything behind it).
+const FAULT_POISON: u32 = 0b0_0001;
+const FAULT_LIST_BINDINGS: u32 = 0b0_0010;
+const FAULT_GET_ROLE: u32 = 0b0_0100;
+const FAULT_GET_ROLE_PERMISSIONS: u32 = 0b0_1000;
+const FAULT_SUBTREE_CONTAINS: u32 = 0b1_0000;
+
 #[derive(Default)]
 struct State {
     permissions: BTreeMap<String, PermissionDefinition>,
@@ -54,7 +66,16 @@ struct State {
     units: HashMap<Uuid, FakeUnit>,
     idempotency: HashMap<(String, String), (String, StoredOutcome)>,
     audits: Vec<FakeAuditRecord>,
-    poisoned: bool,
+    faults: u32,
+}
+
+fn take_fault(state: &mut State, bit: u32) -> Result<(), PolicyStoreError> {
+    let hit = state.faults & bit != 0;
+    state.faults &= !bit;
+    if hit {
+        return Err(PolicyStoreError::Unavailable);
+    }
+    Ok(())
 }
 
 struct FakeUnit {
@@ -173,7 +194,51 @@ impl FakePolicyPorts {
     /// Simulate a store failure on every port.
     pub fn poison(&self) {
         if let Ok(mut state) = self.lock() {
-            state.poisoned = true;
+            state.faults |= FAULT_POISON;
+        }
+    }
+
+    /// Fail the next `list_bindings_for_user` call exactly once.
+    pub fn fail_next_list_bindings(&self) {
+        if let Ok(mut state) = self.lock() {
+            state.faults |= FAULT_LIST_BINDINGS;
+        }
+    }
+
+    /// Fail the next `get_role` call exactly once.
+    pub fn fail_next_get_role(&self) {
+        if let Ok(mut state) = self.lock() {
+            state.faults |= FAULT_GET_ROLE;
+        }
+    }
+
+    /// Fail the next `get_role_permissions` call exactly once.
+    pub fn fail_next_get_role_permissions(&self) {
+        if let Ok(mut state) = self.lock() {
+            state.faults |= FAULT_GET_ROLE_PERMISSIONS;
+        }
+    }
+
+    /// Fail the next `subtree_contains` call exactly once.
+    pub fn fail_next_subtree_contains(&self) {
+        if let Ok(mut state) = self.lock() {
+            state.faults |= FAULT_SUBTREE_CONTAINS;
+        }
+    }
+
+    /// Retire a catalog permission (`active = false`): it evaluates as
+    /// unknown from then on, without losing audit-resolvable rows.
+    pub fn retire_permission(&self, key: &str) {
+        if let Ok(mut state) = self.lock() {
+            if let Some(definition) = state.permissions.get(key) {
+                let retired = PermissionDefinition::restored(
+                    definition.key().clone(),
+                    definition.description().to_string(),
+                    definition.is_reserved(),
+                    false,
+                );
+                state.permissions.insert(key.to_string(), retired);
+            }
         }
     }
 }
@@ -226,7 +291,7 @@ fn seed_catalog(state: &mut State) {
 }
 
 fn check_poisoned(state: &State) -> Result<(), PolicyStoreError> {
-    if state.poisoned {
+    if state.faults & FAULT_POISON != 0 {
         return Err(PolicyStoreError::Unavailable);
     }
     Ok(())
@@ -333,6 +398,17 @@ impl FakeCommand {
         });
         if duplicate_key {
             return Err(PolicyStoreError::AlreadyExists);
+        }
+        // Authoritative tenant role cap: tenant-owned rows only (system
+        // roles are global and never consume a tenant's budget).
+        if state
+            .roles
+            .values()
+            .filter(|role| role.tenant_id() == Some(command.tenant_id))
+            .count()
+            >= MAX_ROLES_PER_TENANT
+        {
+            return Err(PolicyStoreError::TooManyResources);
         }
         let role = RoleDefinition::create_tenant_role(
             role_id,
@@ -551,6 +627,31 @@ impl FakeCommand {
                 replayed: true,
             });
         }
+        // Authoritative caps (evaluated after convergence so idempotent
+        // replays never trip them): per-user active bindings, and total
+        // binding rows in the tenant (all statuses — rows are retained).
+        if state
+            .bindings
+            .values()
+            .filter(|binding| binding.tenant_id() == command.tenant_id)
+            .count()
+            >= MAX_BINDINGS_PER_TENANT
+        {
+            return Err(PolicyStoreError::TooManyResources);
+        }
+        if state
+            .bindings
+            .values()
+            .filter(|binding| {
+                binding.tenant_id() == command.tenant_id
+                    && binding.user_id() == command.user_id
+                    && binding.is_active()
+            })
+            .count()
+            >= MAX_BINDINGS_PER_USER
+        {
+            return Err(PolicyStoreError::TooManyResources);
+        }
         let binding_id = command.binding_id.unwrap_or_else(Uuid::now_v7);
         if state.bindings.contains_key(&binding_id) {
             return Err(PolicyStoreError::AlreadyExists);
@@ -707,8 +808,9 @@ impl PolicyQueryPort for FakeQuery {
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Option<RoleDefinition>, PolicyStoreError> {
-        let state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
+        let mut state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
         check_poisoned(&state)?;
+        take_fault(&mut state, FAULT_GET_ROLE)?;
         Ok(visible_role(&state, tenant_id, role_id))
     }
 
@@ -730,8 +832,9 @@ impl PolicyQueryPort for FakeQuery {
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Vec<String>, PolicyStoreError> {
-        let state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
+        let mut state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
         check_poisoned(&state)?;
+        take_fault(&mut state, FAULT_GET_ROLE_PERMISSIONS)?;
         if visible_role(&state, tenant_id, role_id).is_none() {
             return Err(PolicyStoreError::NotFound);
         }
@@ -749,8 +852,9 @@ impl PolicyQueryPort for FakeQuery {
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Vec<RoleBinding>, PolicyStoreError> {
-        let state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
+        let mut state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
         check_poisoned(&state)?;
+        take_fault(&mut state, FAULT_LIST_BINDINGS)?;
         let mut bindings: Vec<RoleBinding> = state
             .bindings
             .values()
@@ -798,6 +902,11 @@ impl PolicyQueryPort for FakeQuery {
             })
             .cloned()
             .collect();
+        // Bounded listing: more rows than the tenant cap is a store-state
+        // violation, never an unbounded response.
+        if bindings.len() > MAX_BINDINGS_PER_TENANT {
+            return Err(PolicyStoreError::TooManyResources);
+        }
         bindings.sort_by_key(RoleBinding::binding_id);
         Ok(bindings)
     }
@@ -863,8 +972,9 @@ impl OrganizationScopePort for FakeOrg {
         ancestor: Uuid,
         candidate: Uuid,
     ) -> Result<bool, PolicyStoreError> {
-        let state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
+        let mut state = self.state.lock().map_err(|_| PolicyStoreError::Failed)?;
         check_poisoned(&state)?;
+        take_fault(&mut state, FAULT_SUBTREE_CONTAINS)?;
         let Some(ancestor_unit) = state.units.get(&ancestor) else {
             return Ok(false);
         };

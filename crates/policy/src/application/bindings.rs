@@ -211,12 +211,19 @@ impl BindRole {
         if !role_grants_management {
             return Ok(());
         }
-        // Idempotent re-bind: an identical *active* binding to the same
-        // role already converges at the store — allow it.
+        // Idempotent re-bind only: the exception requires the *full*
+        // store-convergence tuple (role, scope, validity window) to match
+        // an existing active, effective binding. A different scope or a
+        // wider window is NEW authority, not a replay, and must go
+        // through the bootstrap-sourced check like any other bind.
+        let now = Utc::now();
         let already_bound = existing_bindings.iter().any(|binding| {
             binding.role_id() == command.role_id
                 && binding.is_active()
-                && binding.is_within_validity(Utc::now())
+                && binding.is_within_validity(now)
+                && binding.scope() == &command.scope
+                && binding.effective_at() == command.effective_at
+                && binding.expires_at() == command.expires_at
         });
         if already_bound {
             return Ok(());

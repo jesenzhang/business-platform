@@ -99,7 +99,16 @@ impl CreateRole {
             .map_err(PolicyApplicationError::Validation)?;
         let audit = audit_context(command.actor_user_id, command.reason)?;
 
-        if self.query.list_roles(command.tenant_id).await?.len() >= MAX_ROLES_PER_TENANT {
+        // Advisory pre-check; the store cap (authoritative, race-free)
+        // counts tenant-owned roles only — system roles are global rows.
+        let tenant_role_count = self
+            .query
+            .list_roles(command.tenant_id)
+            .await?
+            .iter()
+            .filter(|role| !role.is_system())
+            .count();
+        if tenant_role_count >= MAX_ROLES_PER_TENANT {
             return Err(PolicyApplicationError::Validation(format!(
                 "tenant role cap ({MAX_ROLES_PER_TENANT}) reached"
             )));
@@ -301,12 +310,17 @@ impl SetRolePermissions {
             .iter()
             .any(|key| is_iam_management_permission(key) && !current.contains(key.as_str()));
         if adds_management {
+            // Window-aware "holds authority", matching the evaluator: only
+            // a currently effective active binding counts.
+            let now = chrono::Utc::now();
             let holds_role = self
                 .query
                 .list_active_bindings_for_role(command.tenant_id, command.role_id)
                 .await?
                 .iter()
-                .any(|binding| binding.user_id() == command.actor_user_id);
+                .any(|binding| {
+                    binding.user_id() == command.actor_user_id && binding.is_within_validity(now)
+                });
             if holds_role {
                 return Err(PolicyApplicationError::SelfEscalationDenied);
             }

@@ -36,6 +36,15 @@
 //!    revoked rows too — the evaluator distinguishes "revoked" from "never
 //!    bound"; rows come ordered by `binding_id` so deny-reason selection is
 //!    deterministic.
+//! 8. **Caps are store-side and race-free.** Inside the commit
+//!    transaction: `create_role` refuses past `MAX_ROLES_PER_TENANT`
+//!    tenant-owned rows (system roles never count); `bind_role` refuses
+//!    past `MAX_BINDINGS_PER_USER` active rows for the user and
+//!    `MAX_BINDINGS_PER_TENANT` total rows (all statuses); `list_bindings`
+//!    surfaces `TooManyResources` rather than an unbounded result.
+//!    Application-layer cap checks are advisory UX only. Catalog rows
+//!    carry `active`; a retired (`active = false`) row is returned by
+//!    `get_permission` but evaluates as unknown — adapters seed active.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};

@@ -157,6 +157,57 @@ async fn self_bind_idempotent_rebind_converges() {
 }
 
 #[tokio::test]
+async fn self_bind_with_wider_scope_or_window_is_denied() {
+    let ports = setup();
+    seed_role(
+        &ports,
+        iam_role_id(),
+        "iam",
+        &["policy.role.manage", "document.read"],
+    );
+    // Existing self-binding is narrow: ResourceType scope, expiring window.
+    ports.seed_binding(
+        RoleBinding::create(
+            id(30),
+            tenant_a(),
+            subject_user(),
+            iam_role_id(),
+            ResourceScope::resource_type("document").unwrap_or_else(|_| unreachable!()),
+            ValidityWindow {
+                effective_at: ts(1000),
+                expires_at: Some(ts(100_000_000_000)),
+            },
+            ts(1000),
+        )
+        .unwrap_or_else(|_| unreachable!()),
+    );
+    // Same role but TENANT scope is new authority, not a replay → denied.
+    let err = bind_use_case(&ports)
+        .execute(bind_command(subject_user(), iam_role_id()))
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(err, PolicyApplicationError::SelfEscalationDenied);
+    // Same scope but a wider (open-ended) window is also denied.
+    let err = bind_use_case(&ports)
+        .execute(BindRoleCommand {
+            scope: ResourceScope::resource_type("document").unwrap_or_else(|_| unreachable!()),
+            effective_at: ts(1000),
+            expires_at: None,
+            ..bind_command(subject_user(), iam_role_id())
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(err, PolicyApplicationError::SelfEscalationDenied);
+    assert_eq!(
+        ports.audit_records().len(),
+        0,
+        "denied self-binds must not write or audit anything"
+    );
+}
+
+#[tokio::test]
 async fn bootstrap_source_carveout_lives_and_dies_with_the_system_binding() {
     let ports = setup();
     seed_role(&ports, iam_role_id(), "iam", &["policy.binding.manage"]);
@@ -627,4 +678,194 @@ async fn bind_requires_active_membership_visible_role_and_active_target() {
         .err()
         .unwrap_or_else(|| unreachable!());
     assert!(matches!(err, PolicyApplicationError::Validation(_)));
+}
+
+#[tokio::test]
+async fn store_side_caps_are_authoritative() {
+    let ports = setup();
+    // Per-user active binding cap: 100 seeded rows for one user block the
+    // 101st bind at the store even without the application pre-check.
+    for n in 0..100_u128 {
+        ports.seed_binding(
+            RoleBinding::create(
+                Uuid::from_u128(n + 1),
+                tenant_a(),
+                id(80),
+                plain_role_id(),
+                ResourceScope::resource_type(format!("kind-{n}"))
+                    .unwrap_or_else(|_| unreachable!()),
+                ValidityWindow {
+                    effective_at: ts(1000),
+                    expires_at: None,
+                },
+                ts(1000),
+            )
+            .unwrap_or_else(|_| unreachable!()),
+        );
+    }
+    let seeded_role = RoleDefinition::create_tenant_role(
+        plain_role_id(),
+        tenant_a(),
+        "viewer",
+        "Viewer",
+        ts(500),
+    )
+    .unwrap_or_else(|_| unreachable!());
+    ports.seed_role(seeded_role, &["document.read"]);
+    let err = ports
+        .command
+        .bind_role(BindRoleCommit {
+            tenant_id: tenant_a(),
+            binding_id: None,
+            user_id: id(80),
+            role_id: plain_role_id(),
+            scope: ResourceScope::resource_type("kind-200").unwrap_or_else(|_| unreachable!()),
+            effective_at: ts(1000),
+            expires_at: None,
+            audit: mutation_context(),
+            idempotency_key: None,
+            now: ts(1000),
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(err, PolicyStoreError::TooManyResources);
+}
+
+#[tokio::test]
+async fn role_budget_counts_tenant_rows_not_system_roles() {
+    let ports = setup();
+    // Two system roles exist from the seeded catalog. They never consume a
+    // tenant budget: with 499 tenant roles present (499 + 2 = 501 visible
+    // rows, the buggy pre-fix count), the application check must still
+    // admit the 500th tenant role.
+    for n in 0..499_u128 {
+        let role = RoleDefinition::create_tenant_role(
+            Uuid::from_u128(1000 + n),
+            tenant_a(),
+            &format!("role-{n}"),
+            "Role",
+            ts(500),
+        )
+        .unwrap_or_else(|_| unreachable!());
+        ports.seed_role(role, &[]);
+    }
+    let creator = CreateRole::new(Arc::clone(&ports.command), Arc::clone(&ports.query));
+    let outcome = creator
+        .execute(CreateRoleCommand {
+            tenant_id: tenant_a(),
+            role_id: None,
+            stable_key: "role-499".to_string(),
+            display_name: "Role 499".to_string(),
+            actor_user_id: subject_user(),
+            idempotency_key: None,
+            reason: None,
+        })
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert!(!outcome.replayed);
+    // The 501st visible row is now refused by the advisory app check…
+    let err = creator
+        .execute(CreateRoleCommand {
+            tenant_id: tenant_a(),
+            role_id: None,
+            stable_key: "one-too-many".to_string(),
+            display_name: "One too many".to_string(),
+            actor_user_id: subject_user(),
+            idempotency_key: None,
+            reason: None,
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert!(matches!(err, PolicyApplicationError::Validation(_)));
+    // …and by the authoritative store check, which counts tenant rows.
+    let store_err = ports
+        .command
+        .create_role(CreateRoleCommit {
+            tenant_id: tenant_a(),
+            role_id: None,
+            stable_key: "store-side".to_string(),
+            display_name: "Store side".to_string(),
+            audit: mutation_context(),
+            idempotency_key: None,
+            now: ts(1200),
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(store_err, PolicyStoreError::TooManyResources);
+    // The `system.` namespace stays closed to tenant roles.
+    let err = creator
+        .execute(CreateRoleCommand {
+            tenant_id: tenant_a(),
+            role_id: None,
+            stable_key: "system.bootstrap-admin".to_string(),
+            display_name: "Look-alike".to_string(),
+            actor_user_id: subject_user(),
+            idempotency_key: None,
+            reason: None,
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert!(matches!(err, PolicyApplicationError::Validation(_)));
+}
+
+#[tokio::test]
+async fn tenant_binding_listing_and_write_caps_bind_at_the_store() {
+    let ports = setup();
+    let seeded_role = RoleDefinition::create_tenant_role(
+        plain_role_id(),
+        tenant_a(),
+        "viewer",
+        "Viewer",
+        ts(500),
+    )
+    .unwrap_or_else(|_| unreachable!());
+    ports.seed_role(seeded_role, &["document.read"]);
+    // Fill the tenant to the cap with one binding per distinct user so the
+    // per-user cap does not shadow the tenant-wide one.
+    for n in 0..5_000_u128 {
+        ports.seed_binding(
+            RoleBinding::create(
+                Uuid::from_u128(n + 1),
+                tenant_a(),
+                Uuid::from_u128(100_000 + n),
+                plain_role_id(),
+                ResourceScope::Tenant,
+                ValidityWindow {
+                    effective_at: ts(1000),
+                    expires_at: None,
+                },
+                ts(1000),
+            )
+            .unwrap_or_else(|_| unreachable!()),
+        );
+    }
+    // Exactly at the cap, listing still works; writing refuses.
+    let listed = ports
+        .query
+        .list_bindings(tenant_a(), None)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(listed.len(), 5_000);
+    let err = ports
+        .command
+        .bind_role(BindRoleCommit {
+            tenant_id: tenant_a(),
+            binding_id: None,
+            user_id: id(81),
+            role_id: plain_role_id(),
+            scope: ResourceScope::Tenant,
+            effective_at: ts(1000),
+            expires_at: None,
+            audit: mutation_context(),
+            idempotency_key: None,
+            now: ts(1000),
+        })
+        .await
+        .err()
+        .unwrap_or_else(|| unreachable!());
+    assert_eq!(err, PolicyStoreError::TooManyResources);
 }

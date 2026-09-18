@@ -61,6 +61,9 @@ pub struct PermissionDefinition {
     /// legal but an allow can never produce a business operation until the
     /// owning context consumes the key.
     reserved: bool,
+    /// Retired keys (catalog rows kept for audit resolution) evaluate as
+    /// `DenyUnknownPermission`; they can never be re-granted.
+    active: bool,
 }
 
 impl PermissionDefinition {
@@ -77,7 +80,25 @@ impl PermissionDefinition {
             key,
             description,
             reserved,
+            active: true,
         })
+    }
+
+    /// Restore a catalog row with its persisted active state (adapters and
+    /// retirement rehearsal only; there is no runtime retire use case).
+    #[must_use]
+    pub const fn restored(
+        key: PermissionKey,
+        description: String,
+        reserved: bool,
+        active: bool,
+    ) -> Self {
+        Self {
+            key,
+            description,
+            reserved,
+            active,
+        }
     }
 
     #[must_use]
@@ -93,6 +114,11 @@ impl PermissionDefinition {
     #[must_use]
     pub const fn is_reserved(&self) -> bool {
         self.reserved
+    }
+
+    #[must_use]
+    pub const fn is_active(&self) -> bool {
+        self.active
     }
 }
 

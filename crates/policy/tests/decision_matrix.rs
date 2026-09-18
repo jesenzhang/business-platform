@@ -670,3 +670,113 @@ async fn worst_deny_reason_wins_when_nothing_grants() {
     assert_eq!(denied.reason, DecisionReason::DenyScopeMismatch);
     assert_eq!(denied.evaluations.len(), 2);
 }
+
+#[tokio::test]
+async fn subtree_scope_fails_closed_when_bound_or_host_unit_disabled() {
+    let (ports, ctx) = setup();
+    tenant_role(&ports, "viewer", &["document.read"]);
+    bind_tenant(
+        &ports,
+        ResourceScope::organization_unit(unit_a(), true).unwrap_or_else(|_| unreachable!()),
+    )
+    .await;
+    let engine = authorize(&ports);
+    let in_child = ResourceTarget {
+        org_unit_id: Some(unit_b()),
+        ..Default::default()
+    };
+    assert!(
+        engine
+            .check(&ctx, "document.read", Some(&in_child))
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .allowed
+    );
+    // Disabling the bound (ancestor) unit stops the subtree grant.
+    ports.set_unit(tenant_a(), unit_a(), None, false);
+    let denied = engine
+        .check(&ctx, "document.read", Some(&in_child))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(denied.reason, DecisionReason::DenyScopeMismatch);
+    // Disabling the unit that hosts the resource stops it too, even with
+    // an active ancestor.
+    ports.set_unit(tenant_a(), unit_a(), None, true);
+    ports.set_unit(tenant_a(), unit_b(), Some(unit_a()), false);
+    let denied = engine
+        .check(&ctx, "document.read", Some(&in_child))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(denied.reason, DecisionReason::DenyScopeMismatch);
+}
+
+#[tokio::test]
+async fn mid_evaluation_store_failures_deny_internally() {
+    let (ports, ctx) = setup();
+    tenant_role(&ports, "viewer", &["document.read"]);
+    bind_tenant(&ports, ResourceScope::Tenant).await;
+    let engine = authorize(&ports);
+    // One shot per failure point: list bindings, role visibility, role
+    // grants — each must produce DenyInternal, never a deny-skip to a
+    // weaker reason and never an allow.
+    for poison in [
+        FakePolicyPorts::fail_next_list_bindings,
+        FakePolicyPorts::fail_next_get_role,
+        FakePolicyPorts::fail_next_get_role_permissions,
+    ] {
+        poison(&ports);
+        let decision = engine
+            .check(&ctx, "document.read", None)
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        assert!(!decision.allowed);
+        assert_eq!(decision.reason, DecisionReason::DenyInternal);
+    }
+    // The organization bridge failing mid-scope-match also denies
+    // internally (the scope branch must not silently mismatch-and-continue
+    // towards other bindings).
+    let (ports2, ctx2) = setup();
+    tenant_role(&ports2, "viewer", &["document.read"]);
+    bind_tenant(
+        &ports2,
+        ResourceScope::organization_unit(unit_a(), true).unwrap_or_else(|_| unreachable!()),
+    )
+    .await;
+    let engine2 = authorize(&ports2);
+    let in_child = ResourceTarget {
+        org_unit_id: Some(unit_b()),
+        ..Default::default()
+    };
+    ports2.fail_next_subtree_contains();
+    let decision = engine2
+        .check(&ctx2, "document.read", Some(&in_child))
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert_eq!(decision.reason, DecisionReason::DenyInternal);
+}
+
+#[tokio::test]
+async fn retired_permission_denies_as_unknown() {
+    let (ports, ctx) = setup();
+    tenant_role(&ports, "viewer", &["document.read"]);
+    bind_tenant(&ports, ResourceScope::Tenant).await;
+    let engine = authorize(&ports);
+    assert!(
+        engine
+            .check(&ctx, "document.read", None)
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .allowed
+    );
+    ports.retire_permission("document.read");
+    let decision = engine
+        .check(&ctx, "document.read", None)
+        .await
+        .unwrap_or_else(|_| unreachable!());
+    assert!(!decision.allowed);
+    assert_eq!(
+        decision.reason,
+        DecisionReason::DenyUnknownPermission,
+        "a retired catalog key evaluates as unknown"
+    );
+}

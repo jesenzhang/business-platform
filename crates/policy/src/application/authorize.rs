@@ -198,7 +198,7 @@ impl Engine {
         let Ok(entry) = self.policy.get_permission(&key).await else {
             return Ok(PolicyDecision::deny(DecisionReason::DenyInternal));
         };
-        if entry.is_none() {
+        if !entry.is_some_and(|entry| entry.is_active()) {
             return Ok(PolicyDecision::deny(DecisionReason::DenyUnknownPermission));
         }
 
@@ -370,6 +370,26 @@ impl Engine {
                         .map_err(PolicyApplicationError::from);
                 }
                 if !*include_subtree {
+                    return Ok(false);
+                }
+                // Subtree use is scope use: a disabled bound unit stops
+                // granting (same rule as the exact branch), and a disabled
+                // unit hosting the resource stops being addressable — the
+                // walk fails closed at both ends.
+                let bound_active = self
+                    .org
+                    .unit_is_active(ctx.tenant_id, *org_unit_id)
+                    .await
+                    .map_err(PolicyApplicationError::from)?;
+                if !bound_active {
+                    return Ok(false);
+                }
+                let candidate_active = self
+                    .org
+                    .unit_is_active(ctx.tenant_id, resource_unit)
+                    .await
+                    .map_err(PolicyApplicationError::from)?;
+                if !candidate_active {
                     return Ok(false);
                 }
                 self.org
