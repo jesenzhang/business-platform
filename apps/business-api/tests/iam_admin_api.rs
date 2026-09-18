@@ -562,8 +562,10 @@ fn matrix() -> Vec<MatrixRow> {
             Value::Null,
             true,
         ),
+        // Catalog contract: membership creation is governed by
+        // `identity.membership.update`, NOT `identity.user.manage`.
         row(
-            "identity.user.manage",
+            "identity.membership.update",
             Method::POST,
             "/api/v1/admin/tenant-memberships",
             json!({"user_id": FRESH_USER_ID}),
@@ -979,6 +981,27 @@ async fn unit_member_add_list_remove() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(data(&removed)["status"], "inactive");
+}
+
+#[tokio::test]
+async fn user_manage_grant_cannot_create_memberships() {
+    // Catalog contract pin: membership creation is governed solely by
+    // `identity.membership.update`; the (currently unrouted) user-manage
+    // key must not reach it (Stage 8 review, MINOR #2).
+    let router = iam_router_with(|_, policy, _| {
+        grant(policy, DEV_USER_ID, "user-manager", &["identity.user.manage"]);
+    });
+    let (status, _) = call(
+        router,
+        authorized(
+            Method::POST,
+            "/api/v1/admin/tenant-memberships",
+            Some("user-manage-probe"),
+            Some(json!({"user_id": FRESH_USER_ID})),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]

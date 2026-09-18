@@ -54,7 +54,9 @@ use public_api_contracts as contracts;
 // Permission keys (crates/policy/src/catalog.rs). Kept as constants so the
 // handler→permission mapping stays one auditable table.
 const PERMISSION_IDENTITY_READ: &str = "identity.read";
-const PERMISSION_IDENTITY_USER_MANAGE: &str = "identity.user.manage";
+// `identity.user.manage` (user enable/disable) is in the versioned catalog
+// but gates no route yet; user-status mutations arrive with their own
+// follow-up surface and must be wired here when they do.
 const PERMISSION_IDENTITY_MEMBERSHIP_UPDATE: &str = "identity.membership.update";
 const PERMISSION_ORGANIZATION_READ: &str = "organization.read";
 const PERMISSION_ORGANIZATION_MANAGE: &str = "organization.manage";
@@ -616,7 +618,10 @@ pub async fn create_membership(
     headers: HeaderMap,
     Json(body): Json<contracts::CreateTenantMembershipRequest>,
 ) -> Result<Response, ApiError> {
-    authorize_permission(&state, &authz, PERMISSION_IDENTITY_USER_MANAGE).await?;
+    // Catalog contract: `identity.membership.update` governs "create,
+    // suspend, and reactivate tenant memberships"; membership creation must
+    // not ride the user-manage key (reviewer finding, Stage 8).
+    authorize_permission(&state, &authz, PERMISSION_IDENTITY_MEMBERSHIP_UPDATE).await?;
     let idempotency_key = require_idempotency_key(&headers)?;
     let admin = admin_services(&state)?;
     let (target, target_id) = match (body.user_id, body.issuer, body.subject) {
