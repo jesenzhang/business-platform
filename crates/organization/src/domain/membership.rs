@@ -235,19 +235,10 @@ impl OrganizationMembership {
         self.bump_version()
     }
 
-    /// Switch the membership kind (member ↔ leader).
-    pub fn set_type(
-        &mut self,
-        membership_type: OrganizationMembershipType,
-        now: DateTime<Utc>,
-    ) -> Result<(), OrganizationDomainError> {
-        if self.membership_type == membership_type {
-            return Ok(());
-        }
-        self.membership_type = membership_type;
-        let _ = now;
-        self.bump_version()
-    }
+    // Note: there is deliberately no `set_type` mutator. PLAN-0013's
+    // minimal command set has no type switch; changing kind is modelled as
+    // remove + add (a distinct unique key), which keeps audit history
+    // honest. A future leader-promotion command needs its own plan change.
 
     fn bump_version(&mut self) -> Result<(), OrganizationDomainError> {
         self.version = self
@@ -299,15 +290,25 @@ mod tests {
         assert!(membership.is_active());
         assert_eq!(membership.deactivated_at(), None);
         assert_eq!(membership.version().value(), 3);
+    }
 
-        membership
-            .set_type(OrganizationMembershipType::Leader, ts(400))
-            .unwrap_or_else(|_| unreachable!());
+    #[test]
+    fn membership_kind_is_immutable_per_row() {
+        // No set_type mutator exists: the unique key includes the kind, so
+        // kind change must be modelled as remove + add by the application.
+        let membership = OrganizationMembership::join(
+            id(1),
+            id(2),
+            id(3),
+            id(4),
+            OrganizationMembershipType::Member,
+            ts(100),
+        )
+        .unwrap_or_else(|_| unreachable!());
         assert_eq!(
             membership.membership_type(),
-            OrganizationMembershipType::Leader
+            OrganizationMembershipType::Member
         );
-        assert_eq!(membership.version().value(), 4);
     }
 
     #[test]

@@ -238,13 +238,19 @@ impl FakeCommand {
             .map_err(|_| OrganizationStoreError::Failed)?;
         check_poisoned(&state)?;
         let op = format!("create_unit|{}", command.tenant_id);
+        // Payload fingerprint: placement fields plus the caller-chosen unit
+        // id when present; a server-generated id never participates (retry
+        // convergence for auto ids).
         let fingerprint = format!(
-            "{}|{}|{}",
+            "{}|{}|{}|{}",
             command
                 .parent_id
                 .map_or_else(|| "root".to_string(), |id| id.to_string()),
             command.unit_type.as_str(),
-            command.name
+            command.name,
+            command
+                .unit_id
+                .map_or_else(|| "auto".to_string(), |id| id.to_string()),
         );
         if let Some(StoredOutcome::Unit(existing)) =
             idempotent_replay(&state, &op, command.idempotency_key.as_ref(), &fingerprint)?
@@ -254,7 +260,8 @@ impl FakeCommand {
                 replayed: true,
             });
         }
-        if state.units.contains_key(&command.unit_id) {
+        let unit_id = command.unit_id.unwrap_or_else(Uuid::now_v7);
+        if state.units.contains_key(&unit_id) {
             return Err(OrganizationStoreError::AlreadyExists);
         }
         if state
@@ -269,10 +276,10 @@ impl FakeCommand {
         // In-transaction placement re-validation.
         validate_parent_locked(&state, command.tenant_id, command.parent_id)?;
         let snapshot = tree_snapshot(&state, command.tenant_id);
-        validate_tree_placement(&snapshot, command.unit_id, command.parent_id)
-            .map_err(|_| placement_error(command.parent_id, command.unit_id))?;
+        validate_tree_placement(&snapshot, unit_id, command.parent_id)
+            .map_err(|_| placement_error(command.parent_id, unit_id))?;
         let unit = OrganizationUnit::create(
-            command.unit_id,
+            unit_id,
             command.tenant_id,
             command.parent_id,
             command.unit_type,
@@ -310,8 +317,10 @@ impl FakeCommand {
             .map_err(|_| OrganizationStoreError::Failed)?;
         check_poisoned(&state)?;
         let op = format!("update_unit|{}", command.tenant_id);
+        // Payload fingerprint: semantic fields plus the request's
+        // `expected_version` (versioned mutation bodies include it).
         let fingerprint = format!(
-            "{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}",
             command.unit_id,
             command.name.clone().unwrap_or_default(),
             command
@@ -319,7 +328,8 @@ impl FakeCommand {
                 .map_or(String::new(), |kind| kind.as_str().to_string()),
             command
                 .status
-                .map_or(String::new(), |status| status.as_str().to_string())
+                .map_or(String::new(), |status| status.as_str().to_string()),
+            command.expected_version
         );
         if let Some(StoredOutcome::Unit(existing)) =
             idempotent_replay(&state, &op, command.idempotency_key.as_ref(), &fingerprint)?
@@ -338,8 +348,16 @@ impl FakeCommand {
         if unit.version().value() != command.expected_version {
             return Err(OrganizationStoreError::VersionConflict);
         }
-        let changed =
-            command.name.is_some() || command.unit_type.is_some() || command.status.is_some();
+        // Semantic diff: supplied fields that actually differ. Identical
+        // values converge (no version bump, no audit) — identity's rule.
+        let changed = command
+            .name
+            .as_deref()
+            .is_some_and(|name| unit.name() != name.trim())
+            || command
+                .unit_type
+                .is_some_and(|kind| unit.unit_type() != kind)
+            || command.status.is_some_and(|status| unit.status() != status);
         if changed {
             unit.update(
                 command.name.as_deref(),
@@ -380,11 +398,12 @@ impl FakeCommand {
         check_poisoned(&state)?;
         let op = format!("move_unit|{}", command.tenant_id);
         let fingerprint = format!(
-            "{}|{}",
+            "{}|{}|{}",
             command.unit_id,
             command
                 .new_parent_id
-                .map_or_else(|| "root".to_string(), |id| id.to_string())
+                .map_or_else(|| "root".to_string(), |id| id.to_string()),
+            command.expected_version
         );
         if let Some(StoredOutcome::Unit(existing)) =
             idempotent_replay(&state, &op, command.idempotency_key.as_ref(), &fingerprint)?

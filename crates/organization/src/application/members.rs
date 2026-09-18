@@ -8,8 +8,8 @@ use crate::application::error::OrganizationApplicationError;
 use crate::application::{validate_idempotency_key, validate_text_field, MAX_REASON_LEN};
 use crate::domain::OrganizationMembershipType;
 use crate::ports::{
-    AddMemberCommit, MutationContext, OrganizationCommandPort, OrganizationQueryPort,
-    RemoveMemberCommit, TenantMembershipReader,
+    AddMemberCommit, MutationActorKind, MutationContext, OrganizationCommandPort,
+    OrganizationQueryPort, RemoveMemberCommit, TenantMembershipReader,
 };
 
 /// Command for [`AddOrganizationMember`].
@@ -99,6 +99,7 @@ impl AddOrganizationMember {
                 membership_type: command.membership_type,
                 audit: MutationContext {
                     actor_id: command.actor_user_id.to_string(),
+                    actor_kind: MutationActorKind::User,
                     operation_id: Uuid::now_v7(),
                     trace_id: None,
                     reason: command.reason,
@@ -177,6 +178,7 @@ impl RemoveOrganizationMember {
                 expected_version: command.expected_version,
                 audit: MutationContext {
                     actor_id: command.actor_user_id.to_string(),
+                    actor_kind: MutationActorKind::User,
                     operation_id: Uuid::now_v7(),
                     trace_id: None,
                     reason: command.reason,
@@ -306,6 +308,10 @@ mod tests {
             .await
             .unwrap_or_else(|_| unreachable!());
         assert!(readded.membership.is_active());
+        assert!(
+            !readded.replayed,
+            "reactivating a removed membership is a real mutation, not a replay"
+        );
         assert_eq!(
             readded.membership.membership_id(),
             removed.membership.membership_id(),

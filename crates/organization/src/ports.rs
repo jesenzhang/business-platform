@@ -18,8 +18,14 @@
 //! 4. **Optimistic versioning, atomic audit, idempotency** exactly as in
 //!    the identity ports: conditional update on `version`; the aggregate
 //!    change, audit record, and idempotency row commit together; key
-//!    scoping is `(operation, tenant)`; fingerprints cover semantic fields
-//!    only.
+//!    scoping is `(operation, tenant)`. Fingerprints cover the *request
+//!    payload only*: semantic fields plus `expected_version` where the
+//!    request carries one plus the caller-chosen `unit_id` when `Some` —
+//!    never server-generated ids, timestamps, actors, reasons, or trace
+//!    ids. Same key with any payload difference is `IdempotencyConflict`.
+//!    `update_unit` whose supplied fields already equal the stored values
+//!    converges as `replayed = true` with no version bump and no audit
+//!    (identity's same-value rule).
 //! 5. **Add-member convergence.** If an inactive membership row exists for
 //!    the same key, `add_member` reactivates it (version bump) and returns
 //!    `replayed = false`; a fully identical idempotent replay returns
@@ -47,12 +53,12 @@ pub enum OrganizationStoreError {
     /// Optimistic concurrency conflict.
     #[error("organization aggregate version conflict")]
     VersionConflict,
-    /// Parent does not exist, is in another tenant, is not active, or would
-    /// exceed the depth bound.
+    /// Parent does not exist, is in another tenant, is not active, or is
+    /// the unit itself.
     #[error("invalid parent placement")]
     InvalidParent,
-    /// The placement would create a cycle.
-    #[error("organization tree cycle rejected")]
+    /// The placement would create a cycle or exceed the depth bound.
+    #[error("organization tree cycle or depth bound rejected")]
     Cycle,
     /// The organization unit is disabled.
     #[error("organization unit is disabled")]
@@ -77,6 +83,8 @@ pub enum OrganizationStoreError {
 pub struct MutationContext {
     /// Actor identity for the audit record.
     pub actor_id: String,
+    /// Actor classification for the audit trail (`actor_type`).
+    pub actor_kind: MutationActorKind,
     /// Stable operation id shared by mutation and audit.
     pub operation_id: Uuid,
     /// Optional trace id.
@@ -85,13 +93,28 @@ pub struct MutationContext {
     pub reason: Option<String>,
 }
 
+/// Actor classification used by organization mutations (same vocabulary as
+/// the identity ports; the audit chain requires an explicit actor type).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationActorKind {
+    /// An authenticated platform user (management plane call).
+    User,
+    /// The bootstrap service at startup (organization has no bootstrap
+    /// mutations today; variant kept so adapters share one mapping).
+    Bootstrap,
+    /// A migration or rehearsal job.
+    Migration,
+}
+
 /// Atomic unit creation.
 #[derive(Debug, Clone)]
 pub struct CreateUnitCommit {
     /// Tenant boundary.
     pub tenant_id: Uuid,
-    /// Caller-chosen unit id (idempotent provisioning).
-    pub unit_id: Uuid,
+    /// Caller-chosen unit id when `Some` (idempotent provisioning; part of
+    /// the idempotency fingerprint). `None` lets the store generate one,
+    /// which is never part of the fingerprint so retry convergence holds.
+    pub unit_id: Option<Uuid>,
     /// Parent unit, if any.
     pub parent_id: Option<Uuid>,
     /// Unit kind.
@@ -115,7 +138,9 @@ pub struct UnitCommitOutcome {
     pub replayed: bool,
 }
 
-/// Atomic unit update (rename / retyping / status).
+/// Atomic unit update (rename / retyping / status). A commit whose supplied
+/// fields already equal the stored values converges as `replayed = true`
+/// with no version bump and no audit record.
 #[derive(Debug, Clone)]
 pub struct UpdateUnitCommit {
     /// Tenant boundary.
@@ -237,7 +262,8 @@ pub trait OrganizationCommandPort: Send + Sync {
     ) -> Result<MemberCommitOutcome, OrganizationStoreError>;
 
     /// Deactivate a membership (removal). Already-inactive converges as
-    /// `replayed = true`.
+    /// `replayed = true` only while `expected_version` still matches the
+    /// current row; a stale version remains `VersionConflict` (fail closed).
     async fn remove_member(
         &self,
         command: RemoveMemberCommit,
@@ -269,7 +295,8 @@ pub trait OrganizationQueryPort: Send + Sync {
         tenant_id: Uuid,
     ) -> Result<Vec<OrganizationUnit>, OrganizationStoreError>;
 
-    /// Members of one unit, ordered by join time.
+    /// Active members of one unit, ordered by join time (inactive history
+    /// rows are not returned).
     async fn list_unit_members(
         &self,
         tenant_id: Uuid,

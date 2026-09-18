@@ -10,9 +10,10 @@ use crate::application::{
 };
 use crate::domain::{
     validate_tree_placement, OrganizationUnit, OrganizationUnitStatus, OrganizationUnitType,
+    MAX_UNIT_NAME_LEN,
 };
 use crate::ports::{
-    CreateUnitCommit, MoveUnitCommit, MutationContext, OrganizationCommandPort,
+    CreateUnitCommit, MoveUnitCommit, MutationActorKind, MutationContext, OrganizationCommandPort,
     OrganizationQueryPort, UnitCommitOutcome, UpdateUnitCommit,
 };
 
@@ -26,6 +27,7 @@ fn audit_context(
     }
     Ok(MutationContext {
         actor_id: actor_user_id.to_string(),
+        actor_kind: MutationActorKind::User,
         operation_id: Uuid::now_v7(),
         trace_id: None,
         reason,
@@ -121,13 +123,16 @@ impl CreateOrganizationUnit {
             .map(|unit| (unit.unit_id(), unit.parent_id()))
             .collect();
         validate_tree_placement(&tree, draft.unit_id(), draft.parent_id())
-            .map_err(|_| OrganizationApplicationError::InvalidParent)?;
+            .map_err(|_| OrganizationApplicationError::Cycle)?;
 
         Ok(self
             .command_port
             .create_unit(CreateUnitCommit {
                 tenant_id: command.tenant_id,
-                unit_id,
+                // The commit carries the *caller's* id intent: an explicit
+                // id participates in the idempotency fingerprint; a
+                // server-generated one must not (retry convergence).
+                unit_id: command.unit_id,
                 parent_id: command.parent_id,
                 unit_type: command.unit_type,
                 name: command.name.trim().to_string(),
@@ -192,6 +197,17 @@ impl UpdateOrganizationUnit {
             return Err(OrganizationApplicationError::Validation(
                 "at least one field must be updated".to_string(),
             ));
+        }
+        // Client-supplied text fails as Validation (400-class), not as a
+        // store `Failed` (500-class), matching the create path.
+        if let Some(name) = &command.name {
+            validate_text_field(name, MAX_UNIT_NAME_LEN, "name")
+                .map_err(OrganizationApplicationError::Validation)?;
+            if name.trim().is_empty() {
+                return Err(OrganizationApplicationError::Validation(
+                    "name must not be blank".to_string(),
+                ));
+            }
         }
         validate_idempotency_key(command.idempotency_key.as_ref())
             .map_err(OrganizationApplicationError::Validation)?;
