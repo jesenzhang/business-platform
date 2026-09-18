@@ -190,6 +190,14 @@ docs/architecture/ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md
 docs/adr/ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
 ```
 
+涉及用户、Tenant Membership、组织、角色、Permission、RoleBinding、Resource Scope 或业务授权时，必须同时引用：
+
+~~~text
+docs/architecture/IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md
+docs/architecture/SECURITY_ARCHITECTURE.md
+docs/adr/ADR-0024-authentication-externalized-authorization-internal.md
+~~~
+
 涉及 AI Workspace、Agent、Capability、Observation、Artifact 或生成应用时，必须同时引用：
 
 ```text
