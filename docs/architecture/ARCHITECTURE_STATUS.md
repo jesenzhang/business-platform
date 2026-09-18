@@ -3,7 +3,7 @@
 > 文档类型：Living Document
 > 最后更新：2026-09-18
 > 当前阶段：Post-v0.1 Business Delivery — 认证已生产化；下一候选为 PLAN-0013 Identity/Authorization；随后以 Contract 真实垂直切片验证平台，再激活 PLAN-0006 Revision 1
-> 当前计划：PLAN-0013 Proposed / NEXT CANDIDATE；PLAN-0006 Revision 1 Proposed / BLOCKED；PLAN-0012 Integrated / Archived；PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0013 Active / 实施分支验证中（`feat/PLAN-0013-identity-and-authorization-foundation`，未合并 main）；PLAN-0006 Revision 1 Proposed / BLOCKED；PLAN-0012 Integrated / Archived；PLAN-0009 Rehearsal Closed
 > 集成方式：GitHub PR merge
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
@@ -268,8 +268,8 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 与 `crates/organization` 仍为 TODO 骨架，缺少 PlatformUser/TenantMembership、
 > Role/Permission/RoleBinding/ResourceScope 和统一 Policy Decision；Contract 等真实
 > 业务 crate 也尚未形成可验证垂直切片。因此新增
-> `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 与 PLAN-0013（Proposed /
-> NEXT CANDIDATE），并将 PLAN-0006 重写为 Revision 1 / Proposed / BLOCKED：
+> `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 与 PLAN-0013（现为 Active，
+> 实施分支验证中），并将 PLAN-0006 重写为 Revision 1 / Proposed / BLOCKED：
 > 只有 PLAN-0013 与首个 Contract Business Vertical Slice 集成后才能激活。
 > 路线变为 Identity/Authorization → Contract →（按需 Knowledge/Evidence）→
 > Workspace/Agent → Controlled Write ActionPlan → Analytics/跨部门业务。
@@ -381,10 +381,18 @@ synthetic validation 已形成；ADR-0021/0022 已 Accepted，PLAN-0011 已 Inte
 Identity / Authorization 现状：
 
 - ADR-0024 已接受，production OIDC authentication 已实现；
-- `AuthenticatedPrincipal` 已包含 tenant/user/subject/roles/固定 management permissions；
-- `crates/identity` 与 `crates/organization` 仍是 TODO 骨架；
-- User/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/统一 Policy 尚未实现；
-- PLAN-0013 为 Proposed / NEXT CANDIDATE。
+- PLAN-0013（Identity and Authorization Foundation）已按 Active 在实施分支
+  `feat/PLAN-0013-identity-and-authorization-foundation` 上完成编码：
+  `crates/identity`、`crates/organization`、`crates/policy` 承载
+  PlatformUser/TenantMembership/OrganizationUnit+Member/Role/Permission/
+  RoleBinding/ResourceScope 与统一 default-DENY Policy（Authorize/
+  ExplainDecision，15 个有界 DecisionReason），各带 PostgreSQL authority +
+  SQLite 本地单进程 adapter 与跨 dialect 契约套件；server-configured
+  bootstrap admin（无 first-user-is-admin）；Governance API 已迁移到统一
+  Authorize + 兼容桥（仅 7 个 governance 键，flag 默认开启）；Stage 8 admin
+  REST 23 操作 + public contracts/OpenAPI/client + Stage 9 Console 页面已实现；
+- 分支尚未经最终全门禁验证与 Accepted Candidate 评审，未合并 main；
+  `ARCHITECTURE_STATUS` 的 Integrated 表述在合并前不适用。
 
 Enterprise AI Workspace 现状：
 
@@ -525,7 +533,7 @@ PLAN-0010 还必须保持：
 Runtime Audit / Integrity / Repair：已形成 Baseline 且实现基础已集成
 Enterprise AI Workspace：Baseline/ADR/Proposed Plan 已形成，代码未开始
 API/Event 契约：已形成 Baseline，Schema 尚待全面落地
-安全架构：已形成 Baseline；production OIDC authn 已实现；完整 PlatformUser/TenantMembership/Role/Permission/ResourceScope/Policy 待 PLAN-0013；Agent Capability 待 PLAN-0006 Revision 1
+安全架构：已形成 Baseline；production OIDC authn 已实现；PlatformUser/TenantMembership/Role/Permission/ResourceScope/Policy 已在 PLAN-0013 实施分支实现（Accepted Candidate 待定）；Agent Capability 待 PLAN-0006 Revision 1
 质量属性：已形成初始目标，Workspace 性能/恢复证据尚无
 部署和可观测性：已形成 Baseline，Workspace/Sandbox 部署未实现
 遗留迁移：已形成 Baseline，具体切片尚待计划
@@ -541,7 +549,7 @@ PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45
 PLAN-0008：Integrated / Archived（Base `35d1d01fd49a70ee996fbb5fb72818a632989efe`；Implementation/runtime `70469be26cb009c23f1a77c1553947522ba82aed`；Final Candidate/Integration `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`；Feature CI `31353149398`；Main CI `31353409550`；本机 PostgreSQL/MinIO NOT RUN）
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Revision 1 / Proposed / BLOCKED（ADR-0018/0021/0022/0024；planning base `b9eadf8f1b2b46c88f40f2defc88ffcb8bdb0b34`；activation requires PLAN-0013 + Contract vertical slice Integrated）
-PLAN-0013：Proposed / NEXT CANDIDATE（Identity and Authorization Foundation；PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/Policy）
+PLAN-0013：Active / 实施分支验证中（Identity and Authorization Foundation；PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/Policy；分支 `feat/PLAN-0013-identity-and-authorization-foundation`，Accepted Candidate 与合并待定）
 
 PLAN-0007：Integrated / Archived（Business Console、Public REST Contract、CLI、read-only MCP；implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`；completion audit `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`，由 PLAN-0012 M0 完成；全部门禁 PASS 或带原因 NOT RUN，Windows PostgreSQL/MinIO 与本地 Playwright NOT RUN）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
