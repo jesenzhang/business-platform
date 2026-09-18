@@ -1,9 +1,10 @@
 # 服务端安全架构
 
 > 文档 ID：ARCH-SEC-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
 > 生效日期：2026-07-30  
+> 最近修订：2026-09-18  
 > 适用范围：身份、租户、授权、数据保护、外部输入、Agent 与运维安全
 
 ## 1. 安全原则
@@ -60,7 +61,7 @@ Database / Storage / Broker / Providers
 
 ## 4. 认证
 
-正式环境优先采用 OIDC/OAuth2 或公司统一身份平台。
+正式环境采用外部 OIDC/OAuth2 或公司统一身份平台。ADR-0024 已明确：人员登录、凭证签发、MFA、refresh/session 属于外部 IdP；Business Platform 只验证受信 Token，并在平台内部完成租户、业务授权、Policy 与 Audit。
 
 要求：
 
@@ -102,6 +103,8 @@ Database / Storage / Broker / Providers
 ```
 
 Policy Context 提供通用授权机制；具体业务上下文负责业务状态和不变量。
+
+授权的权威模型见 [IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md](IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md)。当前 v0.1 只完成 OIDC principal、tenant context 与少量固定 ManagementPermission；完整 PlatformUser、TenantMembership、Organization、Role、RoleBinding、ResourceScope 与统一 Policy Decision 由 PLAN-0013 实现。外部 IdP role/group 只能通过显式受信映射影响平台 RoleBinding，不能直接替代业务授权。
 
 禁止：
 
