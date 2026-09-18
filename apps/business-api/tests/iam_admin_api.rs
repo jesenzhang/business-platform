@@ -989,7 +989,12 @@ async fn user_manage_grant_cannot_create_memberships() {
     // `identity.membership.update`; the (currently unrouted) user-manage
     // key must not reach it (Stage 8 review, MINOR #2).
     let router = iam_router_with(|_, policy, _| {
-        grant(policy, DEV_USER_ID, "user-manager", &["identity.user.manage"]);
+        grant(
+            policy,
+            DEV_USER_ID,
+            "user-manager",
+            &["identity.user.manage"],
+        );
     });
     let (status, _) = call(
         router,
