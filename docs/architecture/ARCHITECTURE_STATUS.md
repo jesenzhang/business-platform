@@ -2,9 +2,9 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-09-18
-> 当前阶段：v0.1 released — PLAN-0012 Integrated / Archived（`v0.1` tag → `2383651`）；ADR-0024 身份边界 Accepted；PLAN-0009 Rehearsal Closed；下一候选为 PLAN-0006
-> 当前计划：PLAN-0006 Proposed / NOT ACTIVE（`plans/current` 唯一条目）；PLAN-0012 Integrated / Archived；PLAN-0007 Integrated / Archived；PLAN-0011 Integrated / Archived；PLAN-0009 Completed / Rehearsal Closed / Archived
-> 集成方式：PR #12 / GitHub PR merge
+> 当前阶段：Post-v0.1 Business Delivery — 认证已生产化；下一候选为 PLAN-0013 Identity/Authorization；随后以 Contract 真实垂直切片验证平台，再激活 PLAN-0006 Revision 1
+> 当前计划：PLAN-0013 Proposed / NEXT CANDIDATE；PLAN-0006 Revision 1 Proposed / BLOCKED；PLAN-0012 Integrated / Archived；PLAN-0009 Rehearsal Closed
+> 集成方式：GitHub PR merge
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -263,6 +263,21 @@ is deferred). Resolved findings reopen as explicit recurrence episodes.
 > 不受影响。PR 合并需修改 `.github/workflows` 时须经具备 `workflow` scope
 > 的通道推送（当前 gh OAuth token 无该 scope，本次经 SSH 推送）。
 
+> 2026-09-18: post-v0.1 全仓审阅后调整实施路线。审阅确认 production OIDC/JWT、
+> tenant/user principal 和少量 ManagementPermission 已运行，但 `crates/identity`
+> 与 `crates/organization` 仍为 TODO 骨架，缺少 PlatformUser/TenantMembership、
+> Role/Permission/RoleBinding/ResourceScope 和统一 Policy Decision；Contract 等真实
+> 业务 crate 也尚未形成可验证垂直切片。因此新增
+> `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 与 PLAN-0013（Proposed /
+> NEXT CANDIDATE），并将 PLAN-0006 重写为 Revision 1 / Proposed / BLOCKED：
+> 只有 PLAN-0013 与首个 Contract Business Vertical Slice 集成后才能激活。
+> 路线变为 Identity/Authorization → Contract →（按需 Knowledge/Evidence）→
+> Workspace/Agent → Controlled Write ActionPlan → Analytics/跨部门业务。
+> 同步吸收 Ever Gauzy 作为 P0 Business Platform reference：采用 Provider
+> definition/binding 分离、compiled tool catalog + per-turn resolution 等概念，
+> 拒绝其内部 OAuth credential issuer 与 AGPL runtime/code 复用。本轮仅文档/
+> 架构/计划收口，不修改 runtime code、migration、OpenAPI 或数据库。
+
 ## 1. 当前权威结论
 
 - Rust 业务平台是系统主体，Agent 和 Enterprise AI Workspace 是可选产品层；
@@ -351,7 +366,8 @@ Foundation；PLAN-0001 至 PLAN-0005 均已集成并归档。
 - AI Task、Candidate 和 Review 基础；
 - Runtime Audit、Integrity Finding、Controlled Repair 和 Repair Ledger；
 - 真实 PostgreSQL/MinIO E2E 和 Architecture Fitness CI；
-- 完整服务端架构 Baseline 和文档治理。
+- 完整服务端架构 Baseline 和文档治理；
+- production OIDC/JWT authentication、可信 TenantContext/AuthenticatedPrincipal 与少量 Governance ManagementPermission。
 - Business Module Isolation 与 Semantic Contract Baseline、ADR-0020、纯 Rust contract/compiler
   和确定性编译测试；现有业务 crate 尚未迁入 `modules/` 目录。
 
@@ -362,10 +378,18 @@ synthetic validation 已形成；ADR-0021/0022 已 Accepted，PLAN-0011 已 Inte
 纯 Rust contract/compiler/dry-plan/fitness foundation 已实现；不得把这些文档或代码
 描述为已实现 Registry、安装器、卸载器、Saga runtime 或动态插件。
 
+Identity / Authorization 现状：
+
+- ADR-0024 已接受，production OIDC authentication 已实现；
+- `AuthenticatedPrincipal` 已包含 tenant/user/subject/roles/固定 management permissions；
+- `crates/identity` 与 `crates/organization` 仍是 TODO 骨架；
+- User/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/统一 Policy 尚未实现；
+- PLAN-0013 为 Proposed / NEXT CANDIDATE。
+
 Enterprise AI Workspace 现状：
 
-- 架构 Baseline、ADR-0018、参考分析和 PLAN-0006 Proposed 已形成；
-- `crates/agent-integration` 仍只有 TODO 骨架；
+- 架构 Baseline、ADR-0018、Ever Gauzy/Cloudflare OS 参考和 PLAN-0006 Revision 1 已形成；
+- `crates/agent-integration` 仍只有 TODO 骨架；PLAN-0006 Revision 1 在 Identity/Authorization + Contract slice 前 BLOCKED；
 - apps/agent-adapter 在 PLAN-0007 中提供窄的 HTTP MCP read-only adapter；PLAN-0006 的 Workspace/Agent Runtime 仍未实现；
 - Workspace/Conversation/Thread/Turn 尚未实现；
 - Skill/Context/Tool Registry 尚未实现；
@@ -389,22 +413,34 @@ Enterprise AI Workspace 现状：
   演练与生产 observability 在线验证仍待真实生产访问；
 - Enterprise AI Workspace 仅有文档设计，没有运行证据。
 
-## 3.1 总体架构第 19 章后续路线
+## 3.1 当前后续路线
 
-与总体架构第 19 章保持一致，以下能力仍未完成，不能从当前 Runtime Governance 或
-Document Processing 实现推断为已交付：
+当前不再按“先补齐所有平台抽象”推进，而以真实业务垂直切片驱动：
 
-- 核心业务领域迁移与建模：Identity/Organization、Customer、Contract、Approval、
-  Project、Finance、Notification 和其他 Bounded Context；
-- AI 业务能力扩展：Provider、OCR/LLM/VLM/Parser、抽取/分类/摘要、候选复核、成本和恢复；
-- 通用 Durable Task / Workflow：定时任务、Process Manager、重试、补偿、取消、恢复和人工工作流；
-- 平台原生 Analytics/Visualization：投影基座、指标语义、Analytics Query Service、
-  Dashboard/Report 和受控 Agent 分析技能，Runtime 尚未实现；
-- Agent 只读与分析、Agent 受控写入，以及高级智能化和桌面/移动/语音入口。
+~~~text
+P0  PLAN-0013 Identity / Authorization
+      PlatformUser / TenantMembership / Organization
+      Role / Permission / RoleBinding / ResourceScope / Policy
+       ↓
+P1  Contract Business Vertical Slice
+      List/Detail → Document Revision → AI Extract/Evidence
+      → Review → Apply Candidate → Contract Version Update
+       ↓
+P2  Knowledge/Evidence Projection（真实问答需求需要时）
+       ↓
+P3  PLAN-0006 Revision 1 Workspace / Agent
+      Workspace/Turn/AgentRun
+      Compiled Agent Tool Catalog + per-turn resolution
+      task-scoped Capability + Observation + durable SSE
+       ↓
+P4  Controlled Write ActionPlan
+       ↓
+P5  Analytics / Approval / Finance / Legal 跨上下文业务
+~~~
 
-当前只有 PLAN-0004 的固定 Document Processing Pipeline 和 PLAN-0005 的 Runtime
-Governance Foundation 具备集成运行实现；通用 Workflow、完整 Agent 和 Analytics
-Runtime 均仍需独立 PLAN。
+近期明确不优先：generic Workflow Designer、dynamic native/WASM/Node/Python plugin
+runtime、Marketplace、Generated App Sandbox、自建 OAuth/OIDC server、自建通用 RAG
+engine。只有真实业务需求证明抽象必要时再独立立项。
 
 ## 4. 已完成计划的持续约束
 
@@ -489,7 +525,7 @@ PLAN-0010 还必须保持：
 Runtime Audit / Integrity / Repair：已形成 Baseline 且实现基础已集成
 Enterprise AI Workspace：Baseline/ADR/Proposed Plan 已形成，代码未开始
 API/Event 契约：已形成 Baseline，Schema 尚待全面落地
-安全架构：已形成 Baseline，业务和 Governance 部分符合，Agent Capability 待实现
+安全架构：已形成 Baseline；production OIDC authn 已实现；完整 PlatformUser/TenantMembership/Role/Permission/ResourceScope/Policy 待 PLAN-0013；Agent Capability 待 PLAN-0006 Revision 1
 质量属性：已形成初始目标，Workspace 性能/恢复证据尚无
 部署和可观测性：已形成 Baseline，Workspace/Sandbox 部署未实现
 遗留迁移：已形成 Baseline，具体切片尚待计划
@@ -504,7 +540,8 @@ PLAN-0004：Integrated / Archived（main `12454709a88fde16f7769af27a75e79c4bc098
 PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Implementation `24e70f4182ca3315d94033178952113c4faba717`；Candidate `9056db7a1ff780ecbaaa7afb81e070e7f77c45ac`；Main CI `31026047403`；Windows PostgreSQL/MinIO NOT RUN）
 PLAN-0008：Integrated / Archived（Base `35d1d01fd49a70ee996fbb5fb72818a632989efe`；Implementation/runtime `70469be26cb009c23f1a77c1553947522ba82aed`；Final Candidate/Integration `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`；Feature CI `31353149398`；Main CI `31353409550`；本机 PostgreSQL/MinIO NOT RUN）
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
-PLAN-0006：Proposed / NOT ACTIVE（Architecture Decision ADR-0018；Base `a3f78a7d6e1a745d30cd0e6cf257a870fc95aa58`）
+PLAN-0006：Revision 1 / Proposed / BLOCKED（ADR-0018/0021/0022/0024；planning base `b9eadf8f1b2b46c88f40f2defc88ffcb8bdb0b34`；activation requires PLAN-0013 + Contract vertical slice Integrated）
+PLAN-0013：Proposed / NEXT CANDIDATE（Identity and Authorization Foundation；PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/Policy）
 
 PLAN-0007：Integrated / Archived（Business Console、Public REST Contract、CLI、read-only MCP；implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`；completion audit `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`，由 PLAN-0012 M0 完成；全部门禁 PASS 或带原因 NOT RUN，Windows PostgreSQL/MinIO 与本地 Playwright NOT RUN）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）
@@ -515,45 +552,34 @@ v0.1 release：已发布（annotated tag `v0.1` → `2383651`；生产数据演�
 Business Application Platform：Baseline（由 PLAN-0011 建立 packaging/contribution/compiler/dry-plan foundation；runtime/具体业务模块未实现）
 ```
 
-## 8. PLAN-0006 采用前动作
+## 8. 下一实施顺序与门禁
 
-PLAN-0006 进入 Active 前：
+### PLAN-0013
 
-1. 保持 ADR-0018、Workspace Baseline、Cloudflare OS 参考分析和 Proposed 计划文档的语义一致；
-2. 对 PLAN-0006 的 Workspace、Capability、Observation 和 Tool 所有权做独立审查；
-3. 确认第一垂直切片只读且只使用 Document Processing 公共 Query Port；
-4. 明确 Agent Runtime Port 与 deterministic Fake Runtime；
-5. 完成轻量威胁模型；
-6. 明确迁移、API、SSE、Crash Recovery、PostgreSQL E2E 和 Fitness Functions；
-7. 激活后建立独立实现分支，不在文档分支直接编码。
+进入 Active 前必须以最新 main 重新确认：OIDC/ManagementPermission 兼容边界、Identity/
+Organization 骨架、PostgreSQL/SQLite 策略、Audit/Outbox 事务边界、bootstrap admin
+安全模型和 OpenAPI/Console 范围。实现到 Accepted Candidate 后独立审阅，不自动开始
+Contract。
+
+### Contract Business Vertical Slice
+
+PLAN-0013 集成后创建独立计划。该切片必须成为 Identity/Authorization、Document
+Revision/Evidence、Business Application Contract 和 Business Console 的真实消费者，
+而不是继续新增 generic platform abstractions。
+
+### PLAN-0006 Revision 1
+
+仅在 PLAN-0013 与 Contract slice 都 Integrated 后激活。首批 Agent Tool 只读，并且
+只能调用已发布的 Application Query；Capability 只能缩小当前用户权限。
 
 ## 9. 下一次更新条件
 
 出现以下事件时更新本文：
 
-- PLAN-0002 成为 Accepted Candidate；
-- PLAN-0002 本地 fast-forward 集成并完成 main CI；
-- 首个垂直切片通过架构验收；
-- 架构适配测试进入 CI；
-- Bounded Context 或数据所有权调整；
-- 新增部署单元或重大基础设施；
+- PLAN-0013 状态变化、Accepted Candidate 或集成；
+- 首个 Contract Business Vertical Slice 建立/集成；
+- PLAN-0006 Revision 1 activation gate 满足或调整；
+- Identity/Authorization、Bounded Context 或数据所有权改变；
+- 新增生产部署单元、供应链安全事件或重大基础设施变化；
 - 质量属性目标被实测或调整；
-- PLAN-0002 完成并归档；
-- PLAN-0004 Gate 0 通过并进入 durable processing implementation；
-- PLAN-0004 Revision 1 集成并归档，或开始下一项明确计划；
-- PLAN-0005 Runtime Governance Foundation 建立并通过架构门禁；
-- 平台原生 Analytics/Visualization Baseline 建立；后续投影、指标、查询、Dashboard、报表和 Agent 技能必须由独立 PLAN 推进；
-- 指标语义、投影、Analytics Query Service、Dashboard/Report 或 Agent 分析技能开始实现；
-- 开始第一个遗留业务迁移切片。
-- ADR-0021/0022 被接受或拒绝；
-- PLAN-0011 完成 synthetic fixture 和 independent review；
-- Business Application Platform document foundation 进入 Baseline。
-- PLAN-0006 被激活；
-- Workspace/Capability 数据模型形成候选；
-- 第一个 Agent read-only Tool 通过授权和 Adapter 契约测试；
-- Agent Runtime crash/recovery 与 SSE reconnect 有实测证据；
-- PLAN-0006 成为 Accepted Candidate 或被取消/替代；
-- 选择长期 Agent Runtime；
-- 开始 Artifact/Blueprint 阶段；
-- 提议 Generated App Sandbox 或选择 workerd/WASI/container/isolate/microVM；
-- Bounded Context、数据所有权、授权模型或部署单元发生变化。
+- Knowledge/Analytics/Controlled Write 等后续计划被正式提出。
