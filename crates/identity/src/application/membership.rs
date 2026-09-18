@@ -20,7 +20,7 @@ use crate::ports::{
 };
 
 use super::resolve::EXTERNAL_IDENTITY_NAMESPACE;
-use super::validate_idempotency_key;
+use super::{validate_idempotency_key, validate_text_field, MAX_REASON_LEN};
 
 /// Errors shared by membership management use cases.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -274,6 +274,10 @@ impl ChangeTenantMembershipStatus {
         }
         validate_idempotency_key(command.idempotency_key.as_ref())
             .map_err(ChangeTenantMembershipStatusError::Validation)?;
+        if let Some(reason) = &command.reason {
+            validate_text_field(reason, MAX_REASON_LEN, "reason")
+                .map_err(ChangeTenantMembershipStatusError::Validation)?;
+        }
 
         self.command_port
             .change_membership_status(ChangeMembershipStatusCommit {
@@ -369,10 +373,11 @@ mod tests {
             outcome.membership.membership_id()
         );
 
-        // Same key, membership-relevant payload changed ⇒ IdempotencyConflict.
+        // Same operation scope (op+tenant) + same key, semantic payload
+        // changed ⇒ IdempotencyConflict.
         let conflicting = CreateTenantMembershipCommand {
             idempotency_key: Some("key-1".to_string()),
-            tenant_id: Uuid::from_bytes([9; 16]),
+            source: MembershipSource::Bootstrap,
             ..ok
         };
         assert_eq!(

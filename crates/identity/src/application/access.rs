@@ -17,7 +17,8 @@ use crate::ports::{IdentityQueryPort, IdentityStoreError};
 pub enum TenantAccessReason {
     /// Active user with an active tenant membership.
     Active,
-    /// No membership row for this (tenant, user).
+    /// No membership row for this (tenant, user) — or the user record does
+    /// not exist at all, which fails closed the same way.
     NoMembership,
     /// Membership exists but is suspended.
     MembershipSuspended,
@@ -70,28 +71,26 @@ impl TenantAccessChecker {
         Self { query_port }
     }
 
-    /// Membership state is re-read from the store on every call, so a
-    /// suspension or removal takes effect on the very next request even
-    /// while the caller's JWT is still valid.
+    /// Both user status and membership status are re-read from the store on
+    /// every call (no caller-supplied freshness claims), so suspension,
+    /// removal, or disable takes effect on the very next request even while
+    /// the caller's JWT is still valid.
     pub async fn check(
         &self,
         tenant_id: Uuid,
         user_id: Uuid,
-        user_active: bool,
     ) -> Result<TenantAccess, TenantAccessError> {
-        let membership = self.query_port.get_membership(tenant_id, user_id).await?;
-        if !user_active {
-            return Ok(TenantAccess {
-                allowed: false,
-                reason: TenantAccessReason::UserDisabled,
-            });
-        }
-        Ok(match membership {
+        let record = self.query_port.get_tenant_user(tenant_id, user_id).await?;
+        Ok(match record {
             None => TenantAccess {
                 allowed: false,
                 reason: TenantAccessReason::NoMembership,
             },
-            Some(membership) if !membership.is_active() => TenantAccess {
+            Some(record) if !record.user.is_active() => TenantAccess {
+                allowed: false,
+                reason: TenantAccessReason::UserDisabled,
+            },
+            Some(record) if !record.membership.is_active() => TenantAccess {
                 allowed: false,
                 reason: TenantAccessReason::MembershipSuspended,
             },
@@ -130,12 +129,13 @@ mod tests {
         let checker = TenantAccessChecker::new(Arc::clone(&stores.query));
 
         // No membership yet.
-        let access = checker.check(tenant(), user(), true).await;
+        let access = checker.check(tenant(), user()).await;
         assert_eq!(
             access.unwrap_or_else(|_| unreachable!()).reason,
             TenantAccessReason::NoMembership
         );
 
+        stores.seed_user(PlatformUser::create(user(), ts(1)).unwrap_or_else(|_| unreachable!()));
         stores.seed_membership(
             TenantMembership::join(
                 Uuid::now_v7(),
@@ -148,7 +148,7 @@ mod tests {
         );
         assert!(
             checker
-                .check(tenant(), user(), true)
+                .check(tenant(), user())
                 .await
                 .unwrap_or_else(|_| unreachable!())
                 .allowed
@@ -157,7 +157,7 @@ mod tests {
         // Suspended membership denies from the very next request.
         stores.suspend_membership(tenant(), user());
         let access = checker
-            .check(tenant(), user(), true)
+            .check(tenant(), user())
             .await
             .unwrap_or_else(|_| unreachable!());
         assert!(!access.allowed);
@@ -172,7 +172,7 @@ mod tests {
         };
         stores.seed_user(disabled_user);
         let access = checker
-            .check(tenant(), user(), false)
+            .check(tenant(), user())
             .await
             .unwrap_or_else(|_| unreachable!());
         assert!(!access.allowed);

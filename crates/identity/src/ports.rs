@@ -4,6 +4,36 @@
 //! change together with the unified audit record (adapters use the shared
 //! in-transaction audit writer). Query ports are read-only and always
 //! tenant-scoped where a tenant boundary exists.
+//!
+//! # Adapter contract (binding for `identity-postgres` / `identity-sqlite`)
+//!
+//! 1. **Unique indexes.** `external_identities(issuer, subject)` unique, and
+//!    `external_identities(user_id)` unique (v1: one link per user — the
+//!    resolve adoption path is only race-safe with this index). A unique
+//!    violation on the *same* `(issuer, subject)` key during
+//!    [`IdentityResolvePort::resolve_or_provision`] must re-read and continue
+//!    (match-and-continue), never surface as an error.
+//! 2. **Pre-normalized keys.** Ports receive already-trimmed, control-char
+//!    free `issuer`/`subject` values: only the application use cases
+//!    normalize, and every writer must go through them. Adapters may assume
+//!    the caps from `crate::domain` constants.
+//! 3. **Idempotency.** Keys are scoped per `(operation, tenant)` where the
+//!    operation is tenant-bound (global otherwise, keyed by the operation
+//!    name). The request fingerprint must cover all *semantic* fields
+//!    (create: tenant + target user + source; status change: tenant + user +
+//!    target status + expected version; user status: user + target status +
+//!    expected version) and must exclude `now`, `actor`, and `reason`. Same
+//!    key + same fingerprint converges onto the stored outcome; same key +
+//!    different fingerprint fails with `IdempotencyConflict` without
+//!    mutating.
+//! 4. **Optimistic versioning.** Every mutation is a conditional update
+//!    `WHERE tenant_id = $ AND id = $ AND version = expected`; zero rows
+//!    affected ⇒ `VersionConflict`. Aggregate + audit + idempotency rows
+//!    commit or roll back together.
+//! 5. **Disabled users may be attached.** `create_membership` deliberately
+//!    permits attaching a globally disabled user (the access checker denies
+//!    at decision time); adapters must not add an implicit "active only"
+//!    filter here.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};

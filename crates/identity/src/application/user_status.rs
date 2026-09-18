@@ -11,7 +11,7 @@ use crate::ports::{
     MutationContext, UserCommitOutcome,
 };
 
-use super::validate_idempotency_key;
+use super::{validate_idempotency_key, validate_text_field, MAX_REASON_LEN};
 
 /// Errors of the change-user-status use case.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -95,6 +95,10 @@ impl ChangeUserStatus {
         }
         validate_idempotency_key(command.idempotency_key.as_ref())
             .map_err(ChangeUserStatusError::Validation)?;
+        if let Some(reason) = &command.reason {
+            validate_text_field(reason, MAX_REASON_LEN, "reason")
+                .map_err(ChangeUserStatusError::Validation)?;
+        }
 
         self.command_port
             .change_user_status(ChangeUserStatusCommit {

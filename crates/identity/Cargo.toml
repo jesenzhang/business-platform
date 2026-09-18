@@ -15,8 +15,6 @@ default = []
 testing = []
 
 [dependencies]
-shared-kernel = { workspace = true }
-serde = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 async-trait = { workspace = true }

@@ -312,6 +312,14 @@ fn store_idempotent(
     }
 }
 
+fn create_membership_op(tenant_id: Uuid) -> String {
+    format!("create_membership|{tenant_id}")
+}
+
+fn change_membership_status_op(tenant_id: Uuid) -> String {
+    format!("change_membership_status|{tenant_id}")
+}
+
 fn membership_fingerprint(
     tenant_id: Uuid,
     user_id: Uuid,
@@ -365,7 +373,7 @@ impl IdentityCommandPort for FakeCommand {
         );
         if let Some(StoredOutcome::Membership(existing)) = idempotent_replay(
             &state,
-            "create_membership",
+            &create_membership_op(command.tenant_id),
             command.idempotency_key.as_ref(),
             &fingerprint,
         )? {
@@ -402,7 +410,7 @@ impl IdentityCommandPort for FakeCommand {
         );
         store_idempotent(
             &mut state,
-            "create_membership",
+            &create_membership_op(command.tenant_id),
             command.idempotency_key.as_ref(),
             fingerprint,
             StoredOutcome::Membership(membership.clone()),
@@ -428,7 +436,7 @@ impl IdentityCommandPort for FakeCommand {
         );
         if let Some(StoredOutcome::Membership(existing)) = idempotent_replay(
             &state,
-            "change_membership_status",
+            &change_membership_status_op(command.tenant_id),
             command.idempotency_key.as_ref(),
             &fingerprint,
         )? {
@@ -476,7 +484,7 @@ impl IdentityCommandPort for FakeCommand {
         }
         store_idempotent(
             &mut state,
-            "change_membership_status",
+            &change_membership_status_op(command.tenant_id),
             command.idempotency_key.as_ref(),
             fingerprint,
             StoredOutcome::Membership(membership.clone()),
@@ -733,7 +741,7 @@ impl BootstrapLedgerPort for FakeLedger {
             .filter(|entry| {
                 entry.tenant_id == tenant_id && entry.issuer == issuer && entry.subject == subject
             })
-            .max_by_key(|entry| entry.recorded_at)
+            .max_by_key(|entry| (entry.recorded_at, entry.config_version))
             .cloned())
     }
 

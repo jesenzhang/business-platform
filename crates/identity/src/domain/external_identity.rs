@@ -31,6 +31,7 @@ pub struct ExternalIdentity {
     subject: String,
     user_id: Uuid,
     linked_at: DateTime<Utc>,
+    version: i64,
 }
 
 impl ExternalIdentity {
@@ -52,6 +53,9 @@ impl ExternalIdentity {
             subject: subject.to_string(),
             user_id,
             linked_at: now,
+            // The link is immutable: relinking fails closed, so it stays at
+            // version 1 forever (the column exists for schema uniformity).
+            version: 1,
         })
     }
 
@@ -62,9 +66,13 @@ impl ExternalIdentity {
         subject: String,
         user_id: Uuid,
         linked_at: DateTime<Utc>,
+        version: i64,
     ) -> Result<Self, IdentityDomainError> {
         if external_identity_id.is_nil() {
             return Err(IdentityDomainError::InvalidIdentity);
+        }
+        if version < 1 {
+            return Err(IdentityDomainError::InvalidVersion);
         }
         Self::validate(&issuer, &subject, user_id)?;
         Ok(Self {
@@ -73,6 +81,7 @@ impl ExternalIdentity {
             subject,
             user_id,
             linked_at,
+            version,
         })
     }
 
@@ -112,6 +121,11 @@ impl ExternalIdentity {
     #[must_use]
     pub const fn linked_at(&self) -> DateTime<Utc> {
         self.linked_at
+    }
+
+    #[must_use]
+    pub const fn version(&self) -> i64 {
+        self.version
     }
 
     /// True when this link is exactly the `(issuer, subject)` key the caller
