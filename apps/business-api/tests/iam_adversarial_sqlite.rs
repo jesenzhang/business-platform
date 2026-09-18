@@ -10,10 +10,10 @@ mod harness;
 
 use axum::http::{header, Method, StatusCode};
 use harness::{
-    bind, call, create_auditor_role, create_membership, fresh_subject, get_as, post_as, request,
-    root_post, sqlite_app, token, TestApp, ROOT,
+    bind, call, create_auditor_role, create_membership, data, fresh_subject, get_as, post_as,
+    request, root_post, sqlite_app, token, TestApp, ROOT,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 use uuid::Uuid;
 
 async fn staff_without_grants(app: &TestApp) -> (String, Uuid) {
@@ -39,6 +39,7 @@ async fn header_spoofing_is_inert_under_oidc() {
             .header("x-tenant-id", app.tenant.to_string())
             .header("x-management-permissions", "audit.read")
             .header("x-permissions", "identity.read")
+            .header("x-role", "platform-admin")
             .body(axum::body::Body::empty())
             .expect("request builds")
     };
@@ -120,6 +121,58 @@ async fn claim_widening_stops_at_the_compat_bridge_boundary() {
         status,
         StatusCode::OK,
         "compat bridge is bounded, not absent"
+    );
+}
+
+#[tokio::test]
+async fn roles_claim_alone_unlocks_nothing() {
+    // Isolate `roles` inertness from the compat bridge: a token that
+    // claims only roles (no `management_permissions`) unlocks neither
+    // IAM nor governance surfaces on the real composition.
+    let app = sqlite_app(Some(ROOT)).await;
+    let (staff, _) = staff_without_grants(&app).await;
+    let roley = token(
+        &staff,
+        app.tenant,
+        Some(json!({"roles": ["platform-admin", "superuser"]})),
+    );
+    for uri in ["/api/v1/admin/users", "/api/v1/admin/audit-events"] {
+        let (status, _) = call(
+            app.router.clone(),
+            request(Method::GET, uri, Some(&roley), None, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "roles claim: {uri}");
+    }
+}
+
+#[tokio::test]
+async fn foreign_user_id_claim_fails_closed() {
+    // A cryptographically valid token whose `user_id` claim contradicts
+    // the identity bound to its subject must fail closed at resolution
+    // (principal conflict), not resolve as the claimed principal.
+    let app = sqlite_app(Some(ROOT)).await;
+    let (staff, _) = staff_without_grants(&app).await;
+    let stolen = token(
+        &staff,
+        app.tenant,
+        Some(json!({"user_id": harness::derived_user_id(ROOT).to_string()})),
+    );
+    let (status, _) = call(
+        app.router.clone(),
+        request(
+            Method::GET,
+            "/api/v1/admin/audit-events",
+            Some(&stolen),
+            None,
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "user_id claim is server-bound to the subject"
     );
 }
 
@@ -239,6 +292,20 @@ async fn cross_tenant_probes_fail_closed() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "no cross-tenant mutation");
 
+    // Explain about a foreign identity answers only the bounded
+    // tenant-local truth: the user has no membership here. Existence
+    // in another tenant is neither confirmed nor evaluated.
+    let (status, explained) = root_post(
+        &app,
+        "/api/v1/admin/authorization/explain",
+        json!({"user_id": farmer_id, "permission": "audit.read"}),
+        "adv-xtenant-explain-before",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(data(&explained)["allowed"], json!(false), "{explained}");
+    assert_eq!(data(&explained)["reason"], "deny_no_membership");
+
     // Grant farmer read access inside the bootstrap tenant, then act as
     // the same human identity under the foreign tenant: the binding is
     // tenant-scoped and must not follow them there.
@@ -268,21 +335,17 @@ async fn cross_tenant_probes_fail_closed() {
         "tenant-scoped grants never follow across tenants"
     );
 
-    // Explain about the foreign identity from the bootstrap tenant is
-    // denied, not answered.
-    let (status, body): (StatusCode, Value) = root_post(
+    // Explain answers about the caller's tenant only. (The pre-join
+    // probe above proved the bounded `deny_no_membership` answer; now
+    // the same call must report the tenant's real RoleBinding path.)
+    let (status, explained) = root_post(
         &app,
         "/api/v1/admin/authorization/explain",
         json!({"user_id": farmer_id, "permission": "audit.read"}),
-        "adv-xtenant-explain",
+        "adv-xtenant-explain-after",
     )
     .await;
-    let _ = body;
-    assert_eq!(
-        status,
-        StatusCode::OK,
-        "explain answers within tenant scope only"
-    );
-    // The tenant check happens at the caller boundary: the answer can
-    // only ever speak about the caller's tenant.
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(data(&explained)["allowed"], json!(true), "{explained}");
+    assert_eq!(data(&explained)["reason"], "allow_role_binding");
 }
