@@ -542,13 +542,18 @@ async fn create_role_tx(
             replayed: true,
         });
     }
+    // Existence probes select `1::BIGINT`, not bare `1`: PostgreSQL
+    // describes a literal `1` as `int4`, which sqlx refuses to decode as
+    // `i64`, so a hit would fail as a database error instead of mapping
+    // to `AlreadyExists`. SQLite's dynamic typing hides this divergence.
     // Caller-chosen ids are globally unique (system role ids included).
     if let Some(role_id) = command.role_id {
-        let id_taken = sqlx::query_scalar::<_, i64>("SELECT 1 FROM roles WHERE role_id = $1")
-            .bind(role_id)
-            .fetch_optional(&mut *conn)
-            .await
-            .map_err(map_sqlx_error)?;
+        let id_taken =
+            sqlx::query_scalar::<_, i64>("SELECT 1::BIGINT FROM roles WHERE role_id = $1")
+                .bind(role_id)
+                .fetch_optional(&mut *conn)
+                .await
+                .map_err(map_sqlx_error)?;
         if id_taken.is_some() {
             return Err(PolicyStoreError::AlreadyExists);
         }
@@ -556,7 +561,7 @@ async fn create_role_tx(
     // Stable keys are unique per tenant (the partial unique index mirrors
     // this pre-check under races).
     let key_taken = sqlx::query_scalar::<_, i64>(
-        "SELECT 1 FROM roles WHERE tenant_id = $1 AND stable_key = $2",
+        "SELECT 1::BIGINT FROM roles WHERE tenant_id = $1 AND stable_key = $2",
     )
     .bind(command.tenant_id)
     .bind(&command.stable_key)
@@ -976,7 +981,7 @@ async fn bind_role_tx(
     }
     let binding_id = command.binding_id.unwrap_or_else(Uuid::now_v7);
     let id_taken =
-        sqlx::query_scalar::<_, i64>("SELECT 1 FROM role_bindings WHERE binding_id = $1")
+        sqlx::query_scalar::<_, i64>("SELECT 1::BIGINT FROM role_bindings WHERE binding_id = $1")
             .bind(binding_id)
             .fetch_optional(&mut *conn)
             .await
