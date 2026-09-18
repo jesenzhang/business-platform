@@ -503,5 +503,62 @@ foreach ($required in @(
     }
 }
 
+# PLAN-0013 §15 source scans (regex, case-sensitive unless noted).
+function Assert-SourceScan {
+    param(
+        [string]$Label,
+        [string[]]$Directories,
+        [string[]]$Patterns,
+        [string[]]$PathExcludes = @()
+    )
+    foreach ($directory in $Directories) {
+        $target = Join-Path $root $directory
+        if (-not (Test-Path $target)) {
+            continue
+        }
+        foreach ($file in Get-ChildItem $target -Recurse -Include "*.rs" -File) {
+            $normalized = $file.FullName.Replace("\", "/")
+            $skip = $false
+            foreach ($exclude in $PathExcludes) {
+                if ($normalized -match $exclude) {
+                    $skip = $true
+                    break
+                }
+            }
+            if ($skip) {
+                continue
+            }
+            $content = Get-Content -Raw $file.FullName
+            foreach ($pattern in $Patterns) {
+                if ($content -match $pattern) {
+                    throw "${Label}: $($file.FullName) matches forbidden pattern '$pattern'"
+                }
+            }
+        }
+    }
+}
+
+# Rule 1+4: business modules and HTTP handlers never touch the RoleBinding
+# table or parse role strings — RoleBinding is read only through Policy ports.
+Assert-SourceScan -Label "IAM role-authority scan" `
+    -Directories @(
+        "crates/contract", "crates/customer", "crates/finance",
+        "crates/project", "crates/approval", "apps/business-api/src/routes"
+    ) `
+    -Patterns @("role_bindings", "roles\(\)\s*\.\s*contains")
+
+# Rule 4 (preflight §11): no authorization-server markers. Signing keys and
+# JWT minting belong to the external IdP, never to this repository; OIDC
+# validation (decode/verify) stays allowed. Tests may mint tokens in-process.
+Assert-SourceScan -Label "Authorization-server scan" `
+    -Directories @("crates", "apps") `
+    -Patterns @("SigningKey", "jsonwebtoken::encode\b") `
+    -PathExcludes @("/tests/", "/oidc", "oidc_", "/vendor/")
+
+# Rule 5 (preflight §11): no policy DSL — bounded enum evaluation only.
+Assert-SourceScan -Label "Policy DSL scan" `
+    -Directories @("crates/policy/src") `
+    -Patterns @("parse_expression", "evaluate_expression", "Expression\s*\{")
+
 Write-Output "Architecture fitness: PASS"
 exit 0
