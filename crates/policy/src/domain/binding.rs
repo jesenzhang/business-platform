@@ -222,6 +222,16 @@ impl RoleBinding {
     }
 
     #[must_use]
+    pub const fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    #[must_use]
+    pub const fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    #[must_use]
     pub const fn version(&self) -> AggregateVersion {
         self.version
     }

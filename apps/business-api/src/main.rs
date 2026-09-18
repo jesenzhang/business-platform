@@ -7,18 +7,31 @@ use anyhow::Context;
 use business_api::auth::{AuthMiddlewareConfig, ManagementPermission};
 use business_api::bootstrap::{dev_auth_bootstrap_config, BootstrapComposition};
 use business_api::config::{BusinessApiConfig, DatabaseBackend, StorageBackend};
-use business_api::platform_authorization::{IdentitySubjectStatusBridge, OrganizationScopeBridge};
+use business_api::platform_authorization::{
+    IdentitySubjectStatusBridge, IdentityTenantMembershipBridge, OrganizationScopeBridge,
+};
 use business_api::routes;
 use business_api::state::{
-    AccessServices, AppState, DocumentServices, GovernanceServices, PostgresReadinessProbe,
-    ReadinessProbe, SqliteReadinessProbe, StorageServices,
+    AccessServices, AdminServices, AppState, DocumentServices, GovernanceServices,
+    PostgresReadinessProbe, ReadinessProbe, SqliteReadinessProbe, StorageServices,
 };
 use identity::application::{
-    BootstrapAdministratorConfig, ResolveAuthenticatedUser, TenantAccessChecker,
+    BootstrapAdministratorConfig, ChangeTenantMembershipStatus, CreateTenantMembership,
+    GetTenantUser, ListMemberships, ListTenantUsers, ResolveAuthenticatedUser, TenantAccessChecker,
 };
-use identity::ports::{BootstrapLedgerPort, IdentityCommandPort, IdentityResolvePort};
+use identity::ports::{
+    BootstrapLedgerPort, IdentityCommandPort, IdentityQueryPort, IdentityResolvePort,
+};
 use object_storage::{LocalStorageClient, ObjectStorageClient, S3Client};
-use policy::application::Authorize;
+use organization::application::{
+    AddOrganizationMember, CreateOrganizationUnit, ListOrganizationTree, ListUnitMembers,
+    MoveOrganizationUnit, RemoveOrganizationMember, UpdateOrganizationUnit,
+};
+use organization::ports::{OrganizationCommandPort, OrganizationQueryPort};
+use policy::application::{
+    Authorize, BindRole, CreateRole, ExplainDecision, RevokeRoleBinding, SetRolePermissions,
+    UpdateRole,
+};
 use policy::ports::{OrganizationScopePort, PolicyCommandPort, PolicyQueryPort, SubjectStatusPort};
 
 type PersistenceAdapters = (
@@ -35,14 +48,17 @@ type PersistenceAdapters = (
 );
 
 /// Raw identity/policy/organization ports for the platform-authorization
-/// composition (PLAN-0013 §5/§7). The use cases are constructed from these
-/// exactly once, after the backend match.
+/// and IAM management compositions (PLAN-0013 §5/§7/§9). The use cases are
+/// constructed from these exactly once, after the backend match.
 struct AccessAdapters {
     resolve: Arc<dyn IdentityResolvePort>,
     command: Arc<dyn IdentityCommandPort>,
     ledger: Arc<dyn BootstrapLedgerPort>,
+    identity_query: Arc<dyn IdentityQueryPort>,
     subject: Arc<dyn SubjectStatusPort>,
     org_scope: Arc<dyn OrganizationScopePort>,
+    org_command: Arc<dyn OrganizationCommandPort>,
+    org_query: Arc<dyn OrganizationQueryPort>,
     policy_query: Arc<dyn PolicyQueryPort>,
     policy_command: Arc<dyn PolicyCommandPort>,
 }
@@ -124,16 +140,19 @@ async fn main() -> anyhow::Result<()> {
                 organization_postgres::PostgresOrganizationStore::new(pool.clone()),
             );
             let policy_store = Arc::new(policy_postgres::PostgresPolicyStore::new(pool.clone()));
+            let identity_query = identity_store.query_port();
+            let org_query = organization_store.query_port();
             let access = AccessAdapters {
                 resolve: identity_store.resolve_port(),
                 command: identity_store.command_port(),
                 ledger: identity_store.ledger_port(),
+                identity_query: Arc::clone(&identity_query),
                 subject: Arc::new(IdentitySubjectStatusBridge::new(Arc::new(
-                    TenantAccessChecker::new(identity_store.query_port()),
+                    TenantAccessChecker::new(identity_query),
                 ))),
-                org_scope: Arc::new(OrganizationScopeBridge::new(
-                    organization_store.query_port(),
-                )),
+                org_scope: Arc::new(OrganizationScopeBridge::new(Arc::clone(&org_query))),
+                org_command: organization_store.command_port(),
+                org_query,
                 policy_query: policy_store.query_port(),
                 policy_command: policy_store.command_port(),
             };
@@ -196,16 +215,19 @@ async fn main() -> anyhow::Result<()> {
                 pool.clone(),
             ));
             let policy_store = Arc::new(policy_sqlite::SqlitePolicyStore::new(pool.clone()));
+            let identity_query = identity_store.query_port();
+            let org_query = organization_store.query_port();
             let access = AccessAdapters {
                 resolve: identity_store.resolve_port(),
                 command: identity_store.command_port(),
                 ledger: identity_store.ledger_port(),
+                identity_query: Arc::clone(&identity_query),
                 subject: Arc::new(IdentitySubjectStatusBridge::new(Arc::new(
-                    TenantAccessChecker::new(identity_store.query_port()),
+                    TenantAccessChecker::new(identity_query),
                 ))),
-                org_scope: Arc::new(OrganizationScopeBridge::new(
-                    organization_store.query_port(),
-                )),
+                org_scope: Arc::new(OrganizationScopeBridge::new(Arc::clone(&org_query))),
+                org_command: organization_store.command_port(),
+                org_query,
                 policy_query: policy_store.query_port(),
                 policy_command: policy_store.command_port(),
             };
@@ -275,6 +297,80 @@ async fn main() -> anyhow::Result<()> {
         compat_enabled = access_services.compat_enabled,
         "platform authorization composed (compat bridge = server-trusted claim grants, bounded to the seven governance keys)"
     );
+
+    // PLAN-0013 Stage 8: the IAM management use cases. Both backends compose
+    // identically; handlers receive these typed use cases only, never a
+    // store, so no business rule lives in the delivery layer.
+    let tenant_reader = Arc::new(IdentityTenantMembershipBridge::new(Arc::new(
+        TenantAccessChecker::new(Arc::clone(&access_adapters.identity_query)),
+    )));
+    let admin_services = AdminServices {
+        list_users: Arc::new(ListTenantUsers::new(Arc::clone(
+            &access_adapters.identity_query,
+        ))),
+        get_user: Arc::new(GetTenantUser::new(Arc::clone(
+            &access_adapters.identity_query,
+        ))),
+        list_memberships: Arc::new(ListMemberships::new(Arc::clone(
+            &access_adapters.identity_query,
+        ))),
+        create_membership: Arc::new(CreateTenantMembership::new(Arc::clone(
+            &access_adapters.command,
+        ))),
+        change_membership_status: Arc::new(ChangeTenantMembershipStatus::new(Arc::clone(
+            &access_adapters.command,
+        ))),
+        policy_query: Arc::clone(&access_adapters.policy_query),
+        list_org_units: Arc::new(ListOrganizationTree::new(Arc::clone(
+            &access_adapters.org_query,
+        ))),
+        list_org_members: Arc::new(ListUnitMembers::new(Arc::clone(&access_adapters.org_query))),
+        create_unit: Arc::new(CreateOrganizationUnit::new(
+            Arc::clone(&access_adapters.org_command),
+            Arc::clone(&access_adapters.org_query),
+        )),
+        update_unit: Arc::new(UpdateOrganizationUnit::new(Arc::clone(
+            &access_adapters.org_command,
+        ))),
+        move_unit: Arc::new(MoveOrganizationUnit::new(
+            Arc::clone(&access_adapters.org_command),
+            Arc::clone(&access_adapters.org_query),
+        )),
+        add_org_member: Arc::new(AddOrganizationMember::new(
+            Arc::clone(&access_adapters.org_command),
+            Arc::clone(&access_adapters.org_query),
+            tenant_reader,
+        )),
+        remove_org_member: Arc::new(RemoveOrganizationMember::new(Arc::clone(
+            &access_adapters.org_command,
+        ))),
+        create_role: Arc::new(CreateRole::new(
+            Arc::clone(&access_adapters.policy_command),
+            Arc::clone(&access_adapters.policy_query),
+        )),
+        update_role: Arc::new(UpdateRole::new(
+            Arc::clone(&access_adapters.policy_command),
+            Arc::clone(&access_adapters.policy_query),
+        )),
+        set_role_permissions: Arc::new(SetRolePermissions::new(
+            Arc::clone(&access_adapters.policy_command),
+            Arc::clone(&access_adapters.policy_query),
+        )),
+        bind_role: Arc::new(BindRole::new(
+            Arc::clone(&access_adapters.policy_command),
+            Arc::clone(&access_adapters.policy_query),
+            Arc::clone(&access_adapters.subject),
+            Arc::clone(&access_adapters.org_scope),
+        )),
+        revoke_binding: Arc::new(RevokeRoleBinding::new(Arc::clone(
+            &access_adapters.policy_command,
+        ))),
+        explain: Arc::new(ExplainDecision::new(
+            Arc::clone(&access_adapters.policy_query),
+            Arc::clone(&access_adapters.subject),
+            Arc::clone(&access_adapters.org_scope),
+        )),
+    };
 
     // PLAN-0013 §7: startup-only bootstrap; HTTP never triggers it and no
     // request surface can enable it. Mode selection is server-side:
@@ -356,6 +452,7 @@ async fn main() -> anyhow::Result<()> {
         readiness,
         storage: Some(StorageServices { objects: storage }),
         access: Some(access_services),
+        admin: Some(admin_services),
     });
 
     // PLAN-0012 M3: the OIDC validator is built whenever an issuer is

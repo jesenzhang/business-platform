@@ -282,6 +282,7 @@ fn test_router_with_storage(
         readiness: Arc::new(ReadyProbe),
         storage: storage.map(|objects| StorageServices { objects }),
         access: Some(test_access()),
+        admin: None,
     });
     routes::create_router(
         state,

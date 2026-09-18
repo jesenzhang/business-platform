@@ -96,6 +96,7 @@ fn test_router(pool: sqlx::PgPool, tenant_id: Uuid) -> axum::Router {
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
         storage: None,
         access: Some(test_access()),
+        admin: None,
     });
     routes::create_router(
         state,

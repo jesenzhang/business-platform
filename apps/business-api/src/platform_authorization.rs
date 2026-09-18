@@ -143,6 +143,23 @@ pub async fn authorize_governance(
     context: &AuthorizationContext,
     permission: ManagementPermission,
 ) -> Result<(), ApiError> {
+    authorize_permission(state, context, permission.as_str()).await
+}
+
+/// Permission-key guard shared by every management route (PLAN-0013 §9):
+/// identical evaluation, metrics, and error mapping as
+/// [`authorize_governance`], but driven by a catalog permission key instead
+/// of the fixed `ManagementPermission` enum. The IAM management surface
+/// uses this with its catalog keys (`identity.*`, `organization.*`,
+/// `policy.*`); governance routes keep calling
+/// [`authorize_governance`], which delegates here with
+/// `ManagementPermission::as_str()` — one shared decision path, no
+/// behavior fork.
+pub async fn authorize_permission(
+    state: &AppState,
+    context: &AuthorizationContext,
+    permission: &str,
+) -> Result<(), ApiError> {
     let Some(access) = state.access.as_ref() else {
         tracing::error!("platform authorization services are not configured; rejecting request");
         return Err(ApiError::from(AppError::Forbidden(
@@ -150,10 +167,7 @@ pub async fn authorize_governance(
         )));
     };
     let started = Instant::now();
-    let outcome = access
-        .authorize
-        .check(context, permission.as_str(), None)
-        .await;
+    let outcome = access.authorize.check(context, permission, None).await;
     crate::metrics::record_authorization_duration(started.elapsed());
     let (allowed, reason) = match &outcome {
         Ok(decision) => (decision.allowed, decision.reason),
@@ -174,6 +188,43 @@ pub async fn authorize_governance(
     Err(ApiError::from(AppError::Forbidden(
         "management permission required".to_string(),
     )))
+}
+
+/// Composition-root bridge implementing the organization
+/// `TenantMembershipReader` port over the Identity context's `TenantAccess`
+/// use case (organization ports contract: "implemented in the composition
+/// root over the Identity context (never by reading identity tables)").
+/// Only an Active user with an Active tenant membership counts as a member;
+/// suspension and disable both answer "not a member".
+pub struct IdentityTenantMembershipBridge {
+    checker: Arc<TenantAccessChecker>,
+}
+
+impl IdentityTenantMembershipBridge {
+    #[must_use]
+    pub fn new(checker: Arc<TenantAccessChecker>) -> Self {
+        Self { checker }
+    }
+}
+
+#[async_trait::async_trait]
+impl organization::ports::TenantMembershipReader for IdentityTenantMembershipBridge {
+    async fn is_active_member(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, OrganizationStoreError> {
+        self.checker
+            .check(tenant_id, user_id)
+            .await
+            .map(|access| access.reason == TenantAccessReason::Active)
+            .map_err(|error| match error {
+                identity::application::TenantAccessError::Unavailable => {
+                    OrganizationStoreError::Unavailable
+                }
+                identity::application::TenantAccessError::Failed => OrganizationStoreError::Failed,
+            })
+    }
 }
 
 /// Composition-root bridge implementing the policy `SubjectStatusPort` over

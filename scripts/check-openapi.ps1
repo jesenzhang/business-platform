@@ -19,7 +19,10 @@ $requiredPaths = @(
     "/api/v1/documents/{documentId}/processing-jobs",
     "/api/v1/operations/overview",
     "/api/v1/admin/integrity/findings",
-    "/api/v1/admin/audit-events"
+    "/api/v1/admin/audit-events",
+    "/api/v1/admin/users",
+    "/api/v1/admin/roles",
+    "/api/v1/admin/role-bindings"
 )
 foreach ($requiredPath in $requiredPaths) {
     if ($null -eq $document.paths.$requiredPath) {

@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+pub mod iam;
+
+pub use iam::*;
+
 pub const API_VERSION: &str = "v1";
 pub const OPENAPI_TITLE: &str = "Business Platform Public API";
 pub const OPENAPI_VERSION: &str = "3.1.0";

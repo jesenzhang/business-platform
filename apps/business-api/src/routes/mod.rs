@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod documents;
 pub mod health;
+pub mod iam_admin;
 mod operations;
 pub mod processing;
 mod public_dto;
@@ -110,6 +111,10 @@ pub fn create_router(
             "/api/v1/admin/audit/verify-chain",
             axum::routing::post(admin::verify_audit_chain),
         )
+        // PLAN-0013 Stage 8: minimal IAM management surface. Same protected
+        // chain (auth → platform authorization) as the governance routes;
+        // each handler enforces its own catalog permission key.
+        .merge(iam_admin::router())
         // Authentication runs first; the platform-authorization middleware
         // only ever sees requests that already carry an
         // `AuthenticatedPrincipal` (PLAN-0013 §5). In Tower/Axum the last

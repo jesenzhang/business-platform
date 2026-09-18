@@ -237,6 +237,7 @@ where
         readiness: ports,
         storage: None,
         access: Some(test_access()),
+        admin: None,
     });
     let auth_config = AuthMiddlewareConfig {
         dev_auth_enabled: false,

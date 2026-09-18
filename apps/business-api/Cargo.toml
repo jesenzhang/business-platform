@@ -64,6 +64,7 @@ policy-sqlite = { workspace = true }
 
 [dev-dependencies]
 identity = { workspace = true, features = ["testing"] }
+organization = { workspace = true, features = ["testing"] }
 policy = { workspace = true, features = ["testing"] }
 identity-authorization-contracts = { workspace = true }
 tower = { version = "0.5", features = ["util"] }

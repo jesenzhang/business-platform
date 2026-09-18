@@ -152,6 +152,7 @@ fn upload_router(
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
         storage: Some(StorageServices { objects }),
         access: Some(test_access()),
+        admin: None,
     });
     routes::create_router(
         state,
