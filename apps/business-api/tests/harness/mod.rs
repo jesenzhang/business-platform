@@ -581,4 +581,60 @@ pub async fn run_grant_lifecycle(app: &TestApp, chain: &str) {
         StatusCode::FORBIDDEN,
         "revocation flips immediately"
     );
+
+    // 8. Durable audit evidence for the chain itself: every lifecycle
+    //    command left an audit row inside its own tenant (same-transaction
+    //    writes), and the public audit payload carries only the whitelisted
+    //    detail fields — never bearer tokens, raw external subjects, or
+    //    store internals.
+    for action in [
+        "identity.membership.created",
+        "identity.membership.suspended",
+        "identity.membership.reactivated",
+        "policy.role.created",
+        "policy.binding.created",
+        "policy.binding.revoked",
+    ] {
+        let (status, page) = get_as(
+            app,
+            &format!("/api/v1/admin/audit-events?action={action}&limit=50"),
+            ROOT,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "audit trail for {action}");
+        let items = data(&page)["items"]
+            .as_array()
+            .unwrap_or_else(|| unreachable!("audit items for {action}: {page}"));
+        assert!(
+            !items.is_empty(),
+            "chain step {action} must leave an audit row"
+        );
+        assert!(
+            items.iter().all(|event| event["action"] == json!(action)),
+            "audit action filter for {action} matched other rows: {page}"
+        );
+    }
+
+    let (status, page) = get_as(app, "/api/v1/admin/audit-events?limit=100", ROOT).await;
+    assert_eq!(status, StatusCode::OK);
+    let rendered = page.to_string().to_lowercase();
+    for marker in [
+        "eyJhbGciOi",    // JWT header prefix: bearer tokens must never be recorded
+        "authorization", // auth header echoes
+        "password",
+        "secret",
+        "postgres://", // store internals / connection strings
+        "sqlite",
+    ] {
+        assert!(
+            !rendered.contains(marker),
+            "audit payload leaked marker {marker}: {rendered}"
+        );
+    }
+    for subject in [ROOT, &staff_subject] {
+        assert!(
+            !rendered.contains(&subject.to_lowercase()),
+            "audit payload leaked raw external subject {subject}"
+        );
+    }
 }

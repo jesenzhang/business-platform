@@ -1302,9 +1302,10 @@ async fn system_role_mutation_is_rejected() {
         ),
     )
     .await;
-    assert!(
-        status.is_client_error(),
-        "system role rename must be rejected, got {status}"
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "system role rename must be rejected as immutable, got {status}"
     );
     let (status, _) = call(
         router,
@@ -1316,9 +1317,10 @@ async fn system_role_mutation_is_rejected() {
         ),
     )
     .await;
-    assert!(
-        status.is_client_error(),
-        "system role permission replace must be rejected, got {status}"
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "system role permission replace must be rejected as immutable, got {status}"
     );
 }
 

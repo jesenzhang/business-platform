@@ -60,10 +60,10 @@ async fn no_bootstrap_means_no_admin_and_no_http_bootstrap_surface() {
         ),
     )
     .await;
-    assert_ne!(
+    assert_eq!(
         status,
-        StatusCode::CREATED,
-        "no bootstrap=true escape hatch"
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "the strict membership schema rejects a bootstrap=true escape hatch outright"
     );
 }
 
