@@ -55,13 +55,14 @@ export function RolesPage() {
   const [form, setForm] = useState({ stable_key: '', display_name: '' })
   const [selected, setSelected] = useState<string[]>([])
   const [editRoleId, setEditRoleId] = useState<string | null>(null)
+  const [editSelected, setEditSelected] = useState<string[]>([])
   const create = useMutation({
     mutationFn: () => createRole({ stable_key: form.stable_key, display_name: form.display_name, permission_keys: selected }),
     onSuccess: () => { setForm({ stable_key: '', display_name: '' }); setSelected([]); void queryClient.invalidateQueries({ queryKey: ['iam-roles'] }) },
   })
   const setPermissions = useMutation({
     mutationFn: ({ roleId, keys, version }: { roleId: string; keys: string[]; version: number }) => setRolePermissions(roleId, keys, version),
-    onSuccess: () => { setEditRoleId(null); setSelected([]); void queryClient.invalidateQueries({ queryKey: ['iam-roles'] }) },
+    onSuccess: () => { setEditRoleId(null); setEditSelected([]); void queryClient.invalidateQueries({ queryKey: ['iam-roles'] }) },
   })
   const disable = useMutation({
     mutationFn: ({ roleId, version }: { roleId: string; version: number }) => updateRole(roleId, { status: 'disabled', expected_version: version }),
@@ -73,6 +74,9 @@ export function RolesPage() {
   const catalog = permissionsQuery.data.filter((permission) => permission.active)
   const editing = editRoleId ? rolesQuery.data.find((role) => role.role_id === editRoleId) : null
   const toggleSelected = (permissionKey: string, checked: boolean) => setSelected((previous) => checked ? Array.from(new Set([...previous, permissionKey])) : previous.filter((key) => key !== permissionKey))
+  const toggleEditSelected = (permissionKey: string, checked: boolean) => setEditSelected((previous) => checked ? Array.from(new Set([...previous, permissionKey])) : previous.filter((key) => key !== permissionKey))
+  const closeEdit = () => { setEditRoleId(null); setEditSelected([]) }
+  const openEdit = (roleId: string, permissionKeys: string[]) => { setEditRoleId(roleId); setEditSelected(permissionKeys) }
   return <>
     <PageHeader eyebrow="POLICY MANAGEMENT" title="Roles & permissions" description="Roles grant permission keys inside the policy context. System roles are immutable by contract; every mutation is permissioned, versioned, and audited." />
     <article className="panel"><div className="panel-heading"><div><h2>Create a tenant role</h2><p>Tick the permission keys this role should carry, then create. Permission sets are replaced transactionally, never appended blindly.</p></div></div>
@@ -81,10 +85,10 @@ export function RolesPage() {
       <MutationError {...create} />
     </article>
     <article className="panel"><div className="panel-heading"><div><h2>Registered roles</h2><p>{rolesQuery.data.length} roles visible in this tenant</p></div></div>
-      {rolesQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>Role</th><th>Status</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>{rolesQuery.data.map((role) => <tr key={role.role_id}><td><span className="table-primary">{role.display_name}</span><span className="table-secondary mono">{role.stable_key}{role.system ? ' · system' : ''}</span></td><td><StatusPill value={role.status} /></td><td>{role.permission_keys.length ? <span className="mono">{role.permission_keys.join(', ')}</span> : <span className="subtle">none</span>}</td><td><div className="button-row compact">{!role.system && <button className="secondary-button" onClick={() => { setEditRoleId(editRoleId === role.role_id ? null : role.role_id); setSelected([]) }}>{editRoleId === role.role_id ? 'Cancel' : 'Edit permissions'}</button>}{!role.system && role.status === 'active' && <button className="secondary-button" disabled={disable.isPending} onClick={() => disable.mutate({ roleId: role.role_id, version: role.version })}>Disable</button>}{role.system && <span className="subtle">immutable</span>}</div></td></tr>)}</tbody></table></div> : <Empty>No roles are registered in this tenant.</Empty>}
+      {rolesQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>Role</th><th>Status</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>{rolesQuery.data.map((role) => <tr key={role.role_id}><td><span className="table-primary">{role.display_name}</span><span className="table-secondary mono">{role.stable_key}{role.system ? ' · system' : ''}</span></td><td><StatusPill value={role.status} /></td><td>{role.permission_keys.length ? <span className="mono">{role.permission_keys.join(', ')}</span> : <span className="subtle">none</span>}</td><td><div className="button-row compact">{!role.system && <button className="secondary-button" onClick={() => editRoleId === role.role_id ? closeEdit() : openEdit(role.role_id, role.permission_keys)}>{editRoleId === role.role_id ? 'Cancel' : 'Edit permissions'}</button>}{!role.system && role.status === 'active' && <button className="secondary-button" disabled={disable.isPending} onClick={() => disable.mutate({ roleId: role.role_id, version: role.version })}>Disable</button>}{role.system && <span className="subtle">immutable</span>}</div></td></tr>)}</tbody></table></div> : <Empty>No roles are registered in this tenant.</Empty>}
       {editing && <div className="panel nested-panel"><div className="panel-heading"><div><h2>Permissions for {editing.display_name}</h2><p>Set replace at optimistic version v{editing.version}. Unchecking a key you currently hold can lock you out — the self-escalation guard prevents the reverse.</p></div></div>
-        <div className="chip-grid">{catalog.map((permission) => <label key={permission.key} className="chip"><input type="checkbox" defaultChecked={editing.permission_keys.includes(permission.key)} onChange={(event) => toggleSelected(permission.key, event.target.checked)} /><span>{permission.key}</span></label>)}</div>
-        <div className="button-row"><button className="primary-button" disabled={setPermissions.isPending} onClick={() => setPermissions.mutate({ roleId: editing.role_id, keys: selected, version: editing.version })}>Save permissions</button></div>
+        <div className="chip-grid">{catalog.map((permission) => <label key={permission.key} className="chip"><input type="checkbox" checked={editSelected.includes(permission.key)} onChange={(event) => toggleEditSelected(permission.key, event.target.checked)} /><span>{permission.key}</span></label>)}</div>
+        <div className="button-row"><button className="primary-button" disabled={setPermissions.isPending} onClick={() => setPermissions.mutate({ roleId: editing.role_id, keys: editSelected, version: editing.version })}>Save permissions</button></div>
         <MutationError {...setPermissions} />
       </div>}
       <MutationError {...disable} />
