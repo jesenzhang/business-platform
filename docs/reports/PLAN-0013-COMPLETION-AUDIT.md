@@ -3,8 +3,8 @@
 Document ID: REPORT-PLAN-0013-COMPLETION-AUDIT
 Status: Accepted Candidate (independent review completed 2026-09-19; review
 findings fixed on top of `f3a7544` — see “Independent review amendments
-(2026-09-19)”; CI re-run at the amended head and explicit trunk-integration
-instruction pending; `main` untouched, plan not archived)
+(2026-09-19)”; the amended head is green on CI run `35418654378`; explicit
+trunk-integration instruction pending; `main` untouched, plan not archived)
 Date: 2026-09-18
 Scope: `docs/plans/current/PLAN-0013-identity-and-authorization-foundation.md`
 completion verification on branch
@@ -21,7 +21,7 @@ partial evidence.
 | Base SHA | `a72ec6d2ac832e5bdb10bf5547a5e99fbbcb39bb` |
 | Branch | `feat/PLAN-0013-identity-authorization-foundation` |
 | Candidate SHA (code head) | `f3a7544` (32 commits over base; this audit lands as the 33rd, docs-only) |
-| Branch CI (authoritative for infra-backed gates) | 35370573249 at `f3a7544` — green, all 10 jobs |
+| Branch CI (authoritative for infra-backed gates) | `35418654378` at the review-amended head `1990a33` — green, all 10 jobs (previous candidate head: `35370573249` at `f3a7544`) |
 | Prior branch runs (failure→fix loop) | `35366546137`, `35367327662`, `35367995098` (see CI loop table) |
 
 ## Result
@@ -149,7 +149,6 @@ shapes on the CI runner class.
 | Load/capacity beyond the two perf harnesses | NOT RUN | Pre-production environment with production data shapes |
 | Stage 1–4 fixed-format reviewer verdict documents | NOT PERSISTED as standalone records (findings themselves were fixed in the cited commits) | Reconstruct only if the independent acceptance review requires it |
 | Runtime log-payload leakage scan | NOT RUN — no automated assertion that structured logs omit secrets/internals (code convention plus repository gitleaks only; the audit-response path is now E2E-covered, log sinks are not) | A log-scan fitness test or pre-production log-pipeline assertion |
-| CI at the review-amended head | NOT RUN — fixes landed after green run `35370573249` (`f3a7544`) | Re-run the full branch CI at the amended head before merge |
 
 ## Known limitations (accepted for the candidate)
 
@@ -203,5 +202,8 @@ Remaining LOW findings (PostgreSQL 23505 mapping completeness, SQLite
 checksum verification on read, list-path N+1, `config_digest` field separator,
 idempotency-key wording in fakes, OpenAPI 401 documentation, and the rest of
 the LOW list) were accepted as follow-up items and are not fixed here. The
-full gate set was re-run locally at the amended head; PostgreSQL-gated suites
-and CI remain to be re-run with the amended head (NOT RUN table).
+full gate set was re-run locally at the amended head, and branch CI run
+`35418654378` at `1990a33` is green on all 10 jobs — including the
+`PostgreSQL + MinIO + E2E contracts` integration job (`--include-ignored`)
+that executes the extended `verify_ledger` contract and the audit-evidence
+E2E chain against real `PostgreSQL`.
