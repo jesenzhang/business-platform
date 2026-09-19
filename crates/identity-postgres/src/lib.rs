@@ -1218,7 +1218,10 @@ impl BootstrapLedgerPort for PostgresIdentityStore {
             BootstrapOutcome::Failed => "failed",
         };
         let result = sqlx::query(
-            "INSERT INTO platform_bootstrap_executions (tenant_id, issuer, subject, role_stable_key, config_version, config_digest, outcome, recorded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id, issuer, subject, config_digest) DO NOTHING",
+            // Terminal outcomes are immutable; a recorded `failed` row is
+            // superseded in place so a successful retry converges the
+            // ledger instead of re-running the same digest every restart.
+            "INSERT INTO platform_bootstrap_executions (tenant_id, issuer, subject, role_stable_key, config_version, config_digest, outcome, recorded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id, issuer, subject, config_digest) DO UPDATE SET outcome = excluded.outcome, recorded_at = excluded.recorded_at WHERE platform_bootstrap_executions.outcome = 'failed'",
         )
         .bind(entry.tenant_id)
         .bind(&entry.issuer)

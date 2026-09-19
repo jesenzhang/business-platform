@@ -33,6 +33,7 @@ fn composition(stores: &FakeIdentityStores, policy: &FakePolicyPorts) -> Bootstr
     BootstrapComposition::new(
         Arc::clone(&stores.resolve),
         Arc::clone(&stores.command),
+        Arc::clone(&stores.query),
         Arc::clone(&stores.ledger),
         Arc::clone(&policy.query),
         Arc::clone(&policy.command),

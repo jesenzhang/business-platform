@@ -26,11 +26,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::{MembershipSource, MAX_EXTERNAL_ISSUER_LEN, MAX_EXTERNAL_SUBJECT_LEN};
+use crate::domain::{
+    MembershipSource, MembershipStatus, MAX_EXTERNAL_ISSUER_LEN, MAX_EXTERNAL_SUBJECT_LEN,
+};
 use crate::ports::{
-    BootstrapLedgerEntry, BootstrapLedgerPort, BootstrapOutcome, CreateMembershipCommit,
-    IdentityCommandPort, IdentityResolvePort, IdentityStoreError, MembershipTarget,
-    MutationActorKind, MutationContext, ResolvePrincipalCommit,
+    BootstrapLedgerEntry, BootstrapLedgerPort, BootstrapOutcome, ChangeMembershipStatusCommit,
+    CreateMembershipCommit, IdentityCommandPort, IdentityQueryPort, IdentityResolvePort,
+    IdentityStoreError, MembershipTarget, MutationActorKind, MutationContext,
+    ResolvePrincipalCommit,
 };
 
 use super::resolve::EXTERNAL_IDENTITY_NAMESPACE;
@@ -168,6 +171,7 @@ pub enum BootstrapError {
 pub struct BootstrapAdministrator {
     resolve: Arc<dyn IdentityResolvePort>,
     command: Arc<dyn IdentityCommandPort>,
+    query: Arc<dyn IdentityQueryPort>,
     ledger: Arc<dyn BootstrapLedgerPort>,
     binding: Arc<dyn BootstrapBindingPort>,
 }
@@ -177,12 +181,14 @@ impl BootstrapAdministrator {
     pub fn new(
         resolve: Arc<dyn IdentityResolvePort>,
         command: Arc<dyn IdentityCommandPort>,
+        query: Arc<dyn IdentityQueryPort>,
         ledger: Arc<dyn BootstrapLedgerPort>,
         binding: Arc<dyn BootstrapBindingPort>,
     ) -> Self {
         Self {
             resolve,
             command,
+            query,
             ledger,
             binding,
         }
@@ -322,6 +328,17 @@ impl BootstrapAdministrator {
             Ok(_) | Err(IdentityStoreError::AlreadyExists) => {}
             Err(error) => return Err(map_store_error(error)),
         }
+        // The module contract is an **active** membership, so the create
+        // response is never trusted for status (an idempotent replay
+        // returns the row as it was when first written, and an existing
+        // row may have been suspended between runs): the authoritative
+        // status is read back and a suspended membership is reactivated
+        // through the versioned status-change commit, audited under the
+        // bootstrap actor. A deliberate configuration bump is exactly the
+        // server-side recovery path for a self-suspended sole bootstrap
+        // admin.
+        self.ensure_active_membership(config.tenant_id, user_id, digest, audit, now)
+            .await?;
 
         self.binding
             .bind_bootstrap_role(
@@ -336,6 +353,42 @@ impl BootstrapAdministrator {
                 BootstrapBindingError::Unavailable => BootstrapError::Unavailable,
                 BootstrapBindingError::Failed => BootstrapError::Failed,
             })
+    }
+
+    /// Verify the bootstrap membership is Active; reactivate a suspended
+    /// one with a versioned, bootstrapped, idempotent status change. A
+    /// missing row after a converged create is a store anomaly and fails
+    /// closed.
+    async fn ensure_active_membership(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+        digest: &str,
+        audit: &MutationContext,
+        now: DateTime<Utc>,
+    ) -> Result<(), BootstrapError> {
+        let membership = self
+            .query
+            .get_membership(tenant_id, user_id)
+            .await
+            .map_err(map_store_error)?
+            .ok_or(BootstrapError::Failed)?;
+        if membership.is_active() {
+            return Ok(());
+        }
+        self.command
+            .change_membership_status(ChangeMembershipStatusCommit {
+                tenant_id,
+                user_id,
+                target_status: MembershipStatus::Active,
+                expected_version: membership.version().value(),
+                audit: audit.clone(),
+                idempotency_key: Some(format!("bootstrap-membership-activate|{digest}")),
+                now,
+            })
+            .await
+            .map(|_| ())
+            .map_err(map_store_error)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -441,6 +494,7 @@ mod tests {
         let use_case = BootstrapAdministrator::new(
             Arc::clone(&stores.resolve),
             Arc::clone(&stores.command),
+            Arc::clone(&stores.query),
             Arc::clone(&stores.ledger),
             Arc::clone(&binding) as Arc<dyn BootstrapBindingPort>,
         );
@@ -588,6 +642,109 @@ mod tests {
             .await
             .unwrap_or_else(|err| unreachable!("retry failed: {err}"));
         assert_eq!(outcome, Some(BootstrapOutcome::Executed));
+
+        // The successful retry supersedes the durable failure row: the
+        // ledger's latest entry for this digest is now Executed, so the
+        // deployment stops repeating the failed-retry path every restart.
+        let latest = fixture
+            .stores
+            .ledger
+            .latest_for(cfg.tenant_id, &cfg.issuer, &cfg.subject)
+            .await
+            .unwrap_or_else(|err| unreachable!("ledger read failed: {err}"));
+        assert_eq!(
+            latest.map(|entry| entry.outcome),
+            Some(BootstrapOutcome::Executed),
+            "a successful retry must converge the failed ledger row"
+        );
+
+        // A third run with the unchanged digest is a terminal no-op: it
+        // neither re-executes nor re-binds the role.
+        let third = fixture
+            .use_case
+            .execute(&cfg)
+            .await
+            .unwrap_or_else(|err| unreachable!("no-op run failed: {err}"));
+        assert_eq!(third, Some(BootstrapOutcome::NoOp));
+        assert_eq!(
+            fixture
+                .binding
+                .calls
+                .lock()
+                .map(|calls| calls.len())
+                .unwrap_or_default(),
+            1,
+            "the converged no-op must not re-bind the role"
+        );
+    }
+
+    #[tokio::test]
+    async fn suspended_membership_is_reactivated_by_a_deliberate_bump() {
+        let fixture = fixture();
+        let cfg = config();
+        fixture
+            .use_case
+            .execute(&cfg)
+            .await
+            .unwrap_or_else(|err| unreachable!("bootstrap failed: {err}"));
+
+        // An operator suspends the bootstrap admin's membership.
+        let user = fixture
+            .stores
+            .query
+            .find_user_by_external_identity(&cfg.issuer, &cfg.subject)
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!("bootstrap user must exist"));
+        let membership = fixture
+            .stores
+            .query
+            .get_membership(cfg.tenant_id, user.user_id())
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!("membership must exist"));
+        fixture
+            .stores
+            .command
+            .change_membership_status(ChangeMembershipStatusCommit {
+                tenant_id: cfg.tenant_id,
+                user_id: user.user_id(),
+                target_status: MembershipStatus::Suspended,
+                expected_version: membership.version().value(),
+                audit: MutationContext {
+                    actor_id: Uuid::now_v7().to_string(),
+                    actor_kind: MutationActorKind::User,
+                    operation_id: Uuid::now_v7(),
+                    trace_id: None,
+                    reason: None,
+                },
+                idempotency_key: None,
+                now: Utc::now(),
+            })
+            .await
+            .unwrap_or_else(|_| unreachable!());
+
+        // A deliberate configuration bump re-executes and restores an
+        // *active* membership (the module contract), not merely an
+        // existing row: the bump is the server-side recovery path for a
+        // self-suspended sole bootstrap admin.
+        let outcome = fixture
+            .use_case
+            .execute(&BootstrapAdministratorConfig {
+                version: 2,
+                ..cfg.clone()
+            })
+            .await
+            .unwrap_or_else(|err| unreachable!("re-bootstrap failed: {err}"));
+        assert_eq!(outcome, Some(BootstrapOutcome::Executed));
+        let membership = fixture
+            .stores
+            .query
+            .get_membership(cfg.tenant_id, user.user_id())
+            .await
+            .unwrap_or_else(|_| unreachable!())
+            .unwrap_or_else(|| unreachable!("membership must exist"));
+        assert_eq!(membership.status(), MembershipStatus::Active);
     }
 
     #[tokio::test]

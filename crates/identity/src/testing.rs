@@ -18,7 +18,7 @@ use crate::domain::{
     ExternalIdentity, MembershipStatus, PlatformUser, TenantMembership, UserLifecycleStatus,
 };
 use crate::ports::{
-    BootstrapLedgerEntry, BootstrapLedgerPort, ChangeMembershipStatusCommit,
+    BootstrapLedgerEntry, BootstrapLedgerPort, BootstrapOutcome, ChangeMembershipStatusCommit,
     ChangeUserStatusCommit, CreateMembershipCommit, IdentityCommandPort, IdentityQueryPort,
     IdentityResolvePort, IdentityStoreError, KeysetPosition, MembershipCommitOutcome,
     MembershipRecord, MembershipTarget, MutationContext, ResolvePrincipalCommit, ResolvedPrincipal,
@@ -761,13 +761,18 @@ impl BootstrapLedgerPort for FakeLedger {
     async fn record(&self, entry: &BootstrapLedgerEntry) -> Result<bool, IdentityStoreError> {
         let mut state = self.state.lock().map_err(|_| IdentityStoreError::Failed)?;
         check_poisoned(&state)?;
-        let duplicate = state.ledger.iter().any(|existing| {
+        if let Some(existing) = state.ledger.iter_mut().find(|existing| {
             existing.tenant_id == entry.tenant_id
                 && existing.issuer == entry.issuer
                 && existing.subject == entry.subject
                 && existing.config_digest == entry.config_digest
-        });
-        if duplicate {
+        }) {
+            // Mirror the adapter upsert: terminal outcomes are immutable,
+            // a recorded `failed` row is superseded in place.
+            if existing.outcome == BootstrapOutcome::Failed {
+                *existing = entry.clone();
+                return Ok(true);
+            }
             return Ok(false);
         }
         state.ledger.push(entry.clone());

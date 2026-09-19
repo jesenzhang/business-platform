@@ -373,6 +373,7 @@ pub async fn build_app(config: &BusinessApiConfig) -> anyhow::Result<axum::Route
     let bootstrap = BootstrapComposition::new(
         Arc::clone(&access_adapters.resolve),
         Arc::clone(&access_adapters.command),
+        Arc::clone(&access_adapters.identity_query),
         Arc::clone(&access_adapters.ledger),
         Arc::clone(&access_adapters.policy_query),
         Arc::clone(&access_adapters.policy_command),

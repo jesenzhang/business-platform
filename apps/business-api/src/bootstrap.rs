@@ -30,10 +30,10 @@ use identity::application::{
     BootstrapBindingPort, BootstrapError, BOOTSTRAP_ROLE_STABLE_KEY,
 };
 use identity::ports::{
-    BootstrapLedgerEntry, BootstrapLedgerPort, BootstrapOutcome, CreateMembershipCommit,
-    IdentityCommandPort, IdentityResolvePort, IdentityStoreError, MembershipTarget,
-    MutationActorKind as IdentityMutationActorKind, MutationContext as IdentityMutationContext,
-    ResolvePrincipalCommit,
+    BootstrapLedgerEntry, BootstrapLedgerPort, BootstrapOutcome, ChangeMembershipStatusCommit,
+    CreateMembershipCommit, IdentityCommandPort, IdentityQueryPort, IdentityResolvePort,
+    IdentityStoreError, MembershipTarget, MutationActorKind as IdentityMutationActorKind,
+    MutationContext as IdentityMutationContext, ResolvePrincipalCommit,
 };
 use policy::{
     application::{BindRole, BindRoleCommand, PolicyApplicationError},
@@ -137,15 +137,18 @@ impl BootstrapBindingPort for PolicyBootstrapBinding {
 pub struct BootstrapComposition {
     resolve: Arc<dyn IdentityResolvePort>,
     command: Arc<dyn IdentityCommandPort>,
+    identity_query: Arc<dyn IdentityQueryPort>,
     ledger: Arc<dyn BootstrapLedgerPort>,
     binding: Arc<dyn BootstrapBindingPort>,
 }
 
 impl BootstrapComposition {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         resolve: Arc<dyn IdentityResolvePort>,
         command: Arc<dyn IdentityCommandPort>,
+        identity_query: Arc<dyn IdentityQueryPort>,
         ledger: Arc<dyn BootstrapLedgerPort>,
         query: Arc<dyn PolicyQueryPort>,
         policy_command: Arc<dyn PolicyCommandPort>,
@@ -156,6 +159,7 @@ impl BootstrapComposition {
         Self {
             resolve,
             command,
+            identity_query,
             ledger,
             binding: Arc::new(PolicyBootstrapBinding::new(bind_role)),
         }
@@ -170,6 +174,7 @@ impl BootstrapComposition {
         let use_case = BootstrapAdministrator::new(
             Arc::clone(&self.resolve),
             Arc::clone(&self.command),
+            Arc::clone(&self.identity_query),
             Arc::clone(&self.ledger),
             Arc::clone(&self.binding),
         );
@@ -382,6 +387,11 @@ impl BootstrapComposition {
             Ok(_) | Err(IdentityStoreError::AlreadyExists) => {}
             Err(error) => return Err(map_store_error(error)),
         }
+        // Mirror of the production use case: the contract is an *active*
+        // membership, so the status is read back and a suspended row is
+        // reactivated through the versioned status-change commit.
+        self.ensure_active_membership(config.tenant_id, user_id, digest, audit, now)
+            .await?;
 
         self.binding
             .bind_bootstrap_role(
@@ -396,6 +406,41 @@ impl BootstrapComposition {
                 BootstrapBindingError::Unavailable => BootstrapError::Unavailable,
                 BootstrapBindingError::Failed => BootstrapError::Failed,
             })
+    }
+
+    /// Mirror of the production use case's `ensure_active_membership`:
+    /// verify the membership is Active and reactivate a suspended one; a
+    /// missing row fails closed.
+    async fn ensure_active_membership(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+        digest: &str,
+        audit: &IdentityMutationContext,
+        now: DateTime<Utc>,
+    ) -> Result<(), BootstrapError> {
+        let membership = self
+            .identity_query
+            .get_membership(tenant_id, user_id)
+            .await
+            .map_err(map_store_error)?
+            .ok_or(BootstrapError::Failed)?;
+        if membership.is_active() {
+            return Ok(());
+        }
+        self.command
+            .change_membership_status(ChangeMembershipStatusCommit {
+                tenant_id,
+                user_id,
+                target_status: identity::domain::MembershipStatus::Active,
+                expected_version: membership.version().value(),
+                audit: audit.clone(),
+                idempotency_key: Some(format!("bootstrap-membership-activate|{digest}")),
+                now,
+            })
+            .await
+            .map(|_| ())
+            .map_err(map_store_error)
     }
 
     #[allow(clippy::too_many_arguments)]

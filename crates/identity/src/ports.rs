@@ -399,8 +399,13 @@ pub trait BootstrapLedgerPort: Send + Sync {
         subject: &str,
     ) -> Result<Option<BootstrapLedgerEntry>, IdentityStoreError>;
 
-    /// Append a ledger entry with a uniqueness rule on
-    /// (tenant, issuer, subject, `config_digest)`: an existing identical digest
-    /// converges (no duplicate row, `Ok(false)`), otherwise `Ok(true)`.
+    /// Record a bootstrap outcome keyed on
+    /// (tenant, issuer, subject, `config_digest`). A terminal outcome
+    /// (`executed` / `no_op`) is immutable: an identical digest converges
+    /// (no duplicate row, `Ok(false)`), otherwise `Ok(true)`. A previously
+    /// recorded `failed` outcome is superseded in place by the newest
+    /// attempt (`Ok(true)`): a retried bootstrap must converge the ledger,
+    /// otherwise every restart would re-execute the same failed digest
+    /// while the durable record still claims failure.
     async fn record(&self, entry: &BootstrapLedgerEntry) -> Result<bool, IdentityStoreError>;
 }

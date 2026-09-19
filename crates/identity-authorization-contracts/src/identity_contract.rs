@@ -770,6 +770,61 @@ async fn verify_ledger(cx: &Contract, ports: &IdentityContractPorts) -> Result<(
         latest.config_version == 2,
         "latest must surface the newest recorded execution",
     )?;
+    // Ledger supersede semantics (2026-09-19 review): a recorded `failed`
+    // outcome must be superseded in place by the successful retry for the
+    // same digest — otherwise every restart re-executes a failed digest
+    // while the durable record still claims failure. Terminal outcomes stay
+    // immutable afterwards.
+    let failed = BootstrapLedgerEntry {
+        config_digest: "c".repeat(64),
+        outcome: BootstrapOutcome::Failed,
+        recorded_at: cx.at(52),
+        ..entry.clone()
+    };
+    check(
+        ports
+            .ledger
+            .record(&failed)
+            .await
+            .map_err(|error| format!("ledger record failed: {error}"))?,
+        "a failed execution must insert",
+    )?;
+    let superseded = BootstrapLedgerEntry {
+        outcome: BootstrapOutcome::Executed,
+        recorded_at: cx.at(53),
+        ..failed.clone()
+    };
+    check(
+        ports
+            .ledger
+            .record(&superseded)
+            .await
+            .map_err(|error| format!("ledger supersede failed row: {error}"))?,
+        "a successful retry must supersede the failed row for the same digest",
+    )?;
+    let latest = ports
+        .ledger
+        .latest_for(cx.tenant_a, &issuer, subject)
+        .await
+        .map_err(|error| format!("ledger latest supersede: {error}"))?
+        .ok_or("ledger row must be readable")?;
+    check(
+        latest.outcome == BootstrapOutcome::Executed
+            && latest.config_digest == failed.config_digest,
+        "the superseded row must surface as executed for the retried digest",
+    )?;
+    check(
+        !ports
+            .ledger
+            .record(&BootstrapLedgerEntry {
+                outcome: BootstrapOutcome::Failed,
+                recorded_at: cx.at(54),
+                ..superseded.clone()
+            })
+            .await
+            .map_err(|error| format!("ledger terminal immutability: {error}"))?,
+        "a terminal executed row must not regress to failed",
+    )?;
     Ok(())
 }
 
