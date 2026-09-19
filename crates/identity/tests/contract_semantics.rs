@@ -10,9 +10,9 @@ use std::sync::Arc;
 use identity::application::{
     ChangeTenantMembershipStatus, ChangeTenantMembershipStatusCommand, ChangeUserStatus,
     ChangeUserStatusCommand, ChangeUserStatusError, CreateMembershipTarget, CreateTenantMembership,
-    CreateTenantMembershipCommand, IdentityQueryError, ListMemberships, ListTenantUsers,
-    ResolveAuthenticatedUser, ResolveAuthenticatedUserCommand, ResolveCallerError,
-    IDENTITY_MAX_PAGE_SIZE,
+    CreateTenantMembershipCommand, CreateTenantMembershipError, IdentityQueryError,
+    ListMemberships, ListTenantUsers, ResolveAuthenticatedUser, ResolveAuthenticatedUserCommand,
+    ResolveCallerError, IDENTITY_MAX_PAGE_SIZE,
 };
 use identity::domain::{
     MembershipSource, MembershipStatus, PlatformUser, TenantMembership, UserLifecycleStatus,
@@ -190,6 +190,27 @@ async fn membership_by_subject_converges_with_later_login_resolution() {
         .expect("resolve ok");
     assert_eq!(resolved.user.user_id(), outcome.membership.user_id());
     assert!(!resolved.provisioned);
+}
+
+#[tokio::test]
+async fn membership_create_rejects_control_characters_in_reason() {
+    let stores = FakeIdentityStores::default();
+    let create = CreateTenantMembership::new(Arc::clone(&stores.command));
+    // Reason boundary validation must match the sibling status-change use
+    // case: injection is rejected before anything reaches the store.
+    let sneaky = CreateTenantMembershipCommand {
+        tenant_id: tenant_a(),
+        target: CreateMembershipTarget::UserId(Uuid::from_bytes([0x22; 16])),
+        actor_user_id: user_one(),
+        idempotency_key: Some("onboard-1".to_string()),
+        reason: Some("evil\u{0}detail".to_string()),
+        source: MembershipSource::Admin,
+    };
+    assert!(matches!(
+        create.execute(sneaky).await,
+        Err(CreateTenantMembershipError::Validation(_))
+    ));
+    assert!(stores.audit_records().is_empty());
 }
 
 #[tokio::test]

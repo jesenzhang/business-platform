@@ -195,6 +195,10 @@ impl CreateTenantMembership {
         let target = map_target(command.target).map_err(CreateTenantMembershipError::Validation)?;
         validate_idempotency_key(command.idempotency_key.as_ref())
             .map_err(CreateTenantMembershipError::Validation)?;
+        if let Some(reason) = &command.reason {
+            validate_text_field(reason, MAX_REASON_LEN, "reason")
+                .map_err(CreateTenantMembershipError::Validation)?;
+        }
 
         self.command_port
             .create_membership(CreateMembershipCommit {
