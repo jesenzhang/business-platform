@@ -1,12 +1,14 @@
 # PLAN-0013 Completion Audit
 
 Document ID: REPORT-PLAN-0013-COMPLETION-AUDIT
-Status: Accepted Candidate (independent review completed 2026-09-19; review
-findings fixed on top of `f3a7544` — see “Independent review amendments
-(2026-09-19)”; the amended head is green on CI run `35418654378`; explicit
-trunk-integration instruction pending; `main` untouched, plan not archived)
+Status: Integrated / Archived (independent review completed 2026-09-19;
+review findings fixed on top of `f3a7544` — see “Independent review
+amendments (2026-09-19)”; the amended head is green on CI run
+`35418654378`; explicit trunk-integration instruction received 2026-09-19:
+merged to `main` via PR #17, plan archived to
+`docs/plans/archive/2026/PLAN-0013-identity-and-authorization-foundation.md`)
 Date: 2026-09-18
-Scope: `docs/plans/current/PLAN-0013-identity-and-authorization-foundation.md`
+Scope: `docs/plans/archive/2026/PLAN-0013-identity-and-authorization-foundation.md`
 completion verification on branch
 `feat/PLAN-0013-identity-authorization-foundation` (33 commits over
 `origin/main` `a72ec6d`). This report records what was executed, what passed,
@@ -207,3 +209,14 @@ full gate set was re-run locally at the amended head, and branch CI run
 `PostgreSQL + MinIO + E2E contracts` integration job (`--include-ignored`)
 that executes the extended `verify_ledger` contract and the audit-evidence
 E2E chain against real `PostgreSQL`.
+
+## Integration (2026-09-19)
+
+Explicit trunk-integration instruction received (“合并并推送”). Integration was
+executed per repo convention (GitHub PR merge, per `ARCHITECTURE_STATUS.md`
+集成方式): PR #17 from `feat/PLAN-0013-identity-authorization-foundation`
+head `afa1643` (review fixes `3e91f5e..afa1643` over code head `1990a33`),
+merge commit recorded in the `ARCHITECTURE_STATUS.md` registry line. The plan
+moved to `docs/plans/archive/2026/` and living indexes (`docs/README.md`,
+`docs/plans/README.md`, `docs/architecture/ARCHITECTURE_STATUS.md`) were
+synchronized to `Integrated / Archived` in the same PR.

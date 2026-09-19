@@ -24,10 +24,9 @@ plans/
 
 ## 当前计划与顺序
 
-1. [PLAN-0013 Identity and Authorization Foundation](current/PLAN-0013-identity-and-authorization-foundation.md)：Proposed / NEXT CANDIDATE。实现外部 OIDC 之后的平台内用户映射、Tenant Membership、最小组织结构、Role/Permission/RoleBinding/Resource Scope 与统一 Policy Decision，为 Contract 和 Agent 建立真实授权基础。
-2. **Contract Business Vertical Slice**：下一计划，在 PLAN-0013 集成后创建并激活。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础。
-3. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。在 Identity/Authorization 与首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
-4. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
+1. **Contract Business Vertical Slice**：当前下一计划，待创建并激活（前置 PLAN-0013 已 Integrated）。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础。
+2. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
+3. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
 
 ## 已归档计划
 
@@ -42,5 +41,6 @@ plans/
 - [PLAN-0010](archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：Integrated。
 - [PLAN-0011](archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：Integrated / Archived。
 - [PLAN-0012](archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：Integrated / Archived；v0.1 预生产发布，merge 2383651，Main CI 33705531597，v0.1 tag → 2383651。
+- [PLAN-0013](archive/2026/PLAN-0013-identity-and-authorization-foundation.md)：Integrated / Archived；独立审阅修订（C1+M1-M5）完成，代码 head `1990a33`，CI `35418654378` 十作业全绿，PR #17 合入 main；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`。
 
 归档路径按年份组织，文档生命周期遵循 [DOCUMENT_MANAGEMENT.md](../governance/DOCUMENT_MANAGEMENT.md)。

@@ -1,6 +1,6 @@
 # PLAN-0013: Identity and Authorization Foundation
 
-> Status: Accepted Candidate (implementation complete on branch `feat/PLAN-0013-identity-authorization-foundation`, CI green at `f3a7544`; completion audit `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`; not merged to main, awaiting independent review and explicit integration instruction)  
+> Status: Integrated / Archived (independent review completed 2026-09-19 with C1 + M1-M5 fixed and re-verified; merged to main via PR #17, code head `1990a33`, CI run `35418654378` green on all 10 jobs; completion audit `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`)  
 > Revision: 0  
 > Date: 2026-09-18  
 > Owner: Platform Foundation / Identity & Policy  
