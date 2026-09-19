@@ -540,10 +540,20 @@ function Assert-SourceScan {
 
 # Rule 1+4: business modules and HTTP handlers never touch the RoleBinding
 # table or parse role strings — RoleBinding is read only through Policy ports.
+# Adding a business-module crate requires extending this directory list;
+# an omitted crate is never scanned (silent fail-open). Keep it in sync
+# with the IAM forbidden-business-dependency list in
+# crates/architecture-check/src/lib.rs.
 Assert-SourceScan -Label "IAM role-authority scan" `
     -Directories @(
         "crates/contract", "crates/customer", "crates/finance",
-        "crates/project", "crates/approval", "apps/business-api/src/routes"
+        "crates/project", "crates/approval", "crates/workflow",
+        "crates/agent-integration", "crates/notification",
+        "crates/document", "crates/document-sqlite",
+        "crates/document-postgres", "crates/document-persistence-contracts",
+        "crates/document-processing", "crates/document-processing-sqlite",
+        "crates/document-processing-postgres", "crates/document-processing-contracts",
+        "apps/business-api/src/routes"
     ) `
     -Patterns @("role_bindings", "roles\(\)\s*\.\s*contains")
 

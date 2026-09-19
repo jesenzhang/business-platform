@@ -143,7 +143,10 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
         // PLAN-0013 fitness: platform IAM contexts (identity/organization/
         // policy, core and adapters alike) must never depend on business
         // module crates — authority infrastructure cannot know its tenants'
-        // business domains.
+        // business domains. This list is name-based, so adding a new
+        // business-module crate REQUIRES extending it here (and the matching
+        // scan directories in scripts/check-architecture.ps1); an omitted
+        // name fails open silently.
         if matches!(
             architecture.context_name(),
             Some("identity-management" | "organization" | "policy")
@@ -152,9 +155,19 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                 "contract",
                 "customer",
                 "finance",
+                "project",
                 "approval",
                 "workflow",
+                "notification",
                 "agent-integration",
+                "document",
+                "document-sqlite",
+                "document-postgres",
+                "document-persistence-contracts",
+                "document-processing",
+                "document-processing-sqlite",
+                "document-processing-postgres",
+                "document-processing-contracts",
             ] {
                 if direct.contains(dependency) {
                     violations.push(format!(
@@ -274,14 +287,27 @@ mod tests {
     #[test]
     fn rejects_iam_dependency_on_business_modules() {
         let metadata = parse(
-            r#"{"packages":[{"name":"policy","manifest_path":"C:/repo/crates/policy/Cargo.toml","metadata":{"architecture":{"bounded_context":"policy","layer":"domain-and-application"}},"dependencies":[{"name":"contract","path":"C:/repo/crates/contract"}]}]}"#,
+            r#"{"packages":[{"name":"policy","manifest_path":"C:/repo/crates/policy/Cargo.toml","metadata":{"architecture":{"bounded_context":"policy","layer":"domain-and-application"}},"dependencies":[{"name":"contract","path":"C:/repo/crates/contract"},{"name":"document","path":"C:/repo/crates/document"},{"name":"document-processing","path":"C:/repo/crates/document-processing"},{"name":"notification","path":"C:/repo/crates/notification"},{"name":"project","path":"C:/repo/crates/project"}]}]}"#,
         );
         let violations = match validate(&metadata) {
             Ok(()) => unreachable!(),
             Err(violations) => violations,
         };
-        assert!(violations
-            .iter()
-            .any(|violation| violation.contains("forbidden business-module dependency contract")));
+        for dependency in [
+            "contract",
+            "document",
+            "document-processing",
+            "notification",
+            "project",
+        ] {
+            assert!(
+                violations
+                    .iter()
+                    .any(|violation| violation.contains(&format!(
+                        "forbidden business-module dependency {dependency}"
+                    ))),
+                "missing violation for {dependency}"
+            );
+        }
     }
 }
