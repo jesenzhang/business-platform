@@ -216,7 +216,8 @@ Explicit trunk-integration instruction received (“合并并推送”). Integra
 executed per repo convention (GitHub PR merge, per `ARCHITECTURE_STATUS.md`
 集成方式): PR #17 from `feat/PLAN-0013-identity-authorization-foundation`
 head `afa1643` (review fixes `3e91f5e..afa1643` over code head `1990a33`),
-merge commit recorded in the `ARCHITECTURE_STATUS.md` registry line. The plan
+merge commit `d3a919691b5e7b1de6342b08b83e0fbcd2aa54a9` (2026-09-19);
+Main CI `35426688873` green on all 10 jobs. The plan
 moved to `docs/plans/archive/2026/` and living indexes (`docs/README.md`,
 `docs/plans/README.md`, `docs/architecture/ARCHITECTURE_STATUS.md`) were
 synchronized to `Integrated / Archived` in the same PR.

@@ -383,7 +383,7 @@ Identity / Authorization 现状：
 - ADR-0024 已接受，production OIDC authentication 已实现；
 - PLAN-0013（Identity and Authorization Foundation）已 Integrated / Archived：实施分支
   `feat/PLAN-0013-identity-and-authorization-foundation` 经独立审阅修订（C1 + M1-M5）后，
-  以代码 head `1990a33` 经 PR #17 合入 main：
+  以代码 head `1990a33` 经 PR #17 合入 main（merge `d3a9196`，Main CI `35426688873` 全绿）：
   `crates/identity`、`crates/organization`、`crates/policy` 承载
   PlatformUser/TenantMembership/OrganizationUnit+Member/Role/Permission/
   RoleBinding/ResourceScope 与统一 default-DENY Policy（Authorize/
@@ -551,7 +551,7 @@ PLAN-0005：Integrated / Archived（main `9056db7a1ff780ecbaaa7afb81e070e7f77c45
 PLAN-0008：Integrated / Archived（Base `35d1d01fd49a70ee996fbb5fb72818a632989efe`；Implementation/runtime `70469be26cb009c23f1a77c1553947522ba82aed`；Final Candidate/Integration `7eb5421e492a11c0ac20b17f8fd5c3a034f7a29b`；Feature CI `31353149398`；Main CI `31353409550`；本机 PostgreSQL/MinIO NOT RUN）
 Analytics/Visualization：Baseline（ADR-0017）；运行时实现尚未开始
 PLAN-0006：Revision 1 / Proposed / BLOCKED（ADR-0018/0021/0022/0024；planning base `b9eadf8f1b2b46c88f40f2defc88ffcb8bdb0b34`；activation requires Contract vertical slice Integrated；PLAN-0013 已 Integrated）
-PLAN-0013：Integrated / Archived（Identity and Authorization Foundation；PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/Policy；分支 `feat/PLAN-0013-identity-and-authorization-foundation`，代码 head `1990a33`；独立审阅修订 C1+M1-M5 完成；Feature CI `35418654378` 十作业全绿；经 PR #17 合入 main；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`）
+PLAN-0013：Integrated / Archived（Identity and Authorization Foundation；PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope/Policy；分支 `feat/PLAN-0013-identity-and-authorization-foundation`，代码 head `1990a33`；独立审阅修订 C1+M1-M5 完成；Feature CI `35418654378` 十作业全绿；merge `d3a9196`（PR #17），Main CI `35426688873` 全绿；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`）
 
 PLAN-0007：Integrated / Archived（Business Console、Public REST Contract、CLI、read-only MCP；implementation `ec6cff141a89dcdf5de2f2ea2b8b001384f88755`；completion audit `docs/reports/PLAN-0007-COMPLETION-AUDIT.md`，由 PLAN-0012 M0 完成；全部门禁 PASS 或带原因 NOT RUN，Windows PostgreSQL/MinIO 与本地 Playwright NOT RUN）
 PLAN-0009：Completed / Rehearsal Closed / Archived（C Legacy Contract & Document Migration Rehearsal；原始 Base `654fe83d82107d899079d20e5fef8aaf4d5431b8`；原始完成 HEAD `f09d2a5012627ab2219f309a2d9c1c4eacfe11f4`；readiness `REHEARSAL_PASS_WITH_MANUAL_REVIEW_REQUIRED`；production migration `NOT GRANTED`）

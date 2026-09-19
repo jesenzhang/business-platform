@@ -41,6 +41,6 @@ plans/
 - [PLAN-0010](archive/2026/PLAN-0010-business-module-isolation-and-semantic-contract-foundation.md)：Integrated。
 - [PLAN-0011](archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：Integrated / Archived。
 - [PLAN-0012](archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：Integrated / Archived；v0.1 预生产发布，merge 2383651，Main CI 33705531597，v0.1 tag → 2383651。
-- [PLAN-0013](archive/2026/PLAN-0013-identity-and-authorization-foundation.md)：Integrated / Archived；独立审阅修订（C1+M1-M5）完成，代码 head `1990a33`，CI `35418654378` 十作业全绿，PR #17 合入 main；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`。
+- [PLAN-0013](archive/2026/PLAN-0013-identity-and-authorization-foundation.md)：Integrated / Archived；独立审阅修订（C1+M1-M5）完成，代码 head `1990a33`，CI `35418654378` 十作业全绿，merge `d3a9196`（PR #17），Main CI `35426688873` 全绿；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`。
 
 归档路径按年份组织，文档生命周期遵循 [DOCUMENT_MANAGEMENT.md](../governance/DOCUMENT_MANAGEMENT.md)。
