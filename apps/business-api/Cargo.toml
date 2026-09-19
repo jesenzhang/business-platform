@@ -52,8 +52,21 @@ runtime-governance-postgres = { workspace = true }
 runtime-governance-sqlite = { workspace = true }
 object-storage = { workspace = true }
 public-api-contracts = { workspace = true }
+identity = { workspace = true }
+organization = { workspace = true }
+policy = { workspace = true }
+identity-postgres = { workspace = true }
+identity-sqlite = { workspace = true }
+organization-postgres = { workspace = true }
+organization-sqlite = { workspace = true }
+policy-postgres = { workspace = true }
+policy-sqlite = { workspace = true }
 
 [dev-dependencies]
+identity = { workspace = true, features = ["testing"] }
+organization = { workspace = true, features = ["testing"] }
+policy = { workspace = true, features = ["testing"] }
+identity-authorization-contracts = { workspace = true }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 async-trait = { workspace = true }

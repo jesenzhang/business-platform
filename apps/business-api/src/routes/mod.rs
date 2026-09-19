@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod documents;
 pub mod health;
+pub mod iam_admin;
 mod operations;
 pub mod processing;
 mod public_dto;
@@ -22,6 +23,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::auth::{auth_middleware, AuthMiddlewareConfig};
 use crate::config::ServerConfig;
+use crate::platform_authorization::platform_authorization_middleware;
 use crate::state::AppState;
 
 /// 构建 HTTP 路由。
@@ -31,8 +33,10 @@ use crate::state::AppState;
 /// - 受保护路由（`/api/v1/**`）：经过认证中间件，fail-closed。
 ///
 /// 全局中间件按请求处理顺序（外→内）为：
-/// Request ID → Trace → CORS → Body Limit → Timeout → \[Auth(仅受保护路由)\] → Handler。
-/// 由于 Axum 的 `.layer()` 越靠后越靠近 handler，下面按相反顺序声明。
+/// Request ID → Trace → CORS → Body Limit → Timeout →
+/// \[Auth → PlatformAuthz(仅受保护路由)\] → Handler。
+/// Axum 的 `.layer()` 后声明者在外层、先执行，因此受保护路由上先声明
+/// PlatformAuthz、后声明 Auth，使认证先运行。
 pub fn create_router(
     state: Arc<AppState>,
     auth_config: AuthMiddlewareConfig,
@@ -41,6 +45,7 @@ pub fn create_router(
     let request_timeout = Duration::from_secs(server_config.request_timeout_secs);
     let body_limit = server_config.body_limit_bytes;
     let cors = build_cors_layer(&server_config.cors_origins);
+    let authz_state = Arc::clone(&state);
 
     let protected_routes = Router::new()
         .nest("/api/v1/documents", documents::router())
@@ -106,6 +111,19 @@ pub fn create_router(
             "/api/v1/admin/audit/verify-chain",
             axum::routing::post(admin::verify_audit_chain),
         )
+        // PLAN-0013 Stage 8: minimal IAM management surface. Same protected
+        // chain (auth → platform authorization) as the governance routes;
+        // each handler enforces its own catalog permission key.
+        .merge(iam_admin::router())
+        // Authentication runs first; the platform-authorization middleware
+        // only ever sees requests that already carry an
+        // `AuthenticatedPrincipal` (PLAN-0013 §5). In Tower/Axum the last
+        // applied layer is the outermost, i.e. it runs first — so the
+        // authorization layer is declared first and authentication last.
+        .layer(middleware::from_fn_with_state(
+            authz_state,
+            platform_authorization_middleware,
+        ))
         .layer(middleware::from_fn_with_state(auth_config, auth_middleware));
 
     let public_routes = Router::new()

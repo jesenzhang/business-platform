@@ -99,6 +99,55 @@ pub fn record_auth_failure(reason: &str) {
     metrics::counter!("auth_failures_total", "reason" => reason.to_owned()).increment(1);
 }
 
+/// Record one Policy `Authorize` outcome (PLAN-0013 §10). Labels are drawn
+/// exclusively from bounded vocabularies: `decision` is `allow` or `deny`
+/// and `reason` is the closed `DecisionReason` enum's stable string. No
+/// user/tenant/resource identifiers ever enter these labels.
+pub fn record_authorization_decision(allowed: bool, reason: policy::domain::DecisionReason) {
+    metrics::counter!(
+        "authorization_decisions_total",
+        "decision" => if allowed { "allow" } else { "deny" },
+        "reason" => reason.as_str(),
+    )
+    .increment(1);
+}
+
+/// Record the wall-clock duration of one Policy `Authorize` evaluation.
+pub fn record_authorization_duration(elapsed: std::time::Duration) {
+    metrics::histogram!("authorization_duration_seconds").record(elapsed.as_secs_f64());
+}
+
+/// Record one startup bootstrap execution outcome (PLAN-0013 §10). The
+/// outcome label is a bounded enum rendered by [`BootstrapMetricOutcome`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BootstrapMetricOutcome {
+    Executed,
+    NoOp,
+    Failed,
+    ConfigStale,
+    PrincipalMismatch,
+    Unavailable,
+}
+
+impl BootstrapMetricOutcome {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Executed => "executed",
+            Self::NoOp => "noop",
+            Self::Failed => "failed",
+            Self::ConfigStale => "config_stale",
+            Self::PrincipalMismatch => "principal_mismatch",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// Record the outcome of one bootstrap administrator execution.
+pub fn record_bootstrap_outcome(outcome: BootstrapMetricOutcome) {
+    metrics::counter!("bootstrap_outcome_total", "outcome" => outcome.as_str()).increment(1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_method;

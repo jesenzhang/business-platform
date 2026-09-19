@@ -27,8 +27,10 @@ use public_api_contracts as contracts;
 
 use crate::api_error::ApiError;
 use crate::api_response::ApiResponse;
-use crate::auth::{AuthenticatedPrincipal, ManagementPermission};
+use crate::auth::ManagementPermission;
+use crate::platform_authorization::authorize_governance;
 use crate::state::{AppState, GovernanceServices};
+use policy::application::AuthorizationContext;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -127,19 +129,6 @@ fn context(context: &TenantContext) -> Result<(Uuid, Uuid), ApiError> {
     Ok((tenant_id, user_id))
 }
 
-fn require_permission(
-    principal: &AuthenticatedPrincipal,
-    permission: ManagementPermission,
-) -> Result<(), ApiError> {
-    if principal.has_management_permission(permission) {
-        Ok(())
-    } else {
-        Err(ApiError::from(shared_kernel::error::AppError::Forbidden(
-            "management permission required".to_string(),
-        )))
-    }
-}
-
 fn governance(state: &AppState) -> Result<&GovernanceServices, ApiError> {
     state.governance.as_ref().ok_or_else(|| {
         ApiError::from(shared_kernel::error::AppError::ExternalService {
@@ -187,10 +176,10 @@ fn map_repair_error(error: data_repair::RepairError) -> ApiError {
 pub async fn create_scan(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Json(body): Json<ScanRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::IntegrityScan)?;
+    authorize_governance(&state, &authz, ManagementPermission::IntegrityScan).await?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let report = services
@@ -211,9 +200,9 @@ pub async fn create_scan(
 pub async fn list_scans(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::IntegrityRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::IntegrityRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let runs = services
@@ -227,10 +216,10 @@ pub async fn list_scans(
 pub async fn get_scan(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::IntegrityRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::IntegrityRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -245,10 +234,10 @@ pub async fn get_scan(
 pub async fn list_findings(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Query(query): Query<FindingListQuery>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::IntegrityRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::IntegrityRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let findings = services
@@ -272,10 +261,10 @@ pub async fn list_findings(
 pub async fn get_finding(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::IntegrityRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::IntegrityRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let finding = services
@@ -328,10 +317,10 @@ fn validate_target(command: &RepairCommand, finding: &IntegrityFinding) -> Resul
 pub async fn dry_run_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Json(body): Json<RepairRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairDryRun)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairDryRun).await?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let command = command(body, tenant_id, user_id);
@@ -370,10 +359,10 @@ pub async fn dry_run_repair(
 pub async fn create_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Json(body): Json<RepairRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairExecute)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairExecute).await?;
     let (tenant_id, user_id) = context(&auth)?;
     let services = governance(&state)?;
     let command = command(body, tenant_id, user_id);
@@ -457,10 +446,10 @@ pub async fn create_repair(
 pub async fn get_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairExecute)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairExecute).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -476,11 +465,11 @@ pub async fn get_repair(
 pub async fn approve_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<ApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairApprove)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairApprove).await?;
     let (tenant_id, approver) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -508,11 +497,11 @@ pub async fn approve_repair(
 pub async fn execute_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairExecute)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairExecute).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -533,11 +522,11 @@ pub async fn execute_repair(
 pub async fn cancel_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairCancel)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairCancel).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -558,11 +547,11 @@ pub async fn cancel_repair(
 pub async fn resume_repair(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<RepairTransitionRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::RepairExecute)?;
+    authorize_governance(&state, &authz, ManagementPermission::RepairExecute).await?;
     let (tenant_id, _) = context(&auth)?;
     let services = governance(&state)?;
     let run = services
@@ -606,10 +595,10 @@ fn encode_cursor(cursor: Option<audit::AuditCursor>) -> Result<Option<String>, A
 pub async fn list_audit_events(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Query(query): Query<AuditQueryParams>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::AuditRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::AuditRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let actor = parse_actor_type(query.actor.as_deref())?;
     let result = parse_result(query.result.as_deref())?;
@@ -650,10 +639,10 @@ pub async fn list_audit_events(
 pub async fn get_audit_event(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::AuditRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::AuditRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let event = governance(&state)?
         .audit_queries
@@ -675,10 +664,10 @@ pub async fn get_audit_event(
 pub async fn verify_audit_chain(
     axum::Extension(auth): axum::Extension<TenantContext>,
     State(state): State<Arc<AppState>>,
-    axum::Extension(principal): axum::Extension<AuthenticatedPrincipal>,
+    axum::Extension(authz): axum::Extension<AuthorizationContext>,
     Json(body): Json<VerifyChainRequest>,
 ) -> Result<Response, ApiError> {
-    require_permission(&principal, ManagementPermission::AuditRead)?;
+    authorize_governance(&state, &authz, ManagementPermission::AuditRead).await?;
     let (tenant_id, _) = context(&auth)?;
     let verification = governance(&state)?
         .audit_queries

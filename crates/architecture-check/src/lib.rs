@@ -122,6 +122,11 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                 "messaging",
                 "config",
                 "tracing",
+                // PLAN-0013 fitness: authentication concerns (JWT parsing,
+                // OIDC protocol) must never leak into domain or application
+                // layers — they belong to the delivery boundary.
+                "jsonwebtoken",
+                "openidconnect",
             ],
             "shared-kernel" => &["axum", "sqlx", "reqwest", "aws-sdk-s3", "config", "tracing"],
             _ => &[],
@@ -132,6 +137,44 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                     "{} has forbidden direct dependency {}",
                     package.name, dependency
                 ));
+            }
+        }
+
+        // PLAN-0013 fitness: platform IAM contexts (identity/organization/
+        // policy, core and adapters alike) must never depend on business
+        // module crates — authority infrastructure cannot know its tenants'
+        // business domains. This list is name-based, so adding a new
+        // business-module crate REQUIRES extending it here (and the matching
+        // scan directories in scripts/check-architecture.ps1); an omitted
+        // name fails open silently.
+        if matches!(
+            architecture.context_name(),
+            Some("identity-management" | "organization" | "policy")
+        ) {
+            for dependency in [
+                "contract",
+                "customer",
+                "finance",
+                "project",
+                "approval",
+                "workflow",
+                "notification",
+                "agent-integration",
+                "document",
+                "document-sqlite",
+                "document-postgres",
+                "document-persistence-contracts",
+                "document-processing",
+                "document-processing-sqlite",
+                "document-processing-postgres",
+                "document-processing-contracts",
+            ] {
+                if direct.contains(dependency) {
+                    violations.push(format!(
+                        "{} (IAM context) has forbidden business-module dependency {}",
+                        package.name, dependency
+                    ));
+                }
             }
         }
 
@@ -220,5 +263,51 @@ mod tests {
             r#"{"packages":[{"name":"document-sqlite","manifest_path":"C:/repo/crates/document-sqlite/Cargo.toml","metadata":{"architecture":{"bounded_context":"document-management","layer":"infrastructure-adapter"}},"dependencies":[{"name":"document","path":"C:/repo/crates/document"},{"name":"messaging","path":"C:/repo/crates/messaging"}]}]}"#,
         );
         assert!(validate(&metadata).is_err());
+    }
+
+    #[test]
+    fn rejects_jwt_dependency_in_core_layers() {
+        for layer in ["domain", "domain-and-application"] {
+            let metadata = parse(&format!(
+                r#"{{"packages":[{{"name":"identity","manifest_path":"C:/repo/crates/identity/Cargo.toml","metadata":{{"architecture":{{"bounded_context":"identity-management","layer":"{layer}"}}}},"dependencies":[{{"name":"jsonwebtoken","path":null}}]}}]}}"#
+            ));
+            let violations = match validate(&metadata) {
+                Ok(()) => unreachable!(),
+                Err(violations) => violations,
+            };
+            assert!(
+                violations
+                    .iter()
+                    .any(|violation| violation.contains("forbidden direct dependency jsonwebtoken")),
+                "layer {layer} must reject jsonwebtoken: {violations:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_iam_dependency_on_business_modules() {
+        let metadata = parse(
+            r#"{"packages":[{"name":"policy","manifest_path":"C:/repo/crates/policy/Cargo.toml","metadata":{"architecture":{"bounded_context":"policy","layer":"domain-and-application"}},"dependencies":[{"name":"contract","path":"C:/repo/crates/contract"},{"name":"document","path":"C:/repo/crates/document"},{"name":"document-processing","path":"C:/repo/crates/document-processing"},{"name":"notification","path":"C:/repo/crates/notification"},{"name":"project","path":"C:/repo/crates/project"}]}]}"#,
+        );
+        let violations = match validate(&metadata) {
+            Ok(()) => unreachable!(),
+            Err(violations) => violations,
+        };
+        for dependency in [
+            "contract",
+            "document",
+            "document-processing",
+            "notification",
+            "project",
+        ] {
+            assert!(
+                violations
+                    .iter()
+                    .any(|violation| violation.contains(&format!(
+                        "forbidden business-module dependency {dependency}"
+                    ))),
+                "missing violation for {dependency}"
+            );
+        }
     }
 }

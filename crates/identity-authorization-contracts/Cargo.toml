@@ -1,0 +1,19 @@
+[package]
+name = "identity-authorization-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.architecture]
+bounded_context = "identity-authorization"
+layer = "contracts"
+
+[dependencies]
+identity = { workspace = true }
+organization = { workspace = true }
+policy = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[lints]
+workspace = true

@@ -9,7 +9,20 @@ use document::query::{DocumentDetailQuery, DocumentListQuery};
 use document_processing::ports::{
     CandidateQuery, ProcessingExecutionUnitOfWork, ProcessingJobQuery, ProcessingStepQuery,
 };
+use identity::application::{
+    ChangeTenantMembershipStatus, CreateTenantMembership, GetTenantUser, ListMemberships,
+    ListTenantUsers, ResolveAuthenticatedUser,
+};
 use object_storage::ObjectStorageClient;
+use organization::application::{
+    AddOrganizationMember, CreateOrganizationUnit, ListOrganizationTree, ListUnitMembers,
+    MoveOrganizationUnit, RemoveOrganizationMember, UpdateOrganizationUnit,
+};
+use policy::application::{
+    Authorize, BindRole, CreateRole, ExplainDecision, RevokeRoleBinding, SetRolePermissions,
+    UpdateRole,
+};
+use policy::ports::PolicyQueryPort;
 use runtime_governance::IntegrityScanPort;
 use sqlx::PgPool;
 
@@ -27,6 +40,72 @@ pub struct ProcessingServices {
     pub candidate_queries: Arc<dyn CandidateQuery>,
     pub step_queries: Arc<dyn ProcessingStepQuery>,
     pub execution: Arc<dyn ProcessingExecutionUnitOfWork>,
+}
+
+/// Identity/Policy authorization services injected by the composition
+/// root (PLAN-0013 Stage 7). Handlers and middleware call these
+/// application use cases directly; no handler receives stores or
+/// implements authorization rules.
+#[derive(Clone)]
+pub struct AccessServices {
+    /// Identity resolve-or-provision use case (write-on-read).
+    pub resolve: Arc<ResolveAuthenticatedUser>,
+    /// Policy default-DENY evaluation use case.
+    pub authorize: Arc<Authorize>,
+    /// Locked compat bridge flag (`auth.management_permission_compat_enabled`).
+    /// When false, the middleware carries an empty compat grant set and
+    /// only `RoleBindings` can grant.
+    pub compat_enabled: bool,
+    /// Configured OIDC issuer; the resolver namespace for OIDC-authenticated
+    /// requests (dev-auth uses the fixed `urn:business-api:dev-auth`).
+    pub oidc_issuer: String,
+}
+
+/// Identity/Organization/Policy management use cases injected by the
+/// composition root (PLAN-0013 Stage 8). Handlers receive these typed use
+/// cases and the read-only policy query port only; every business rule
+/// lives in the application layer.
+#[derive(Clone)]
+pub struct AdminServices {
+    /// Keyset listing of tenant users (identity read).
+    pub list_users: Arc<ListTenantUsers>,
+    /// Single tenant user fetch (identity read).
+    pub get_user: Arc<GetTenantUser>,
+    /// Keyset listing of tenant memberships (identity read).
+    pub list_memberships: Arc<ListMemberships>,
+    /// Create a tenant membership (identity command).
+    pub create_membership: Arc<CreateTenantMembership>,
+    /// Suspend/reactivate a tenant membership (identity command).
+    pub change_membership_status: Arc<ChangeTenantMembershipStatus>,
+    /// Read-only policy queries: permission catalog, role reads, binding
+    /// listing (policy read).
+    pub policy_query: Arc<dyn PolicyQueryPort>,
+    /// Flat tenant unit tree (organization read).
+    pub list_org_units: Arc<ListOrganizationTree>,
+    /// Members of one unit (organization read).
+    pub list_org_members: Arc<ListUnitMembers>,
+    /// Create a unit (organization command).
+    pub create_unit: Arc<CreateOrganizationUnit>,
+    /// Update unit metadata/status (organization command).
+    pub update_unit: Arc<UpdateOrganizationUnit>,
+    /// Reparent a unit (organization command).
+    pub move_unit: Arc<MoveOrganizationUnit>,
+    /// Attach a user to a unit (organization command).
+    pub add_org_member: Arc<AddOrganizationMember>,
+    /// Detach a user from a unit (organization command).
+    pub remove_org_member: Arc<RemoveOrganizationMember>,
+    /// Create a tenant role (policy command).
+    pub create_role: Arc<CreateRole>,
+    /// Update role metadata/status (policy command).
+    pub update_role: Arc<UpdateRole>,
+    /// Transactional role permission set replace (policy command).
+    pub set_role_permissions: Arc<SetRolePermissions>,
+    /// Bind a role to a user (policy command).
+    pub bind_role: Arc<BindRole>,
+    /// Revoke a binding (policy command).
+    pub revoke_binding: Arc<RevokeRoleBinding>,
+    /// Admin decision explanation (policy read).
+    pub explain: Arc<ExplainDecision>,
 }
 
 /// Management-only governance ports.  Handlers receive typed ports rather
@@ -114,6 +193,14 @@ pub struct AppState {
     pub governance: Option<GovernanceServices>,
     pub readiness: Arc<dyn ReadinessProbe>,
     pub storage: Option<StorageServices>,
+    /// PLAN-0013 Stage 7 platform authorization services. `None` is a
+    /// fail-closed misconfiguration: every protected request is rejected
+    /// with 403 rather than bypassing identity resolution.
+    pub access: Option<AccessServices>,
+    /// PLAN-0013 Stage 8 IAM management use cases. `None` is a
+    /// fail-closed misconfiguration: management routes answer the generic
+    /// unavailable error rather than performing any mutation.
+    pub admin: Option<AdminServices>,
 }
 
 pub struct PostgresReadinessProbe {

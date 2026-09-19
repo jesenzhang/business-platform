@@ -8,8 +8,11 @@
 pub mod api_error;
 pub mod api_response;
 pub mod auth;
+pub mod bootstrap;
+pub mod composition;
 pub mod config;
 pub mod metrics;
 pub mod oidc;
+pub mod platform_authorization;
 pub mod routes;
 pub mod state;

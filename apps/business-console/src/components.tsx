@@ -9,6 +9,11 @@ const navItems = [
   ['/findings', 'Integrity', '◈'],
   ['/repairs', 'Repairs', '✓'],
   ['/audit', 'Audit', '≡'],
+  ['/identities', 'Identities', '◉'],
+  ['/roles', 'Roles', '⚿'],
+  ['/bindings', 'Bindings', '⇆'],
+  ['/organization', 'Organization', '⛁'],
+  ['/explain', 'Explain', '？'],
 ] as const
 
 export function AppShell() {

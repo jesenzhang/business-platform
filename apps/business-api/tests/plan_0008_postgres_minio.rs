@@ -7,11 +7,13 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use business_api::auth::AuthMiddlewareConfig;
 use business_api::config::{
-    AuthConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig, ObservabilityConfig,
-    ServerConfig, StorageConfig,
+    AuthConfig, BootstrapAdminConfig, BusinessApiConfig, DatabaseBackend, DatabaseConfig,
+    ObservabilityConfig, ServerConfig, StorageConfig,
 };
 use business_api::routes;
-use business_api::state::{AppState, DocumentServices, PostgresReadinessProbe, StorageServices};
+use business_api::state::{
+    AccessServices, AppState, DocumentServices, PostgresReadinessProbe, StorageServices,
+};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use document::application::{CreateDocumentCommand, CreateDocumentMetadata};
@@ -130,6 +132,8 @@ fn upload_router(
             dev_user_id: Some(user),
             dev_subject: Some("plan-0008-upload-test".to_string()),
             dev_roles: BTreeSet::new(),
+            management_permission_compat_enabled: true,
+            bootstrap: BootstrapAdminConfig::default(),
         },
     };
     let document_store = Arc::new(PostgresCreateDocumentUnitOfWork::new(pool.clone()));
@@ -147,6 +151,8 @@ fn upload_router(
         governance: None,
         readiness: Arc::new(PostgresReadinessProbe::new(pool)),
         storage: Some(StorageServices { objects }),
+        access: Some(test_access()),
+        admin: None,
     });
     routes::create_router(
         state,
@@ -848,5 +854,31 @@ async fn plan_0008_postgres_minio_revision_evidence_contract() {
     // Avoid retaining test objects in a shared CI bucket.
     for key in [source_key, second_key, key_a, key_b, artifact_object_key] {
         let _ = storage.delete(&key).await;
+    }
+}
+
+/// Minimal working `AccessServices` for authenticated non-governance tests:
+/// the resolver auto-provisions the test principal on first contact, which
+/// is all the documents/storage routes need (the governance guard itself is
+/// covered in `security.rs`).
+fn test_access() -> AccessServices {
+    let stores = identity::testing::FakeIdentityStores::new();
+    let policy = policy::testing::FakePolicyPorts::new();
+    let subject = Arc::new(
+        business_api::platform_authorization::IdentitySubjectStatusBridge::new(Arc::new(
+            identity::application::TenantAccessChecker::new(Arc::clone(&stores.query)),
+        )),
+    );
+    AccessServices {
+        resolve: Arc::new(identity::application::ResolveAuthenticatedUser::new(
+            Arc::clone(&stores.resolve),
+        )),
+        authorize: Arc::new(policy::application::Authorize::new(
+            Arc::clone(&policy.query),
+            subject,
+            Arc::clone(&policy.org),
+        )),
+        compat_enabled: true,
+        oidc_issuer: String::new(),
     }
 }

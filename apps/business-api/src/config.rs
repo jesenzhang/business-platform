@@ -122,6 +122,57 @@ pub struct AuthConfig {
     pub dev_subject: Option<String>,
     #[serde(default)]
     pub dev_roles: BTreeSet<String>,
+    /// PLAN-0013 §5 compatibility bridge switch. While `true`, the
+    /// server-trusted `management_permissions` claim set (or the dev-auth
+    /// server config set) may grant the seven governance permissions
+    /// through the bounded compat bridge (reason
+    /// `AllowCompatManagementClaim`). Never grants IAM or reserved
+    /// permissions; membership/user status always overrides. Default true
+    /// per the locked preflight; the sunset plan flips it to false in a
+    /// follow-up release once `AllowCompatManagementClaim` reaches zero.
+    #[serde(default = "default_compat_enabled")]
+    pub management_permission_compat_enabled: bool,
+    /// Server-controlled cold-start bootstrap (PLAN-0013 §7). HTTP never
+    /// triggers bootstrap; this section is consumed only by the
+    /// composition root at startup.
+    #[serde(default = "default_bootstrap_config")]
+    pub bootstrap: BootstrapAdminConfig,
+}
+
+/// `[auth.bootstrap]` — explicit production bootstrap administrator
+/// (PLAN-0013 §7 mode 1). All fields are explicit; there is no "first
+/// user becomes admin" path anywhere.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct BootstrapAdminConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub tenant_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub issuer: Option<String>,
+    #[serde(default)]
+    pub subject: Option<String>,
+    /// Deliberate repetition knob: re-running a bootstrap requires a
+    /// version bump (audited).
+    #[serde(default = "default_bootstrap_version")]
+    pub version: i64,
+}
+
+fn default_compat_enabled() -> bool {
+    true
+}
+
+/// The whole-section default must match the field-level serde default
+/// (`version = 1`), not the derived `Default` (which would give 0).
+fn default_bootstrap_config() -> BootstrapAdminConfig {
+    BootstrapAdminConfig {
+        version: default_bootstrap_version(),
+        ..BootstrapAdminConfig::default()
+    }
+}
+
+fn default_bootstrap_version() -> i64 {
+    1
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -231,6 +282,48 @@ impl BusinessApiConfig {
                 .any(|value| value.trim().is_empty())
             {
                 messages.push("auth.dev_roles must not contain empty values".to_string());
+            }
+        }
+        // PLAN-0013 §7 mode 1: when bootstrap is enabled every target must
+        // be explicit and the issuer must be https (mirrors
+        // `identity::application::BootstrapAdministratorConfig::validate`,
+        // so a malformed section fails at startup, not mid-bootstrap).
+        if self.auth.bootstrap.enabled {
+            if self.auth.bootstrap.tenant_id.is_none_or(|id| id.is_nil()) {
+                messages.push(
+                    "auth.bootstrap.tenant_id must be a non-nil UUID when bootstrap is enabled"
+                        .to_string(),
+                );
+            }
+            match self.auth.bootstrap.issuer.as_deref() {
+                None => messages.push(
+                    "auth.bootstrap.issuer must be configured when bootstrap is enabled"
+                        .to_string(),
+                ),
+                Some(issuer) if !is_https_url(issuer) => messages.push(
+                    "auth.bootstrap.issuer must use https when bootstrap is enabled".to_string(),
+                ),
+                Some(issuer) if issuer.trim().is_empty() => messages.push(
+                    "auth.bootstrap.issuer must not be blank when bootstrap is enabled".to_string(),
+                ),
+                Some(_) => {}
+            }
+            if self
+                .auth
+                .bootstrap
+                .subject
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                messages.push(
+                    "auth.bootstrap.subject must be configured when bootstrap is enabled"
+                        .to_string(),
+                );
+            }
+            if self.auth.bootstrap.version < 1 {
+                messages.push(
+                    "auth.bootstrap.version must be >= 1 when bootstrap is enabled".to_string(),
+                );
             }
         }
         let scheme = self.database.url.expose().split(':').next();
@@ -425,6 +518,8 @@ mod tests {
                 dev_user_id: None,
                 dev_subject: None,
                 dev_roles: BTreeSet::new(),
+                management_permission_compat_enabled: true,
+                bootstrap: BootstrapAdminConfig::default(),
             },
             observability: ObservabilityConfig::default(),
         }
@@ -589,6 +684,92 @@ mod tests {
         // explicitly configured plaintext jwks_url fails the transport rule.
         let mut config = production_config();
         config.auth.jwks_url = None;
+        assert!(config.validate().is_ok());
+    }
+
+    // ------------------------------------------------------------------
+    // PLAN-0013 Stage 7: compat bridge flag and bootstrap section.
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn compat_bridge_flag_defaults_to_true() {
+        // The locked preflight requires the bridge to default ON so an
+        // upgrade is behavior-preserving for claim-injected deployments.
+        let config: AuthConfig =
+            serde_json::from_value(serde_json::json!({})).unwrap_or_else(|_| unreachable!());
+        assert!(config.management_permission_compat_enabled);
+        assert!(!config.bootstrap.enabled);
+        assert_eq!(config.bootstrap.version, 1);
+    }
+
+    #[test]
+    fn bootstrap_requires_https_issuer_and_explicit_targets_when_enabled() {
+        let mut config = valid_config();
+        config.auth.bootstrap = BootstrapAdminConfig {
+            enabled: true,
+            tenant_id: Some(uuid::Uuid::new_v4()),
+            issuer: Some("http://idp.example.test".to_string()),
+            subject: Some("bootstrap-operator".to_string()),
+            version: 1,
+        };
+        let Err(error) = config.validate() else {
+            unreachable!();
+        };
+        assert!(error
+            .to_string()
+            .contains("auth.bootstrap.issuer must use https"));
+        config.auth.bootstrap.issuer = Some("https://idp.example.test".to_string());
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn bootstrap_requires_non_nil_tenant_non_blank_subject_and_positive_version() {
+        for (tenant_id, subject, version, expected) in [
+            (
+                Some(uuid::Uuid::nil()),
+                "s".to_string(),
+                1i64,
+                "auth.bootstrap.tenant_id",
+            ),
+            (None, "s".to_string(), 1, "auth.bootstrap.tenant_id"),
+            (
+                Some(uuid::Uuid::new_v4()),
+                "   ".to_string(),
+                1,
+                "auth.bootstrap.subject",
+            ),
+            (
+                Some(uuid::Uuid::new_v4()),
+                "s".to_string(),
+                0,
+                "auth.bootstrap.version",
+            ),
+        ] {
+            let mut config = valid_config();
+            config.auth.bootstrap = BootstrapAdminConfig {
+                enabled: true,
+                tenant_id,
+                issuer: Some("https://idp.example.test".to_string()),
+                subject: Some(subject.clone()),
+                version,
+            };
+            let Err(error) = config.validate() else {
+                unreachable!("config with version {version} must be rejected");
+            };
+            assert!(
+                error.to_string().contains(expected),
+                "expected {expected} in {error}"
+            );
+        }
+        // A disabled bootstrap section is inert (no validation at all).
+        let mut config = valid_config();
+        config.auth.bootstrap = BootstrapAdminConfig {
+            enabled: false,
+            tenant_id: Some(uuid::Uuid::nil()),
+            issuer: None,
+            subject: None,
+            version: 0,
+        };
         assert!(config.validate().is_ok());
     }
 }

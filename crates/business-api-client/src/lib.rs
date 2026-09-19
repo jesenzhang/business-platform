@@ -225,6 +225,332 @@ impl BusinessApiClient {
             .await
     }
 
+    pub async fn list_users(
+        &self,
+        cursor: Option<&str>,
+        limit: u32,
+    ) -> Result<contracts::Page<contracts::AdminUser>, ClientError> {
+        let mut path = format!("/api/v1/admin/users?limit={limit}");
+        if let Some(cursor) = cursor {
+            path.push_str("&cursor=");
+            path.push_str(&urlencoding::encode(cursor));
+        }
+        self.request_json(Method::GET, &path, None).await
+    }
+
+    pub async fn get_user(&self, user_id: Uuid) -> Result<contracts::AdminUser, ClientError> {
+        self.request_json(Method::GET, &format!("/api/v1/admin/users/{user_id}"), None)
+            .await
+    }
+
+    pub async fn list_tenant_memberships(
+        &self,
+        cursor: Option<&str>,
+        limit: u32,
+    ) -> Result<contracts::Page<contracts::MembershipView>, ClientError> {
+        let mut path = format!("/api/v1/admin/tenant-memberships?limit={limit}");
+        if let Some(cursor) = cursor {
+            path.push_str("&cursor=");
+            path.push_str(&urlencoding::encode(cursor));
+        }
+        self.request_json(Method::GET, &path, None).await
+    }
+
+    pub async fn create_tenant_membership(
+        &self,
+        request: &contracts::CreateTenantMembershipRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::MembershipView, ClientError> {
+        self.request_json(
+            Method::POST,
+            "/api/v1/admin/tenant-memberships",
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn suspend_tenant_membership(
+        &self,
+        user_id: Uuid,
+        expected_version: i64,
+        idempotency_key: &str,
+    ) -> Result<contracts::MembershipView, ClientError> {
+        let body = serde_json::json!({ "expected_version": expected_version });
+        self.request_json(
+            Method::POST,
+            &format!("/api/v1/admin/tenant-memberships/{user_id}/suspend"),
+            Some((&body, idempotency_key)),
+        )
+        .await
+    }
+
+    pub async fn reactivate_tenant_membership(
+        &self,
+        user_id: Uuid,
+        expected_version: i64,
+        idempotency_key: &str,
+    ) -> Result<contracts::MembershipView, ClientError> {
+        let body = serde_json::json!({ "expected_version": expected_version });
+        self.request_json(
+            Method::POST,
+            &format!("/api/v1/admin/tenant-memberships/{user_id}/reactivate"),
+            Some((&body, idempotency_key)),
+        )
+        .await
+    }
+
+    pub async fn list_permissions(&self) -> Result<Vec<contracts::PermissionView>, ClientError> {
+        self.request_json(Method::GET, "/api/v1/admin/permissions", None)
+            .await
+    }
+
+    pub async fn list_roles(&self) -> Result<Vec<contracts::RoleView>, ClientError> {
+        self.request_json(Method::GET, "/api/v1/admin/roles", None)
+            .await
+    }
+
+    pub async fn get_role(&self, role_id: Uuid) -> Result<contracts::RoleView, ClientError> {
+        self.request_json(Method::GET, &format!("/api/v1/admin/roles/{role_id}"), None)
+            .await
+    }
+
+    pub async fn create_role(
+        &self,
+        request: &contracts::CreateRoleRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::RoleView, ClientError> {
+        self.request_json(
+            Method::POST,
+            "/api/v1/admin/roles",
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn update_role(
+        &self,
+        role_id: Uuid,
+        request: &contracts::UpdateRoleRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::RoleView, ClientError> {
+        self.request_json(
+            Method::PATCH,
+            &format!("/api/v1/admin/roles/{role_id}"),
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn set_role_permissions(
+        &self,
+        role_id: Uuid,
+        request: &contracts::SetRolePermissionsRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::RoleView, ClientError> {
+        self.request_json(
+            Method::PUT,
+            &format!("/api/v1/admin/roles/{role_id}/permissions"),
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn list_role_bindings(
+        &self,
+        user_id: Option<Uuid>,
+    ) -> Result<Vec<contracts::RoleBindingView>, ClientError> {
+        let path = match user_id {
+            Some(user_id) => format!("/api/v1/admin/role-bindings?user_id={user_id}"),
+            None => "/api/v1/admin/role-bindings".to_string(),
+        };
+        self.request_json(Method::GET, &path, None).await
+    }
+
+    pub async fn create_role_binding(
+        &self,
+        request: &contracts::BindingCreateRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::RoleBindingView, ClientError> {
+        self.request_json(
+            Method::POST,
+            "/api/v1/admin/role-bindings",
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn revoke_role_binding(
+        &self,
+        binding_id: Uuid,
+        expected_version: i64,
+        idempotency_key: &str,
+    ) -> Result<contracts::RoleBindingView, ClientError> {
+        let body = serde_json::json!({ "expected_version": expected_version });
+        self.request_json(
+            Method::POST,
+            &format!("/api/v1/admin/role-bindings/{binding_id}/revoke"),
+            Some((&body, idempotency_key)),
+        )
+        .await
+    }
+
+    pub async fn list_organization_units(
+        &self,
+    ) -> Result<Vec<contracts::OrganizationUnitView>, ClientError> {
+        self.request_json(Method::GET, "/api/v1/admin/organization-units", None)
+            .await
+    }
+
+    pub async fn create_unit(
+        &self,
+        request: &contracts::CreateUnitRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::OrganizationUnitView, ClientError> {
+        self.request_json(
+            Method::POST,
+            "/api/v1/admin/organization-units",
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn update_unit(
+        &self,
+        unit_id: Uuid,
+        request: &contracts::UpdateUnitRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::OrganizationUnitView, ClientError> {
+        self.request_json(
+            Method::PATCH,
+            &format!("/api/v1/admin/organization-units/{unit_id}"),
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn move_unit(
+        &self,
+        unit_id: Uuid,
+        request: &contracts::MoveUnitRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::OrganizationUnitView, ClientError> {
+        self.request_json(
+            Method::POST,
+            &format!("/api/v1/admin/organization-units/{unit_id}/move"),
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn list_unit_members(
+        &self,
+        unit_id: Uuid,
+    ) -> Result<Vec<contracts::OrganizationMemberView>, ClientError> {
+        self.request_json(
+            Method::GET,
+            &format!("/api/v1/admin/organization-units/{unit_id}/members"),
+            None,
+        )
+        .await
+    }
+
+    pub async fn add_unit_member(
+        &self,
+        unit_id: Uuid,
+        user_id: Uuid,
+        request: &contracts::AddUnitMemberRequest,
+        idempotency_key: &str,
+    ) -> Result<contracts::OrganizationMemberView, ClientError> {
+        self.request_json(
+            Method::POST,
+            &format!("/api/v1/admin/organization-units/{unit_id}/members/{user_id}"),
+            Some((
+                &serde_json::to_value(request).map_err(Self::serialization_error)?,
+                idempotency_key,
+            )),
+        )
+        .await
+    }
+
+    pub async fn remove_unit_member(
+        &self,
+        unit_id: Uuid,
+        user_id: Uuid,
+        membership_type: Option<&str>,
+        expected_version: i64,
+        idempotency_key: &str,
+    ) -> Result<contracts::OrganizationMemberView, ClientError> {
+        let mut path = format!(
+            "/api/v1/admin/organization-units/{unit_id}/members/{user_id}?expected_version={expected_version}"
+        );
+        if let Some(membership_type) = membership_type {
+            path.push_str("&membership_type=");
+            path.push_str(&urlencoding::encode(membership_type));
+        }
+        self.request_json_no_body(Method::DELETE, &path, idempotency_key)
+            .await
+    }
+
+    pub async fn explain_decision(
+        &self,
+        request: &contracts::ExplainRequest,
+    ) -> Result<contracts::ExplainView, ClientError> {
+        // Pure evaluation: no mutation, so no Idempotency-Key is required.
+        let response = self
+            .authorized(
+                self.http
+                    .post(self.url("/api/v1/admin/authorization/explain")),
+            )
+            .json(request)
+            .send()
+            .await?;
+        self.decode(response).await
+    }
+
+    fn serialization_error(_: serde_json::Error) -> ClientError {
+        ClientError::InvalidConfiguration("request body could not be serialized".to_string())
+    }
+
+    async fn request_json_no_body<T>(
+        &self,
+        method: Method,
+        path: &str,
+        idempotency_key: &str,
+    ) -> Result<T, ClientError>
+    where
+        T: DeserializeOwned,
+    {
+        let request = self
+            .authorized(self.http.request(method, self.url(path)))
+            .header("Idempotency-Key", idempotency_key);
+        let response = request.send().await?;
+        self.decode(response).await
+    }
+
     async fn request_json<T>(
         &self,
         method: Method,

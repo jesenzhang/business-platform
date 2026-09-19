@@ -46,6 +46,13 @@ members = [
     "crates/public-api-contracts",
     "crates/business-api-client",
     "crates/policy",
+    "crates/identity-postgres",
+    "crates/identity-sqlite",
+    "crates/organization-postgres",
+    "crates/organization-sqlite",
+    "crates/policy-postgres",
+    "crates/policy-sqlite",
+    "crates/identity-authorization-contracts",
     "crates/object-storage",
     "crates/messaging",
     "crates/observability",
@@ -114,7 +121,7 @@ opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
 
 # Utilities
 bytes = "1"
-uuid = { version = "1", features = ["v4", "v7", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
 url = "2"
@@ -142,6 +149,13 @@ messaging = { path = "crates/messaging" }
 policy = { path = "crates/policy" }
 identity = { path = "crates/identity" }
 organization = { path = "crates/organization" }
+identity-postgres = { path = "crates/identity-postgres" }
+identity-sqlite = { path = "crates/identity-sqlite" }
+organization-postgres = { path = "crates/organization-postgres" }
+organization-sqlite = { path = "crates/organization-sqlite" }
+policy-postgres = { path = "crates/policy-postgres" }
+policy-sqlite = { path = "crates/policy-sqlite" }
+identity-authorization-contracts = { path = "crates/identity-authorization-contracts" }
 customer = { path = "crates/customer" }
 contract = { path = "crates/contract" }
 project = { path = "crates/project" }

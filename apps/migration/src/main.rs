@@ -157,6 +157,17 @@ async fn run_sqlite_up(database_url: &str) -> anyhow::Result<()> {
     document_processing_sqlite::run_migrations(&pool)
         .await
         .context("failed to apply document processing SQLite migrations")?;
+    // PLAN-0013 identity/organization/policy catalogs layer on top of the
+    // unified audit tables provided by the chained catalogs above.
+    identity_sqlite::run_migrations(&pool)
+        .await
+        .context("failed to apply identity SQLite migrations")?;
+    organization_sqlite::run_migrations(&pool)
+        .await
+        .context("failed to apply organization SQLite migrations")?;
+    policy_sqlite::run_migrations(&pool)
+        .await
+        .context("failed to apply policy SQLite migrations")?;
     tracing::info!("All SQLite migrations applied successfully");
     Ok(())
 }
@@ -212,7 +223,35 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
             );
         }
     }
+    for (label, ledger) in [
+        ("Identity", "identity_migrations"),
+        ("Organization", "organization_migrations"),
+        ("Policy", "policy_migrations"),
+    ] {
+        // Each IAM catalog applies exactly one foundation migration; a
+        // missing ledger table means "pending", any other database error
+        // must fail the status command.
+        let sql = format!("SELECT COALESCE(MAX(version), 0) FROM {ledger}");
+        let applied = match sqlx::query_scalar::<_, i64>(&sql).fetch_one(&pool).await {
+            Ok(version) => version,
+            Err(error) if is_missing_iam_ledger(&error, ledger) => 0,
+            Err(error) => return Err(error.into()),
+        };
+        println!("\n{label} migrations:");
+        let state = if applied >= 1 { "applied" } else { "pending" };
+        println!("  [{state}] 1 {label} foundation");
+    }
     Ok(())
+}
+
+fn is_missing_iam_ledger(error: &sqlx::Error, ledger: &str) -> bool {
+    matches!(
+        error,
+        sqlx::Error::Database(database_error)
+            if database_error.message().eq_ignore_ascii_case(
+                format!("no such table: {ledger}").as_str()
+            )
+    )
 }
 
 fn is_postgres_missing_migration_table(error: &sqlx::Error) -> bool {

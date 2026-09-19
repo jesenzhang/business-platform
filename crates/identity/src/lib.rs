@@ -1,7 +1,18 @@
-//! 身份认证与用户管理领域
+//! Platform Identity bounded context (PLAN-0013).
 //!
-//! 负责用户身份、认证、授权、会话管理等核心身份功能。
+//! Owns `PlatformUser`, `ExternalIdentity`, and `TenantMembership`: who a
+//! caller is inside the platform and whether they may act inside a tenant.
+//! Authentication stays external (ADR-0024); this context maps an already
+//! authenticated external subject to durable platform identity state. It owns
+//! no credentials and never signs or validates tokens.
 //!
-//! 本模块遵循 DDD 分层：domain / application / infrastructure / api
+//! DDD layering: `domain` (entities + invariants), `application` (use cases
+//! over ports), `ports` (persistence contracts). Adapters live in
+//! `identity-postgres` / `identity-sqlite`.
 
-// TODO: 阶段二实现
+pub mod application;
+pub mod domain;
+pub mod ports;
+
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;

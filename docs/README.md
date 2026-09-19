@@ -146,14 +146,13 @@ reference/EVER_GAUZY_REFERENCE_ANALYSIS.md
 
 ## 9. 当前实施
 
-截至 2026-09-18：
+截至 2026-09-19：
 
 - v0.1 已发布：PLAN-0012 Integrated / Archived，annotated tag v0.1 → 2383651；真实 PostgreSQL + MinIO + vLLM + Prometheus/Grafana 与真实 Auth0 production-mode 验收已记录在完成审计。
 - 发布后供应链修复已进入 main：rustls 0.23.45 清除 RUSTSEC-2026-0285；MinIO/mc 镜像从已下线的 Docker Hub 仓库迁移到 quay.io。
-- 当前身份认证是可运行实现；完整用户/组织/角色/业务权限管理尚未实现。crates/identity 与 crates/organization 仍是骨架，Management API 目前依赖固定 ManagementPermission。
-- 当前下一候选是 [PLAN-0013 Identity and Authorization Foundation](plans/current/PLAN-0013-identity-and-authorization-foundation.md)，状态 Proposed / NEXT CANDIDATE。
-- [PLAN-0006 Enterprise AI Workspace](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md) 已更新为 Revision 1 / Proposed / BLOCKED，必须等待 PLAN-0013 与首个 Contract 真实垂直切片集成。
-- 下一业务里程碑在 PLAN-0013 后创建 Contract Business Vertical Slice：Contract List/Detail → Document Revision → AI Extract/Evidence → Review → Apply Candidate → Contract Version Update。
+- 身份与授权已生产化：[PLAN-0013 Identity and Authorization Foundation](plans/archive/2026/PLAN-0013-identity-and-authorization-foundation.md) Integrated / Archived（PR #17）——PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope 与统一 default-DENY Policy Decision 已实现，Governance API 已迁移到统一 Authorize + 有界兼容桥（7 个 governance 键，flag 默认开启）。
+- 当前下一候选是 Contract Business Vertical Slice（待创建计划）：Contract List/Detail → Document Revision → AI Extract/Evidence → Review → Apply Candidate → Contract Version Update。
+- [PLAN-0006 Enterprise AI Workspace](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md) 仍为 Revision 1 / Proposed / BLOCKED：PLAN-0013 已集成，还需等待首个 Contract 真实垂直切片集成。
 - Business Application Platform 的 package/contribution/compiler/dry-plan foundation 已实现，但 Module Registry、安装执行器、Marketplace、动态插件 Runtime 尚未实现。
 - Analytics/Visualization 只有 Baseline；Knowledge/RAG/通用 Workflow/Generated App Runtime 尚未形成生产实现。
 - 外部参考增加 Ever Gauzy，重点吸收 tenant-aware runtime binding、Provider definition/binding、Compiled Tool Catalog + per-turn resolution；其内部 OAuth issuer 与 AGPL runtime/code 不采用。
@@ -161,7 +160,7 @@ reference/EVER_GAUZY_REFERENCE_ANALYSIS.md
 当前优先顺序：
 
 ~~~text
-PLAN-0013 Identity / Authorization
+PLAN-0013 Identity / Authorization (Integrated 2026-09-19)
   -> Contract Business Vertical Slice
   -> Knowledge/Evidence Projection（按业务需要）
   -> PLAN-0006 Revision 1 Workspace / Agent

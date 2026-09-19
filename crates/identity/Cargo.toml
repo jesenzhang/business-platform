@@ -4,12 +4,26 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.architecture]
+bounded_context = "identity-management"
+layer = "domain-and-application"
+data_owner = "identity-management"
+
+[features]
+default = []
+# In-memory fake ports used by application tests and API-level tests.
+testing = []
+
 [dependencies]
-shared-kernel = { workspace = true }
-serde = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 async-trait = { workspace = true }
+thiserror = { workspace = true }
+# Canonical SHA-256 digest of the bootstrap configuration (application rule).
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
 
 [lints]
 workspace = true
