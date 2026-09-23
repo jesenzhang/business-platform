@@ -244,6 +244,8 @@ CapabilityPort
 
 采用 SemVer。Breaking public contract 必须 major bump。
 
+`BusinessModuleManifest.module_version` 是功能模块的 canonical release version。当前 workspace 的 `version.workspace = true` 只能代表仓库/产品版本，**不得**被解释为模块独立版本。进入 R2 前，模块必须建立独立 release version（或明确的 module-version → crate-version 映射），并由 release artifact/manifest/digest 固定。一个模块由多个 crate 组成时，这些 crate 必须作为一个 module release bundle 有可审计的版本映射。
+
 ### Contract version
 
 Command/Query/Event/Resource 可拥有独立 schema version。Module patch/minor 不应无故破坏 public schema。
@@ -428,14 +430,14 @@ apps/<module>-service
 
 | Module | 当前等级 | 主要缺口 |
 |---|---:|---|
-| identity | R2 接近完成 | 独立 release artifact/remote surface 未固定 |
-| organization | R2 接近完成 | 同上 |
-| policy | R2 接近完成 | external engine adapter/remote surface 可后置 |
-| document | R2 接近完成 | module manifest/独立 release metadata 需补 |
-| document-processing | R2 | 对外 durable job contract 需进一步稳定 |
-| audit | R1/R2 | 独立 capability contract/release metadata |
-| object-storage | R1/R2 | provider-neutral contract 已有，独立发布证据需补 |
-| messaging | R1/R2 | published capability/version 需正式登记 |
+| identity | **R1** | Domain/Application/Port 与双数据库行为契约强；但仍 `version.workspace=true`，无独立 module manifest/release artifact/remote surface |
+| organization | **R1** | 同上 |
+| policy | **R1** | Domain/Application/Port 已成型；无独立 module release，external engine adapter/remote surface 可后置 |
+| document | **R1** | Domain/ports/adapters 较成熟；缺 module manifest、独立 SemVer/artifact/release metadata |
+| document-processing | **R1** | contracts/adapters/durable semantics 较强；仍缺独立 module release identity/artifact |
+| audit | **R1** | 已有 owner/adapters；缺独立 capability manifest/release artifact |
+| object-storage | **R1** | provider-neutral seam 已有；缺独立 capability version/artifact |
+| messaging | **R1** | Outbox/Inbox 已有；published capability/version/release artifact 未正式登记 |
 | observability | R1 | 主要为平台内部 capability |
 | customer/contract/project/finance/approval | R0/R1 不等 | 需由真实业务切片逐个提升 |
 | commercial/entitlement | 尚无 | 新建 owner |
