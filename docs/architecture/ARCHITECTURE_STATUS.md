@@ -602,3 +602,15 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > 分离；外部 SaaS 基础设施只通过 Port/Contract 作为 provider。Backend Manifest、Server Architecture、
 > Bounded Context Map、Business Application Platform、Code Architecture、Deployment Architecture 与
 > Architecture Fitness 已同步。本轮 docs-only，不修改 Rust、migration、OpenAPI、数据库或运行拓扑。
+
+> 2026-09-23: PLAN-0014 Wave 0/1 在分支
+> `feat/PLAN-0014-wave1-iam-policy-reference-conformance` 基于同步后的
+> `8365de0211390a6a3367b536c5ceaa5256bbb5cf` 完成 Identity / Organization / Policy
+> 的源码、测试、migration、API 与架构基线重建，以及固定版本的外部参考对齐。审阅记录见
+> `docs/reviews/2026-09-23-plan-0014-wave0-iam-policy-baseline.md` 与
+> `docs/reviews/2026-09-23-saas-align-identity-organization-policy.md`。当前实现判定为
+> R1 foundation；本轮未发现 C0，C1 以 R2 独立发布证据与真实 PostgreSQL/发布闭环不足为阻断，
+> 过期/撤销生命周期、service identity 与通用 ReBAC 保留为 C2/C3。SQLite shared contract
+> 验证已通过；完整 Business API、PostgreSQL、workspace 与独立 reviewer 状态以 formal review
+> 的逐项证据为准。本轮仍为 docs-only，不修改 Rust、migration、OpenAPI、provider runtime，
+> 不启动 Wave 2。
