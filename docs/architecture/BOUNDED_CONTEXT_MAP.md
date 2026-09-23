@@ -1,9 +1,10 @@
 # 业务能力与 Bounded Context Map
 
 > 文档 ID：ARCH-BC-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
 > 生效日期：2026-07-30  
+> 最近修订：2026-09-23  
 > 适用范围：服务端业务边界、模块划分、数据所有权与跨上下文协作
 
 ## 1. 目的
@@ -56,12 +57,25 @@
 - Messaging；
 - Observability。
 
+### 2.4 SaaS 平台能力域
+
+这些能力横跨所有业务上下文，属于 business-platform 的产品/平台 Authority，但不要求全部成为独立进程：
+
+- **Tenancy**：Tenant 生命周期、Tenant Membership 与 tenant-aware provisioning；当前由 Identity/Organization/Shared Context 协作承载，后续形成稳定跨进程 contract；
+- **Commercial & Entitlement**：Product/Plan/Feature、Entitlement、Quota/Budget、UsageEvent、Subscription/Billing binding；当前为目标 Context，尚未形成生产实现；
+- **Platform Module Registry & Lifecycle**：module identity/version、manifest、compatibility、install/enable/disable/uninstall、release digest；compiler/dry-plan foundation 已存在，runtime registry 未实现；
+- **Security & Credential Binding**：SecretRef、Credential Binding、workload/service identity scope；secret value/PKI 可由外部 Secret Manager 承担；
+- **Platform Operations**：tenant/operator administration、configuration、feature rollout、backup/restore、module release/rollback。
+
+这些能力与具体业务 Context 分离，但其业务语义不能由外部 provider schema 取代。
+
 ## 3. 上下文总览
 
 ```text
-Identity and Access ───────┐
-Organization ──────────────┼────→ 所有业务上下文的调用上下文
-Policy ────────────────────┘
+Tenancy / Identity and Access ─┐
+Organization ──────────────────┼────→ 所有业务上下文的调用上下文
+Policy ────────────────────────┘
+Commercial / Entitlement ──────→ 产品能力、Quota、Usage 与 Runtime Policy
 
 Customer ─────┐
               ├──→ Contract ───→ Approval ───→ Finance
@@ -80,6 +94,20 @@ Project ──────┘        │              │
 外部系统 ─────→ Integration Gateway / Anti-Corruption Layer
 Web / Agent ──→ 同一 Application API
 ```
+
+## 3.1 SaaS Context 与外部基础设施的边界
+
+```text
+External IdP            -> AuthN credential/session/token
+AuthZ engine            -> optional authorization computation adapter
+Metering/Billing engine -> optional usage/billing adapter
+Secret Manager/PKI      -> secret value / dynamic credential
+S3-compatible storage   -> object bytes
+Webhook/Notification    -> delivery
+Telemetry backend       -> trace/metric/log analysis
+```
+
+以上实现均不获得 Tenant、业务权限词汇、业务资源所有权、Entitlement 语义或 Domain/Audit 权威。
 
 ## 4. Identity and Access Context
 
