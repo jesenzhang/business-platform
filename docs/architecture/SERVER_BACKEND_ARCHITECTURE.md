@@ -1,9 +1,10 @@
 # 服务端后端架构基线
 
 > 文档 ID：ARCH-BACKEND-001  
-> 版本：2.0  
+> 版本：2.1  
 > 状态：Baseline  
 > 生效日期：2026-07-30  
+> 最近修订：2026-09-23  
 > 适用范围：整个 Rust 服务端 Workspace
 
 ## 1. 架构结论
@@ -11,7 +12,8 @@
 服务端后端采用：
 
 ```text
-战略 DDD
+Enterprise AI SaaS Platform
++ 战略 DDD
 + 模块化单体优先
 + 领域/应用/适配器分层
 + 依赖倒置与端口适配
@@ -21,6 +23,38 @@
 ```
 
 完整架构由 [`BACKEND_ARCHITECTURE_MANIFEST.md`](BACKEND_ARCHITECTURE_MANIFEST.md) 登记的文档集共同定义。本文是总体原则，不替代 Bounded Context、数据、安全、长时任务、部署和契约等专题架构。
+
+### 1.1 Enterprise AI SaaS Platform 定位
+
+business-platform 是 Enterprise AI SaaS Platform 主承载。Rust 服务端同时承载 SaaS Platform Core、Business Application Platform 与 AI/Agent Platform：
+
+```text
+SaaS Platform Core
+  Tenancy / Identity Mapping / Authorization
+  Commercial & Entitlement / Audit / Governance / Operations
+        +
+Business Application Platform
+  Contract / Document / Customer / Project / Approval / Finance / ...
+        +
+AI & Agent Platform
+  Agent Registry / Tool-MCP / Knowledge Binding / Runtime Binding / Capability
+```
+
+核心 Domain/Application/Ports/Compiler 优先 Rust；成熟独立基础设施通过标准协议接入。外部组件的实现语言不改变本平台 Authority。
+
+每个正式 Platform/Business/Agent Module 的目标最低成熟度是 R2（独立版本化 package），但 R2 不要求独立部署。Embedded Rust、Standalone Service、External Provider Adapter 必须位于同一稳定 Port/Contract 后。
+
+### 1.2 SaaS 模块长期不变量
+
+- Tenant/Organization/Membership、业务权限词汇、Resource Ownership、Entitlement 和 Audit/Usage event semantics 属于平台；
+- AuthN credential issuance 外置，AuthZ/business-state final decision 内置；
+- provider schema/SDK/type 不进入 Domain 或 public contract；
+- module release version 与 workspace/product version 分离；
+- module uninstall 与 data purge 分离；
+- Generic Job 与 Durable Domain/Agent Execution 分离；
+- Audit Fact、Runtime Event 与 Telemetry 分离；
+- R2 admission 必须通过 SAAS_MODULE_STANDARD 与 Reference Conformance Review；
+- 模块可 embedded/remote/provider 化，但消费者业务逻辑不能依赖承载方式。
 
 这不是要求所有代码机械套用完整 DDD 战术模式，而是要求：
 
