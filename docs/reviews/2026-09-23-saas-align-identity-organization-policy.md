@@ -1,10 +1,10 @@
 # SaaS Reference Conformance Review：Identity / Organization / Policy
 
-> Review date: 2026-09-23  
-> Plan: PLAN-0014 Wave 0 / Wave 1  
-> Base SHA: `8365de0211390a6a3367b536c5ceaa5256bbb5cf`  
-> Branch: `feat/PLAN-0014-wave1-iam-policy-reference-conformance`  
-> Current implementation baseline: [`2026-09-23-plan-0014-wave0-iam-policy-baseline.md`](2026-09-23-plan-0014-wave0-iam-policy-baseline.md)  
+> Review date: 2026-09-23<br>
+> Plan: PLAN-0014 Wave 0 / Wave 1<br>
+> Base SHA: `8365de0211390a6a3367b536c5ceaa5256bbb5cf`<br>
+> Branch: `feat/PLAN-0014-wave1-iam-policy-reference-conformance`<br>
+> Current implementation baseline: [`2026-09-23-plan-0014-wave0-iam-policy-baseline.md`](2026-09-23-plan-0014-wave0-iam-policy-baseline.md)
 > Scope: review and bounded evidence only; no external authorization runtime is activated
 
 ## 1. Review question and method
