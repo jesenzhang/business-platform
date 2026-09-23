@@ -1,8 +1,11 @@
 # SaaS Module Independent Release Standard
 
+> 文档 ID：STD-SAAS-MODULE-001  
+> 版本：1.0  
 > 文档类型：Standard  
-> 状态：Proposed  
-> 日期：2026-09-23  
+> 状态：Baseline（Accepted by ADR-0025）  
+> 日期：2026-09-23
+> 架构决策：ADR-0025  
 > 适用范围：Platform Capability Module、Business Module、AI/Agent Module、外部服务 Adapter  
 > 目标：任何功能模块可独立版本化/发布，并可在其他产品或部署形态中承担同一能力
 

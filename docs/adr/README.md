@@ -53,6 +53,7 @@ ADR-0006 与 ADR-0007 为历史跳号：经全历史（含所有分支）核查�
 | [`ADR-0022`](ADR-0022-inter-module-communication-and-business-collaboration.md) | Inter-Module Communication and Business Collaboration | Accepted | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga |
 | [`ADR-0023`](ADR-0023-ai-worker-model-provider-dependency.md) | ai-worker 的 model-provider 依赖与可替换性边界 | Accepted | vendored path（CI 私有仓库不可达）、reqwest TLS 并集代价、密钥边界、DocumentFieldExtractor 可替换、隔离门禁 |
 | [`ADR-0024`](ADR-0024-authentication-externalized-authorization-internal.md) | 认证外置与授权内置 | Accepted | 平台不实现凭证签发；外部 OIDC IdP 认证 + 平台内租户/权限/审计授权；私有化交付捆绑开源 IdP；服务身份独立 |
+| [`ADR-0025`](ADR-0025-enterprise-ai-saas-platform-and-independent-modules.md) | Enterprise AI SaaS Platform 与独立可发布模块 | Accepted | business-platform 作为 SaaS Platform 主承载；SaaS/Business/Agent 模块采用统一 Authority/Contract；R2 独立发布不等于微服务；外部 OSS 只通过 Port/Contract 接入 |
 
 ## 4. ADR-0003 的完整 Baseline
 

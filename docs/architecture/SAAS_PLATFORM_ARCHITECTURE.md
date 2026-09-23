@@ -1,8 +1,9 @@
 # Enterprise SaaS Platform Modular Architecture
 
 > 文档类型：Architecture  
-> 状态：Proposed（整合现有 Accepted ADR/Baseline；模块独立发布规则在实现验证后晋升 Baseline）  
-> 日期：2026-09-23  
+> 状态：Baseline（Accepted by ADR-0025）  
+> 日期：2026-09-23
+> 架构决策：ADR-0025 Enterprise AI SaaS Platform and Independently Releasable Modules  
 > 适用范围：business-platform 的 SaaS Platform Core、Business Module、AI/Agent Platform、外部基础设施集成  
 > 当前代码基线：main `9df475d5b834e4f43851deb9613e513f82ef8575`
 
@@ -10,7 +11,7 @@
 
 business-platform 是三个相关项目中企业级 SaaS Platform 的主承载项目。平台核心能力优先使用 Rust 实现；已经形成成熟独立产品边界的通用基础设施通过标准协议接入，不为了语言统一而重写。
 
-本架构不要求“一个仓库包含 SaaS 的全部功能”，也不要求每个逻辑模块立即拆成微服务。目标是：
+本架构由 ADR-0025 接受并成为服务端 Baseline。它不要求“一个仓库包含 SaaS 的全部功能”，也不要求每个逻辑模块立即拆成微服务。目标是：
 
 1. 每个功能模块拥有独立、稳定、版本化的公开合同；
 2. 每个模块可以独立构建、测试、版本化、发布和替换；
