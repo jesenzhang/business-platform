@@ -6,7 +6,8 @@
 > Target close: 2026-10-23  
 > Owner: Platform Architecture + Module Owners  
 > Planning Base: main at `5bd9b88a7b83e811aeec7087215b4bc5c004f4cf`  
-> Architecture inputs: SAAS_PLATFORM_ARCHITECTURE, SAAS_MODULE_STANDARD, BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE, ADR-0020/0021/0022/0024  
+> Architecture inputs: SAAS_PLATFORM_ARCHITECTURE, SAAS_MODULE_STANDARD, BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE, ADR-0020/0021/0022/0024/0025  
+> Architecture Rebaseline: 2026-09-23 ADR-0025 / SaaS Baseline alignment; execution branches must sync latest main before review  
 > Constraint: this plan does not authorize a broad microservice split or replacement of current working modules
 
 ## 1. Goal
