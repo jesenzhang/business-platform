@@ -1,9 +1,10 @@
 # 服务端部署架构
 
 > 文档 ID：ARCH-DEPLOY-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
 > 生效日期：2026-07-30  
+> 最近修订：2026-09-23  
 > 适用范围：开发、测试、预生产与生产环境的进程、节点、网络和扩缩容
 
 ## 1. 原则
@@ -99,6 +100,25 @@ Persistence / Message / Artifact / Providers
 
 共享进程是部署优化，不是取消边界。
 
+## 4.1 独立发布与独立部署分离
+
+SaaS Module 的 R2“独立发布”是 package/contract/version 边界，不意味着每个模块都成为容器或服务。
+
+```text
+R2 Module
+├─ embedded in business-api/business-worker
+├─ embedded in another Rust host
+└─ later R3 standalone service (only when justified)
+```
+
+同一 Port 的 remote/provider adapter 必须保持业务语义等价。拆分前先证明独立扩缩容、安全域、故障域、发布周期、特殊运行时或跨产品共享等客观需求。
+
+## 4.2 外部 SaaS 基础设施
+
+生产部署允许按需求接入独立基础设施：External OIDC IdP、authorization computation engine、metering/billing engine、Secret Manager/PKI、S3-compatible object store、webhook/notification delivery、feature management、OpenTelemetry/telemetry backend、AI trace/eval backend。
+
+这些服务必须位于 adapter/network boundary 后。Business Platform 在外部服务不可用时按对应 capability 的 failure policy fail closed 或有界降级，不能静默改变业务授权、Entitlement 或 Domain 语义。
+
 ## 5. 拆分条件
 
 只有满足至少一项可测量需求时拆分独立服务：
@@ -156,7 +176,7 @@ Ingress Zone
 Application Zone
 Data Zone
 Management/Observability Zone
-External Provider Egress
+External Provider / SaaS Infrastructure Egress
 ```
 
 要求：
