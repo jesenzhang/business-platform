@@ -2,11 +2,11 @@
 
 > 文档类型：Living Document
 > 最后更新：2026-09-23
-> 当前阶段：Post-v0.1 Business Delivery — 认证已生产化；PLAN-0013 Identity/Authorization 已 Integrated / Archived；下一步以 Contract 真实垂直切片验证平台，再激活 PLAN-0006 Revision 1
+> 当前阶段：Enterprise AI SaaS Platform Baseline 已对齐；PLAN-0014 Reference Conformance / R2 Readiness Active；Contract 真实垂直切片仍是下一主要业务实现
 > 当前计划：PLAN-0014 Reference Conformance / R2 Readiness Active（review-first，2026-09-23→2026-10-23）；Contract Business Vertical Slice 仍是下一主要业务代码计划；PLAN-0006 Revision 1 Proposed / BLOCKED
 > 集成方式：GitHub PR merge
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
-> SaaS Platform：2026-09-23 完成 docs-only 模块化架构收敛（Proposed）：复用现有 BusinessModuleManifest/compiler 与 PLAN-0013 IAM，不激活新 runtime；后续模块按独立 version/contract/release、embedded/remote/provider 可替换标准演进
+> SaaS Platform：2026-09-23 经 ADR-0025 Accepted，`SAAS_PLATFORM_ARCHITECTURE.md` 与 `SAAS_MODULE_STANDARD.md` 已晋升 Baseline；复用现有 BusinessModuleManifest/compiler 与 PLAN-0013 IAM，不激活新 runtime
 > Reference Alignment：PLAN-0014 已排期，先 IAM/Policy 与 Module Packaging，再 Durable/Audit、Document/Storage、Observability/Notification，最后至少两个模块完成 R2 pilot
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
@@ -594,3 +594,11 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 - 新增生产部署单元、供应链安全事件或重大基础设施变化；
 - 质量属性目标被实测或调整；
 - Knowledge/Analytics/Controlled Write 等后续计划被正式提出。
+
+
+> 2026-09-23: ADR-0025 Accepted，完成 Enterprise AI SaaS Platform 文档对齐。business-platform
+> 被明确为 SaaS Platform 主承载；SaaS Core、Business Application Platform 与 AI/Agent Platform
+> 使用同一 Tenant/Principal/Policy/Audit/Usage contract；正式模块目标最低 R2，独立发布与独立部署
+> 分离；外部 SaaS 基础设施只通过 Port/Contract 作为 provider。Backend Manifest、Server Architecture、
+> Bounded Context Map、Business Application Platform、Code Architecture、Deployment Architecture 与
+> Architecture Fitness 已同步。本轮 docs-only，不修改 Rust、migration、OpenAPI、数据库或运行拓扑。
