@@ -1,9 +1,10 @@
 # 项目代码架构规范
 
 > 文档 ID：ARCH-CODE-001  
-> 版本：1.0  
+> 版本：1.1  
 > 状态：Baseline  
 > 生效日期：2026-07-30  
+> 最近修订：2026-09-23  
 > 适用范围：整个 Rust Workspace
 
 ## 1. 目标
@@ -120,6 +121,48 @@ src/
 - 为避免循环依赖而临时搬入的代码。
 
 当前 `shared-kernel` 对 Axum 和 SQLx 的依赖属于初始实现债务，后续应拆分为协议层错误映射和基础设施层错误转换。
+
+### 3.5 SaaS Module 发布边界
+
+Cargo crate 是代码单元，不自动等于可独立发布 Module。
+
+R2 Module 至少需要：
+
+```text
+module identity/version
+manifest
+public commands/queries/events/resources
+ports
+migration namespace
+compatibility
+package/contract digest
+contract tests
+release metadata
+```
+
+推荐物理模式：
+
+```text
+crates/<module>
+crates/<module>-contracts       # 需要跨包/跨产品时
+crates/<module>-postgres
+crates/<module>-sqlite          # 声明支持时
+crates/<module>-<provider>
+apps/<module>-service           # 只有 R3/独立部署需要时
+```
+
+`version.workspace = true` 只表示当前产品/workspace 版本；不能替代 module canonical release version。进入 R2 前必须建立 module version 与 crate/release bundle 的可审计映射。
+
+### 3.6 Embedded / Remote / Provider 等价
+
+```text
+Caller -> CapabilityPort
+          ├─ InProcessAdapter
+          ├─ RemoteServiceAdapter
+          └─ ExternalProviderAdapter
+```
+
+Domain/Application 禁止依赖 concrete SaaS provider SDK/type；provider binding 位于 composition/infrastructure。
 
 ## 4. 分层职责
 
@@ -287,7 +330,7 @@ shared-kernel → Axum/SQLx
 
 当前默认是模块化单体。crate 是代码边界，不自动等于部署服务。
 
-只有满足至少一个客观条件时考虑拆分：
+模块达到 R2 并不触发拆分。只有满足至少一个客观条件时考虑从 embedded 进一步拆为 R3 独立部署：
 
 - 独立扩缩容；
 - 独立安全边界；
