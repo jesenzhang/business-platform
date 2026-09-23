@@ -1,9 +1,9 @@
 # PLAN-0014 Wave 0：Identity / Organization / Policy 真实基线
 
-> Review date: 2026-09-23  
-> Branch: `feat/PLAN-0014-wave1-iam-policy-reference-conformance`  
-> Base: `8365de0211390a6a3367b536c5ceaa5256bbb5cf`（同步后的 `main`）  
-> Scope: PLAN-0013 集成后的 Identity、Organization、Policy，以及 Business API 的认证/授权组合根  
+> Review date: 2026-09-23<br>
+> Branch: `feat/PLAN-0014-wave1-iam-policy-reference-conformance`<br>
+> Base: `8365de0211390a6a3367b536c5ceaa5256bbb5cf`（同步后的 `main`）<br>
+> Scope: PLAN-0013 集成后的 Identity、Organization、Policy，以及 Business API 的认证/授权组合根
 > Status: Wave 0 baseline reconstructed; R2 is not claimed
 
 ## 1. 证据边界
@@ -143,5 +143,4 @@
 
 当前源码支持的结论是：Identity、Organization、Policy 已从 PLAN-0013 的基础实现进入可验证的 **R1 foundation**，并且在本地 fake/domain 与 SQLite adapter 证据上保持 default-deny、tenant-scoped、versioned、idempotent 和 auditable 语义。它们仍不是 R2 独立发布模块。
 
-没有发现需要在 Wave 1 直接引入外部授权 runtime、通用 relation graph、service identity 或巨大 PrincipalContext 的 C0 安全缺口。下一个正式 review 文档将固定六个参考项目的 tag/commit，逐项给出 ADOPT/ADAPT/KEEP/DEFER/REJECT，以及 17 个 adversarial scenario 的当前证据、NOT RUN 和 C2/C3 边界。
-
+没有发现需要在 Wave 1 直接引入外部授权 runtime、通用 relation graph、service identity 或巨大 PrincipalContext 的 C0 安全缺口。配套的正式 conformance review 已固定六个参考项目的 tag/commit，并逐项记录 ADOPT/ADAPT/KEEP/DEFER/REJECT 决策、17 个 adversarial scenario 的现有证据、NOT RUN 项与 C2/C3 边界。
