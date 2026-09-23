@@ -3,12 +3,12 @@
 > 文档类型：Baseline
 > 状态：Accepted baseline; PLAN-0011 Integrated
 > 日期：2026-08-19
-> 最近修订：2026-09-18
+> 最近修订：2026-09-23
 > 适用范围：Platform Core、Business Module、Application Packaging、Contribution、跨模块协作与生命周期
 
 ## 1. 目标
 
-本架构定义一个通用 Enterprise Business Application Platform 的最小稳定模型：新增业务模块不要求修改 Platform Core；模块可通过公开契约和贡献声明加入平台；模块之间可以协作、扩展和安全引用；模块代码移除与业务数据清除分离。
+本架构定义 Enterprise AI SaaS Platform 内部的通用 Enterprise Business Application Platform 最小稳定模型：新增业务模块不要求修改 Platform Core；模块可通过公开契约和贡献声明加入平台；模块之间可以协作、扩展和安全引用；模块代码移除与业务数据清除分离。
 
 本轮只收敛架构、标准、ADR、Plan 和 Fitness Functions，不实现 Module Registry、安装/卸载 executor、动态插件、WASM/Node/Python runtime、Marketplace、数据库迁移或真实业务模块。
 
@@ -49,6 +49,22 @@ Business Module
 ```
 
 Module 拥有其 Bounded Context 的正式事实、状态、事务、版本、幂等规则、领域事件、迁移和公开 Application Commands/Queries。Manifest、compiled package、UI metadata、Agent descriptor 和 Semantic Contract 都不能取代 Domain。
+
+## 2.3 与 SaaS Platform 的关系
+
+Business Application Platform 是 SaaS Platform 的业务模块层，不单独拥有第二套 Tenant/Identity/AuthZ/Commercial/Audit。
+
+```text
+Enterprise SaaS Platform
+├── SaaS Platform Capabilities
+│   Tenancy / Identity / Policy / Commercial / Audit / Operations
+├── Business Application Platform
+│   Business Modules + Packaging + Contributions + Semantic Contract
+└── AI & Agent Platform
+    Agent/Tool/Knowledge/Runtime Binding
+```
+
+Business Module 统一消费平台 Principal/Tenant、Policy、SecretRef、UsageEvent、Audit/Event contracts。外部 OSS 只能作为 capability adapter。
 
 ## 3. 三层边界：DDD、Extension Metadata、Semantic Contract
 
@@ -218,3 +234,33 @@ module-extension  consumes A's published extension point
 - Identity/Authorization 具体平台模型由 `IDENTITY_AND_AUTHORIZATION_ARCHITECTURE.md` 约束；
 - PLAN-0006 Revision 1 只能在 Identity/Authorization 与真实 Contract Published Contract 已集成后激活；
 - 不引入第二 Durable Task Runtime，不修改 PLAN-0009 已完成归档状态。
+
+
+## 11. 独立发布成熟度与 R2 门禁
+
+Business Module Packaging 的长期目标不是“每个模块一个微服务”，而是“每个模块先拥有可独立发布的 package boundary”。
+
+```text
+R0 Internal
+R1 Isolated
+R2 Independently Versioned Package
+R3 Deployment Independent
+R4 Cross-product Reusable
+```
+
+所有正式 Platform/Business/Agent Module 的目标最低等级为 R2。进入 R2 前必须有 stable module identity、独立 module release version、manifest/public contracts/package digest、migration namespace/compatibility、shared contract tests、Reference Conformance Review PASS、C0/C1 全部关闭和 independent reviewer PASS。
+
+当前多数成熟 crate 仍为 R1：代码边界和行为契约较好，但 workspace version、manifest/release artifact/remote surface 尚未构成独立 module release。不得提前宣称 R2。
+
+具体规则由 SAAS_MODULE_STANDARD 与 PLAN-0014 约束。
+
+## 12. 承载形态
+
+```text
+Application -> CapabilityPort
+               ├─ Embedded Rust Adapter
+               ├─ Remote Service Adapter
+               └─ External OSS Provider Adapter
+```
+
+消费者只依赖 public contract/port。承载方式变化不得改变 Domain 业务规则，也不得把 provider DTO/type 泄漏到 public contract。
