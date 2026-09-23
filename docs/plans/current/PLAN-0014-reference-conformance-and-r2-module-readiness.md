@@ -5,7 +5,7 @@
 > Date: 2026-09-23  
 > Target close: 2026-10-23  
 > Owner: Platform Architecture + Module Owners  
-> Planning Base: main at `5bd9b88a7b83e811aeec7087215b4bc5c004f4cf`  
+> Planning Base: main at `8365de0211390a6a3367b536c5ceaa5256bbb5cf` (2026-09-23 sync)  
 > Architecture inputs: SAAS_PLATFORM_ARCHITECTURE, SAAS_MODULE_STANDARD, BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE, ADR-0020/0021/0022/0024/0025  
 > Architecture Rebaseline: 2026-09-23 ADR-0025 / SaaS Baseline alignment; execution branches must sync latest main before review  
 > Constraint: this plan does not authorize a broad microservice split or replacement of current working modules
@@ -412,7 +412,8 @@ Required tests：
 
 ```text
 docs/reviews/
-  2026-09-xx-saas-align-iam-policy.md
+  2026-09-23-plan-0014-wave0-iam-policy-baseline.md
+  2026-09-23-saas-align-identity-organization-policy.md
   2026-09-xx-saas-align-module-packaging.md
   2026-10-xx-saas-align-durable-execution.md
   2026-10-xx-saas-align-audit-messaging.md
@@ -425,6 +426,28 @@ docs/reviews/
 `docs/templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md`
 
 每份 review 必须记录 fixed reference revisions，不允许只引用项目首页。
+
+### Wave 0/1 execution record — 2026-09-23
+
+本轮执行分支为 `feat/PLAN-0014-wave1-iam-policy-reference-conformance`，固定
+Base 为 `8365de0211390a6a3367b536c5ceaa5256bbb5cf`；`main` 未修改、未 push、未
+启动 Wave 2。已从源码、测试、migration、API/UI 与 architecture check 重建
+Identity / Organization / Policy 的真实语义，并固定 Logto、ZITADEL、ABP Framework、
+OpenFGA、SpiceDB、Cerbos 的 release/tag、commit、license、source/test/doc 路径。
+
+交付物：
+
+- `docs/reviews/2026-09-23-plan-0014-wave0-iam-policy-baseline.md`；
+- `docs/reviews/2026-09-23-saas-align-identity-organization-policy.md`；
+- 本计划与 `docs/architecture/ARCHITECTURE_STATUS.md` 的执行状态同步。
+
+当前结论：Identity / Organization / Policy 保持 R1 foundation；本轮未发现 C0，C1
+明确为 R2 阻断或待独立发布证据关闭；过期/撤销生命周期、service identity、通用
+ReBAC 与独立模块发布材料保留为 C2/C3 或后续 Wave。没有为“参考对齐”引入 Rust、
+migration、OpenAPI 或 provider runtime 变更。共享 identity/organization/policy
+contract 的 fake/domain 与 SQLite 适配器证据已记录；Business API、PostgreSQL、
+workspace 全门禁及独立 reviewer 必须按 formal review 的逐项状态解释，未运行项不得
+解释为通过。Wave 1 exit 在独立 reviewer 完成前仍为 `R2 BLOCKED / NOT CLAIMED`。
 
 ## 6. 日程
 
