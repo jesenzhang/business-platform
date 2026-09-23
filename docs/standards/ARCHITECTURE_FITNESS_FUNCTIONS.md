@@ -450,3 +450,21 @@ Architecture Foundation Convergence 文档阶段新增以下 Required 设计门�
 - required platform capability 必须 against explicit evidence/catalog 解析并 fail closed；UI/Agent target 类型和 classification 必须由 typed contract 闭合校验；规划冲突必须输出结构化 `Conflict`；
 - Module removal 不能暗示或自动执行 business data purge；
 - UI、Agent、Semantic contribution 共享 module identity 但有独立 schema/authorization，Agent Tool 只能调用 Application API。
+
+
+## 28. SaaS Module 与 Reference Conformance gates
+
+触及 Enterprise SaaS Platform、模块 R2 admission 或 provider adapter 时，Conditional Required：
+
+- module core 不依赖 concrete provider SDK/type；
+- cross-module 只依赖 public contract/port，不导入 private persistence；
+- module release version 与 workspace product version 语义分离；
+- manifest、public contract、package digest、compatibility、migration namespace 一致；
+- declared adapter 必须执行同一 shared behavior contract suite；
+- tenant-required command/query 缺可信 Principal/Tenant context 时 fail closed；
+- uninstall 不自动 purge；
+- Embedded/Remote/Provider adapter 不改变业务授权、资源所有权和 Domain 决策；
+- provider outage/fallback 有明确测试；
+- R2 admission 必须有 Reference Conformance Review：至少两个成熟同领域 reference、至少一个生产型 OSS/平台、fixed reviewed revision、C0=0/C1=0、独立 reviewer PASS；
+- 进入 R2 的 release artifact 必须可重复构建，并能由 consumer 在不依赖 concrete adapter 的情况下编译/测试；
+- Release claim 必须与实际成熟度一致：只有代码隔离而无 independent version/manifest/artifact 的模块仍为 R1。
