@@ -1,10 +1,10 @@
 # 服务端后端架构清单与执行契约
 
 > 文档 ID：ARCH-MANIFEST-001
-> 版本：1.3
+> 版本：1.4
 > 状态：Baseline
 > 生效日期：2026-08-08
-> 最近修订：2026-09-18
+> 最近修订：2026-09-23
 > 适用范围：所有服务端设计、计划、代码、测试、部署与审查任务
 
 ## 1. 目的
@@ -22,6 +22,7 @@
 + 长时任务与流程协调
 + Enterprise AI Workspace 与 Agent Capability
 + 身份、组织、角色与业务授权
++ Enterprise SaaS Tenancy / Commercial / Module Release
 + 安全、质量属性与可运维性
 + 部署、可观测性与演进治理
 + 自动化架构适配门禁
@@ -53,11 +54,13 @@
 | 数据治理、分析与可视化 | `DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md` | 可重建分析投影、指标语义、受控查询、Dashboard、报表和 Agent 边界 |
 | Business Module Isolation 与 Semantic Contract | `BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md` | 平台核心/业务模块隔离、Manifest、语义贡献、确定性编译与 legacy ACL 边界 |
 | Business Application Platform | `BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md` | Platform Core/Business Module 边界、DDD/Metadata/Semantic 三层、贡献、生命周期与 synthetic validation |
+| Enterprise SaaS Platform | `SAAS_PLATFORM_ARCHITECTURE.md` | Tenancy/AuthZ/Commercial/Security/Execution/Data/Integration/Governance/Ops/Agent 的 SaaS 组合架构、Authority 与可替换 provider 边界 |
 | 跨模块通信与业务协作 | `../standards/INTER_MODULE_COMMUNICATION_STANDARD.md` / `../adr/ADR-0022-inter-module-communication-and-business-collaboration.md` | Query、Command、Event、ResourceRef、Snapshot、Projection、Process Manager/Saga |
 | API 与事件 | `../standards/API_AND_EVENT_CONTRACT_STANDARD.md` | 对外协议和兼容性规则 |
 | 架构门禁 | `../standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` | 如何自动证明架构符合性 |
 | Rust 编码 | `../standards/RUST_CODING_STANDARD.md` | 具体编码和测试规范 |
 | 查询与数据库适配 | `../standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md` | Read DTO、分页、查询性能、SQL/ORM 与层级数据规则 |
+| SaaS Module 独立发布 | `../standards/SAAS_MODULE_STANDARD.md` | Module identity/version/manifest/contracts/migration/adapters/release、R0-R4 与 Reference Conformance/R2 门禁 |
 
 任何单份文档都不能脱离其余文档单独解释为完整架构。
 
@@ -70,6 +73,18 @@ DATA_OWNERSHIP_AND_CONSISTENCY.md
 DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md
 ADR-0019-enterprise-business-domain-portfolio-and-cross-functional-assurance.md
 ```
+
+涉及 Enterprise SaaS Platform、Tenant/Organization/Entitlement、模块独立发布、外部 SaaS infrastructure 组合或 R2 admission 的任务，必须同时遵守：
+
+```text
+SAAS_PLATFORM_ARCHITECTURE.md
+BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md
+../standards/SAAS_MODULE_STANDARD.md
+../plans/current/PLAN-0014-reference-conformance-and-r2-module-readiness.md
+../adr/ADR-0025-enterprise-ai-saas-platform-and-independent-modules.md
+```
+
+外部 IdP/AuthZ/Metering/Secret/Webhook/Notification/Feature/Telemetry 产品只能作为 provider/adapter；不得成为 Tenant、业务权限词汇、Resource Ownership、Entitlement 语义或 Audit/Domain authority 的第二权威。
 
 涉及 Business Module、Semantic Contract、Metric/Dimension/Lineage 注册、模块依赖或
 legacy ACL 的任务，必须同时遵守：
@@ -190,6 +205,18 @@ Workspace、Conversation、Skill、Context、Observation、Artifact 和 Generate
 ### 4.16 认证外置、业务授权内置
 
 人员凭证、登录、MFA、refresh/session 归外部 OIDC IdP；平台只验证受信身份。平台内部必须拥有 PlatformUser/TenantMembership、Role/Permission/Resource Scope 与可审计 Policy Decision。Agent Capability 是当前用户权限的更窄委托，不能代替基础授权。
+
+### 4.17 SaaS Authority 与实现解耦
+
+business-platform 是 Enterprise AI SaaS Platform 的主承载。平台自己拥有 Tenant/Membership、业务权限词汇、Resource Ownership、Entitlement/Usage/Audit 语义；成熟 OSS 可以承担认证签发、授权计算、计量、Secret、Webhook、通知、Feature Flag、Telemetry、对象存储等实现，但只能通过稳定 Port/Contract 接入。
+
+### 4.18 独立发布不等于独立部署
+
+Platform/Business/Agent Module 以 BusinessModuleManifest、独立 release identity、versioned contract、migration namespace、compatibility、digest 和 contract tests 形成独立发布边界。默认仍可运行在模块化单体内；只有独立扩缩容、安全域、故障域、生命周期或跨产品复用需求出现时才拆独立进程。
+
+### 4.19 R2 前必须 Reference Conformance
+
+模块进入独立发布 R2 前，必须完成 Reference Conformance Review：至少两个同领域成熟参考项目、至少一个生产型 OSS/平台，固定 reviewed revision，检查源码/测试/失败/安全/恢复语义，关闭 C0/C1，并由独立 reviewer 对固定 SHA 给出 PASS。
 
 ## 5. 新任务架构准入
 
