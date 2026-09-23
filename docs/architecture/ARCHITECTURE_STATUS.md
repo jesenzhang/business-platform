@@ -1,11 +1,13 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-19
+> 最后更新：2026-09-23
 > 当前阶段：Post-v0.1 Business Delivery — 认证已生产化；PLAN-0013 Identity/Authorization 已 Integrated / Archived；下一步以 Contract 真实垂直切片验证平台，再激活 PLAN-0006 Revision 1
-> 当前计划：下一候选 Contract Business Vertical Slice（待创建计划）；PLAN-0013 Integrated / Archived（PR #17 合入 main）；PLAN-0006 Revision 1 Proposed / BLOCKED；PLAN-0012 Integrated / Archived；PLAN-0009 Rehearsal Closed
+> 当前计划：PLAN-0014 Reference Conformance / R2 Readiness Active（review-first，2026-09-23→2026-10-23）；Contract Business Vertical Slice 仍是下一主要业务代码计划；PLAN-0006 Revision 1 Proposed / BLOCKED
 > 集成方式：GitHub PR merge
-> Analytics/Visualization：Baseline 已建立，运行时尚未实现\n> SaaS Platform：2026-09-23 完成 docs-only 模块化架构收敛（Proposed）：复用现有 BusinessModuleManifest/compiler 与 PLAN-0013 IAM，不激活新 runtime；后续模块按独立 version/contract/release、embedded/remote/provider 可替换标准演进
+> Analytics/Visualization：Baseline 已建立，运行时尚未实现
+> SaaS Platform：2026-09-23 完成 docs-only 模块化架构收敛（Proposed）：复用现有 BusinessModuleManifest/compiler 与 PLAN-0013 IAM，不激活新 runtime；后续模块按独立 version/contract/release、embedded/remote/provider 可替换标准演进
+> Reference Alignment：PLAN-0014 已排期，先 IAM/Policy 与 Module Packaging，再 Durable/Audit、Document/Storage、Observability/Notification，最后至少两个模块完成 R2 pilot
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
 > was fast-forwarded at `ad47544505b66d577ccdcb8f300812c294d3d7bf`; main CI

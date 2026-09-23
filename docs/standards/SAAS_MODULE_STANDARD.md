@@ -368,6 +368,17 @@ build_toolchain
 
 有 manifest/SemVer/digest/migration/compatibility，可发布到独立 artifact registry。**所有 Platform/Business Module 的目标最低等级。**
 
+进入 R2 前必须完成 **Reference Conformance Review**：
+
+- 至少两个同领域成熟参考项目；
+- 至少一个是真实生产型 OSS/平台而不是 starter；
+- 固定 reviewed revision/release；
+- 检查源码、测试、失败/安全/恢复语义，不只读 README；
+- C0=0、C1=0；
+- 独立 reviewer 对固定 SHA 给出 PASS；
+- review 使用 `docs/templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md`；
+- 对齐结论允许 KEEP/DEFER/REJECT，不要求复制参考项目。
+
 ### R3 — Deployment-independent
 
 存在 remote adapter，模块可以独立进程运行，消费者无需改业务逻辑。
