@@ -113,7 +113,7 @@ Owner Module A 主动发布版本化 Extension Point；Consumer Module B 通过 
 
 ## 5. Module 间通信
 
-唯一正式机制为：Synchronous Application Query、Synchronous Command、Integration Event、ResourceRef、Reference + Snapshot、Published Read Projection，以及跨模块业务过程使用的 Process Manager/Saga。细节由 [`INTER_MODULE_COMMUNICATION_STANDARD.md`](../standards/INTER_MODULE_COMMUNICATION_STANDARD.md) 和 Proposed ADR-0022 定义。
+唯一正式机制为：Synchronous Application Query、Synchronous Command、Integration Event、ResourceRef、Reference + Snapshot、Published Read Projection，以及跨模块业务过程使用的 Process Manager/Saga。细节由 [`INTER_MODULE_COMMUNICATION_STANDARD.md`](../standards/INTER_MODULE_COMMUNICATION_STANDARD.md) 和 Accepted ADR-0022 定义。
 
 ```text
 Module A
