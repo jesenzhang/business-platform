@@ -158,13 +158,14 @@ Current boundary:
 |---|---|---|
 | Identity/Organization/Policy domain + shared fake tests | PASS | `cargo test -p identity -p organization -p policy -p identity-authorization-contracts --all-features` |
 | SQLite adapter contracts | PASS | identity, organization and policy contract tests; each one passed in this run |
-| Business API adversarial/E2E | IN PROGRESS at document drafting time | Run separately because the workspace target directory was locked by another Cargo process; final result is recorded in the closeout update |
+| Business API adversarial SQLite | PASS | `cargo test -p business-api --test iam_adversarial_sqlite --all-features`; 6 passed |
+| Business API bootstrap / IAM admin / security | PASS | `e2e_admin_bootstrap_sqlite` 3 passed; `iam_admin_api` 22 passed; `security` 16 passed |
 | PostgreSQL adapter contracts/E2E/perf | NOT RUN locally | No local PostgreSQL/Docker; historical PLAN-0013 CI evidence is cited separately and is not current-run evidence |
-| `cargo fmt --all -- --check` | PENDING closeout | Must be rerun after all branch edits |
-| `cargo check --workspace --all-targets --all-features` | PENDING closeout | Must be rerun after all branch edits |
-| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | PENDING closeout | Must be rerun after all branch edits |
-| `cargo test --workspace --all-features` | PENDING closeout | Must be rerun or marked NOT RUN with reason |
-| `scripts/check-architecture.ps1` / equivalent | PENDING closeout | Must be rerun after all branch edits |
+| `cargo fmt --all -- --check` | PASS | Run on the final docs-only tree; no Rust source changed |
+| `cargo check --workspace --all-targets --all-features` | NOT RUN | No production code changed; the focused Business API command compiled the API and relevant dependency graph |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | NOT RUN | No production code changed; no workspace-wide lint claim |
+| `cargo test --workspace --all-features` | NOT RUN | No production code changed; focused identity, organization, policy, adapter, API and security tests are listed above |
+| `scripts/check-architecture.ps1` | PASS | `Architecture fitness: PASS`; included OpenAPI contract check passed |
 | security/license/secret scan | NOT RUN locally unless the repository command is available | Do not infer from source review |
 
 ## 11. R2 readiness
@@ -194,4 +195,3 @@ To be filled after the implementation/document candidate is frozen:
 ## 13. Conclusion before independent review
 
 Current reference alignment supports **KEEP internal authority + ADAPT proven safety/contract practices + DEFER consumer-less capabilities + REJECT provider replacement**. No production Rust behavior change is justified by a C0/C1 security defect in this review snapshot. The remaining R2 blockers are explicit and must not be hidden by the green domain/SQLite evidence.
-

@@ -449,6 +449,14 @@ contract 的 fake/domain 与 SQLite 适配器证据已记录；Business API、Po
 workspace 全门禁及独立 reviewer 必须按 formal review 的逐项状态解释，未运行项不得
 解释为通过。Wave 1 exit 在独立 reviewer 完成前仍为 `R2 BLOCKED / NOT CLAIMED`。
 
+本轮收集的当前分支证据：`cargo fmt --all -- --check` PASS；
+`scripts/check-architecture.ps1` 的 Architecture Fitness 与 OpenAPI contract PASS；
+`iam_adversarial_sqlite` 6/6、`e2e_admin_bootstrap_sqlite` 3/3、`iam_admin_api` 22/22、
+`security` 16/16 PASS；identity/organization/policy domain/shared fake tests 及三个
+SQLite adapter contract suites PASS。PostgreSQL、workspace-wide check/clippy/test 与
+本机 security/license/secret scan 仍分别为 `NOT RUN`（无本机 PostgreSQL；本轮无生产 Rust
+变更）。详细限定见 formal review 的 Validation 表。
+
 ## 6. 日程
 
 ### Wave 0 — Baseline & tooling
