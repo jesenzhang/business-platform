@@ -114,6 +114,7 @@
 | G-06 explain target resource/compat semantics need explicit API wording | C2 | Authorize and Explain share Engine; admin explain builds target context without caller token compat grants | A caller could mistake stored-policy explanation for another token’s complete decision | Document as policy-binding diagnostic; add parity fixture when a real business resource explain consumer exists |
 | G-07 role creation with initial permissions spans two commands | C2 accepted limitation | `apps/business-api/src/routes/iam_admin.rs` creates role then set-replaces permissions; prior Stage 8 review recorded this | Crash between commands can leave an empty role, but replay converges and no authorization widening occurs | Keep bounded behavior; repair only if a product contract requires atomic composite command |
 | G-08 cross-process PrincipalContext not yet a published contract | C2 | Current `TenantContext`/`AuthenticatedPrincipal` are request-local; no worker/remote IAM consumer | Independent worker/module use needs stable subject, tenant, auth method, delegation and correlation semantics | Defer until real cross-process consumer; do not create a large context now |
+| G-09 organization roster removal does not revoke a separate Policy RoleBinding | C2 SHOULD | `OrganizationMembership` removal only deactivates the organization row; Policy `scope_matches` validates unit status/tree but not the subject's membership. Existing organization tests assert roster removal/filtering, not a subsequent authorization deny | If roster removal is intended to revoke org access, a still-active org-scoped binding may remain effective while the unit stays active | Clarify whether membership and authorization are separate product semantics; if removal must cut access, define owner/transaction or revocation contract and add a remove→authorize regression before claiming it |
 
 No C0 was found in the reviewed current paths. C1 items are R2 admission/evidence blockers, not permission bypasses; Wave 1 therefore does not claim R2 readiness.
 
@@ -129,7 +130,7 @@ No C0 was found in the reviewed current paths. C1 items are R2 admission/evidenc
 | 6 | Revoked binding | `contract_authorization_fixture::revocation_stops_authorization_on_the_next_decision`; E2E revoke → 403 | PASS |
 | 7 | Expired/not-yet-effective binding | policy decision matrix and binding contract validity-window cases | PASS |
 | 8 | Expired tenant/org membership | no expiry state in current membership models; organization removal is inactive and is tested | PARTIAL; expiry is C2, not an untested allow path |
-| 9 | Removed organization membership | organization contract remove→inactive, list filtering and re-add; disabled unit scope denies | PASS for current remove semantics |
+| 9 | Removed organization membership | organization contract proves remove→inactive, list filtering and re-add; Policy OrganizationUnit scope checks unit status/tree but does not resolve the subject's OrganizationMembership | PASS for roster removal; separate RoleBinding revocation is not proven (G-09 C2) |
 | 10 | Unknown/retired/malformed permission | policy decision matrix and bounded compat parser; unknown keys never grant | PASS |
 | 11 | Bad scope/resource kind or scope widening | ResourceScope validation, decision matrix, exact/type/org-subtree tests | PASS |
 | 12 | Wrong-tenant/foreign role | policy contract role visibility and cross-tenant bind rejection | PASS |
@@ -185,13 +186,15 @@ Current boundary:
 
 ## 12. Independent reviewer record
 
-To be filled after the implementation/document candidate is frozen:
-
 - Reviewer: GPT-5.6 Sol, High reasoning, read-only independent pass;
-- Fixed range: Base `8365de0211390a6a3367b536c5ceaa5256bbb5cf` → candidate SHA recorded in closeout;
-- Required verdict: `PASS`, `PASS WITH C2-C3`, or `FAIL`;
-- Required focus: authority, tenant isolation, provider leakage, C0/C1 classification, adversarial evidence, release honesty and speculative abstraction.
+- Review date: 2026-09-24;
+- Fixed range: Base `8365de0211390a6a3367b536c5ceaa5256bbb5cf` → Candidate `c7dc3d142a526b47e9ba8e472b82346ffdaed221`;
+- Verdict: **PASS WITH C2/C3**; no evidence-backed C0/C1 correctness or tenant-isolation blocker found;
+- Accepted C2 clarification: G-09, organization roster removal does not itself prove revocation of a separately stored Policy binding;
+- Other accepted limits: membership expiry, service/workload identity, ReBAC/group sharing, cross-process PrincipalContext, and complete resource-owner loading remain deferred;
+- R2 remains blocked by independent module SemVer/identity, manifest/digest, migration/rollback mapping, reproducible artifact/consumer build, and fresh PostgreSQL release evidence;
+- Review coverage note: the reviewer did not independently re-fetch the six upstream repositories during the pass; their exact tags/commits, licenses and inspected source/test paths are recorded in Section 2 from the reference pinning work.
 
-## 13. Conclusion before independent review
+## 13. Conclusion
 
-Current reference alignment supports **KEEP internal authority + ADAPT proven safety/contract practices + DEFER consumer-less capabilities + REJECT provider replacement**. No production Rust behavior change is justified by a C0/C1 security defect in this review snapshot. The remaining R2 blockers are explicit and must not be hidden by the green domain/SQLite evidence.
+Current reference alignment supports **KEEP internal authority + ADAPT proven safety/contract practices + DEFER consumer-less capabilities + REJECT provider replacement**. The independent pass found no blocking C0/C1 defect. G-09 remains an explicit C2 contract question; no production Rust behavior change is justified without a product decision that organization roster removal must revoke an independent policy grant. The remaining R2 blockers must not be hidden by the green domain/SQLite evidence.

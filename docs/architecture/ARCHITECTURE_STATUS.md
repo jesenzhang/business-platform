@@ -614,3 +614,11 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > 验证已通过；完整 Business API、PostgreSQL、workspace 与独立 reviewer 状态以 formal review
 > 的逐项证据为准。本轮仍为 docs-only，不修改 Rust、migration、OpenAPI、provider runtime，
 > 不启动 Wave 2。
+
+> 2026-09-24 closeout: PLAN-0014 Wave 1 独立只读审阅对 Base
+> `8365de0211390a6a3367b536c5ceaa5256bbb5cf` → Candidate
+> `c7dc3d142a526b47e9ba8e472b82346ffdaed221` 给出 `PASS WITH C2/C3`，未发现证据支持的
+> C0/C1 correctness 或 tenant-isolation blocker。审阅确认的 C2 已记录为 G-09：组织成员
+> roster 移除不能单独证明另一条 Policy RoleBinding 已撤销。Identity / Organization /
+> Policy 继续为 R1 foundation；R2 因独立发布契约及当前 PostgreSQL 证据不足保持 BLOCKED。
+> 详见 formal review；本次只更新审阅状态文档。

@@ -447,7 +447,10 @@ ReBAC 与独立模块发布材料保留为 C2/C3 或后续 Wave。没有为“�
 migration、OpenAPI 或 provider runtime 变更。共享 identity/organization/policy
 contract 的 fake/domain 与 SQLite 适配器证据已记录；Business API、PostgreSQL、
 workspace 全门禁及独立 reviewer 必须按 formal review 的逐项状态解释，未运行项不得
-解释为通过。Wave 1 exit 在独立 reviewer 完成前仍为 `R2 BLOCKED / NOT CLAIMED`。
+解释为通过。独立 reviewer 已给出 `PASS WITH C2/C3`（Base
+`8365de0211390a6a3367b536c5ceaa5256bbb5cf` → reviewed Candidate
+`c7dc3d142a526b47e9ba8e472b82346ffdaed221`）；Wave 1 review exit 满足，Identity /
+Organization / Policy 仍保持 `R1 / R2 BLOCKED / NOT CLAIMED`。
 
 本轮收集的当前分支证据：`cargo fmt --all -- --check` PASS；
 `scripts/check-architecture.ps1` 的 Architecture Fitness 与 OpenAPI contract PASS；
@@ -456,6 +459,9 @@ workspace 全门禁及独立 reviewer 必须按 formal review 的逐项状态解
 SQLite adapter contract suites PASS。PostgreSQL、workspace-wide check/clippy/test 与
 本机 security/license/secret scan 仍分别为 `NOT RUN`（无本机 PostgreSQL；本轮无生产 Rust
 变更）。详细限定见 formal review 的 Validation 表。
+Reviewer 另将 OrganizationMembership roster removal 与独立 Policy RoleBinding 撤销
+未被联动/验证列为 G-09 C2；据此补齐 gap registry 与 scenario 9 的证据边界，没有
+改变运行时语义。
 
 ## 6. 日程
 
