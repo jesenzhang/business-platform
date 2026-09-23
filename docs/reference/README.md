@@ -14,7 +14,7 @@
 
 | 项目 | 分类 | 主要参考价值 | 分析文档 |
 |---|---|---|---|
-| Ever Gauzy | P0 Business Management / AI-native Business Platform | Headless Business APIs、tenant-aware Plugin Registry、AI Provider/BYOK、Embedded AI Chat、per-turn Tool Resolution、MCP；内部 OAuth AS 不采用 | [`EVER_GAUZY_REFERENCE_ANALYSIS.md`](EVER_GAUZY_REFERENCE_ANALYSIS.md) |
+| SaaS Platform module matrix | P0 SaaS Platform / Infrastructure | Tenant/AuthN/AuthZ/Commercial/Secrets/Jobs/Storage/Webhook/Notification/Observability/Feature/Agent 等边界的组合式 OSS 选型与 Adopt/Adapt/Reference 决策 | [`SAAS_PLATFORM_REFERENCE_MATRIX.md`](SAAS_PLATFORM_REFERENCE_MATRIX.md) |\n| Ever Gauzy | P0 Business Management / AI-native Business Platform | Headless Business APIs、tenant-aware Plugin Registry、AI Provider/BYOK、Embedded AI Chat、per-turn Tool Resolution、MCP；内部 OAuth AS 不采用 | [`EVER_GAUZY_REFERENCE_ANALYSIS.md`](EVER_GAUZY_REFERENCE_ANALYSIS.md) |
 | Cloudflare OS | 企业 AI Workspace / Agent 应用平台 | Workspace、Gatekeeper、Gadget、Blueprint、Capability-based security、Observation/Observer | [`CLOUDFLARE_OS_REFERENCE_ANALYSIS.md`](CLOUDFLARE_OS_REFERENCE_ANALYSIS.md) |
 | Canner/WrenAI | Semantic Contract / GenBI 参考 | MDL、语义建模、source-to-compiled manifest、结构化校验与 dry-plan 思想；不采用其运行时和任意 SQL/MCP 边界 | [`WRENAI_REFERENCE_ANALYSIS.md`](WRENAI_REFERENCE_ANALYSIS.md) |
 | Twenty | Business App / Module Packaging / UI / Lifecycle | Manifest、stable identity、兼容性、dry-plan、contribution 和 lifecycle | [`TWENTY_REFERENCE_ANALYSIS.md`](TWENTY_REFERENCE_ANALYSIS.md) |

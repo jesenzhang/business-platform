@@ -37,7 +37,7 @@
 | Audit Retention | [`architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md`](architecture/AUDIT_RETENTION_AND_TAMPER_EVIDENCE.md) | Baseline profile | 保留、归档和 Hash Chain 证据 |
 | 数据治理、分析与可视化 | [`architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md`](architecture/DATA_GOVERNANCE_ANALYTICS_AND_VISUALIZATION_ARCHITECTURE.md) | Baseline | 可重建分析投影、指标语义、受控查询、Dashboard 与报表边界 |
 | Business Module Isolation 与 Semantic Contract | [`architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md`](architecture/BUSINESS_MODULE_ISOLATION_AND_SEMANTIC_CONTRACT_ARCHITECTURE.md) | Baseline | 平台核心/业务模块隔离、模块 manifest、语义贡献、确定性编译和 legacy ACL 边界 |
-| Business Application Platform | [`architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md) | Baseline | Platform Core/Business Module 边界、贡献、跨模块协作、生命周期和 synthetic validation |
+| Business Application Platform | [`architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md`](architecture/BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE.md) | Baseline | Platform Core/Business Module 边界、贡献、跨模块协作、生命周期和 synthetic validation |\n| Enterprise SaaS Platform | [`architecture/SAAS_PLATFORM_ARCHITECTURE.md`](architecture/SAAS_PLATFORM_ARCHITECTURE.md) | Proposed | 将现有模块平台提升为 Tenant/AuthZ/Commercial/Security/Execution/Data/Integration/Governance/Ops/Agent 的 SaaS 组合架构；Rust-first、provider-neutral |
 | 遗留迁移 | [`architecture/LEGACY_MIGRATION_ARCHITECTURE.md`](architecture/LEGACY_MIGRATION_ARCHITECTURE.md) | Baseline | 从现有系统渐进迁移与退出策略 |
 | 代码架构 | [`architecture/CODE_ARCHITECTURE.md`](architecture/CODE_ARCHITECTURE.md) | Baseline | crate、层次、依赖和运行边界 |
 | 架构状态 | [`architecture/ARCHITECTURE_STATUS.md`](architecture/ARCHITECTURE_STATUS.md) | Living | 当前实现符合程度和计划门禁 |
@@ -53,7 +53,7 @@
 | 架构门禁 | [`standards/ARCHITECTURE_FITNESS_FUNCTIONS.md`](standards/ARCHITECTURE_FITNESS_FUNCTIONS.md) | Baseline | CI 依赖检查、契约测试和发布证据 |
 | Rust 编码 | [`standards/RUST_CODING_STANDARD.md`](standards/RUST_CODING_STANDARD.md) | Baseline | Rust 代码、错误、异步、测试和安全规则 |
 | 查询与数据库适配 | [`standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`](standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md) | Baseline | Query Object、Read DTO、分页、SQL/ORM 与多数据库规则 |
-| 跨模块通信 | [`standards/INTER_MODULE_COMMUNICATION_STANDARD.md`](standards/INTER_MODULE_COMMUNICATION_STANDARD.md) | Proposed input to ADR-0022 | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga 边界 |
+| 跨模块通信 | [`standards/INTER_MODULE_COMMUNICATION_STANDARD.md`](standards/INTER_MODULE_COMMUNICATION_STANDARD.md) | Proposed input to ADR-0022 | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga 边界 |\n| SaaS Module 独立发布 | [`standards/SAAS_MODULE_STANDARD.md`](standards/SAAS_MODULE_STANDARD.md) | Proposed | 每个 Platform/Business/Agent 模块的独立 identity/version/manifest/contracts/migration/adapters/release 与 embedded/remote/provider 可替换规则 |
 | 基础设施验证 | [`../企业AI业务平台基础设施开发验证与预生产方案_v1.md`](../企业AI业务平台基础设施开发验证与预生产方案_v1.md) | Baseline | 本地、测试、CI、预生产与恢复 |
 | 文档治理 | [`governance/DOCUMENT_MANAGEMENT.md`](governance/DOCUMENT_MANAGEMENT.md) | Baseline | 文档目录、生命周期、变更和归档 |
 
@@ -204,7 +204,7 @@ docs/architecture/ENTERPRISE_AI_WORKSPACE_ARCHITECTURE.md
 docs/adr/ADR-0018-enterprise-ai-workspace-and-capability-security.md
 ```
 
-涉及 Business Module、Semantic Contract、Metric/Dimension/Lineage 注册、模块依赖或
+涉及 Enterprise SaaS Platform、Tenant/Entitlement/独立模块发布或外部 SaaS infrastructure 组合时，同时阅读：\n\n```text\narchitecture/SAAS_PLATFORM_ARCHITECTURE.md\nstandards/SAAS_MODULE_STANDARD.md\nreference/SAAS_PLATFORM_REFERENCE_MATRIX.md\n```\n\n涉及 Business Module、Semantic Contract、Metric/Dimension/Lineage 注册、模块依赖或
 legacy ACL 时，必须同时引用：
 
 ```text
