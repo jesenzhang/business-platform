@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-23
+> 最后更新：2026-09-24
 > 当前阶段：Enterprise AI SaaS Platform Baseline 已对齐；PLAN-0014 Reference Conformance / R2 Readiness Active；Contract 真实垂直切片仍是下一主要业务实现
 > 当前计划：PLAN-0014 Reference Conformance / R2 Readiness Active（review-first，2026-09-23→2026-10-23）；Contract Business Vertical Slice 仍是下一主要业务代码计划；PLAN-0006 Revision 1 Proposed / BLOCKED
 > 集成方式：GitHub PR merge
@@ -623,3 +623,20 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > roster 移除不能单独证明另一条 Policy RoleBinding 已撤销。Identity / Organization /
 > Policy 继续为 R1 foundation；R2 因独立发布契约及当前 PostgreSQL 证据不足保持 BLOCKED。
 > 详见 formal review；本次只更新审阅状态文档。
+
+> 2026-09-24: PLAN-0014 Wave 2 Business Module Packaging reference conformance 在分支
+> `feat/PLAN-0014-wave2-business-module-packaging-conformance`（Base
+> `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`，未 push、未合并）完成：固定 ABP 10.6.1、
+> Frappe v16.35.0、ERPNext v16.36.0、Odoo 19.0、Twenty v2.9.0 的 commit 级参考并按源码
+> 取证（修正 ADR-0021 的 Twenty 装饰器/激活假设——参考 commit 上 NOT FOUND）。canonical
+> module release identity（`module-release.identity.v1` 八字段 + `ModuleReleaseBundle`）
+> 与 compiler canonical `contract_digest` seam 落地为纯值契约并有测试与 fitness 守卫；
+> 复用 `BusinessModuleManifest` 为唯一声明，未建第二 manifest、未新增运行时或部署单元。
+> R2 packaging acceptance 12 条均有可执行入口（本轮可运行 9 条 PASS；PostgreSQL lane、
+> release 工件构建、workspace 外独立消费者构建记 NOT RUN，归 Wave 5 fixture）。Wave 2
+> 三个 exit 判定 MET。gap registry：C0=0；C1×3（G-201 契约层已关闭；G-202 独立发布工件
+> 与外部消费者证据缺失 = R2 BLOCKER；G-203 迁移命名空间未落物理隔离）；C2×3（含继承
+> Wave 1 的 G-09 原样保留）。`business-module-contracts`/`business-application-compiler`
+> 与 Identity/Organization/Policy 一律维持 R1 / R2 BLOCKED / NOT CLAIMED。审阅记录
+> `docs/reviews/2026-09-24-saas-align-module-packaging.md`；状态 READY FOR REVIEW /
+> NOT INTEGRATED，独立 reviewer verdict 待回填。

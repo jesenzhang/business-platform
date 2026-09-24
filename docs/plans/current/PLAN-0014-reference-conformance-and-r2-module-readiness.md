@@ -463,6 +463,53 @@ Reviewer 另将 OrganizationMembership roster removal 与独立 Policy RoleBindi
 未被联动/验证列为 G-09 C2；据此补齐 gap registry 与 scenario 9 的证据边界，没有
 改变运行时语义。
 
+### Wave 2 execution record — 2026-09-24
+
+本轮执行分支为 `feat/PLAN-0014-wave2-business-module-packaging-conformance`，固定
+Base 为 `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`（Wave 1 链未合入 main，因此直接从
+本地 Wave 1 链顶创建；`git range-diff` 已确认本地链与远端同名链 patch 等价，两条链不得
+同时合入；本地 `main` 落后，不作为基线）。`main` 未修改、未 push、未启动 Wave 3、
+未宣布任何模块 R2。
+
+固定参考（review date 2026-09-24）：ABP `10.6.1` = `9ca1d3ee62c8c557af34b50fc49c146405d752d4`、
+Frappe `v16.35.0` = `012667b9c4e7f66d5e1ff5858d2e922331d4300a`、ERPNext `v16.36.0` =
+`b30aa5334bcea94dba74f5b866af13c43a861948`、Odoo 分支 `19.0` tip =
+`2e2acfd6d2725d1a4a95b1a605634e1ac34163f`（无版本 tag，如实记录）、Twenty `v2.9.0` =
+`b53f1832d80f87be2cfd88990b855c0e5f3cc926`；均按源码/测试取证，并修正 ADR-0021 中
+`TwentyCoreModule`/`serverVersionRange`/`ApplicationActivation` 的既有假设（NOT FOUND）。
+
+交付物：
+
+- canonical module release identity：`module-release.identity.v1`（8 字段）与
+  `ModuleReleaseBundle`（module_version → crate_version 审计映射）落为
+  `business-module-contracts/src/release.rs` 纯值契约；compiler 新增 canonical
+  `contract_digest` seam（公开契约面 SHA-256，与输入顺序及发布元数据无关）；
+  `check-architecture.ps1` 增加成员与 seam fitness。复用 `BusinessModuleManifest`
+  为唯一声明，未建第二 manifest。
+- 新测试：release identity 9 unit + `release_surface_digest.rs` 5 项行为测试；
+- `docs/reviews/2026-09-24-saas-align-module-packaging.md`（能力矩阵、决策登记、
+  gap registry G-201..G-206、T0–T7 验证矩阵、R2 packaging acceptance A-01..A-12、
+  Wave 2 exit 判定）；
+- 本计划与 `docs/architecture/ARCHITECTURE_STATUS.md` 的执行状态同步。
+
+当前结论：Wave 2 三个 exit（canonical release identity defined / R2 packaging
+acceptance executable / no forced microservice split）判定 MET；C0=0；C1×3——G-201
+release identity 契约层已关闭（真实模块工件组装留 Wave 5），G-202 独立发布工件与
+workspace 外消费者证据缺失（R2 BLOCKER，Wave 5 pilot 关闭）、G-203 迁移命名空间未落
+物理隔离（声明字段已有）；C2×3 含继承的 G-09 原样保留。`business-module-contracts` /
+`business-application-compiler` 与 Identity / Organization / Policy 一律维持
+`R1 / R2 BLOCKED / NOT CLAIMED`。
+
+本轮证据（本地 Windows，`cargo` 链顺序执行）：`cargo fmt --all -- --check`、
+`cargo check --workspace --all-targets --all-features`、
+`cargo clippy --workspace --all-targets --all-features -- -D warnings`、
+`cargo test --workspace --all-features` 全部退出码 0；focused 79 tests（含 14 项新增）
+PASS；`scripts/check-architecture.ps1` Architecture Fitness 与 OpenAPI contract PASS；
+`git diff --check` clean。PostgreSQL 迁移 lane、release 工件构建与 workspace 外独立
+消费者构建为 `NOT RUN`（无本机 PostgreSQL / release tool 未实现 / 属 Wave 5 fixture，
+见 review §9/§10），不以 focused 或 SQLite 证据替代。独立 reviewer verdict 未返回；
+状态为 `READY FOR REVIEW / NOT INTEGRATED`。
+
 ## 6. 日程
 
 ### Wave 0 — Baseline & tooling
