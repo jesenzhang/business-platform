@@ -1,7 +1,9 @@
 # PLAN-0014 Wave 2 — Business Module Packaging Reference Conformance Review
 
 > Review ID: REVIEW-SaaS-module-packaging-2026-09-24
-> Status: READY FOR REVIEW / NOT INTEGRATED（实现者自检完成；独立 reviewer verdict 未返回，本文不自行填写 PASS）
+> Status: READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED（Round 2 独立审阅发现见 §16；
+> 缺口已在同一分支修复并以新测试证据逐项恢复，等待实现者之外的 reviewer 只读复审；
+> 本文不自行填写 PASS）
 > Module: Business Module Packaging foundation — `business-module-contracts` + `business-application-compiler`（P0-B）
 > Module revision: 见 §2 基线与候选（代码 candidate 为候选链首提交）
 > Reviewer: 实现者自检（本 agent）；独立 reviewer 待指派（§14）
@@ -54,9 +56,22 @@ Candidate 改动（代码链，`git diff --stat` 于提交前）：
 | `crates/business-application-compiler/tests/release_surface_digest.rs` | 新增 | 契约摘要与 release identity 装配的 5 项行为测试 |
 | `scripts/check-architecture.ps1` | 修改 | release identity 成员与 compiler digest seam 的 fitness 检查 |
 
-代码候选提交：`4ad7096fbfa7582a608252145709f8c56f514191`（`feat(packaging): pin
-canonical module release identity and contract digest`）；本文档与 PLAN-0014 /
-ARCHITECTURE_STATUS 同步构成文档提交，即候选链末端（SHA 见分支 `git log`）。
+Round 1 代码候选提交：`4ad7096fbfa7582a608252145709f8c56f514191`（`feat(packaging): pin
+canonical module release identity and contract digest`）；文档提交 `50b6ae9`。
+
+Round 2 修复改动（`git diff --stat` 于提交前；全部本地实现）：
+
+| 文件 | 类型 | 内容 |
+|---|---|---|
+| `crates/business-module-contracts/Cargo.toml` | 修改 | 新增外部 registry `semver` 值解析依赖（无 path 依赖） |
+| `crates/business-module-contracts/src/release.rs` | 修改 | 双层验证文档（shape vs consistency）、`NotSemVer`、`validate` SemVer 强制、`crate_version` 严格 SemVer、`package_digest` 语义=declaration fingerprint；+2 SemVer unit |
+| `crates/business-application-compiler/src/lib.rs` | 修改 | `contract_digest` 纳入 `agent_tool_contributions` + 边界文档；新增 `package_fingerprint`、`ReleaseIdentityMismatch`、`verify_release_identity` |
+| `crates/business-application-compiler/tests/release_surface_digest.rs` | 修改 | +12 项行为测试（agent 公开契约面、消费者侧排除边界、fingerprint 同值、一致性门禁正/负全部单字段错配、stateless None） |
+| `scripts/check-architecture.ps1` | 修改 | `pub fn package_fingerprint` 与 `pub fn verify_release_identity` seam fitness 检查 |
+
+Round 2 代码候选提交：`1e3a25b3dff62a336ce32ba7bd9f2aaf763f6e9b`；本文档与
+PLAN-0014 / ARCHITECTURE_STATUS 同步构成 Round 2 文档提交，即候选链末端（SHA 见
+分支 `git log`）。
 
 ## 3. Fixed references（review date 2026-09-24）
 
@@ -96,15 +111,22 @@ README/文档声称与源码证据在下表与 §6 中分开标注。
   （`CANNOT_DOWNGRADE_APPLICATION`）；首装失败自动 uninstall 补偿、升级失败保留旧版本；
   **无** enable/disable 概念（无 status 列；`canBeUninstalled` 仅保护内置应用）；卸载执行
   workspace migration 后对 app 的 custom object `dropTable(cascade)`，数据丢失有 issue 证据
-  （#20589）。**修正 ADR-0021 的既有假设**：`TwentyCoreModule`、`serverVersionRange`、
-  `ApplicationActivation` 在 v2.9.0 与 ADR 早期参考 commit `65616332` 均 NOT FOUND。
+  （#20589）。**标识校准（Round 2 修正本记录原表述）**：`TwentyCoreModule`、
+  `serverVersionRange`、`ApplicationActivation` 三个标识在 v2.9.0 与早期参考 commit
+  `65616332` 均 NOT FOUND；与 ADR-0021 原文逐字核对后确认——ADR-0021 从未使用这三个
+  标识符，其依赖的是 "required server version range" 的兼容窗口语义，而 v2.9.0 源码证据
+  （`engines.twenty` semver 检查 + `CANNOT_DOWNGRADE_APPLICATION` 拒绝降级）证实该机制
+  仍然存在。因此这只是本 review 自身参考取证记录的源码标识校准，不构成对 Accepted
+  ADR-0021 任何决策依据的推翻，无需 ADR 修订（详见 §16）。
 
 ## 4. Current implementation facts（三层重建）
 
 ### 4.1 Fields/types defined（已定义）
 
 - `BusinessModuleManifest`（`business-module-contracts/src/manifest.rs`）：`module_id`、
-  `module_version`（SemVer）、`manifest_schema_version`（`business-module.manifest.v1`）、
+  `module_version`（版本 token 语法；严格 SemVer 在 release 层由 `ModuleReleaseIdentity::validate`
+  强制，Round 2 起，见 §5/§16——manifest/compile 兼容行为未变）、
+  `manifest_schema_version`（`business-module.manifest.v1`）、
   `owned_bounded_contexts`、required/optional platform capabilities、published commands/queries/events、
   `resource_kinds`、`data_classification`、`migration_namespace`、semantic/UI/agent contributions、
   `dependencies`、`compatibility`——为唯一模块声明，本轮未新增第二 manifest。
@@ -127,11 +149,17 @@ README/文档声称与源码证据在下表与 §6 中分开标注。
 
 ### 4.2 Tests executed（本轮执行，细节见 §9）
 
-- `business-module-contracts`：22 unit + 22 integration（digest 稳定性、tamper、fail-closed）
-  ——本轮新增 release.rs 9 unit。
-- `business-application-compiler`：18 compiler + 26 planning + 6 synthetic + **本轮新增 5**
-  （`release_surface_digest.rs`）；既有语义覆盖确定性、环/未知依赖/版本不兼容拒绝、
+- `business-module-contracts`：unit 24（manifest 13 + release.rs 11，其中 Round 2 新增
+  2 个 SemVer 门禁 unit）+ integration 22（`extension_points` 2、
+  `platform_core_isolation` 1、`stable_identity` 7、`typed_contributions` 12）
+  ——digest 稳定性、tamper、fail-closed、SemVer 门禁。
+- `business-application-compiler`：18 compiler + 26 planning + 6 synthetic +
+  17（`release_surface_digest.rs`：Round 1 的 5 项 + Round 2 新增 12 项，覆盖 agent
+  公开契约摘要、消费者侧排除边界、fingerprint 与 planner 一致、一致性门禁及全部
+  单字段错配负向）= 67；既有语义覆盖确定性、环/未知依赖/版本不兼容拒绝、
   BlockedRemoval、uninstall≠purge、Downgrade 拒绝。
+- focused 合计 113（Round 1 实测 44+55=99，原记录 "79" 为誊写错误，§16 更正；
+  Round 2 新增 14 项 → 113，分项以上述逐目标实测为准）。
 
 ### 4.3 Independent reproducible release artifacts（不存在）
 
@@ -159,22 +187,50 @@ README/文档声称与源码证据在下表与 §6 中分开标注。
 |---|---|---|
 | `schema_version` | `String` | 必须等于 `module-release.identity.v1`，`deny_unknown_fields` |
 | `module_id` | `BusinessModuleId` | 复用 manifest 同一新类型（禁止自由字符串） |
-| `module_version` | `BusinessModuleVersion` | SemVer，≠ workspace crate 版本 |
-| `manifest_schema_version` | `ManifestSchemaVersion` | 与 manifest 声明一致 |
+| `module_version` | `BusinessModuleVersion` | 严格 SemVer（`validate` 在 release 层强制，Round 2；manifest 层 token 语法不变）；≠ workspace crate 版本 |
+| `manifest_schema_version` | `ManifestSchemaVersion` | 与 manifest 声明的一致性由 `verify_release_identity` 验证 |
 | `source_revision` | `SourceRevision` | 40/64 位小写 hex git commit；分支/标签名不接受 |
-| `contract_digest` | `ContractDigest` | SHA-256( canonical JSON(公开契约面) )，由 compiler `contract_digest()` 产生 |
-| `package_digest` | `PackageDigest` | 复用既有类型；即 compiled package digest |
-| `migration_revision` | `Option<MigrationRevision>` | `migration_namespace`（manifest 同一语法）+ `set_digest`（迁移文件集 sha256，对齐既有 `MANIFEST.sha256` 机制）；无状态模块为 `None` |
+| `contract_digest` | `ContractDigest` | SHA-256( canonical JSON(公开契约面) )，由 compiler `contract_digest()` 产生；公开契约面含已发布 agent capabilities（见下边界判定） |
+| `package_digest` | `PackageDigest` | 复用既有类型；= **compiled declaration fingerprint**（规范化声明 JSON 的指纹，与 planner 报告的 per-module digest 同值）。它钉住的是编译声明，不是 tarball/发布工件字节；工件字节完整性 digest 属 Wave 5（G-202），本轮不存在物理工件 |
+| `migration_revision` | `Option<MigrationRevision>` | `migration_namespace`（manifest 同一语法）+ `set_digest`（迁移文件集 sha256，对齐既有 `MANIFEST.sha256` 机制）；namespace 与 manifest 声明的一致性由 `verify_release_identity` 验证；无状态模块为 `None` |
 | `build_toolchain` | `BuildToolchain` | `toolchain_id`（小写 slug ≤64）+ `version`（manifest 版本 token 语法） |
 
 `ModuleReleaseBundle { identity, crate_versions }` 提供多 crate 模块的
 module_version→crate_version 可审计映射（非空、crate 名去重，重复报 `DuplicateCrate`）。
 
-`contract_digest` 规则（compiler seam）：对 normalized 包的 canonical 表面
+`contract_digest` 规则（compiler seam，Round 2 修订）：对 normalized 包的 canonical 表面
 `{module_id, data_classification, published_commands/queries/events, resource_kinds,
-semantic_contributions, extension_points}` 做 SHA-256；**与输入顺序无关、与发布元数据
-（module_version、compatibility）无关，但发布工件 digest 仍覆盖后者**——即"契约没变"与
-"发布变了"可分别证明。不纳入持久化与构建输入。
+semantic_contributions, agent_tool_contributions, extension_points}` 做 SHA-256；
+**与输入顺序无关、与发布元数据（module_version、dependencies、compatibility）无关，
+但 package digest 仍覆盖后者与消费者侧声明**——即"契约没变"与"发布变了"可分别证明。
+哈希输入是规范化声明，不是工件字节；不纳入持久化与构建输入。
+
+逐类边界判定（Round 2；理由写进测试名与源码文档，由
+`tests/release_surface_digest.rs` 逐项证明）：
+
+- `manifest.agent_tool_contributions` **∈ 公开契约面**：compiler 将每一项登记为
+  `PublicTargetKind::Capability` public target 并生成 `PublicCapability` 跨模块依赖
+  引用（ADR-0021 §2.5、BUSINESS_APPLICATION_PLATFORM_ARCHITECTURE "Compiled Agent
+  Tool Catalog"），重命名/改版本即跨模块契约变更——Round 1 摘要未覆盖，为 §16 修复项；
+- `manifest.ui_contributions` **∉**：供 platform shell 消费的展示声明，不进 public
+  catalog，无跨模块依赖引用解析到它；
+- `package.contributions` 的 typed UI/Agent/Policy **∉**：消费者侧 wiring——只*引用*
+  public target（compile fail-closed），自身不是 target（`PublicTargetKind` 仅
+  Resource/Query/Command/Capability）；
+- public catalog 本身可由纳入面完整推导，不设独立 catalog 摘要；
+- 被排除的声明仍由 compiled package digest 与 planning per-component fingerprint
+  钉住，"发布面变了"仍可证。修复没有通过无差别哈希整个 package JSON 来掩盖边界。
+
+两层验证（Round 2 明确，§16 修复 A-09）：`ModuleReleaseIdentity::validate` 是
+**字段形状校验**——schema 版本、SemVer module/crate 版本、toolchain/migration 语法与
+长度界限；它不比较任何声明或构建证据，不得被描述为一致性验证。一致性验证的可执行入口
+是 compiler 边界的 `verify_release_identity(compiled, identity)`：针对 `compile()` 输出
+重算 `contract_digest` 与 compiled declaration fingerprint 并比较，且核对 module_id、
+module_version、manifest_schema_version 与（钉定 migration revision 时的）manifest
+migration namespace；每种单字段错配返回具名 `ReleaseIdentityMismatch`。无状态模块钉
+`migration_revision: None` 合法，此时 manifest 的 namespace 声明不受约束。
+`business-module-contracts` 保持纯 Rust 值契约（新增依赖仅外部 registry 的 `semver`
+值解析 crate，无 path 依赖，fitness 内部依赖白名单不变）。
 
 Lifecycle/发布规则（既有契约 + 本轮钉定，均有测试）：
 
@@ -190,9 +246,11 @@ Lifecycle/发布规则（既有契约 + 本轮钉定，均有测试）：
    **强于** Odoo/Frappe/Twenty 的 uninstall-即-drop；
 7. **live consumer 移除阻断**：`BlockedRemoval` + `validate_extension_point_removal`（既有测试）。
 
-纯度边界保持：两个 crate 仍无 SQLx/Axum/vendor SDK/运行时注册表；
-`check-architecture.ps1` 新增成员检查（release identity 12 个成员名 + `pub fn contract_digest`）
-与既有依赖白名单/禁 token 扫描共同强制。
+纯度边界保持：两个 crate 仍无 SQLx/Axum/vendor SDK/运行时注册表；新增的 `semver`
+为外部 registry 值解析依赖（无 `path`，不进入 fitness 的内部依赖 allowlist 检查面）。
+`check-architecture.ps1` 新增成员检查（release identity 12 个成员名 +
+`pub fn contract_digest` + Round 2 新增的 `pub fn package_fingerprint` 与
+`pub fn verify_release_identity` seam）与既有依赖白名单/禁 token 扫描共同强制。
 
 ## 6. Capability matrix
 
@@ -235,9 +293,13 @@ C0（阻断 correctness/tenant-isolation）：**无**——本轮未发现新 C0
 
 - **G-201（Wave 1 G-01 重编号承接）：canonical module release identity 缺失** ——
   本轮**部分关闭**：值契约（8 字段+bundle）、canonical `contract_digest` seam、fitness 守卫、
-  9+5 项测试已落地（`release.rs`、`release_surface_digest.rs`、`check-architecture.ps1`）。
+  Round 1 的 9+5 项测试，以及 Round 2 的 `verify_release_identity` 一致性门禁
+  （重算双 digest + 6 类单字段错配负向测试）、release 层 SemVer 强制（identity
+  module_version 与 bundle crate_version）、agent 公开契约面入摘要。
+  Round 1 曾把 shape-only 的 `ModuleReleaseIdentity::validate` 记为一致性验证（A-09 高估，
+  §16）；Round 2 起 A-09 引用真正的可执行一致性验证。
   残留关闭条件：真实模块 manifest 的 release identity 由 release tool 实际组装并钉入 pilot
-  工件（Wave 5 关闭）。证据：§4.1 Base `git grep`；测试 §9 T1/T2。
+  工件（Wave 5 关闭）。证据：§4.1 Base `git grep`；测试 §9 T1/T2 与 §10 A-01/A-03/A-09。
 - **G-202：无独立发布工件与 workspace 外消费者证据**（R2 BLOCKER）。
   影响：`identity`/`policy`/`contracts-compiler` 均不可宣布 R2。owner 边界：Wave 5 pilot
   （pilot #3 = contracts/compiler bundle，可先于业务模块证明工件+消费者闭环）。
@@ -281,7 +343,7 @@ manifest 全量收敛覆盖用户定制（Twenty #21550）；无任何 app→框
 | Format | T0 | `cargo fmt --all -- --check` | PASS | 无 diff（门禁链 `FMT_EXIT=0`） |
 | Check | T0 | `cargo check --workspace --all-targets --all-features` | PASS | `CHECK_EXIT=0` |
 | Clippy | T1 | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | PASS | `CLIPPY_EXIT=0` |
-| Focused unit/integration | T1/T2 | `cargo test -p business-module-contracts -p business-application-compiler --all-features` | PASS | 79 tests 全绿（contracts 22u+22i，compiler 18+26+6+**5 新增**；release.rs 9 新 unit 在 contracts 计数内） |
+| Focused unit/integration | T1/T2 | `cargo test -p business-module-contracts -p business-application-compiler --all-features` | PASS | 113 tests 全绿：contracts unit 24（manifest 13 + release.rs 11）+ integration 22（2+1+7+12）；compiler 18 compiler + 26 planning + 17 release_surface_digest + 6 synthetic。原记 "79" 为誊写错误（Round 1 实测 99），分项见 §4.2、§16 |
 | Workspace tests | T2 | `cargo test --workspace --all-features` | PASS | `TEST_EXIT=0`；日志无 FAILED/panic/error；per-suite 明细未保留在日志（tail-only），以退出码为准 |
 | Architecture fitness | T2 | `pwsh scripts/check-architecture.ps1` | PASS | `Cargo metadata architecture fitness: PASS / OpenAPI contract: PASS / Architecture fitness: PASS`；含新 release identity 成员与 contract_digest seam 检查（本轮最后一次运行） |
 | Git hygiene | T0 | `git diff --check` | PASS | clean |
@@ -289,6 +351,24 @@ manifest 全量收敛覆盖用户定制（Twenty #21550）；无任何 app→框
 | Release artifact build | T5 | — | **NOT RUN** | release tool 不存在（G-202）；Wave 5 fixture：pilot bundle `cargo package`/tarball + `ModuleReleaseIdentity` 钉定 + `MigrationSetDigest` 复算 |
 | Independent out-of-workspace consumer | T6 | — | **NOT RUN** | Wave 5 fixture：新建外部 cargo 工程仅依赖发布产物（无 path 依赖），编译并运行 contract 测试 |
 | Performance | T7 | — | NOT RUN | 本轮无性能声明需求（compile/plan 为开发期/发布期路径） |
+
+### Round 2 门禁重跑（2026-09-24，代码提交 `1e3a25b3dff62a336ce32ba7bd9f2aaf763f6e9b`）
+
+统一环境同上（本地 Windows，Git Bash，无远程主机；最终候选链末端为 markdown-only
+文档提交，不改变门禁输入）。逐项命令与退出码：
+
+| Test | Command | Exit | 实际结果 / 限制 |
+|---|---|---|---|
+| Format | `cargo fmt --all -- --check` | 0 | 无 diff |
+| Check | `cargo check --workspace --all-targets --all-features` | 0 | PASS |
+| Clippy | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | 0 | 零 warning（workspace 级） |
+| Focused | `cargo test -p business-module-contracts -p business-application-compiler --all-features` | 0 | 113 passed / 0 failed（分项见 §4.2；含全部新增负向测试） |
+| Workspace tests | `cargo test --workspace --all-features` | 0 | 无 FAILED/panic；per-suite 明细 tail-only，以退出码为准 |
+| Architecture fitness | `pwsh scripts/check-architecture.ps1` | 0 | Cargo metadata / OpenAPI contract / Architecture fitness 全 PASS（含 `package_fingerprint`/`verify_release_identity` 新 seam 检查） |
+| Git hygiene | `git diff --check` | 0 | clean（仅 autocrlf 提示，非 whitespace 错误） |
+| PostgreSQL lanes | — | — | **NOT RUN**（不变：本机无 PostgreSQL，本轮未触持久化路径） |
+| Release artifact build | — | — | **NOT RUN**（不变：release tool 不存在，G-202；本轮零工件代码，声明 fingerprint ≠ 工件字节） |
+| Independent out-of-workspace consumer | — | — | **NOT RUN**（不变，Wave 5 fixture） |
 
 历史证据 vs 本轮证据分离声明：Wave 0/1 的 SQLite/`iam_*` focused 证据只属于 Wave 0/1
 review（见其 Validation 表），不构成本轮或 R2 证据；本轮为 contract/compiler/fitness/docs
@@ -301,15 +381,15 @@ review（见其 Validation 表），不构成本轮或 R2 证据；本轮为 con
 
 | # | Acceptance entry | Fixture / test | Command | Result |
 |---|---|---|---|---|
-| A-01 | 同输入置换 → 同 contract digest | `release_surface_digest.rs::contract_digest_ignores_input_order_of_the_same_contract_surface` + `contract_digest_is_stable_across_repeated_invocations` | `cargo test -p business-application-compiler --test release_surface_digest` | PASS |
-| A-02 | 发布元数据变（module_version/compatibility）→ contract digest 不变、package digest 变 | 同文件 `contract_digest_ignores_release_metadata_but_package_digest_covers_it` | 同上 | PASS |
-| A-03 | 契约面变（命令/查询/事件/扩展点/分类/semantic 版本）→ contract digest 变 | 同文件 `contract_digest_changes_when_a_published_contract_or_extension_version_changes` | 同上 | PASS |
+| A-01 | 同输入置换 → 同 contract digest（含 agent capabilities 置换，Round 2） | `release_surface_digest.rs::contract_digest_ignores_input_order_of_the_same_contract_surface` + `contract_digest_is_stable_across_repeated_invocations` | `cargo test -p business-application-compiler --test release_surface_digest` | PASS |
+| A-02 | 发布元数据变（module_version/compatibility）→ contract digest 不变、package digest 变；消费者侧/UI 声明变同样只动 package digest（Round 2 边界判定） | 同文件 `contract_digest_ignores_release_metadata_but_package_digest_covers_it` + `contract_digest_ignores_consumer_side_contributions_but_package_digest_covers_them` | 同上 | PASS |
+| A-03 | 契约面变（命令/查询/事件/扩展点/分类/semantic 版本/已发布 agent capability ID 与版本）→ contract digest 变 | 同文件 `contract_digest_changes_when_a_published_contract_or_extension_version_changes` + `contract_digest_changes_when_a_public_agent_capability_id_or_version_changes`（Round 2；修复前该测试失败证实摘要漏面，§16） | 同上 | PASS |
 | A-04 | 重复 ID | 既有 `business-application-compiler` compiler tests（duplicate module id）+ contracts integration | `cargo test -p business-application-compiler` | PASS |
 | A-05 | 未知依赖/未知 endpoint | 既有 compiler tests（unknown dependency、extension point endpoint） | 同上 | PASS |
 | A-06 | 版本不兼容（含 Downgrade 拒绝、compat 窗口） | 既有 compiler/planning tests | `cargo test -p business-application-compiler --all-features` | PASS |
 | A-07 | 依赖环 | 既有 compiler tests（`DependencyCycle`） | 同 A-06 | PASS |
-| A-08 | 非法 platform dependency / 跨模块 private ref / manifest 非法字段 | 既有 contracts integration tests（`tests/` 22 项：contribution、private ref、schema 版本、unknown field 等）+ 新 `release.rs` 9 unit（`release_contracts_reject_unknown_fields_and_bad_digest_bytes` 等） | `cargo test -p business-module-contracts --all-features` | PASS |
-| A-09 | manifest 与 release contract 一致性（identity 钉定 manifest 的 id/version/schema/namespace 语法；bundle crate 去重） | `release.rs` unit（`migration_revision_pins_manifest_namespace_grammar`、`bundle_requires_non_empty_unique_crate_mapping`）+ `release_surface_digest.rs::release_identity_and_bundle_assemble_from_compiled_evidence` | `cargo test --all-features`（两 crate） | PASS |
+| A-08 | 非法 platform dependency / 跨模块 private ref / manifest 非法字段 | 既有 contracts integration tests（`tests/` 22 项：contribution、private ref、schema 版本、unknown field 等）+ `release.rs` 11 unit（`release_contracts_reject_unknown_fields_and_bad_digest_bytes`、Round 2 `release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions` 等） | `cargo test -p business-module-contracts --all-features` | PASS |
+| A-09 | **release 一致性验证（Round 2 重写）**：`verify_release_identity` 对 `compile()` 输出重算 contract digest 与 compiled declaration fingerprint 并比较，核对 module_id/module_version/manifest_schema_version/（钉定时）migration namespace；每种单字段错配独立负向；release 层 SemVer（identity module_version、bundle crate_version）拒绝非 SemVer token | `release_surface_digest.rs::verify_release_identity_accepts_identity_recomputed_from_compiled_evidence`、`..._accepts_stateless_identity_without_migration_revision`、`..._rejects_pinned_module_id_not_in_evidence`、`..._rejects_pinned_module_version_mismatch`、`..._rejects_pinned_manifest_schema_version_mismatch`、`..._rejects_pinned_contract_digest_mismatch`、`..._rejects_pinned_package_digest_mismatch`、`..._rejects_pinned_migration_namespace_mismatch`、`..._rejects_identity_failing_shape_validation`、`package_fingerprint_matches_the_planner_per_module_digest` + `release.rs::release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions` | `cargo test -p business-application-compiler -p business-module-contracts --all-features` | PASS（Round 1 曾以 shape-only `validate` + 手工同值装配记 PASS——高估，Round 2 审阅判 NOT MET 后以本行证据恢复 MET，§16） |
 | A-10 | 独立消费者无 concrete adapter 编译/测试 | workspace 内证据：两 crate 依赖白名单（fitness）+ 全部 51 个 compiler/contracts 测试仅用纯 contract 类型（本轮 PASS）；workspace 外独立工程 | Wave 5：外部 cargo 工程仅依赖发布产物（fixture 见 §9 T6） | 内部 PASS / 外部 **NOT RUN** |
 | A-11 | live consumer 移除阻断、uninstall≠purge | 既有 planning tests（BlockedRemoval、RemoveModule data_retained） | 同 A-06 | PASS |
 | A-12 | 真实模块 release 工件 + PG 迁移 lane | — | Wave 5 pilot #1/#2/#3（fixture 见 §9 T4/T5） | **NOT RUN** |
@@ -322,10 +402,10 @@ review（见其 Validation 表），不构成本轮或 R2 证据；本轮为 con
 | Independent version | MET（契约层） | `BusinessModuleVersion` ≠ workspace 0.1.0；A-02 |
 | Manifest | MET（单一声明，无第二 manifest） | §4.1/§5 D-05 |
 | Public contracts | MET | published commands/queries/events/resource kinds 全入 canonical surface |
-| Package/contract digest | MET | package digest（既有）+ `contract_digest`（新增）A-01..A-03 |
+| Package/contract digest | MET（声明层） | compiled declaration fingerprint + `contract_digest`（含 agent 公开契约面）A-01..A-03；一致性由 `verify_release_identity` 可执行验证 A-09。**不是工件字节摘要**——物理发布工件与其完整性 digest 属 Wave 5（G-202），本轮无工件、无声明 |
 | Compatibility | MET（契约层） | `CompatibilityDescriptor` + A-06 |
 | Migration namespace | **PARTIAL** | 声明字段+`MigrationRevision` 已有；物理隔离/执行隔离未落（G-203） |
-| Contract suite | MET（workspace 内） | 79 tests；外部消费者缺口=A-10 后半 |
+| Contract suite | MET（workspace 内） | 113 tests（§4.2 分项）；外部消费者缺口=A-10 后半 |
 | Failure model | MET（compile/plan 层）/执行层 DEFER | fail-closed + BlockedRemoval；registry 属 G-204 |
 | Security/tenant | MET（边界层） | 纯度禁 token/依赖白名单 fitness；per-tenant 安装态= G-206（DEFER，非本层） |
 | Reference review | 本文件；**独立 verdict 未返回** | §14 |
@@ -339,30 +419,39 @@ G-09 C2 保留）。
 
 | Exit condition | Verdict | Basis |
 |---|---|---|
-| canonical module release identity defined | **MET** | §5 落地为 `module-release.identity.v1` + bundle，测试与 fitness 守卫（G-201 契约层关闭） |
-| R2 packaging acceptance executable | **MET（定义+本轮可运行部分全部 PASS）**；工件/外部消费者/PG 条目如实 NOT RUN，属 Wave 5 | §10 A-01..A-12 |
-| no forced microservice split | **MET** | 零新增部署单元；`apps/*`、infra、数据库拓扑零改动；改动仅 2 个纯 crate + 1 个 fitness 脚本 + 文档 |
+| canonical module release identity defined | **MET（Round 2 修复后）**；Round 2 审阅曾判 **NOT MET**——A-09 引用的 `validate` 是 shape-only、agent 公开契约面未入摘要、package digest 语义被写成工件内容（§16）。现值契约 + 一致性门禁 + SemVer + fitness 全部有测试证据 | §5/§16；`verify_release_identity` 与 SemVer 测试（A-09）、`contract_digest` agent 面（A-03） |
+| R2 packaging acceptance executable | **MET（定义+本轮可运行部分全部 PASS；A-09 以真实一致性验证恢复）**；工件/外部消费者/PG 条目如实 NOT RUN，属 Wave 5 | §10 A-01..A-12 |
+| no forced microservice split | **MET** | 零新增部署单元；`apps/*`、infra、数据库拓扑零改动；改动仅 2 个纯 crate + 1 个 fitness 脚本 + 文档（Round 2 同） |
 
 ## 13. Reviewer questions（供独立审阅）
 
-1. `contract_digest` 的 canonical surface 选择（含 extension points、semantic contributions，
-   排除 UI/agent contributions）是否遗漏了应属"公开契约面"的内容？
+1. `contract_digest` 的 canonical surface 选择是否遗漏了应属"公开契约面"的内容？
+   ——Round 2 已回答：是，遗漏了 `agent_tool_contributions`（已登记为 public target 的
+   公开 Agent capability）。已修复并以测试锁定；UI/typed contributions 的排除判定及
+   理由见 §5 边界判定与 §16。
 2. release identity 作为独立派生值契约（而非 manifest 新字段）是否真正满足"无第二 manifest"？
 3. `contract_digest` 与发布元数据解耦（A-02）是否会造成"同契约不同版本"被误判可互换？
 4. G-203 记 C1 而非 C2 是否恰当（声明字段已有、隔离未落）？
-5. §3 对 ADR-0021 的 Twenty 事实修正（`TwentyCoreModule`/`serverVersionRange`/
-   `ApplicationActivation` NOT FOUND）是否需要另开 ADR 修订？
+5. ~~§3 对 ADR-0021 的 Twenty 事实修正是否需要另开 ADR 修订？~~ ——Round 2 已回答：
+   三个标识符从未出现在 ADR-0021 原文，其 "required server version range" 兼容窗口结论
+   被 v2.9.0 源码证据证实仍然成立；本 review 只校准了自身取证记录的标识表述，
+   Accepted ADR 未被推翻，无需 ADR 修订（§3/§16）。
 6. G-206（per-tenant 安装态）归 C2/DEFER 而非 C1 是否成立（R2 pilot 是否必须先有 per-tenant 状态）？
 7. 其余同模板 §8 九问（authority 未变、无 provider 类型泄漏、fail-closed、分类诚实、
    测试证明失败语义、版本/迁移声明诚实、无投机抽象、可替换性、R 级诚实）。
 
 ## 14. Independent reviewer record
 
-- Candidate 链：代码提交 `4ad7096fbfa7582a608252145709f8c56f514191` + 本文档/
-  PLAN-0014/ARCHITECTURE_STATUS 同步提交（候选链末端 = 分支顶端，SHA 见 `git log`；
-  Base `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`）。
-- 状态：**READY FOR REVIEW / NOT INTEGRATED**。未 push、未合并 main、未启动 Wave 3、
-  未宣布任何模块 R2。
+- Round 1 Candidate 链：代码提交 `4ad7096fbfa7582a608252145709f8c56f514191` + 文档提交
+  `50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f`（分支顶端；Base
+  `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`）。Round 1 独立审阅发现 §16 所列缺口。
+- Round 2 Candidate 链（修复）：代码提交
+  `1e3a25b3dff62a336ce32ba7bd9f2aaf763f6e9b`（contracts release.rs+Cargo.toml、
+  compiler lib+tests、fitness、Cargo.lock）+ 本文档/PLAN-0014/ARCHITECTURE_STATUS
+  同步文档提交（候选链末端 = 分支顶端，SHA 见 `git log`；文档提交仅 markdown，
+  不影响任何门禁输入）。
+- 状态：**READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED**。未 push、未合并 main、
+  未启动 Wave 3/Wave 5、未宣布任何模块 R2。
 - 独立 verdict（由实现者之外的 reviewer 只读填写）：
 
 ```
@@ -377,10 +466,38 @@ Notes:               <pending>
 
 Wave 2 交付：(1) canonical module release identity 从"字段缺失"（Base 证据）落地为
 `module-release.identity.v1` 值契约 + `ModuleReleaseBundle` + compiler canonical
-`contract_digest` seam，并以 fitness 与 14 项新测试锁定；(2) R2 packaging acceptance 12 条
-全部具有可执行入口，本轮可运行的 9 条全 PASS，需要发布工具/外部工程/PostgreSQL 的条目以
-精确 fixture 记 NOT RUN；(3) 四个固定 revision 的外部参考对照产生 8 项决定与 7 项缺口
-（C0=0；C1×3——其中 G-201 契约层关闭、G-202/G-203 保持 R2 阻断；C2×3 含继承的 G-09；
-C3 与 REJECT 各成清单）。Business Module Packaging foundation 与 Identity/Organization/
-Policy 一律维持 R1；R2 宣布被 G-202（独立发布工件与外部消费者证据）显式阻断，归 Wave 5。
-本轮未 push、未合并、未启动 Wave 3；等待实现者之外的独立 reviewer 回填 §14。
+`contract_digest` seam + Round 2 的 `verify_release_identity` 一致性门禁与 release 层
+SemVer，并以 fitness 与两轮共 28 项新测试锁定；(2) R2 packaging acceptance 12 条全部
+具有可执行入口，本轮可运行的 9 条全 PASS（A-09 在 Round 2 以真实一致性验证恢复），
+需要发布工具/外部工程/PostgreSQL 的条目以精确 fixture 记 NOT RUN；(3) 四个固定 revision
+的外部参考对照产生 8 项决定与 7 项缺口（C0=0；C1×3——其中 G-201 契约层关闭、G-202/G-203
+保持 R2 阻断；C2×3 含继承的 G-09；C3 与 REJECT 各成清单）。Round 1 独立审阅发现的
+A-09 高估、contract digest 漏面、package digest 语义夸大、79 计数错误与 ADR-0021
+表述失准已记录于 §16 并修复。Business Module Packaging foundation 与 Identity/
+Organization/Policy 一律维持 R1；R2 宣布被 G-202（独立发布工件与外部消费者证据）显式
+阻断，归 Wave 5。本轮未 push、未合并、未启动 Wave 3/Wave 5；等待实现者之外的独立
+reviewer 对 Round 2 candidate 只读复审并回填 §14。
+
+## 16. Round 2 independent review findings and remediation（2026-09-24）
+
+Round 1 candidate `50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f` 的独立审阅发现以下缺口。
+本节为逐条记录 + 修复证据；修复全部发生在同一 Wave 2 分支，未触碰外部固定参考记录
+（§3 的版本/commit/源码取证沿用原记录，本次修复均为本地测试证据，不构成外部参考、
+发布工件或 PostgreSQL 证据）。
+
+| # | 发现（审阅意见） | Round 1 状态的高估之处 | 修复（Round 2） | 证据 |
+|---|---|---|---|---|
+| F-1 | `manifest.agent_tool_contributions` 的公开 capability ID/版本变化不改变 `contract_digest`，但这些声明已被 compiler 登记为 public target 并生成 `PublicCapability` 跨模块依赖引用——是已登记的公开契约 | A-03 "契约面全" 不成立；存在可静默漂移的公开契约面 | 先写失败测试证明（修复前 digest `49fd48d5…` 不随重命名变化），再将 `agent_tool_contributions` 纳入 canonical surface；未用整包 JSON 无差别哈希掩盖边界 | `contract_digest_changes_when_a_public_agent_capability_id_or_version_changes`；置换测试含 agent 逆序 |
+| F-2 | UI/typed contributions 的取舍缺逐项判定 | 排除本身可能正确，但没有判定与证据 | 逐项判定入 §5 与测试名/源码文档：`manifest.ui_contributions` = 展示面声明（不进 catalog、无依赖解析）；`package.contributions` typed UI/Agent/Policy = 消费者侧 wiring（引用 target 而自身非 target）；public catalog 可由纳入面推导、无独立 catalog 摘要；全部排除项仍由 package digest + component fingerprint 钉住 | `contract_digest_ignores_consumer_side_contributions_but_package_digest_covers_them` |
+| F-3 | A-09 只测试了 shape 校验与手工同值装配，`ModuleReleaseIdentity::validate` 不是"manifest 与 release contract 一致性"验证 | A-09 记 PASS 属高估；"consistency" 声明无证据 | 明确 `validate` = 字段形状校验（名称/注释/文档已改，不得称一致性验证）；在 compiler 边界新增 `verify_release_identity(compiled, identity)`：对 `compile()` 输出重算 `contract_digest` 与 compiled declaration fingerprint 并比较，核对 module_id/module_version/manifest_schema_version/（钉定 migration revision 时的）manifest namespace；单字段错配各有负向测试；`package_fingerprint` 与 planner per-module digest 同值有交叉测试 | A-09 行全部测试；`package_fingerprint_matches_the_planner_per_module_digest` |
+| F-4 | release identity 的 `module_version` 与 bundle `crate_version` 未强制 SemVer（token 语法可过） | "SemVer" 表述与实现不符（`SAAS_MODULE_STANDARD` §8/§14 要求 SemVer） | release 层强制严格 SemVer（新增 `semver` 外部 registry 依赖，纯值解析，无 path 依赖）；manifest/compile 兼容行为未变 | `release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions`（非 SemVer token 全部拒绝） |
+| F-5 | `PackageDigest` 哈希的是规范化声明，不是发布工件字节；`release.rs` 注释/文档把 `package_digest` 写成"release package contents" | 存在把声明摘要读成 tarball 内容摘要的空间 | 全链语义修正：release.rs 字段注释、`package_fingerprint`/`contract_digest` 文档、§5/R2 readiness 均改为 compiled declaration fingerprint；真实工件 digest 与工件完整性验证继续记 Wave 5 NOT RUN（本轮无物理工件、无工件 fixture，不宣称已验证） | `dry_plan`/`compile` 路径复核（输入为声明，非工件字节）；本轮零工件代码 |
+| F-6 | focused "79" 与实际不符 | 总数不可复核 | 更正为逐项可复核分项与总数（Round 1 实测 99、本次 113） | §4.2/§9 分项 + §9 focused 行 |
+| F-7 | "修正 ADR-0021 的既有假设"表述与 ADR 原文不符 | 把自身取证记录的标识 NOT FOUND 说成推翻 Accepted ADR 的假设 | 与 ADR-0021 原文逐字核对：三个标识符从未出现在 ADR；ADR 的 "required server version range" 兼容窗口结论被 v2.9.0 证据（`engines.twenty` + `CANNOT_DOWNGRADE_APPLICATION`）证实。表述改为标识校准；不修改 Accepted ADR，无需修订候选 | §3 Twenty 条目 + §13 Q5 结论 |
+| F-8 | 修复本身不得被写成外部参考/发布工件/PostgreSQL 已验证 | — | 外部固定参考沿用 §3 原记录；本节全部证据为本地 `cargo`/fitness 运行；T4/T5/T6 保持 NOT RUN | §9 T4/T5/T6 行 |
+
+Round 2 对状态的影响：A-09 由 PASS（高估）→ 审阅时 NOT MET → 以 F-3/F-4 证据恢复
+PASS；Wave 2 exit 第一项由 MET（高估）→ 审阅时 NOT MET → 恢复 MET（§12）；A-01..A-08、
+A-10..A-12 的原有证据不受影响，其中 A-01..A-03 因 F-1/F-2 扩展了覆盖面。修复未新增
+部署单元、未改 manifest/compile 兼容行为、未改 Accepted ADR，G-201 契约层关闭依据增强，
+G-202/G-203 关闭条件不变（Wave 5）。

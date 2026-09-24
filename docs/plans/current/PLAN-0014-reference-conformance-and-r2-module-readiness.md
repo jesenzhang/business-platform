@@ -475,8 +475,12 @@ Base 为 `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`（Wave 1 链未合入 main�
 Frappe `v16.35.0` = `012667b9c4e7f66d5e1ff5858d2e922331d4300a`、ERPNext `v16.36.0` =
 `b30aa5334bcea94dba74f5b866af13c43a861948`、Odoo 分支 `19.0` tip =
 `2e2acfd6d2725d1a4a95b1a605634e1ac34163f`（无版本 tag，如实记录）、Twenty `v2.9.0` =
-`b53f1832d80f87be2cfd88990b855c0e5f3cc926`；均按源码/测试取证，并修正 ADR-0021 中
-`TwentyCoreModule`/`serverVersionRange`/`ApplicationActivation` 的既有假设（NOT FOUND）。
+`b53f1832d80f87be2cfd88990b855c0e5f3cc926`；均按源码/测试取证。（Round 2 校准：
+`TwentyCoreModule`/`serverVersionRange`/`ApplicationActivation` 三个标识从未出现在
+ADR-0021 原文，其 NOT FOUND 只是对本记录自身参考取证的标识校准；ADR-0021 依赖的
+"required server version range" 兼容窗口语义经 v2.9.0 源码证据（`engines.twenty` +
+`CANNOT_DOWNGRADE_APPLICATION`）证实仍成立，Accepted ADR 未被推翻、未修改，无需修订
+候选。见 review §3/§16。）
 
 交付物：
 
@@ -493,7 +497,9 @@ Frappe `v16.35.0` = `012667b9c4e7f66d5e1ff5858d2e922331d4300a`、ERPNext `v16.36
 - 本计划与 `docs/architecture/ARCHITECTURE_STATUS.md` 的执行状态同步。
 
 当前结论：Wave 2 三个 exit（canonical release identity defined / R2 packaging
-acceptance executable / no forced microservice split）判定 MET；C0=0；C1×3——G-201
+acceptance executable / no forced microservice split）判定 MET（Round 1 初判；其中
+第一项在 Round 2 独立审阅中因 A-09 高估与摘要漏面被判 NOT MET，修复后以新测试证据
+恢复 MET——见下方 Round 2 记录与 review §12/§16）；C0=0；C1×3——G-201
 release identity 契约层已关闭（真实模块工件组装留 Wave 5），G-202 独立发布工件与
 workspace 外消费者证据缺失（R2 BLOCKER，Wave 5 pilot 关闭）、G-203 迁移命名空间未落
 物理隔离（声明字段已有）；C2×3 含继承的 G-09 原样保留。`business-module-contracts` /
@@ -504,11 +510,27 @@ workspace 外消费者证据缺失（R2 BLOCKER，Wave 5 pilot 关闭）、G-203
 `cargo check --workspace --all-targets --all-features`、
 `cargo clippy --workspace --all-targets --all-features -- -D warnings`、
 `cargo test --workspace --all-features` 全部退出码 0；focused 79 tests（含 14 项新增）
-PASS；`scripts/check-architecture.ps1` Architecture Fitness 与 OpenAPI contract PASS；
-`git diff --check` clean。PostgreSQL 迁移 lane、release 工件构建与 workspace 外独立
-消费者构建为 `NOT RUN`（无本机 PostgreSQL / release tool 未实现 / 属 Wave 5 fixture，
-见 review §9/§10），不以 focused 或 SQLite 证据替代。独立 reviewer verdict 未返回；
-状态为 `READY FOR REVIEW / NOT INTEGRATED`。
+PASS（Round 2 更正：该 "79" 为誊写错误，Round 1 实际为 99 = contracts 22u+22i、
+compiler 18+26+5+6；分项以 review §4.2 为准）；`scripts/check-architecture.ps1`
+Architecture Fitness 与 OpenAPI contract PASS；`git diff --check` clean。PostgreSQL
+迁移 lane、release 工件构建与 workspace 外独立消费者构建为 `NOT RUN`（无本机
+PostgreSQL / release tool 未实现 / 属 Wave 5 fixture，见 review §9/§10），不以 focused
+或 SQLite 证据替代。独立 reviewer verdict 未返回；该轮状态为
+`READY FOR REVIEW / NOT INTEGRATED`。
+
+Wave 2 Round 2 修复（同分支，2026-09-24）：Round 1 候选 `50b6ae9` 的独立审阅发现
+(1) `contract_digest` 遗漏已登记为 public target 的公开 agent capability 面（先写
+失败测试证实再修复纳入）；(2) A-09 只有 shape 校验与手工同值装配，非一致性验证——
+新增 compiler 边界 `verify_release_identity`（对 `compile()` 输出重算 contract digest
+与 compiled declaration fingerprint 并比较，核对 module_id/version/manifest schema/
+migration namespace，单字段错配各有负向测试）并明确 `validate` 仅字段形状校验；
+(3) release 层 `module_version`/bundle `crate_version` 强制严格 SemVer；(4) `package_digest`
+语义修正为 compiled declaration fingerprint——声明摘要，不是发布工件字节，工件完整性
+digest 继续 Wave 5 NOT RUN；(5) 计数与 ADR-0021 表述校准。focused 现为 113 tests
+（Round 1 新增 14 + Round 2 新增 14）。Wave 2 exit 第一项经 Round 2 NOT MET 降级后以
+新证据恢复 MET（review §12/§16）。本轮仍零部署单元、零运行时变更、未改 Accepted ADR、
+未改 manifest/compile 兼容行为。修复后状态为 `READY FOR INDEPENDENT RE-REVIEW /
+NOT INTEGRATED`；PostgreSQL、真实发布工件、workspace 外消费者证据维持 NOT RUN。
 
 ## 6. 日程
 

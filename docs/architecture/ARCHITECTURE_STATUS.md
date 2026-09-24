@@ -628,7 +628,10 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > `feat/PLAN-0014-wave2-business-module-packaging-conformance`（Base
 > `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`，未 push、未合并）完成：固定 ABP 10.6.1、
 > Frappe v16.35.0、ERPNext v16.36.0、Odoo 19.0、Twenty v2.9.0 的 commit 级参考并按源码
-> 取证（修正 ADR-0021 的 Twenty 装饰器/激活假设——参考 commit 上 NOT FOUND）。canonical
+> 取证（Round 2 校准：`TwentyCoreModule`/`serverVersionRange`/`ApplicationActivation`
+> 从未出现在 ADR-0021 原文，NOT FOUND 仅为本记录自身取证的标识校准；ADR-0021 的
+> "required server version range" 兼容窗口结论经 v2.9.0 证据证实仍成立，Accepted ADR
+> 未修改）。canonical
 > module release identity（`module-release.identity.v1` 八字段 + `ModuleReleaseBundle`）
 > 与 compiler canonical `contract_digest` seam 落地为纯值契约并有测试与 fitness 守卫；
 > 复用 `BusinessModuleManifest` 为唯一声明，未建第二 manifest、未新增运行时或部署单元。
@@ -638,5 +641,15 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > 与外部消费者证据缺失 = R2 BLOCKER；G-203 迁移命名空间未落物理隔离）；C2×3（含继承
 > Wave 1 的 G-09 原样保留）。`business-module-contracts`/`business-application-compiler`
 > 与 Identity/Organization/Policy 一律维持 R1 / R2 BLOCKED / NOT CLAIMED。审阅记录
-> `docs/reviews/2026-09-24-saas-align-module-packaging.md`；状态 READY FOR REVIEW /
-> NOT INTEGRATED，独立 reviewer verdict 待回填。
+> `docs/reviews/2026-09-24-saas-align-module-packaging.md`。
+> Round 2 修复（同分支，2026-09-24）：Round 1 候选独立审阅发现 A-09 实为 shape 校验
+> 非一致性验证、`contract_digest` 遗漏已登记 public target 的 agent capability、
+> `package_digest` 被误述为工件内容摘要、focused 计数 "79" 誊写错误。修复：compiler
+> 边界新增 `verify_release_identity`（重算双 digest + 单字段错配负向）并明确
+> `ModuleReleaseIdentity::validate` 仅字段形状校验；agent 公开契约面纳入摘要；release 层
+> `module_version`/bundle `crate_version` 强制 SemVer；`package_digest` 语义修正为
+> compiled declaration fingerprint（声明摘要 ≠ 发布工件字节，工件完整性 digest 维持
+> Wave 5 NOT RUN）。focused 更正为 113；Wave 2 exit 第一项经 NOT MET 降级后以新证据
+> 恢复 MET（review §12/§16）。G-202/G-203 关闭条件不变；两个 crate 仍维持
+> R1 / R2 BLOCKED / NOT CLAIMED。当前状态 READY FOR INDEPENDENT RE-REVIEW /
+> NOT INTEGRATED，独立 reviewer 复审 verdict 待回填。
