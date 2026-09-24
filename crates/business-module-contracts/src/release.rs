@@ -2,15 +2,29 @@
 //!
 //! A module manifest is a declaration; a release identity pins one auditable
 //! build of that declaration: the exact source revision, public contract
-//! surface digest, package digest, migration revision and build toolchain.
-//! These types are pure value contracts. They do not build packages,
-//! register, install, enable, uninstall or purge anything, and they do not
-//! replace [`crate::BusinessModuleManifest`] as the module declaration.
+//! surface digest, compiled package digest, migration revision and build
+//! toolchain. These types are pure value contracts. They do not build
+//! packages, register, install, enable, uninstall or purge anything, and they
+//! do not replace [`crate::BusinessModuleManifest`] as the module declaration.
 //!
 //! Canonical release identity fields are fixed by `SAAS_MODULE_STANDARD` §13;
 //! the multi-crate mapping fulfils `SAAS_MODULE_STANDARD` §8 module-version to
 //! crate-version auditability. A release tool assembles this identity from a
-//! compiled package plus build evidence; this crate only validates it.
+//! compiled package plus build evidence.
+//!
+//! Two validation layers, deliberately separated:
+//!
+//! * [`ModuleReleaseIdentity::validate`] (and the `validate` methods here)
+//!   check only the *shape* of an assembled identity: supported schema
+//!   version, `SemVer` module and crate versions, identifier grammar and length
+//!   bounds. They prove nothing about which declaration the identity was
+//!   assembled from and must not be described as consistency verification.
+//! * Consistency with declaration and build evidence — re-computing the
+//!   contract and compiled package digests and comparing them, plus identity/
+//!   manifest agreement on module id, version, manifest schema version and
+//!   migration namespace — is enforced by the packaging compiler's
+//!   `verify_release_identity` entry point (`business-application-compiler`),
+//!   which consumes the compiled package the identity claims to pin.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -205,6 +219,12 @@ pub enum ModuleReleaseError {
     /// The same crate appears twice in the bundle mapping.
     #[error("duplicate crate '{crate_name}' in release bundle")]
     DuplicateCrate { crate_name: String },
+    /// A release-layer version token is not valid `SemVer`. Release identity
+    /// module versions and bundle crate versions use the strict `SemVer`
+    /// grammar required by `SAAS_MODULE_STANDARD` §8/§13/§14 (R2); the
+    /// broader manifest-level version token grammar is unchanged.
+    #[error("{kind} '{value}' is not valid SemVer")]
+    NotSemVer { kind: &'static str, value: String },
 }
 
 /// The build toolchain that produced a module package release.
@@ -293,15 +313,21 @@ pub struct ModuleReleaseIdentity {
     pub schema_version: String,
     /// Stable module identity.
     pub module_id: BusinessModuleId,
-    /// Independently versioned module release version (`SemVer`).
+    /// Independently versioned module release version. The release layer
+    /// enforces strict `SemVer` ([`Self::validate`]); the manifest-level
+    /// version token grammar is a separate, broader rule.
     pub module_version: BusinessModuleVersion,
     /// Manifest schema version of the declaration this release was built from.
     pub manifest_schema_version: ManifestSchemaVersion,
     /// Pinned source revision the package was built from.
     pub source_revision: SourceRevision,
-    /// Canonical digest of the published cross-module contract surface.
+    /// Canonical digest of the published cross-module contract surface,
+    /// produced by the compiler's `contract_digest` seam.
     pub contract_digest: ContractDigest,
-    /// Canonical digest of the release package contents.
+    /// Canonical digest of the compiled module declaration — the normalized
+    /// declaration fingerprint the compiler planner reports per module. It
+    /// pins declarations, not packed artifact bytes; a physical artifact
+    /// integrity digest is a separate, still-unimplemented concern.
     pub package_digest: PackageDigest,
     /// Pinned migration set, or `None` for modules with no persistent facts.
     #[serde(default)]
@@ -311,12 +337,26 @@ pub struct ModuleReleaseIdentity {
 }
 
 impl ModuleReleaseIdentity {
-    /// Validates the assembled identity against the release contract.
+    /// Validates the *shape* of an assembled identity against the release
+    /// contract: supported schema version, `SemVer` module release version
+    /// (`SAAS_MODULE_STANDARD` §8/§14), and toolchain/migration grammar and
+    /// length bounds. This is a field-shape check only: it does not compare
+    /// any field against a module declaration or build evidence. Consistency
+    /// verification against the compiled package the identity claims to pin
+    /// (re-computed contract and package digests, manifest agreement on
+    /// id/version/schema/namespace) is performed by the packaging compiler's
+    /// `verify_release_identity` entry point.
     pub fn validate(&self) -> Result<(), ModuleReleaseError> {
         if self.schema_version != MODULE_RELEASE_IDENTITY_SCHEMA_VERSION {
             return Err(ModuleReleaseError::UnsupportedSchemaVersion {
                 expected: MODULE_RELEASE_IDENTITY_SCHEMA_VERSION.to_owned(),
                 actual: self.schema_version.clone(),
+            });
+        }
+        if semver::Version::parse(self.module_version.as_str()).is_err() {
+            return Err(ModuleReleaseError::NotSemVer {
+                kind: "release module version",
+                value: self.module_version.to_string(),
             });
         }
         self.build_toolchain.validate()?;
@@ -334,12 +374,14 @@ impl ModuleReleaseIdentity {
 pub struct CrateVersionBinding {
     /// Cargo crate name.
     pub crate_name: String,
-    /// Version that crate was released with under this module release.
+    /// Version that crate was released with under this module release. Must be
+    /// strict `SemVer` (`SAAS_MODULE_STANDARD` §8), not an arbitrary token.
     pub crate_version: String,
 }
 
 impl CrateVersionBinding {
-    /// Validates one mapping entry.
+    /// Validates one mapping entry: crate name grammar and bounds, and a
+    /// strict `SemVer` crate version.
     pub fn validate(&self) -> Result<(), ModuleReleaseError> {
         if self.crate_name.is_empty() {
             return Err(ModuleReleaseError::EmptyValue { kind: "crate name" });
@@ -360,11 +402,12 @@ impl CrateVersionBinding {
                 kind: "crate name with valid characters",
             });
         }
-        validate_version_token(&self.crate_version, "crate version").map_err(|_| {
-            ModuleReleaseError::InvalidCharacters {
+        if semver::Version::parse(&self.crate_version).is_err() {
+            return Err(ModuleReleaseError::NotSemVer {
                 kind: "crate version",
-            }
-        })?;
+                value: self.crate_version.clone(),
+            });
+        }
         Ok(())
     }
 }
@@ -586,6 +629,53 @@ mod tests {
             invalid_name.validate(),
             Err(ModuleReleaseError::InvalidCharacters { .. })
         ));
+    }
+
+    #[test]
+    fn release_identity_requires_semver_module_version() {
+        // Every token below passes the manifest-level version *token*
+        // grammar but is not SemVer; the release layer must reject them.
+        for rejected in ["1.2", "1", "v1.2.3", "nightly-2026-09", "1.2.3.4"] {
+            let mut identity = valid_identity();
+            identity.module_version = BusinessModuleVersion::new(rejected.to_owned()).unwrap();
+            assert!(
+                matches!(
+                    identity.validate(),
+                    Err(ModuleReleaseError::NotSemVer { .. })
+                ),
+                "release module version '{rejected}' must be rejected as non-SemVer"
+            );
+        }
+        for accepted in ["1.2.0", "0.0.1", "1.2.0-rc.1"] {
+            let mut identity = valid_identity();
+            identity.module_version = BusinessModuleVersion::new(accepted.to_owned()).unwrap();
+            assert_eq!(
+                identity.validate(),
+                Ok(()),
+                "release module version '{accepted}' must satisfy SemVer"
+            );
+        }
+    }
+
+    #[test]
+    fn bundle_requires_semver_crate_versions() {
+        let mut bundle = ModuleReleaseBundle {
+            identity: valid_identity(),
+            crate_versions: vec![CrateVersionBinding {
+                crate_name: "module-core".to_owned(),
+                crate_version: "1.2.0".to_owned(),
+            }],
+        };
+        assert_eq!(bundle.validate(), Ok(()));
+        for rejected in ["1.2", "nightly", "0"] {
+            bundle.crate_versions[0].crate_version = rejected.to_owned();
+            assert!(
+                matches!(bundle.validate(), Err(ModuleReleaseError::NotSemVer { .. })),
+                "crate version '{rejected}' must be rejected as non-SemVer"
+            );
+        }
+        bundle.crate_versions[0].crate_version = "1.2.0-rc.1".to_owned();
+        assert_eq!(bundle.validate(), Ok(()));
     }
 
     #[test]

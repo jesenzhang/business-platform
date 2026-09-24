@@ -5,12 +5,13 @@
 
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
-    ContractDescriptor, ContractDigest, DataClassification, ExtensionContribution,
-    ExtensionPointId, ManifestValidationError, ModuleDataState, ModuleDependency,
-    ModuleInstallationState, NamespacedId, PackageDigest, PublicContributionCatalog,
-    PublicContributionTarget, PublicTargetKind, PublishedDependencyCatalog,
-    PublishedDependencyReference, PublishedExtensionPoint, ResourceKindDescriptor,
-    SemanticContributionDescriptor, TypedContributionSet,
+    ContractDescriptor, ContractDigest, ContributionDescriptor, DataClassification,
+    ExtensionContribution, ExtensionPointId, ManifestValidationError, ModuleDataState,
+    ModuleDependency, ModuleInstallationState, ModuleReleaseError, ModuleReleaseIdentity,
+    NamespacedId, PackageDigest, PublicContributionCatalog, PublicContributionTarget,
+    PublicTargetKind, PublishedDependencyCatalog, PublishedDependencyReference,
+    PublishedExtensionPoint, ResourceKindDescriptor, SemanticContributionDescriptor,
+    TypedContributionSet,
 };
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -1276,13 +1277,37 @@ fn package_digest(package: &BusinessApplicationPackage) -> Result<PackageDigest,
 ///
 /// The surface is the module's externally observable inter-module contract:
 /// data classification, published commands/queries/events, resource kinds,
-/// semantic contributions and owner-published extension points, after
-/// compiler normalization (stable sorting). Non-contract release metadata —
-/// module version, dependencies, platform compatibility window and
-/// consumer-side contributions or UI/Agent declarations — does not change
-/// this digest, so a released contract artifact can be re-verified
-/// independently of packaging metadata. The digest covers declarations only;
-/// it never includes persistence or build inputs.
+/// semantic contributions, owner-published extension points, and published
+/// agent capabilities, after compiler normalization (stable sorting).
+///
+/// Boundary decisions (proven test-by-test in
+/// `tests/release_surface_digest.rs`):
+///
+/// * `manifest.agent_tool_contributions` are part of the surface: every entry
+///   is registered as a `PublicTargetKind::Capability` in the public
+///   contribution catalog and as a `PublishedDependencyReference::
+///   PublicCapability`, so other modules may resolve and depend on exactly
+///   these IDs and versions (ADR-0021 §2.5). A rename or re-version is a
+///   contract change.
+/// * `manifest.ui_contributions` are presentation declarations consumed by the
+///   platform shell. They never enter the public contribution catalog and no
+///   dependency reference resolves against them, so they are not a published
+///   cross-module contract.
+/// * `package.contributions` typed UI/Agent/Policy entries are consumer-side
+///   wiring: they reference published targets (compile fails closed otherwise)
+///   and are themselves never targets (`PublicTargetKind` only has
+///   Resource/Query/Command/Capability), so they are not a published
+///   cross-module contract either.
+/// * The published public target catalog is fully derivable from the included
+///   surface, so no separate catalog digest exists.
+///
+/// Non-contract release metadata — module version, dependencies and the
+/// platform compatibility window — does not change this digest, so a released
+/// contract artifact can be re-verified independently of packaging metadata.
+/// Excluded declarations remain pinned by the compiled package digest and the
+/// planner's per-component fingerprints. The digest covers compiled
+/// declarations only; it never includes persistence, build inputs, or packed
+/// artifact bytes.
 pub fn contract_digest(
     package: &BusinessApplicationPackage,
 ) -> Result<ContractDigest, CompilationError> {
@@ -1295,6 +1320,7 @@ pub fn contract_digest(
         published_events: &'a [ContractDescriptor],
         resource_kinds: &'a [ResourceKindDescriptor],
         semantic_contributions: &'a [SemanticContributionDescriptor],
+        agent_tool_contributions: &'a [ContributionDescriptor],
         extension_points: &'a [PublishedExtensionPoint],
     }
     let mut normalized = package.clone();
@@ -1307,10 +1333,131 @@ pub fn contract_digest(
         published_events: &normalized.manifest.published_events,
         resource_kinds: &normalized.manifest.resource_kinds,
         semantic_contributions: &normalized.manifest.semantic_contributions,
+        agent_tool_contributions: &normalized.manifest.agent_tool_contributions,
         extension_points: &normalized.extension_points,
     })?;
     ContractDigest::new(format!("{:x}", Sha256::digest(&bytes)))
         .map_err(|_| CompilationError::Digest)
+}
+
+/// Canonical fingerprint of one module declaration: SHA-256 over the
+/// normalized package JSON — the same per-module digest [`dry_plan`] reports
+/// in its `AddModule` change. It pins the whole compiled declaration surface
+/// (contract surface, consumer-side contributions and release metadata), not
+/// packed artifact bytes; a physical artifact integrity digest is a separate,
+/// still-unimplemented concern.
+pub fn package_fingerprint(
+    package: &BusinessApplicationPackage,
+) -> Result<PackageDigest, CompilationError> {
+    let mut normalized = package.clone();
+    normalize(std::slice::from_mut(&mut normalized));
+    let bytes = serde_json::to_vec(&normalized)?;
+    PackageDigest::new(format!("{:x}", Sha256::digest(bytes))).map_err(|_| CompilationError::Digest)
+}
+
+/// A release identity that failed the consistency gate against compiled
+/// package evidence. Each variant names exactly one compared field so a
+/// release tool can report a single actionable mismatch.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum ReleaseIdentityMismatch {
+    /// The identity does not even satisfy its own shape contract.
+    #[error("release identity failed shape validation: {0}")]
+    IdentityShape(#[from] ModuleReleaseError),
+    /// The identity's module is absent from the compiled evidence, i.e. the
+    /// pinned module identity does not match the package that was built.
+    #[error("release identity pins module '{pinned}' which is not present in the compiled package evidence")]
+    UnknownModule { pinned: String },
+    /// Pinned module version disagrees with the compiled declaration.
+    #[error("release identity pins module_version '{pinned}' but the compiled declaration declares '{declared}'")]
+    ModuleVersion { pinned: String, declared: String },
+    /// Pinned manifest schema version disagrees with the compiled declaration.
+    #[error("release identity pins manifest_schema_version '{pinned}' but the compiled declaration declares '{declared}'")]
+    ManifestSchemaVersion { pinned: String, declared: String },
+    /// Pinned contract digest disagrees with the digest re-computed over the
+    /// compiled declaration's published contract surface.
+    #[error("release identity pins contract_digest '{pinned}' but the compiled declaration re-computes to '{declared}'")]
+    ContractDigest { pinned: String, declared: String },
+    /// Pinned package digest disagrees with the compiled declaration
+    /// fingerprint re-computed over the normalized package.
+    #[error("release identity pins package_digest '{pinned}' but the compiled declaration re-computes to '{declared}'")]
+    PackageDigest { pinned: String, declared: String },
+    /// A pinned migration namespace disagrees with the manifest declaration.
+    #[error("release identity pins migration namespace '{pinned}' but the manifest declares '{declared}'")]
+    MigrationNamespace { pinned: String, declared: String },
+    /// A canonical re-computation over the compiled evidence failed. The
+    /// reason is carried as text: the underlying compilation error is not a
+    /// comparable value type.
+    #[error("canonical re-computation failed: {reason}")]
+    Compilation { reason: String },
+}
+
+/// Consistency gate between an assembled release identity and the compiled
+/// package evidence it claims to pin. Unlike
+/// [`business_module_contracts::ModuleReleaseIdentity::validate`] (shape
+/// only), this re-computes the canonical contract digest and the compiled
+/// declaration fingerprint from the compiled packages and compares them,
+/// and verifies identity/manifest agreement on module id, module version,
+/// manifest schema version, and — when a migration revision is pinned — the
+/// migration namespace. A module that ships no migration set may pin `None`;
+/// the manifest-level namespace declaration is then unconstrained.
+///
+/// This is the executable entry for release-time verification: callers pass
+/// the output of [`compile`] (a verified compiled package set) plus the
+/// identity the release tool assembled, and any single-field mismatch fails
+/// with a named [`ReleaseIdentityMismatch`].
+pub fn verify_release_identity(
+    compiled: &CompiledBusinessApplicationManifest,
+    identity: &ModuleReleaseIdentity,
+) -> Result<(), ReleaseIdentityMismatch> {
+    identity.validate()?;
+    let package = compiled
+        .packages
+        .iter()
+        .find(|candidate| candidate.manifest.module_id == identity.module_id)
+        .ok_or_else(|| ReleaseIdentityMismatch::UnknownModule {
+            pinned: identity.module_id.to_string(),
+        })?;
+    if identity.module_version != package.manifest.module_version {
+        return Err(ReleaseIdentityMismatch::ModuleVersion {
+            pinned: identity.module_version.to_string(),
+            declared: package.manifest.module_version.to_string(),
+        });
+    }
+    if identity.manifest_schema_version != package.manifest.manifest_schema_version {
+        return Err(ReleaseIdentityMismatch::ManifestSchemaVersion {
+            pinned: identity.manifest_schema_version.to_string(),
+            declared: package.manifest.manifest_schema_version.to_string(),
+        });
+    }
+    let recomputed_contract =
+        contract_digest(package).map_err(|error| ReleaseIdentityMismatch::Compilation {
+            reason: error.to_string(),
+        })?;
+    if identity.contract_digest != recomputed_contract {
+        return Err(ReleaseIdentityMismatch::ContractDigest {
+            pinned: identity.contract_digest.to_string(),
+            declared: recomputed_contract.to_string(),
+        });
+    }
+    let recomputed_package =
+        package_fingerprint(package).map_err(|error| ReleaseIdentityMismatch::Compilation {
+            reason: error.to_string(),
+        })?;
+    if identity.package_digest != recomputed_package {
+        return Err(ReleaseIdentityMismatch::PackageDigest {
+            pinned: identity.package_digest.to_string(),
+            declared: recomputed_package.to_string(),
+        });
+    }
+    if let Some(revision) = &identity.migration_revision {
+        if revision.migration_namespace != package.manifest.migration_namespace {
+            return Err(ReleaseIdentityMismatch::MigrationNamespace {
+                pinned: revision.migration_namespace.clone(),
+                declared: package.manifest.migration_namespace.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn digest_json<T: Serialize>(value: &T) -> Result<PackageDigest, PlanError> {

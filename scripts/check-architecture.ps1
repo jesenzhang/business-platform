@@ -260,6 +260,12 @@ foreach ($member in $requiredReleaseIdentityMembers) {
 if ($businessApplicationCompilerSource -notmatch 'pub fn contract_digest') {
     throw "business-application-compiler must expose the canonical contract digest seam"
 }
+if ($businessApplicationCompilerSource -notmatch 'pub fn package_fingerprint') {
+    throw "business-application-compiler must expose the compiled package fingerprint seam"
+}
+if ($businessApplicationCompilerSource -notmatch 'pub fn verify_release_identity') {
+    throw "business-application-compiler must expose the release identity consistency verification seam"
+}
 
 $semanticSource = @(Get-ChildItem (Join-Path $root "crates/semantic-contract/src") -Recurse -File | ForEach-Object {
     Get-Content -Raw $_.FullName
