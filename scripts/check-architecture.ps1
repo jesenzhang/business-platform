@@ -242,6 +242,25 @@ foreach ($field in $requiredManifestFields) {
     }
 }
 
+# PLAN-0014 Wave 2: the canonical module release identity contract must stay
+# pinned to the SAAS_MODULE_STANDARD release identity surface, and the generic
+# compiler must expose the canonical contract digest seam used to assemble it.
+$requiredReleaseIdentityMembers = @(
+    "ModuleReleaseIdentity", "MODULE_RELEASE_IDENTITY_SCHEMA_VERSION",
+    "module_id", "module_version", "manifest_schema_version",
+    "source_revision", "contract_digest", "package_digest",
+    "migration_revision", "build_toolchain",
+    "ModuleReleaseBundle", "crate_versions"
+)
+foreach ($member in $requiredReleaseIdentityMembers) {
+    if ($moduleManifestSource -notmatch [regex]::Escape($member)) {
+        throw "Module release identity member is missing: $member"
+    }
+}
+if ($businessApplicationCompilerSource -notmatch 'pub fn contract_digest') {
+    throw "business-application-compiler must expose the canonical contract digest seam"
+}
+
 $semanticSource = @(Get-ChildItem (Join-Path $root "crates/semantic-contract/src") -Recurse -File | ForEach-Object {
     Get-Content -Raw $_.FullName
 }) -join [Environment]::NewLine

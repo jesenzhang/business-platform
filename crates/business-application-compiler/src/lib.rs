@@ -5,11 +5,12 @@
 
 use business_module_contracts::{
     BusinessModuleId, BusinessModuleManifest, BusinessModuleVersion, CompatibilityDescriptor,
-    ExtensionContribution, ExtensionPointId, ManifestValidationError, ModuleDataState,
-    ModuleDependency, ModuleInstallationState, NamespacedId, PackageDigest,
-    PublicContributionCatalog, PublicContributionTarget, PublicTargetKind,
-    PublishedDependencyCatalog, PublishedDependencyReference, PublishedExtensionPoint,
-    TypedContributionSet,
+    ContractDescriptor, ContractDigest, DataClassification, ExtensionContribution,
+    ExtensionPointId, ManifestValidationError, ModuleDataState, ModuleDependency,
+    ModuleInstallationState, NamespacedId, PackageDigest, PublicContributionCatalog,
+    PublicContributionTarget, PublicTargetKind, PublishedDependencyCatalog,
+    PublishedDependencyReference, PublishedExtensionPoint, ResourceKindDescriptor,
+    SemanticContributionDescriptor, TypedContributionSet,
 };
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
@@ -1269,6 +1270,47 @@ fn all_components<'a>(
 
 fn package_digest(package: &BusinessApplicationPackage) -> Result<PackageDigest, PlanError> {
     digest_json(package)
+}
+
+/// Canonical digest of one package's published cross-module contract surface.
+///
+/// The surface is the module's externally observable inter-module contract:
+/// data classification, published commands/queries/events, resource kinds,
+/// semantic contributions and owner-published extension points, after
+/// compiler normalization (stable sorting). Non-contract release metadata —
+/// module version, dependencies, platform compatibility window and
+/// consumer-side contributions or UI/Agent declarations — does not change
+/// this digest, so a released contract artifact can be re-verified
+/// independently of packaging metadata. The digest covers declarations only;
+/// it never includes persistence or build inputs.
+pub fn contract_digest(
+    package: &BusinessApplicationPackage,
+) -> Result<ContractDigest, CompilationError> {
+    #[derive(Serialize)]
+    struct CanonicalContractSurface<'a> {
+        module_id: &'a BusinessModuleId,
+        data_classification: &'a [DataClassification],
+        published_commands: &'a [ContractDescriptor],
+        published_queries: &'a [ContractDescriptor],
+        published_events: &'a [ContractDescriptor],
+        resource_kinds: &'a [ResourceKindDescriptor],
+        semantic_contributions: &'a [SemanticContributionDescriptor],
+        extension_points: &'a [PublishedExtensionPoint],
+    }
+    let mut normalized = package.clone();
+    normalize(std::slice::from_mut(&mut normalized));
+    let bytes = serde_json::to_vec(&CanonicalContractSurface {
+        module_id: &normalized.manifest.module_id,
+        data_classification: &normalized.manifest.data_classification,
+        published_commands: &normalized.manifest.published_commands,
+        published_queries: &normalized.manifest.published_queries,
+        published_events: &normalized.manifest.published_events,
+        resource_kinds: &normalized.manifest.resource_kinds,
+        semantic_contributions: &normalized.manifest.semantic_contributions,
+        extension_points: &normalized.extension_points,
+    })?;
+    ContractDigest::new(format!("{:x}", Sha256::digest(&bytes)))
+        .map_err(|_| CompilationError::Digest)
 }
 
 fn digest_json<T: Serialize>(value: &T) -> Result<PackageDigest, PlanError> {

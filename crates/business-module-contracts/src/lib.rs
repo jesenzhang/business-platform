@@ -5,6 +5,7 @@
 //! business fact.
 
 mod manifest;
+mod release;
 
 pub use manifest::{
     validate_extension_point_removal, validate_extension_points,
@@ -23,4 +24,9 @@ pub use manifest::{
     PublishedDependencyReference, PublishedExtensionPoint, ResourceKindDescriptor,
     SemanticContributionDescriptor, TypedContributionSet, UiContributionId,
     BUSINESS_MODULE_MANIFEST_SCHEMA_VERSION,
+};
+pub use release::{
+    BuildToolchain, ContractDigest, CrateVersionBinding, MigrationRevision, MigrationSetDigest,
+    ModuleReleaseBundle, ModuleReleaseError, ModuleReleaseIdentity, SourceRevision,
+    MODULE_RELEASE_IDENTITY_SCHEMA_VERSION,
 };
