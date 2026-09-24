@@ -444,3 +444,32 @@ AuthorizationPort
 - ADR-0020/0021/0022/0024：模块、通信、认证边界。
 
 改变上述既有 Authority 或数据所有权仍需 ADR。本文件不能被解释为已部署 OpenFGA、OpenMeter、Infisical、RustFS、Svix、Novu、Unleash、AgentOS 或其他外部服务。
+
+
+## Shared Execution / Sandbox Infrastructure Boundary (Proposed 2026-09-24)
+
+Controlled execution is treated as an Infrastructure Plane capability, not as a Business Module or an AI Worker private implementation.
+
+    Business Modules / Workspace / Durable Jobs
+                    |
+            ExecutionServicePort
+                    |
+         Shared Execution/Sandbox Service
+                    |
+              execution nodes
+                    |
+        process / OS sandbox / container / VM providers
+
+Normative ownership direction:
+
+- Business Platform retains tenant authorization, business state, Durable Job/JobStep/Attempt authority, approval, business audit and formal result commit.
+- The Execution/Sandbox Service owns only environment lifecycle, provider admission, resource placement, isolation enforcement, process/PTY mechanics, cleanup and execution evidence.
+- The service must be independently deployable and replaceable; no shared database or cross-service transaction with Business Platform is assumed.
+- Jarvis may consume the same service semantics through an independent adapter, but Business Platform must not depend on Jarvis Runtime crates or desktop internals.
+- Local/fake providers are allowed for development and contract tests; production guarantees must be re-proved by the selected remote backend.
+- Backend selection (Docker/Kubernetes/containerd/microVM/VM) is deferred. Unsupported requested guarantees fail closed; no silent isolation downgrade is allowed.
+- Optional snapshot/restore/fork are reserved capabilities, not current platform guarantees.
+
+Authority candidate: [ADR-0026](../adr/ADR-0026-execution-sandbox-as-shared-infrastructure-service.md). Detailed design: [EXECUTION_SANDBOX_SERVICE_ARCHITECTURE.md](EXECUTION_SANDBOX_SERVICE_ARCHITECTURE.md). Proposed plan: [PLAN-0015](../plans/current/PLAN-0015-execution-sandbox-service-boundary.md).
+
+This proposal does not activate a new runtime/service and does not block PLAN-0014 or the Contract Business Vertical Slice.
