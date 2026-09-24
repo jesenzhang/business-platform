@@ -8,6 +8,7 @@
 > Analytics/Visualization：Baseline 已建立，运行时尚未实现
 > SaaS Platform：2026-09-23 经 ADR-0025 Accepted，`SAAS_PLATFORM_ARCHITECTURE.md` 与 `SAAS_MODULE_STANDARD.md` 已晋升 Baseline；复用现有 BusinessModuleManifest/compiler 与 PLAN-0013 IAM，不激活新 runtime
 > Reference Alignment：PLAN-0014 已排期，先 IAM/Policy 与 Module Packaging，再 Durable/Audit、Document/Storage、Observability/Notification，最后至少两个模块完成 R2 pilot
+> Execution/Sandbox Infrastructure：2026-09-24 新增 ADR-0026 + EXECUTION_SANDBOX_SERVICE_ARCHITECTURE.md + PLAN-0015（均 Proposed / NOT ACTIVE）；先确定共享基础设施边界，Business Platform 保留 Durable Job/业务权威，远程执行服务独立部署且不与 Jarvis 共享状态；当前不改变 PLAN-0014 与 Contract 垂直切片优先级。
 
 > 2026-08-03: PLAN-0001 and PLAN-0002 are Integrated and archived. PLAN-0002
 > was fast-forwarded at `ad47544505b66d577ccdcb8f300812c294d3d7bf`; main CI
