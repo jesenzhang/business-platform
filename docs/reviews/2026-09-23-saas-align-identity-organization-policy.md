@@ -57,7 +57,7 @@
 | Authority | Organization owns units and membership; Identity is read through a port | Logto organizations and ZITADEL organizations/projects are first-class records | No generic relation graph owner | KEEP |
 | Domain model | company/department/team, parent tree, active/disabled; member/leader membership | Logto organization roles and ZITADEL org/project grants show scoped relations | No group/explicit share/relation tuple model | C2/C3 DEFER |
 | Tenant | all units/memberships tenant-scoped; cross-tenant visibility denied | ABP current tenant and Logto tenant guard provide analogous boundary | No separate tenant registry in this slice | KEEP current authority |
-| AuthZ | Organization supplies active membership and subtree facts to Policy | Cerbos/OpenFGA/SpiceDB distinguish subject, resource and contextual relation | Current Organization has no policy engine of its own, intentionally | KEEP / ADAPT through port only |
+| AuthZ | Organization supplies unit status and subtree facts to Policy; Policy scope evaluation does not check whether the target user has an active OrganizationMembership | Cerbos/OpenFGA/SpiceDB distinguish subject, resource and contextual relation | Organization roster membership is not currently an authorization revocation input | KEEP current boundary; document G-09 and define membership-to-grant semantics with a real consumer |
 | API / events | typed application commands and public admin DTOs; no organization event bus contract | ZITADEL eventstore and ABP distributed event patterns are larger frameworks | no published organization event schema | C1 only for future R2 artifact; no Wave 1 event expansion |
 | Lifecycle | unit active/disabled; membership active/inactive with deactivated_at and re-add | References support disable/remove/role revocation in different layers | time-boxed membership expiry absent | C2 SHOULD |
 | Failure semantics | cycle/tenant/disabled parent and scope bridge errors fail closed | OpenFGA/SpiceDB graph/dispatch failures are explicit; Cerbos errors are not allow | intermediate subtree revalidation is deliberately bounded | KEEP current documented rule; C2 review if a real resource consumer needs stronger semantics |
@@ -130,7 +130,7 @@ No C0 was found in the reviewed current paths. C1 items are R2 admission/evidenc
 | 6 | Revoked binding | `contract_authorization_fixture::revocation_stops_authorization_on_the_next_decision`; E2E revoke → 403 | PASS |
 | 7 | Expired/not-yet-effective binding | policy decision matrix and binding contract validity-window cases | PASS |
 | 8 | Expired tenant/org membership | no expiry state in current membership models; organization removal is inactive and is tested | PARTIAL; expiry is C2, not an untested allow path |
-| 9 | Removed organization membership | organization contract proves remove→inactive, list filtering and re-add; Policy OrganizationUnit scope checks unit status/tree but does not resolve the subject's OrganizationMembership | PASS for roster removal; separate RoleBinding revocation is not proven (G-09 C2) |
+| 9 | Removed organization membership | organization contract proves remove→inactive, list filtering and re-add; Policy OrganizationUnit scope checks unit status/tree but does not resolve the subject's OrganizationMembership | Roster removal PASS; post-removal authorization effect NOT VALIDATED (G-09 C2) |
 | 10 | Unknown/retired/malformed permission | policy decision matrix and bounded compat parser; unknown keys never grant | PASS |
 | 11 | Bad scope/resource kind or scope widening | ResourceScope validation, decision matrix, exact/type/org-subtree tests | PASS |
 | 12 | Wrong-tenant/foreign role | policy contract role visibility and cross-tenant bind rejection | PASS |
@@ -180,7 +180,7 @@ Current boundary:
 | Migration/retention/rollback mapping | NOT READY as an independent module artifact |
 | Shared contract artifact and consumer build | Workspace contracts exist; independent release artifact NOT READY |
 | PostgreSQL/remote release evidence | Current local PG NOT RUN; remote adapter not activated |
-| Independent review | PENDING until the candidate SHA is frozen |
+| Independent review | **PASS WITH C2/C3** on Base `8365de0211390a6a3367b536c5ceaa5256bbb5cf` → Candidate `c7dc3d142a526b47e9ba8e472b82346ffdaed221` |
 
 **R2 verdict: BLOCKED / NOT CLAIMED.** Wave 1 can close only with a review verdict and honest C0/C1 disposition; it does not promote `identity`, `organization` or `policy` to R2. Packaging and at least two-module R2 pilot remain in the later PLAN-0014 wave.
 
