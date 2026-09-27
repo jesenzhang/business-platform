@@ -5,7 +5,7 @@
 //! transaction.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -196,6 +196,7 @@ impl AuditEvent {
         let mut changed_fields = changed_fields;
         changed_fields.sort_unstable();
         changed_fields.dedup();
+        let occurred_at = canonical_timestamp(occurred_at);
         Ok(Self {
             id,
             tenant_id,
@@ -313,7 +314,7 @@ impl AuditEvent {
             return Err(AuditValidationError::InvalidChainMetadata.into());
         }
         self.stream_sequence = stream_sequence;
-        self.recorded_at = recorded_at;
+        self.recorded_at = canonical_timestamp(recorded_at);
         self.chain_version = chain_version;
         self.previous_hash = previous_hash;
         self.record_hash = Some(hash_record(&self)?);
@@ -542,6 +543,23 @@ pub fn hash_record(event: &AuditEvent) -> Result<String, AuditError> {
     Ok(hex_encode(&digest))
 }
 
+/// Canonical precision for every timestamp that enters `record_hash`.
+///
+/// `record_hash` is recomputed from stored rows during verification, so a hashed
+/// timestamp must survive a persistence round trip unchanged on every supported
+/// backend. `PostgreSQL` `TIMESTAMPTZ` stores microseconds while
+/// `chrono::Utc::now()` carries nanoseconds: without this normalization the
+/// digest written at append time no longer matches the digest recomputed from
+/// the stored row, and a freshly written chain reports itself as broken.
+///
+/// `rehydrate` deliberately does not normalize. Verification compares against
+/// the bytes a row was actually signed with, so stored timestamps are preserved
+/// exactly and existing history is never reinterpreted or re-signed.
+#[must_use]
+pub fn canonical_timestamp(value: DateTime<Utc>) -> DateTime<Utc> {
+    Utc.timestamp_nanos(value.timestamp_micros() * 1_000)
+}
+
 #[must_use]
 pub fn audit_chain_genesis(tenant_id: Uuid) -> String {
     format!("GENESIS:audit:v1:{tenant_id}")
@@ -675,6 +693,53 @@ mod tests {
             serde_json::json!({"lease_token": "hidden"})
         )
         .is_err());
+    }
+
+    #[test]
+    fn hash_inputs_survive_a_microsecond_persistence_round_trip() {
+        // PostgreSQL TIMESTAMPTZ stores microseconds. A timestamp that enters
+        // record_hash must therefore already be microsecond aligned, otherwise
+        // the digest recomputed from the stored row no longer matches the one
+        // written at append time and a healthy chain verifies as broken.
+        let nanosecond_instant = Utc.timestamp_nanos(1_761_000_000_123_456_789);
+        assert_eq!(nanosecond_instant.timestamp_subsec_nanos(), 123_456_789);
+        let persisted = canonical_timestamp(nanosecond_instant);
+        assert_eq!(persisted.timestamp_subsec_nanos(), 123_456_000);
+        assert_eq!(canonical_timestamp(persisted), persisted);
+
+        let base = event(AuditResult::Succeeded, serde_json::json!({"n": 1}))
+            .unwrap_or_else(|_| unreachable!());
+        let tenant = base.tenant_id();
+        let mut signed = base
+            .with_chain_metadata(1, nanosecond_instant, 1, Some(audit_chain_genesis(tenant)))
+            .unwrap_or_else(|_| unreachable!());
+        // Both hashed instants are backend representable before signing.
+        assert_eq!(signed.recorded_at.timestamp_subsec_nanos() % 1_000, 0);
+        assert_eq!(signed.occurred_at.timestamp_subsec_nanos() % 1_000, 0);
+        let signed_digest = signed
+            .record_hash
+            .clone()
+            .unwrap_or_else(|| unreachable!("chain metadata must sign the row"));
+        // Rehydrate the row the way an adapter reads it back from PostgreSQL.
+        signed.occurred_at = canonical_timestamp(signed.occurred_at);
+        signed.recorded_at = canonical_timestamp(signed.recorded_at);
+        assert_eq!(
+            hash_record(&signed).unwrap_or_else(|_| unreachable!()),
+            signed_digest,
+            "a row read back from a microsecond-precision backend must re-verify"
+        );
+        // Negative control: the hash really is nanosecond sensitive, so the
+        // normalization above is what keeps the chain verifiable.
+        let mut drifted = signed.clone();
+        let recorded_nanos = drifted
+            .recorded_at
+            .timestamp_nanos_opt()
+            .unwrap_or_else(|| unreachable!("a microsecond-aligned instant fits i64 nanos"));
+        drifted.recorded_at = Utc.timestamp_nanos(recorded_nanos + 1);
+        assert_ne!(
+            hash_record(&drifted).unwrap_or_else(|_| unreachable!()),
+            signed_digest
+        );
     }
 
     #[test]

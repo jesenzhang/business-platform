@@ -47,8 +47,11 @@ async fn cleanup(pool: &PgPool, tenant: Uuid) {
         .execute(pool)
         .await
         .expect("audit cleanup");
+    // `outbox_events.tenant_id` is the legacy `VARCHAR(100)` column (migration
+    // 001) and every production writer binds it as text; binding a `Uuid` here
+    // would make PostgreSQL reject the comparison as `varchar = uuid`.
     sqlx::query("DELETE FROM outbox_events WHERE tenant_id = $1")
-        .bind(tenant)
+        .bind(tenant.to_string())
         .execute(pool)
         .await
         .expect("outbox cleanup");
@@ -152,7 +155,7 @@ async fn outbox_count(pool: &PgPool, tenant: Uuid, event_type: &str) -> i64 {
     sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM outbox_events WHERE tenant_id = $1 AND event_type = $2",
     )
-    .bind(tenant)
+    .bind(tenant.to_string())
     .bind(event_type)
     .fetch_one(pool)
     .await
