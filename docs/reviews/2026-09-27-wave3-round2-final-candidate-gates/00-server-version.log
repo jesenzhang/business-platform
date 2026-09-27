@@ -1,0 +1,38 @@
+== PostgreSQL server environment capture (temporary probe, deleted after the run) ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmoqp0h0jd-04ky87k-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-32ayjsvkvf7bh\s-hmoqpj19i0-1gsxdb4-working`
+
+warning: `audit-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\wave3_pg_env_probe-3p9o4da1k6q9a\s-hmoqrl273q-0oorx7a-working`
+
+warning: `audit-postgres` (test "wave3_pg_env_probe") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running tests\wave3_pg_env_probe.rs (target\debug\deps\wave3_pg_env_probe-707fb7eb6ae3925d.exe)
+
+running 1 test
+test capture_server_environment ... PG_VERSION=PostgreSQL 18.4 on x86_64-windows, compiled by msvc-19.44.35227, 64-bit
+PG_SERVER_VERSION=18.4
+PG_LC_MESSAGES=Chinese (Simplified)_China.936
+PG_DATABASE=business_platform encoding=UTF8
+PG_DATABASE=business_platform_gates encoding=UTF8
+PG_DATABASE=contract_api_8fa744f879d3_test encoding=UTF8
+PG_DATABASE=contract_management encoding=UTF8
+PG_DATABASE=contract_management_es_test encoding=UTF8
+PG_DATABASE=contract_management_restore_test encoding=UTF8
+PG_DATABASE=contract_management_test encoding=UTF8
+PG_DATABASE=plan0014_wave3_r2 encoding=UTF8
+PG_DATABASE=plan0014_wave3_test encoding=UTF8
+PG_DATABASE=postgres encoding=UTF8
+PG_DATABASE=schema_gate_1a359b32b43c_test encoding=UTF8
+PG_PUBLIC_TABLES_IN_CONNECTED_DB=43
+PG_APPLIED_MIGRATIONS=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+PG_CURRENT_USER_PRESENT=true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+
+EXIT_CODE=0
+

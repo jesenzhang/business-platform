@@ -1,7 +1,7 @@
 # PLAN-0014 Wave 3 — Durable Task Execution Reference Conformance Review
 
 > Wave: PLAN-0014 Wave 3 (Durable Task Execution / Audit / Messaging)
-> Status: Wave 3 implementation reviewed / self-verified / **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**
+> Status: Round 1 independent verdict **FAIL / NEEDS REPAIR**; Round 2 final candidate `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` — PostgreSQL lanes EXECUTED on PostgreSQL 18.4 (22 passed / 0 failed / 0 ignored). NOT INTEGRATED; independent re-review pending. See §14
 > Review date: 2026-09-27 (actual start date of Wave 3; no date back-filling)
 > Branch: `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`
 > Base: `443a11cabdce1dd34006feaf08aa8be3382150c1` (Wave 2 closeout commit on the Wave 2 branch; Wave 2 itself remains NOT INTEGRATED)
@@ -98,7 +98,8 @@ audited). Canonical rules now enforced by tests on both adapters:
 
 | Path | Intent evidence | Fact evidence (exactly at transition, exactly once) |
 | --- | --- | --- |
-| `cancel_processing` while Queued/Running (cooperative) | audit `processing_cancel_requested` | none yet (job still executing) |
+| `cancel_processing` while Running (cooperative) | audit `processing_cancel_requested` | none yet (job still executing) |
+| `cancel_processing` while Queued/WaitingForReview (immediate) | audit `processing_cancel_requested` | event + audit `processing_cancelled`, exactly once |
 | `cancel_processing` while WaitingForAi (immediate) | `processing_cancel_requested` | event `document.processing.cancelled.v1` + audit `processing_cancelled` |
 | `complete_step` sees `cancel_requested` | — | event + audit `processing_cancelled` (was: event only, no audit) |
 | `retry_or_fail_step` with Cancelled disposition | — | event + audit `processing_cancelled` alongside `step_failed` |
@@ -116,16 +117,16 @@ wired into `.github/workflows/ci.yml` integration job.
 
 | Row | Semantics (baseline anchor) | Evidence (file :: test) | Environment | Verdict |
 | --- | --- | --- | --- | --- |
-| D01 | stale worker rejected (lease/fence fail-closed, §10) | `document-processing/src/domain/job.rs::stale_fence_is_rejected_after_expiry_reclaim`; `document-processing-sqlite/tests/lease_fence.rs::stale_fence_is_rejected_everywhere_without_evidence` (5 fenced mutations incl. heartbeat/release, zero evidence rows, version unchanged); messaging outbox lane `stale_worker_cannot_publish_or_fail` | local-domain, local-SQLite, PG-ignored | PASS (SQLite/domain); PG mirror NOT RUN |
-| D02 | lease/expiry/reclaim/heartbeat/fence consistency | `lease_fence.rs::active_lease_is_neither_reclaimed_nor_double_dispatched`, `::heartbeat_after_lease_expiry_fails_closed`, `::successor_can_progress_after_reclaim`, `cancel_factuality.rs::reclaim_of_cancelled_expired_job_publishes_the_fact`; `job.rs::cancellation_wins_release_and_expiry_reclaim`; PG `document-processing-postgres/tests/contracts.rs::postgres_processing_contract_reclaims_expired_ai_task` | local-SQLite, local-domain, PG-ignored | PASS (SQLite/domain); PG NOT RUN |
+| D01 | stale worker rejected (lease/fence fail-closed, §10) | `document-processing/src/domain/job.rs::stale_fence_is_rejected_after_expiry_reclaim`; `document-processing-sqlite/tests/lease_fence.rs::stale_fence_is_rejected_everywhere_without_evidence` (5 fenced mutations incl. heartbeat/release, zero evidence rows, version unchanged); messaging outbox lane `stale_worker_cannot_publish_or_fail` | local-domain, local-SQLite, PostgreSQL 18.4 | PASS. PG lane executed 2026-09-27 on the final candidate (`outbox_reliability` 7/0); the SQLite/domain evidence is unchanged |
+| D02 | lease/expiry/reclaim/heartbeat/fence consistency | `lease_fence.rs::active_lease_is_neither_reclaimed_nor_double_dispatched`, `::heartbeat_after_lease_expiry_fails_closed`, `::successor_can_progress_after_reclaim`, `cancel_factuality.rs::reclaim_of_cancelled_expired_job_publishes_the_fact`; `job.rs::cancellation_wins_release_and_expiry_reclaim`; PG `document-processing-postgres/tests/contracts.rs::postgres_processing_contract_reclaims_expired_ai_task` | local-SQLite, local-domain, PostgreSQL 18.4 | PASS. PG mirror executed on the final candidate (`contracts` 3/0) |
 | D03 | retryable vs terminal classification; storage failure ≠ LeaseLost | `job.rs::transient_retry_respects_limit_and_cancellation`; UoW retry event `document.processing.retry-scheduled.v1` in `revision1.rs::revision_one_uow_commits_fixed_pipeline_and_review_atomically`; mapping separation is source-level: `map_sql_error` (Failed/Conflict/TenantMismatch) vs explicit `LeaseLost` only from fence/lease checks (`crates/document-processing-sqlite/src/lib.rs` retry/complete/reclaim arms) | local-domain, local-SQLite + source | PASS |
-| D04 | crash recovery at each UoW commit boundary | `revision1.rs::revision_one_uow_commits_fixed_pipeline_and_review_atomically` (SQLite restart replay); PG `contracts.rs::postgres_processing_revision_one_uow_is_atomic_and_replayable` | local-SQLite, PG-ignored | PASS (SQLite); PG NOT RUN |
-| D05 | duplicate dispatch cannot double-run | `lease_fence.rs::active_lease_is_neither_reclaimed_nor_double_dispatched`; outbox lane `concurrent_claim_no_duplicates`, `concurrent_claim_100_has_unique_ownership` | local-SQLite, PG-ignored | PASS (SQLite); PG NOT RUN |
-| D06 | cancel × completion interplay (cooperative; no false terminal; no lost fact) | `cancel_factuality.rs::cooperative_cancel_is_intent_only`, `::waiting_for_ai_cancel_publishes_fact_once`, `::cancel_fact_lands_exactly_once_at_the_step_boundary`, `::cancelled_failure_disposition_audits_the_fact`; PG `cancel_factuality_pg.rs` mirrors | local-SQLite, PG-ignored | PASS (SQLite); PG NOT RUN |
-| D07 | checkpoints persist and are reused | `write_step_completed` checkpoint column + artifact-before-AI ordering pinned in `revision1.rs` (text artifact persisted before `ExtractFields` enqueue); step-completed rows assertable (see `lease_fence.rs::successor_can_progress_after_reclaim`) | local-SQLite | PASS |
+| D04 | crash recovery at UoW commit boundaries | Round 2 `cancel_factuality.rs::cancellation_boundaries_rollback_and_survive_file_reopen`: request/complete_step/reclaim transaction failure and reopen. Historical `revision1.rs` is in-memory Review rollback/replay, NOT restart evidence. | local-SQLite | PARTIAL; process kill, other boundaries and PG NOT RUN |
+| D05 | duplicate dispatch cannot double-run | `lease_fence.rs::active_lease_is_neither_reclaimed_nor_double_dispatched`; outbox lane `concurrent_claim_no_duplicates`, `concurrent_claim_100_has_unique_ownership` | local-SQLite, PostgreSQL 18.4 | PASS (SQLite and PostgreSQL). PG lane executed on the final candidate, 7/0, including the 100-way concurrent claim. Concurrency is intra-process against a real server, not separate worker processes |
+| D06 | cancellation facts and terminal idempotency | `cancel_factuality.rs` covers request, immediate AI/Queued/WaitingForReview, step/failure/reclaim; Round 2 file recovery coverage; PG mirror `cancel_factuality_pg.rs` (5 tests) | local-SQLite; PostgreSQL 18.4 | PASS for listed sequential transitions on SQLite and PostgreSQL (`cancel_factuality_pg` 5/0 on the final candidate; the first real run failed on a fixture-only VARCHAR/UUID bind). Concurrent cancel/completion NOT RUN |
+| D07 | checkpoints persist and are reused after interruption | `revision1.rs` proves artifact-before-AI ordering; `successor_can_progress_after_reclaim` proves successor progress, not checkpoint reuse after process crash | local-SQLite/source | PARTIAL; checkpoint skip/reuse after crash needs a dedicated fixture |
 | D08 | no blind replay after unknown side effects | fenced completion (`complete_ai_and_resume`) + durable text artifact read (source); durable AI lane re-dispatch keeps single active task via claim (`claim_next` filters `next_attempt_at`); Restate journal-style command dedup is NOT replicated — recorded as gap D-G04 rather than claimed | source + local-SQLite | PARTIAL (C2 gap registered) |
-| D09 | pipeline version pinned per task (baseline §8) | none — no column, no fixture | — | NOT IMPLEMENTED → gap D-G03 (C2, design proposal) |
-| D10 | PostgreSQL multi-worker real evidence | historical CI integration job only in this session | historical-CI / this-session NOT RUN | NOT RUN (BLOCKED locally; see gates/07) |
+| D09 | pipeline version pinned per task | field/fixture absent; [ADR-0027](../adr/ADR-0027-processing-pipeline-version-pinning.md) Proposed | — | OPEN C1 / NOT IMPLEMENTED; fixed pipeline is not a Baseline exemption |
+| D10 | PostgreSQL multi-worker real evidence | Round 2 final candidate executed the PostgreSQL lanes on PostgreSQL 18.4 in a dedicated database: `contracts` 3, `cancel_factuality_pg` 5, `chain_pg` 3, `outbox_reliability` 7 (incl. `concurrent_claim_100_has_unique_ownership`), `inbox_idempotency` 4 — 22 passed / 0 failed / 0 ignored, all migrations via the project migration CLI. See §14 and [the gate bundle](2026-09-27-wave3-round2-final-candidate-gates/README.md) | PostgreSQL 18.4, dedicated DB, single process, `--test-threads=1` | PARTIAL: real-server evidence now exists, which the Round 1 "historical CI only" line did not provide. Still one OS process against one server: no separate worker processes, no rolling upgrade, no multi-node |
 | D11 | `AwaitReview` ≠ business completion | review finalization is a separate UoW command recorded with candidate facts (`revision1.rs` review phase; `candidate.rs::candidate_evidence_is_revision_and_line_bounded`); job `Succeeded` never mutates business state — no such path exists in the adapters | local-SQLite, local-domain | PASS |
 
 ## 7. Gap registry
@@ -176,7 +177,7 @@ Current behavior: the pipeline is compile-time fixed (`job.rs:107-149`), so
 today no ambiguity exists, but the baseline requires the version on the Job.
 Violated contract: WORKFLOW baseline §5/§8 (literal deviation, latent).
 Impact: an upgrade that reorders steps could not be interpreted against
-historical jobs. Severity C1-by-letter, C2-in-practice. Decision DEFER →
+historical jobs. Severity C1 (open Baseline conformance gap). Decision PROPOSED →
 separate design proposal (new migration column + write-at-queue + interpretation
 rule; references: Temporal opaque markers, Trigger v4 attempt→runtimeEnvironment
 binding). Repro: source absence (`document_processing_jobs` has no
@@ -187,12 +188,11 @@ side effects (baseline §5/§12; D08 partial).** Current behavior: attempt
 counters on job/step rows; no per-attempt row (worker id, error class,
 external request ref); AI provider requests are not persisted for status
 re-query after timeout. Decision DEFER (C2). Restate's command-dedup and
-Temporal's attempt records are the calibration; not needed by current
-providers' idempotency but required before multi-provider AI lanes.
+Temporal's attempt records are the calibration; current provider idempotency has not been established by this review; unknown side-effect outcome remains an unverified constraint.
 
 **D-G05 — legacy claim-port seam (`ProcessingJobClaimPort::request_cancel/release/reclaim_expired`) writes durable state with no audit/outbox.** No production callers (worker path is the UoW; verified by grep of `apps/*`). Decision DEFER (C2) with direction: delete the seam or route it through the UoW once `data-repair`/tests migrate. Repro: `crates/document-processing-{postgres,sqlite}/src/lib.rs` claim-port impls.
 
-**D-G06 — processing outbox events carry no envelope correlation/causation/producer fields** (API/event standard §16; AGENTS §9 "事件包含唯一 ID、版本、租户、关联和因果信息"). Outbox rows carry event_id/type/schema_version/tenant/aggregate/occurred_at but no correlation/causation columns (payload `correlation_id` exists on jobs/tasks only). Severity C1-by-standard, but closing it changes the published event shape = public contract change → separate design proposal (cross-ref A-G07 in the audit/messaging review). Decision DEFER with explicit blocker noted; review continues.
+**D-G06 — processing outbox events carry no envelope correlation/causation/producer fields** (API/event standard §16; AGENTS §9 "事件包含唯一 ID、版本、租户、关联和因果信息"). Outbox rows carry event_id/type/schema_version/tenant/aggregate/occurred_at but no correlation/causation columns (job/task correlation context is propagated into unified audit trace_id, but does not establish a complete outbox envelope). Severity C1-by-standard, but closing it changes the published event shape = public contract change → separate design proposal (cross-ref A-G07 in the audit/messaging review). Decision DEFER with explicit blocker noted; review continues.
 
 **D-G07 — no external anti-truncation checkpoint for durable facts** is covered in the audit review (A-G03); cross-referenced only.
 
@@ -236,11 +236,82 @@ cancel_factuality_pg` ×5) — they have NEVER executed against a real PostgreSQ
 in this session and must not be reported as passing; historical CI evidence
 covers only pre-existing lanes.
 
+> **Superseded on 2026-09-27 by §14.** Both the PG row above and this
+> accounting paragraph describe the Round 1 session and are kept verbatim. The
+> five lanes were later executed against a real PostgreSQL 18.4 on an
+> operator-authorized dedicated database.
+
+## 14. Round 2 final candidate — real PostgreSQL execution (2026-09-27)
+
+Candidates, in order:
+
+| Stage | SHA | Note |
+| --- | --- | --- |
+| Round 1 reviewed HEAD | `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` | independent verdict **FAIL / NEEDS REPAIR** |
+| Round 2 repair candidate | `81640e79147128925d10efb0f6ff30a0c568ec33` | the two Round 1 regressions; [gates](2026-09-27-wave3-round2-gates/README.md) |
+| **Final candidate** | `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` | adds the PostgreSQL-found repairs; [gates](2026-09-27-wave3-round2-final-candidate-gates/README.md) |
+
+The operator authorized creating a dedicated database on the local server. The
+legacy `TEST_POSTGRESQL_URL` / `TEST_POSTGRESQL_RESTORED_URL` variables were not
+used as targets: per `docs/reports/PLAN-0012-COMPLETION-AUDIT.md` they belong to
+another project's contract-test harness (`contract_management_test`,
+`contract_management_restore_test`), so no migration or cleanup was run against
+them. No shared service or authentication configuration was modified and no
+password was guessed.
+
+PostgreSQL **18.4**, dedicated database `plan0014_wave3_r2`, created by
+`cargo run -p migration -- --backend postgres up` (exit 0, migrations 1 to 19).
+Lanes run with `--include-ignored --test-threads=1`:
+
+| Lane | Result |
+| --- | --- |
+| `document-processing-postgres --test contracts` | 3 passed, 0 failed, 0 ignored |
+| `document-processing-postgres --test cancel_factuality_pg` | 5 passed, 0 failed, 0 ignored |
+| `audit-postgres --test chain_pg` | 3 passed, 0 failed, 0 ignored |
+| `messaging --test outbox_reliability` | 7 passed, 0 failed, 0 ignored |
+| `messaging --test inbox_idempotency` | 4 passed, 0 failed, 0 ignored |
+| total | **22 passed, 0 failed, 0 ignored** |
+
+Two defects appeared only here, and neither was one of the two Round 1
+regressions:
+
+1. **Product, new C1.** The `audit` crate hashed `occurred_at` / `recorded_at`
+   at nanosecond precision while PostgreSQL `TIMESTAMPTZ` stores microseconds,
+   so every PostgreSQL audit row failed re-verification. That is the
+   tamper-evidence authority failing on the production backend while 741
+   SQLite/unit tests stayed green, and it is the strongest available evidence
+   that `#[ignore]` plus CI wiring is not evidence. It lands in the audit
+   review as A-G09 and is recorded here because `D05`/`D07`/`D08` cite the same
+   audit rows written in the same transaction as the durable state change.
+2. **Fixture only.** `cancel_factuality_pg` bound a `Uuid` to the legacy
+   `outbox_events.tenant_id VARCHAR(100)`; PostgreSQL rejected the comparison
+   (SQLSTATE 42883) where SQLite accepted it silently. Production binds that
+   column as text, so this was the test lying, not the product.
+
+Both were fixed in the final candidate and re-verified: six local gates exit 0
+with **742 passed / 0 failed / 50 ignored**, and all five lanes pass on a fresh
+dedicated database.
+
+Limits this run does not remove. The lanes need a database that starts empty —
+`claim_next` and `claim_batch` are global queues, so a second run over rows left
+by an aborted run fails `contracts` and `outbox_reliability`; that is a fixture
+isolation limitation, recorded rather than hidden. A file close-and-reopen is
+still not a process kill, so **D04 and D07 stay PARTIAL**: there is no
+kill-between-commit-boundaries execution and no checkpoint reuse after a real
+crash. No real provider side effect or
+external source pin ran. **D-G03** (pipeline version pinning, ADR-0027 Proposed)
+and **D-G06/A-G07** (event envelope, ADR-0028 Proposed) remain open C1. Durable
+audit ordering is not message reordering, so **D04** does not gain ordering
+proof from this run.
+
+Determination for this document: **READY FOR INDEPENDENT RE-REVIEW / NOT
+INTEGRATED**, PostgreSQL executed. Independent re-review not yet performed; no
+self-filled verdict. R1 claim stands only for a re-reviewed candidate;
+**R2 BLOCKED**. Wave 4/5 not started.
+
 ## 10. Wave 3 exit determination (this doc)
 
-Proven C1 defects (D-G01, D-G02) are closed with failing-first tests executed
-on the real adapters; the remaining C2/C3 items are registered with decisions
-and no baseline violation is left silently open. PostgreSQL execution is
+Round 1 fixes have local SQLite evidence; PG execution remains unverified. D-G03 and D-G06 remain open C1. Round 1 independent review found two additional regressions and acceptance overstatement; Round 2 repairs and corrected evidence are recorded separately. PostgreSQL execution is
 BLOCKED locally with exact rerun commands and CI wiring. Therefore: **READY
 FOR INDEPENDENT REVIEW / NOT INTEGRATED**. This review does not claim R2,
 does not self-assign any independent-reviewer verdict, and does not open
@@ -269,3 +340,7 @@ Wave 4/5.
 <pending — to be filled by the independent reviewer; this record stays empty
 until then. Verdict vocabulary: PASS / PASS WITH C2-C3 / FAIL. R2 admission is
 not on the table for Wave 3.</pending>
+
+## 13. Round 2 correction
+
+[Repair record](2026-09-27-wave3-round2-repair.md) supersedes Round 1 acceptance claims where they conflict. Historical gate logs remain historical. D-G03 is open C1 ([ADR-0027](../adr/ADR-0027-processing-pipeline-version-pinning.md)); D-G06 is open C1 ([ADR-0028](../adr/ADR-0028-processing-event-envelope-evolution.md)). Both proposals are NOT ACCEPTED. No independent PASS for the repair.

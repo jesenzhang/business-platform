@@ -1,7 +1,7 @@
 # PLAN-0014 Wave 3 — Audit Chain & Messaging Reliability Reference Conformance Review
 
 > Wave: PLAN-0014 Wave 3 (Durable Task Execution / Audit / Messaging)
-> Status: Wave 3 implementation reviewed / self-verified / **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**
+> Round 1 status: Wave 3 implementation reviewed / self-verified / **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**
 > Review date: 2026-09-27 (actual date; no back-filling)
 > Branch: `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`
 > Base: `443a11cabdce1dd34006feaf08aa8be3382150c1` (Wave 2 closeout; Wave 2 NOT INTEGRATED)
@@ -10,6 +10,11 @@
 
 Companion document: `2026-09-27-saas-align-durable-execution.md` (same wave,
 same base/candidate; cross-references D-Gxx).
+
+> Current status: Round 2 final candidate `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a`;
+> real PostgreSQL lanes EXECUTED on PostgreSQL 18.4 (22 passed / 0 failed / 0 ignored),
+> which exposed and closed one further C1 (A-G09). NOT INTEGRATED; independent
+> re-review pending. See §14.
 
 ## 1. Review question and method
 
@@ -96,8 +101,12 @@ Claimed (docs/code): per-tenant append-only hash chain detects modification,
 replacement and interior deletion of verified (chain_version=1) rows; legacy
 rows are counted separately and never presented as chain-verified.
 Proven by tests: payload change, interior deletion, and row replacement
-detected (SQLite + unit; PG mirrors compiled, NOT RUN this session).
-NOT claimed anywhere in this repo: anti-truncation without a trusted external
+detected (SQLite + unit; the PostgreSQL mirror first executed on 2026-09-27 and
+**failed there**, exposing a real defect in this claim on the production
+backend — see §13 and
+[pg-discovery](2026-09-27-wave3-round2-gates/pg-discovery/README.md); repaired
+and now passing on the final candidate).
+Not established by these tests: anti-truncation without a trusted external
 checkpoint (test `audit_chain.rs::chain_detects_mutation_and_interior_deletion_but_not_tail_truncation`
 asserts the limitation stays true — the name itself encodes it; immudb's own
 anti-truncation requires client-pinned roots — same class of limitation,
@@ -111,24 +120,24 @@ locally, CI-wired).
 
 | Row | Semantics (baseline anchor) | Evidence (file :: test) | Environment | Verdict |
 | --- | --- | --- | --- | --- |
-| A01 | audit + business write atomically (DATA_OWNERSHIP; AGENTS §7) | `document-sqlite/tests/contracts.rs::sqlite_rolls_back_the_document_when_atomic_side_effect_fails`; processing side: `document-processing-sqlite/tests/revision1.rs::revision_one_uow_commits_fixed_pipeline_and_review_atomically`; PG mirrors `contracts.rs::postgres_processing_revision_one_uow_is_atomic_and_replayable` (audit-postgres PG audit+outbox lane historical-CI only) | local-SQLite, PG-ignored | PASS (SQLite); PG NOT RUN this session |
-| A02 | tamper evidence is honest: detect payload change / interior deletion, do NOT claim anti-truncation | `audit/src/lib.rs::hash_chain_detects_payload_change`; `document-sqlite/tests/audit_chain.rs::chain_detects_mutation_and_interior_deletion_but_not_tail_truncation` (mutation + interior deletion detected; tail truncation asserted NOT detected); `audit-postgres/tests/chain_pg.rs::chain_detects_mutation_and_interior_deletion_but_not_tail_truncation` mirror | local-unit, local-SQLite, PG-ignored | PASS (SQLite/unit); PG NOT RUN |
-| A03 | duplicate / replay converges to one side effect (AGENTS §9 consumers handle duplicates) | `messaging/tests/inbox_idempotency.rs::sequential_duplicate_commits_one_side_effect`, `::concurrent_duplicate_commits_one_side_effect`, `::rollback_releases_marker_and_side_effect`, `::consumers_have_independent_idempotency_scopes`; replay determinism: `audit_chain.rs::document_created_audit_row_is_chain_verifiable_and_readable` (chain re-verified after reopen/replay of the same rows) | local-SQLite (chain replay), PG-ignored (inbox suite) | PASS (chain replay); inbox suite NOT RUN (needs PG) |
-| A04 | out-of-order delivery rules (sequence ≠ wall clock; independent of business time) | `audit/src/lib.rs::append_sequence_is_independent_of_business_time`; chain validation uses stored `previous_hash` linkage, never timestamps; `chain_pg.rs::concurrent_appends_form_one_verified_tenant_chain` (advisory-lock serialization, sequences 1..=10 contiguous) | local-unit, PG-ignored | PASS (unit); PG NOT RUN |
-| A05 | publisher crash after claim is recoverable; republish is idempotent | `messaging/tests/outbox_reliability.rs::expired_lease_recovery` (reclaim by new worker), `::concurrent_claim_no_duplicates` / `::concurrent_claim_100_has_unique_ownership` (no double claim), `::stale_worker_cannot_publish_or_fail` (fenced old lease rejected); event_id stable across republish (source: publish path mutates only lease/attempt columns) | PG-ignored | NOT RUN locally (all 7 outbox tests require PostgreSQL; cause + rerun commands in gates/07) |
-| A06 | retry exhaustion → explicit terminal state, poison message cannot loop | `outbox_reliability.rs::failure_schedules_retry` (backoff), `::max_attempts_reached` (terminal `failed`, row retained, no re-claim); calibration: Infisical drops after 5 with labeled metric, JetStream drops after MaxDeliver — our terminal-without-delete is the stricter choice (A-G05 KEEP) | PG-ignored | NOT RUN locally |
-| A07 | schema/version evolution: readers survive legacy rows, writers stay on v1 | `document-sqlite/tests/audit_chain.rs::legacy_null_chain_rows_stay_readable_and_are_counted_as_legacy` (NULL hash columns from pre-004 migrations) + `chain_pg.rs::legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them` (PG mirror); `crates/audit-sqlite/src/lib.rs` `into_event` normalizes `chain_version NULL→0` matching PG migrations 013 (backfill 0) / 015 (reset); `schema_version` carried on every row | local-SQLite + source | PASS |
-| A08 | tenant/actor/resource/outcome/correlation present; no secrets/lease tokens/raw text/storage paths in audit or events | `audit/src/lib.rs::validates_and_redacts_sensitive_details`, `::legacy_details_are_redacted_for_readers`; cancel/lease suites assert evidence rows contain no lease tokens or raw text (`lease_fence.rs::stale_fence_is_rejected_everywhere_without_evidence`; `cancel_factuality.rs` payload assertions); envelope correlation/causation columns missing → gap D-G06/A-G07 | local-unit, local-SQLite | PASS WITH registered C1 contract-change gap (D-G06) |
+| A01 | audit + business write atomically (DATA_OWNERSHIP; AGENTS §7) | `document-sqlite/tests/contracts.rs::sqlite_rolls_back_the_document_when_atomic_side_effect_fails`; processing side: `document-processing-sqlite/tests/revision1.rs::revision_one_uow_commits_fixed_pipeline_and_review_atomically`; PG side executed: `document-processing-postgres/tests/contracts.rs::postgres_processing_revision_one_uow_is_atomic_and_replayable` | local-SQLite, PostgreSQL 18.4 (dedicated DB) | PASS (SQLite and PostgreSQL); PostgreSQL first executed 2026-09-27, 3 passed / 0 failed |
+| A02 | tamper evidence is honest: detect payload change / interior deletion, do NOT claim anti-truncation | `audit/src/lib.rs::hash_chain_detects_payload_change`; `document-sqlite/tests/audit_chain.rs::chain_detects_mutation_and_interior_deletion_but_not_tail_truncation` (mutation + interior deletion detected; tail truncation asserted NOT detected); `audit-postgres/tests/chain_pg.rs::chain_detects_mutation_and_interior_deletion_but_not_tail_truncation` mirror | local-unit, local-SQLite, PostgreSQL 18.4 (dedicated DB) | PASS on the final candidate (SQLite/unit/PostgreSQL, 3 passed / 0 failed). **First real PostgreSQL run FAILED all 3 rows**: `record_hash` was taken over nanosecond timestamps that `TIMESTAMPTZ` truncates to microseconds, so no freshly written PG row verified. New C1, see A-G08 and §13. |
+| A03 | duplicate / replay converges to one side effect | Existing PostgreSQL inbox tests are the relevant evidence; audit-chain rereading proves no inbox semantics | PostgreSQL 18.4 (dedicated DB) | PASS on `messaging --test inbox_idempotency` (4 passed / 0 failed, 2026-09-27); audit-chain replay still not accepted as substitute evidence |
+| A04 | out-of-order messages cannot regress consumer state | Audit append sequence and business timestamps are unrelated to consumer version handling; no production messaging consumer fixture establishes this requirement | — | NOT PROVEN / gap retained; no new consumer introduced. Real PostgreSQL execution does not change this |
+| A05 | publisher crash after claim is recoverable; republish is idempotent | `messaging/tests/outbox_reliability.rs::expired_lease_recovery` (reclaim by new worker), `::concurrent_claim_no_duplicates` / `::concurrent_claim_100_has_unique_ownership` (no double claim), `::stale_worker_cannot_publish_or_fail` (fenced old lease rejected); event_id stable across republish (source: publish path mutates only lease/attempt columns) | PostgreSQL 18.4 (dedicated DB) | PASS on the final candidate: 7 passed / 0 failed. Still no real broker and no process kill; the claim is lease/commit-boundary recovery only |
+| A06 | retry exhaustion → explicit terminal state, poison message cannot loop | `outbox_reliability.rs::failure_schedules_retry` (backoff), `::max_attempts_reached` (terminal `failed`, row retained, no re-claim); calibration: Infisical drops after 5 with labeled metric, JetStream drops after MaxDeliver — our terminal-without-delete is the stricter choice (A-G05 KEEP) | PostgreSQL 18.4 (dedicated DB) | PASS on the final candidate (both rows inside the 7 passed / 0 failed) |
+| A07 | event schema/version evolution | Legacy audit-row compatibility is tested separately by `audit_chain.rs`; no event consumer schema-evolution fixture executed | local-SQLite audit only | PARTIAL for audit storage compatibility; event evolution NOT PROVEN |
+| A08 | envelope context and redaction | `audit` unit tests cover their listed redaction keys. Cancel/fence tests count evidence rows and do not establish payload redaction. Unified Audit already has correlation/causation/trace fields; missing event propagation is scoped by ADR-0028 | local-unit/source | PARTIAL; D-G06/A-G07 OPEN C1; no whole-envelope PASS |
 
 ## 7. Gap registry
 
 ### Closed in this wave (C1)
 
-**A-G01 — the document-processing SQLite writer never produced a verifiable chain.**
+**A-G01 — the Document Management SQLite writer did not produce a v1 chain.**
 Current behavior (pre-fix, `git show 443a11c`): `document-sqlite`'s
 `insert_audit` used a 17-column INSERT that omitted
 `recorded_at`/`stream_sequence`/`chain_version` entirely and bound
-`previous_hash`/`record_hash` to NULL — every document-processing audit row
+`previous_hash`/`record_hash` to NULL — every Document Management audit row from this writer
 landed as legacy/unverified even after the 004 chain migration; replay
 verification of the same rows returned mismatch (the rehearsal's own
 `verify_rehearsal_events` compared rebuilt events field-by-field and failed).
@@ -137,7 +146,7 @@ chain-verifiable), DATA_OWNERSHIP (audit rows must be trustworthy evidence).
 Repro entry: `cargo test -p document-sqlite --test audit_chain` observed RED
 before the fix (first append produced no `record_hash`; continuation failed).
 Impact: the chain existed only in schema and in the audit-postgres writer; any
-tenant relying on document-processing audit would silently have zero
+tenant relying on this Document Management audit writer would silently have zero
 verifiable history. Severity C1. Decision FIX.
 Fix files: `crates/document-sqlite/src/unit_of_work.rs` (writer:
 MAX+1 sequence, previous-hash lookup with genesis fallback,
@@ -174,14 +183,35 @@ terminal state + later replay tooling is the strictest of the three. C2 KEEP.
 audit-sqlite writer vs audit-postgres writer each compute the previous-hash/
 sequence logic). Drift risk (this very bug was that drift). C2 DEFER →
 extraction into `audit` crate helper proposed alongside D-G04 work.
-**A-G07 — event/audit envelope lacks correlation/causation/producer columns**
-(API/event standard §16 verbatim requirement). Same root as D-G06; closing it
+Drift materialized once more on 2026-09-27: the hash-input precision defect
+(A-G09) sat in the shared `audit` crate but was only observable on one of the
+three backends, which is precisely the cost this entry predicted. Evidence
+strengthened, disposition unchanged (C2).
+**A-G07 — processing outbox/messaging envelope lacks complete correlation/causation/producer propagation**
+(API/event standard §16). Unified AuditEvent and audit_events already have correlation/causation/trace fields; they must not be described as absent. See Proposed ADR-0028 for per-surface facts. Same root as D-G06; closing it
 changes published DTOs = public contract change → separate design proposal
 with explicit blocker; C1-by-standard, DEFER to proposal (not silently fixed).
 **A-G08 — redaction is a key blacklist** (`SENSITIVE_KEYS`), so a new
 sensitive field name added elsewhere can leak until registered. Infisical's
 EE logger redacts structurally at the DTO boundary. C2 DEFER (field-registry
 lint or DTO-level redaction).
+**A-G09 — C1, found by the first real PostgreSQL execution of `chain_pg`,
+repaired in the final candidate.** `record_hash` hashed `occurred_at` and
+`recorded_at` at nanosecond precision, while `audit_events.occurred_at` /
+`recorded_at` are `TIMESTAMPTZ` (microseconds). The row was therefore signed
+over a value PostgreSQL could not store, so re-verification recomputed a
+different digest and `verify_chain` marked a freshly written, intact tenant
+chain as broken. This violates the tamper-evidence claim on the *production*
+backend while all 741 SQLite/unit tests stayed green, which is the strongest
+available argument that `#[ignore]` + CI wiring is not evidence.
+Repaired by `audit::canonical_timestamp`: every timestamp entering
+`record_hash` is microsecond aligned at construction and in
+`with_chain_metadata`. `rehydrate` deliberately does not normalize, so stored
+rows keep the bytes they were signed with and no history is re-signed. Pinned by
+`audit::hash_inputs_survive_a_microsecond_persistence_round_trip`. Residual
+obligation: PostgreSQL rows written before the fix remain unverifiable and
+require a separate reviewed repair plus an operator-facing detection query —
+not automatic re-signing. Wave 4 follow-up.
 
 ## 8. Decision register (references → dispositions)
 
@@ -215,6 +245,64 @@ Evidence classes are kept separate: historical CI (pre-existing lanes) ≠
 current local (this session, SQLite/unit only) ≠ current integration (none in
 this session).
 
+> **Superseded on 2026-09-27 by §14.** The PG paragraph above was accurate at
+> the time it was written and is kept verbatim; the lanes were subsequently
+> executed against a real PostgreSQL 18.4 on an operator-authorized dedicated
+> database, and that run found a further C1 in this document's scope.
+
+## 14. Round 2 final candidate — real PostgreSQL execution (2026-09-27)
+
+Candidates, in order:
+
+| Stage | SHA | Note |
+| --- | --- | --- |
+| Round 1 reviewed HEAD | `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` | independent verdict **FAIL / NEEDS REPAIR** |
+| Round 2 repair candidate | `81640e79147128925d10efb0f6ff30a0c568ec33` | the two Round 1 regressions; [gates](2026-09-27-wave3-round2-gates/README.md) |
+| **Final candidate** | `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` | adds the PostgreSQL-found repairs; [gates](2026-09-27-wave3-round2-final-candidate-gates/README.md) |
+
+Authorization actually used: the operator authorized creating a dedicated
+database on the local server. The legacy `TEST_POSTGRESQL_URL` /
+`TEST_POSTGRESQL_RESTORED_URL` variables were **not** used as targets —
+`contract_management_test` and `contract_management_restore_test` belong to
+another project's contract-test harness per
+`docs/reports/PLAN-0012-COMPLETION-AUDIT.md`. No shared service or
+authentication configuration was modified and no password was guessed.
+
+Environment and outcome: PostgreSQL **18.4**, dedicated database
+`plan0014_wave3_r2`, project migration CLI
+`cargo run -p migration -- --backend postgres up` exit 0, migrations 1 to 19,
+43 public tables. Lanes with `--include-ignored --test-threads=1`:
+
+| Lane | Result |
+| --- | --- |
+| `document-processing-postgres --test contracts` | 3 passed, 0 failed, 0 ignored |
+| `document-processing-postgres --test cancel_factuality_pg` | 5 passed, 0 failed, 0 ignored |
+| `audit-postgres --test chain_pg` | 3 passed, 0 failed, 0 ignored |
+| `messaging --test outbox_reliability` | 7 passed, 0 failed, 0 ignored |
+| `messaging --test inbox_idempotency` | 4 passed, 0 failed, 0 ignored |
+| total | **22 passed, 0 failed, 0 ignored** |
+
+What this changes in this document: A01, A02, A03, A05 and A06 move from
+`NOT RUN`/`PG-ignored` to executed-Pass on the final candidate, and A02's
+first real run **failed**, which is why A-G09 was opened rather than the row
+simply relabeled. A04 is unchanged: a real database does not create an event
+consumer, so out-of-order handling stays NOT PROVEN. The 50 ignored tests in
+the workspace run are still not counted as executed acceptance, and CI wiring is
+still not a claim that this candidate passed CI.
+
+Local gates were re-run on the final candidate because product code changed: all
+six exit 0, **742 passed / 0 failed / 50 ignored**, Architecture Fitness PASS.
+Raw logs and the code snapshot are in
+[2026-09-27-wave3-round2-final-candidate-gates](2026-09-27-wave3-round2-final-candidate-gates/README.md);
+the failing first run is retained under
+[pg-discovery](2026-09-27-wave3-round2-gates/pg-discovery/README.md).
+
+Determination for this document: **READY FOR INDEPENDENT RE-REVIEW / NOT
+INTEGRATED**, PostgreSQL executed. Independent re-review not yet performed; no
+self-filled verdict. Remaining open C1: A-G07/D-G06 (ADR-0028, Proposed) and the
+pre-fix unverifiable PostgreSQL rows noted under A-G09. R1 claim stands only for
+a re-reviewed candidate; **R2 BLOCKED**. Wave 4/5 not started.
+
 ## 10. Wave 3 exit determination (this doc)
 
 The one proven C1 defect (A-G01: chain writer silent break) is closed
@@ -243,8 +331,19 @@ No R2 claim; no self-filled independent verdict.
    reset; SQLite NULL→0) leaves old rows permanently unverifiable. Confirm
    acceptance vs a backfill-into-v1 proposal (which would weaken the chain's
    historical credibility).
+5. A-G09 leaves a population of PostgreSQL rows written before the fix that
+   cannot verify. The repair deliberately does not re-sign them. Is a Wave 4
+   operator-facing detection query sufficient for R1, or must that population be
+   enumerated and dispositioned before R1 can be claimed?
+6. The PG lanes require a database that starts empty because `claim_next` and
+   `claim_batch` are global queues. Is fixing that fixture isolation a Wave 4
+   prerequisite, or acceptable as a documented rerun precondition?
 
 ## 12. Independent reviewer record
 
 <pending — to be filled by the independent reviewer only. Verdict vocabulary:
 PASS / PASS WITH C2-C3 / FAIL. R2 admission is not on the table for Wave 3.</pending>
+
+## 13. Round 2 independent finding and repair
+
+Round 1 reviewed HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6`: **FAIL / NEEDS REPAIR**. Document-only migration/create regressed and explicit version-0 rows with protected hashes were silently downgraded to valid legacy. Both were reproduced before fixing. [Round 2 repair](2026-09-27-wave3-round2-repair.md) and [ADR-0028](../adr/ADR-0028-processing-event-envelope-evolution.md) describe changes and unresolved scope. Current matrix rows override historical overclaims; this repair is not an independent PASS.

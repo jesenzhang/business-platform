@@ -1,0 +1,38 @@
+== cargo run -p migration -- --backend postgres up (fresh dedicated database plan0014_wave3_r2) ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmoqp0h0jd-04ky87k-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-0p0x36wa30eyi\s-hmoqp187ji-119o6gt-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-3g6yc4sajpect\s-hmoqp18mex-1maq8xp-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-2ojj5z4ikf8jv\s-hmoqp1a7ib-00im64s-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-2ckudq535vvuo\s-hmoqp3arf3-1i21abq-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-0xfo8jb4jey3g\s-hmoqp3apmk-1asubof-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-3t9lnn87gnawo\s-hmoqp3a704-0ndj6v3-working`
+
+warning: `policy-sqlite` (lib) generated 1 warning
+warning: `identity-sqlite` (lib) generated 1 warning
+warning: `organization-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\migration-0lbb2ohzone10\s-hmoqp6xk9p-0cdsoxf-working`
+
+warning: `migration` (bin "migration") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.12s
+     Running `target\debug\migration.exe --backend postgres up`
+2026-09-27T15:25:26.770233Z  INFO migration: Creating database
+2026-09-27T15:25:27.290431Z  INFO migration: Applying migrations
+2026-09-27T15:25:27.453511Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的列 "published_at" 已经存在，跳过
+2026-09-27T15:25:27.489690Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_status_check" 不存在
+2026-09-27T15:25:27.489728Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_attempt_count_check" 不存在
+2026-09-27T15:25:27.489740Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_max_attempts_check" 不存在
+2026-09-27T15:25:27.489749Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_published_compatibility_check" 不存在
+2026-09-27T15:25:27.748848Z  INFO migration: All migrations applied successfully
+
+EXIT_CODE=0
+

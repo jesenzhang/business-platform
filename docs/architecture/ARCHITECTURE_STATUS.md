@@ -694,3 +694,38 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > PLAN-0015/PLAN-0006。审阅记录
 > `docs/reviews/2026-09-27-saas-align-durable-execution.md`、
 > `docs/reviews/2026-09-27-saas-align-audit-messaging.md`。
+
+## 2026-09-27 Wave 3 Round 2 correction
+
+Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAIL / NEEDS REPAIR. Document-only SQLite migration and audit legacy downgrade regressions are repaired with failing-first tests; acceptance matrices no longer substitute audit ordering/replay for messaging or crash recovery. D-G03 and D-G06/A-G07 remain open C1 with ADR-0027/0028 Proposed, NOT ACCEPTED. Historical C2-only/closed summaries above are superseded on these points. R1 / R2 BLOCKED; Wave 4/5 not started. Details: `docs/reviews/2026-09-27-wave3-round2-repair.md`; current gates are separate from Round 1 evidence.
+
+## 2026-09-27 Wave 3 Round 2b 固化与真实 PostgreSQL 验证
+
+- Round 2 修复已固化为本地 commit `81640e79147128925d10efb0f6ff30a0c568ec33`。入库前 `code-snapshot.json`
+  十个哈希逐一与工作区字节一致；因仓库 `core.autocrlf=true` 且无 `.gitattributes`，其中 6 个 blob 以 CRLF 形式入库，
+  换行归一化后与工作区文本逐字符等价（字节差恰为 CR 个数），无语义差异。`crates/document-sqlite/tests/operational.rs`
+  为既有 EOL/stat 脏标记，工作区字节与 HEAD blob 相同，未 staged、未 reset/checkout/clean，也不计入本轮修复。
+- 数据库授权：仅按操作者明确授权在共享 :5432 服务上**新建专用库**；未使用 `TEST_POSTGRESQL_URL` /
+  `TEST_POSTGRESQL_RESTORED_URL` 指向的 `contract_management_*` 库（属另一项目 contract harness），
+  未修改共享服务或认证配置，未猜测密码，日志全量脱敏。
+- 环境：PostgreSQL 18.4，专用库 `plan0014_wave3_r2`，`cargo run -p migration -- --backend postgres up` 退出码 0，
+  迁移 1–19，43 张 public 表。五条 lane 均 `--all-features -- --include-ignored --test-threads=1`：
+  contracts 3 / cancel_factuality_pg 5 / chain_pg 3 / outbox_reliability 7 / inbox_idempotency 4，
+  合计 **22 passed / 0 failed / 0 ignored**。
+- 首次真实执行暴露两个只有 PostgreSQL 才能发现的缺陷，已在最终候选 `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` 修复：
+  1. **产品缺陷（新 C1，A-G09）**：`record_hash` 覆盖纳秒精度的 `occurred_at`/`recorded_at`，而 `TIMESTAMPTZ` 只存微秒，
+     导致 PostgreSQL 上刚写入的审计行即无法自验，生产后端防篡改能力失效，而 741 个 SQLite/单元测试全绿。
+     修复为 `audit::canonical_timestamp` 在签名时对齐微秒；`rehydrate` 不做归一化，历史行不重签名。
+     修复前已写入 PostgreSQL 的行仍不可验证，属需另行评审的运维事项，不做自动重签名。
+  2. **仅测试 fixture**：`cancel_factuality_pg` 向 `outbox_events.tenant_id`（migration 001 遗留 `VARCHAR(100)`）
+     绑定 `Uuid`，PostgreSQL 以 SQLSTATE 42883 拒绝，SQLite 静默接受；生产写入方本就绑定文本。
+- 重跑硬性前提：lane 需**初始为空的专用库**。`claim_next`/`claim_batch` 是全局队列，复用被中断残留数据污染的库会使
+  `contracts`、`outbox_reliability` 失败；此为 fixture 隔离限制，已记录不掩盖。
+- 最终候选重跑六项门禁全部退出码 0：`cargo test --workspace --all-features` 为 **742 passed / 0 failed / 50 ignored**，
+  Architecture Fitness PASS。50 个 ignored 仍不计为已执行；CI 接线不等于本候选已通过 CI。
+- 仍未执行/仍为 BLOCKED：进程级 kill 崩溃恢复（D04/D07 保持 PARTIAL，文件重开不等于进程杀死）、真实 provider 副作用与外部
+  source pin、消息乱序与事件 Schema 演进（A04 仍 NOT PROVEN）、多进程多节点与滚动升级（D10 仅 PARTIAL）。
+  D-G03 与 D-G06/A-G07 仍为未关闭 C1，ADR-0027/ADR-0028 仍 **Proposed / NOT ACCEPTED**。
+- 状态：**READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED**（PG BLOCKED 已解除）。实现者不自填独立 PASS；
+  两份正式评审的独立记录仍为 `<pending>`。R1 仅在独立复审通过后成立，**R2 BLOCKED**；Wave 4/5 未启动，
+  PLAN-0015 / PLAN-0006 未激活。

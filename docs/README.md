@@ -248,3 +248,12 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 
 - [`templates/ADR_TEMPLATE.md`](templates/ADR_TEMPLATE.md)
 - [`templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md`](templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md)：成熟模块 Reference Conformance Review 与 R2 admission 固定模板。
+
+## PLAN-0014 Wave 3 repair and proposals (2026-09-27)
+
+- [Round 2 repair and evidence scope](reviews/2026-09-27-wave3-round2-repair.md).
+- [Round 2 candidate gates — commit 81640e7](reviews/2026-09-27-wave3-round2-gates/README.md).
+- [PostgreSQL lanes, first real run and root causes](reviews/2026-09-27-wave3-round2-gates/pg-discovery/README.md).
+- [Final candidate gates incl. real PostgreSQL lanes — commit 2f9976e](reviews/2026-09-27-wave3-round2-final-candidate-gates/README.md).
+- [ADR-0027 Pipeline version pinning — Proposed](adr/ADR-0027-processing-pipeline-version-pinning.md).
+- [ADR-0028 Event envelope evolution — Proposed](adr/ADR-0028-processing-event-envelope-evolution.md).

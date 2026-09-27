@@ -1,0 +1,10 @@
+{
+  "base": "6b324ea76986640a3f1baef7ecebdb2c53fbd2c6",
+  "round2_candidate": "81640e79147128925d10efb0f6ff30a0c568ec33",
+  "candidate": "working-tree (postgreSQL repair on top of the Round 2 candidate)",
+  "note": "SHA-256 of final working tree bytes. Gate logs 01-06 and 07-12 in this directory were produced against exactly these bytes. Files inherited unchanged from the Round 2 candidate are listed in ../2026-09-27-wave3-round2-gates/code-snapshot.json.",
+  "sha256": {
+    "crates/audit/src/lib.rs": "702c65f1b9db0e45bda9e8247596a6d2a9ddbcb16ad960f57453a54eaf933875",
+    "crates/document-processing-postgres/tests/cancel_factuality_pg.rs": "81bb84768176aa34d3b58e808234eb59f65705282e3b642d9141b8b98cd00c91"
+  }
+}

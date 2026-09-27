@@ -1,0 +1,15 @@
+== cargo test -p messaging --test inbox_idempotency --all-features -- --include-ignored --test-threads=1 ==
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests\inbox_idempotency.rs (target\debug\deps\inbox_idempotency-fb2647659a22fe1d.exe)
+
+running 4 tests
+test concurrent_duplicate_commits_one_side_effect ... ok
+test consumers_have_independent_idempotency_scopes ... ok
+test rollback_releases_marker_and_side_effect ... ok
+test sequential_duplicate_commits_one_side_effect ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+
+EXIT_CODE=0
+

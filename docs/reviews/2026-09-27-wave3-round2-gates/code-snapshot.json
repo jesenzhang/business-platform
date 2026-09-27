@@ -1,0 +1,16 @@
+{
+  "base": "6b324ea76986640a3f1baef7ecebdb2c53fbd2c6",
+  "candidate": "working-tree",
+  "sha256": {
+    "crates/audit-sqlite/src/lib.rs": "14442ad4329347fd4f0d3ad5266ed5837050834631cfca27ca4fdcfeb4581069",
+    "crates/document-processing-sqlite/tests/cancel_factuality.rs": "e4e849027e5f8d7d13dd8fcdca22e7d41005c0f3661963ea8d18fb05ac0d7442",
+    "crates/document-sqlite/migrations/006_document_audit_chain.sql": "b10fc3e4803247d3ae3ee6107ffd4a95bd654f8bd324b4a3f5e1e9a6d219ab70",
+    "crates/document-sqlite/migrations/MANIFEST.sha256": "e033455da6de047cb01383b0af79495532871232c585682c9f0b08cebec13840",
+    "crates/document-sqlite/src/lib.rs": "1548b5520b93cfc6acb86e321cb4b6decdb2f8a8e94a95db9c46af7780ba9101",
+    "crates/document-sqlite/src/migrations.rs": "ba820bcff154e0bb1f577016c4ce18ad95027b872fde4e34a269dc478d16a80a",
+    "crates/document-sqlite/tests/audit_chain.rs": "c9f5c740b9ada38d318b597bf8b574077bbdfa4b75d3cdf02fe5352dec7ea047",
+    "crates/document-sqlite/tests/concurrency.rs": "9f3060cb2a96674dc5cae9f1848ee771cc5895050819b5ee795eca164f0060c9",
+    "crates/document-sqlite/tests/contracts.rs": "39718385bcea0ea45db5385fa57fa8da7f7034d9fb2de4446de2d5c67620df7c",
+    "crates/document-sqlite/tests/revision_history.rs": "f297a39a5398de7847c08984ceb576ee1af32196b490dd1168b8ef11d5d1a3ac"
+  }
+}

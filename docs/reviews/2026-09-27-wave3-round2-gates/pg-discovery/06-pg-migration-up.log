@@ -1,0 +1,30 @@
+== cargo run -p migration -- --backend postgres up ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-0p0x36wa30eyi\s-hmoqan4bg2-1utr3yn-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-2ojj5z4ikf8jv\s-hmoqan4q2o-1askile-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-3g6yc4sajpect\s-hmoqan4bfq-16zcv7u-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: `document-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-0xfo8jb4jey3g\s-hmoqao66aq-0m1p1vo-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-2ckudq535vvuo\s-hmoqao66nr-1wjsj9j-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-3t9lnn87gnawo\s-hmoqao6eus-1lenmq5-working`
+
+warning: `identity-sqlite` (lib) generated 1 warning
+warning: `policy-sqlite` (lib) generated 1 warning
+warning: `organization-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\migration-0lbb2ohzone10\s-hmoqathc4l-066p7v6-working`
+
+warning: `migration` (bin "migration") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.68s
+     Running `target\debug\migration.exe --backend postgres up`
+2026-09-27T15:10:34.595058Z  INFO migration: Applying migrations
+2026-09-27T15:10:34.632401Z  INFO sqlx::postgres::notice: 关系 "_sqlx_migrations" 已经存在, 跳过
+2026-09-27T15:10:34.653029Z  INFO migration: All migrations applied successfully
+
+EXIT_CODE=0
+

@@ -1,5 +1,18 @@
 # PG lanes — BLOCKED on the local workstation (2026-09-27)
 
+> **SUPERSEDED later the same day — do not treat this as the current PG
+> status.** The blocker was cleared by an operator-supplied connection and the
+> five lanes were executed for real. Current status, results and the retention
+> of the rerun procedure:
+> [final candidate gates](../2026-09-27-wave3-round2-final-candidate-gates/README.md)
+> (§14 of both review docs). What follows is kept verbatim as the Round 1 record
+> of *why* the lanes had not run; it was accurate when written and is not being
+> rewritten into a pass. The first real run then FAILED two of the five lanes and
+> exposed a product defect, recorded in
+> [pg-discovery](../2026-09-27-wave3-round2-gates/pg-discovery/README.md) — so
+> this file's "never executed" sentence is the reason that discovery was
+> necessary, not a resolved formatting issue.
+
 Environment: 本地 Windows 10 (19045) workstation. A local `postgres.exe`
 service listens on 127.0.0.1:5432, but no usable credential set is available
 to this session: `postgres:postgres`, empty password and `postgres:password`

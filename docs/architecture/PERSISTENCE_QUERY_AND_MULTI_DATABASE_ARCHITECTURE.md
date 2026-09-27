@@ -138,3 +138,27 @@ executing 006 SQL bypasses its documented conditional-column precondition and
 is not the supported migration entry point.
 
 Evidence and limits: [Wave 3 Round 2 repair](../reviews/2026-09-27-wave3-round2-repair.md).
+
+## Audit hash timestamp precision across backends (2026-09-27)
+
+`record_hash` covers `occurred_at` and `recorded_at`, so a chain is only as
+verifiable as the precision the storage layer preserves for those fields.
+PostgreSQL `TIMESTAMPTZ` stores microseconds; `chrono::Utc::now()` carries
+nanoseconds. SQLite stores RFC 3339 text and round-trips nanoseconds, so the two
+backends do not have the same failure mode.
+
+Contract: every timestamp that enters `record_hash` is aligned to microsecond
+precision by `audit::canonical_timestamp` before signing, at event construction
+and in `with_chain_metadata`. A digest is therefore identical across supported
+backends and stable across a persistence round trip.
+
+`AuditEvent::rehydrate` does not normalize. Verification must compare against
+the bytes a row was signed with, so stored timestamps are preserved exactly,
+history is never reinterpreted and no checksum is rewritten. Rows written to
+PostgreSQL before this contract held are unverifiable and stay an
+operator-visible failure requiring separate reviewed repair, not automatic
+re-signing.
+
+Pinned by `audit::hash_inputs_survive_a_microsecond_persistence_round_trip`,
+which includes a one-nanosecond negative control. Discovery and evidence:
+[pg-discovery](../reviews/2026-09-27-wave3-round2-gates/pg-discovery/README.md).
