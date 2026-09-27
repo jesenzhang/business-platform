@@ -114,3 +114,27 @@ Critical queries document indexes, scale assumptions, EXPLAIN evidence, maximum
 rows, timeout, tenant filter and permission filter. Keyset pagination uses a
 stable unique tie-breaker. Read models expose lag/failure metrics. Adapter errors
 are sanitised at core seams; URLs and sensitive row data are not logged.
+
+## PLAN-0014 Wave 3 SQLite audit bootstrap correction (2026-09-27)
+
+Document's SQLite bootstrap already creates the shared audit_events table.
+Migration 006 completes its Audit-owned chain format without requiring the
+Processing catalog. No business or audit semantic ownership is transferred.
+Document-only contract tests and composed-profile tests are separate.
+
+Use document_sqlite::MIGRATOR.run(&pool), including through the migration CLI.
+The exported adapter migrator preserves run(pool)/iter() usage; its concrete
+type is DocumentMigrator. It validates SQLx historical checksums and dirty or
+unknown versions. For 006 it conditionally adopts the three chain columns and
+applies backfill, indexes and SQLx migration registration atomically under
+BEGIN IMMEDIATE. This permits upgrading databases where historical Processing
+004 already supplied those columns. Historical migration SQL is unchanged.
+
+Existing v1 rows retain their hashes. Pre-chain all-NULL metadata is migrated
+to explicit unverified legacy rows; no historical verification is manufactured.
+Explicit version 0 with hashes remains invalid at read time. Back up before
+upgrade; rollback retains additive columns and the audit history. Directly
+executing 006 SQL bypasses its documented conditional-column precondition and
+is not the supported migration entry point.
+
+Evidence and limits: [Wave 3 Round 2 repair](../reviews/2026-09-27-wave3-round2-repair.md).

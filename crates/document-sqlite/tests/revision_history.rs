@@ -12,11 +12,6 @@ async fn saving_a_new_revision_keeps_r1_and_updates_current_revision_atomically(
         .await;
     let Ok(pool) = pool else { unreachable!() };
     assert!(MIGRATOR.run(&pool).await.is_ok());
-    // Audit chain columns arrive via the processing catalog; real SQLite
-    // deployments always apply both (business-api composition).
-    assert!(document_processing_sqlite::run_migrations(&pool)
-        .await
-        .is_ok());
 
     let tenant_id = Uuid::now_v7();
     let created_by = Uuid::now_v7();

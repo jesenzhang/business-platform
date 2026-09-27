@@ -28,15 +28,6 @@ async fn setup() -> (String, sqlx::SqlitePool, sqlx::SqlitePool) {
         migration.is_ok(),
         "SQLite migrations must apply: {migration:?}"
     );
-    // The audit chain columns live in the processing catalog (its 004
-    // migration ALTERs audit_events); every real SQLite deployment (see
-    // business-api composition) applies both catalogs, so concurrency
-    // fixtures must mirror that composition.
-    let processing_migration = document_processing_sqlite::run_migrations(&pool_a).await;
-    assert!(
-        processing_migration.is_ok(),
-        "processing migrations must apply: {processing_migration:?}"
-    );
     let pool_b = SqlitePoolOptions::new()
         .max_connections(4)
         .connect(&url)

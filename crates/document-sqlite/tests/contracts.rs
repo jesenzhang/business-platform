@@ -8,12 +8,6 @@ async fn sqlite_satisfies_shared_document_persistence_contract() {
         .await;
     let Ok(pool) = pool else { unreachable!() };
     assert!(document_sqlite::MIGRATOR.run(&pool).await.is_ok());
-    // Audit chain columns arrive via the processing catalog; real SQLite
-    // deployments always apply both (business-api composition), so contract
-    // fixtures compose the same way.
-    assert!(document_processing_sqlite::run_migrations(&pool)
-        .await
-        .is_ok());
 
     let result = document_persistence_contracts::verify_document_persistence_contract(
         Arc::new(document_sqlite::SqliteCreateDocumentUnitOfWork::new(
@@ -36,12 +30,6 @@ async fn sqlite_rolls_back_the_document_when_atomic_side_effect_fails() {
         .await;
     let Ok(pool) = pool else { unreachable!() };
     assert!(document_sqlite::MIGRATOR.run(&pool).await.is_ok());
-    // Audit chain columns arrive via the processing catalog; real SQLite
-    // deployments always apply both (business-api composition), so contract
-    // fixtures compose the same way.
-    assert!(document_processing_sqlite::run_migrations(&pool)
-        .await
-        .is_ok());
     assert!(sqlx::query("DROP TABLE outbox_events")
         .execute(&pool)
         .await

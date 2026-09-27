@@ -288,3 +288,166 @@ async fn chain_detects_mutation_and_interior_deletion_but_not_tail_truncation() 
     pool.close().await;
     temp_file(&url);
 }
+
+#[tokio::test]
+async fn standalone_document_catalog_supports_create_and_replay() {
+    let pool = document_sqlite::connect("sqlite::memory:", 1)
+        .await
+        .unwrap();
+    MIGRATOR.run(&pool).await.unwrap();
+    let uow = SqliteCreateDocumentUnitOfWork::new(pool.clone());
+    let command = persist_command(Uuid::now_v7(), Uuid::now_v7());
+    assert!(uow.execute(command.clone()).await.is_ok());
+    assert!(uow.execute(command.clone()).await.unwrap().replayed);
+    let verification = SqliteAuditStore::new(pool.clone())
+        .verify_chain(scope(command.document.tenant_id()))
+        .await
+        .unwrap();
+    assert!(verification.valid);
+    assert_eq!(verification.verified_count, 1);
+    MIGRATOR.run(&pool).await.unwrap();
+    pool.close().await;
+}
+
+#[tokio::test]
+async fn contradictory_chain_metadata_is_rejected_without_legacy_downgrade() {
+    let (url, pool) = setup().await;
+    for mutation in [
+        "chain_version = 0",
+        "chain_version = 2",
+        "stream_sequence = NULL",
+        "previous_hash = NULL",
+        "record_hash = NULL",
+    ] {
+        let tenant = Uuid::now_v7();
+        append_sqlite(&pool, &audit_event(tenant, "protected"))
+            .await
+            .unwrap();
+        sqlx::query(&format!(
+            "UPDATE audit_events SET {mutation} WHERE tenant_id = ?1"
+        ))
+        .bind(tenant.to_string())
+        .execute(&pool)
+        .await
+        .unwrap();
+        let result = SqliteAuditStore::new(pool.clone())
+            .verify_chain(scope(tenant))
+            .await;
+        assert!(
+            result.is_err() || result.as_ref().is_ok_and(|r| !r.valid),
+            "corrupt metadata {mutation} accepted: {result:?}"
+        );
+    }
+    pool.close().await;
+    temp_file(&url);
+}
+
+#[tokio::test]
+async fn old_composed_catalog_upgrade_preserves_verified_rows() {
+    let pool = document_sqlite::connect("sqlite::memory:", 1)
+        .await
+        .unwrap();
+    let old = sqlx::migrate::Migrator {
+        migrations: std::borrow::Cow::Owned(
+            MIGRATOR.iter().filter(|m| m.version < 6).cloned().collect(),
+        ),
+        ..sqlx::migrate::Migrator::DEFAULT
+    };
+    old.run(&pool).await.unwrap();
+    document_processing_sqlite::run_migrations(&pool)
+        .await
+        .unwrap();
+    let tenant = Uuid::now_v7();
+    append_sqlite(&pool, &audit_event(tenant, "before-upgrade"))
+        .await
+        .unwrap();
+    let hash_before: String =
+        sqlx::query_scalar("SELECT record_hash FROM audit_events WHERE tenant_id = ?1")
+            .bind(tenant.to_string())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    MIGRATOR.run(&pool).await.unwrap();
+    document_processing_sqlite::run_migrations(&pool)
+        .await
+        .unwrap();
+    MIGRATOR.run(&pool).await.unwrap();
+    let hash_after: String =
+        sqlx::query_scalar("SELECT record_hash FROM audit_events WHERE tenant_id = ?1")
+            .bind(tenant.to_string())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(hash_before, hash_after);
+    let command = persist_command(tenant, Uuid::now_v7());
+    let uow = SqliteCreateDocumentUnitOfWork::new(pool.clone());
+    assert!(uow.execute(command.clone()).await.is_ok());
+    assert!(uow.execute(command).await.unwrap().replayed);
+    let v = SqliteAuditStore::new(pool.clone())
+        .verify_chain(scope(tenant))
+        .await
+        .unwrap();
+    assert!(v.valid);
+    assert_eq!(v.verified_count, 2);
+    pool.close().await;
+}
+
+#[tokio::test]
+async fn old_document_only_rows_remain_unverified_after_upgrade() {
+    let pool = document_sqlite::connect("sqlite::memory:", 1)
+        .await
+        .unwrap();
+    let old = sqlx::migrate::Migrator {
+        migrations: std::borrow::Cow::Owned(
+            MIGRATOR.iter().filter(|m| m.version < 6).cloned().collect(),
+        ),
+        ..sqlx::migrate::Migrator::DEFAULT
+    };
+    old.run(&pool).await.unwrap();
+    let tenant = Uuid::now_v7();
+    for _ in 0..3 {
+        sqlx::query("INSERT INTO audit_events (id,tenant_id,action,resource_type,resource_id,created_at,occurred_at,previous_hash,record_hash) VALUES (?1,?2,'document.created','document','legacy-document',?3,?3,'old','old')")
+            .bind(Uuid::now_v7().to_string()).bind(tenant.to_string())
+            .bind(chrono::Utc::now().to_rfc3339()).execute(&pool).await.unwrap();
+    }
+    // Failure in the backfill must roll back newly adopted columns and must
+    // not mark migration 6 applied. The same database must be retryable.
+    sqlx::query("CREATE TRIGGER reject_backfill BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT, 'test-migration-rollback'); END")
+        .execute(&pool).await.unwrap();
+    assert!(MIGRATOR.run(&pool).await.is_err());
+    let column_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pragma_table_info('audit_events') WHERE name = 'stream_sequence'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(column_count, 0);
+    let version: i64 = sqlx::query_scalar("SELECT MAX(version) FROM _sqlx_migrations")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(version, 5);
+    sqlx::query("DROP TRIGGER reject_backfill")
+        .execute(&pool)
+        .await
+        .unwrap();
+    MIGRATOR.run(&pool).await.unwrap();
+    append_sqlite(&pool, &audit_event(tenant, "new"))
+        .await
+        .unwrap();
+    let v = SqliteAuditStore::new(pool.clone())
+        .verify_chain(scope(tenant))
+        .await
+        .unwrap();
+    assert!(v.valid);
+    assert_eq!((v.legacy_count, v.verified_count), (3, 1));
+    sqlx::query("UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = 1")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        MIGRATOR.run(&pool).await,
+        Err(sqlx::migrate::MigrateError::VersionMismatch(1))
+    ));
+    pool.close().await;
+}

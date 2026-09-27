@@ -25,9 +25,17 @@ use sqlx::Executor;
 use uuid::Uuid;
 
 async fn setup() -> (sqlx::SqlitePool, Uuid, Uuid, Uuid) {
+    setup_url("sqlite::memory:").await
+}
+
+async fn setup_url(url: &str) -> (sqlx::SqlitePool, Uuid, Uuid, Uuid) {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
-        .connect("sqlite::memory:")
+        .connect_with(
+            url.parse::<sqlx::sqlite::SqliteConnectOptions>()
+                .unwrap_or_else(|_| unreachable!())
+                .create_if_missing(true),
+        )
         .await
         .unwrap_or_else(|_| unreachable!());
     pool.execute("PRAGMA foreign_keys = ON")
@@ -123,6 +131,188 @@ async fn audit_count(pool: &sqlx::SqlitePool, tenant: Uuid, action: &str) -> i64
 }
 
 const CANCELLED_EVENT: &str = "document.processing.cancelled.v1";
+
+#[tokio::test]
+async fn queued_and_review_wait_cancel_are_immediate_and_idempotent() {
+    for waiting_for_review in [false, true] {
+        let (pool, tenant, document, user) = setup().await;
+        let store = SqliteProcessingStore::new(pool.clone());
+        let job = queue_job(&store, tenant, document, user).await;
+        if waiting_for_review {
+            // Seed the persisted AwaitReview boundary; this fixture tests the
+            // cancellation transition, not extraction or review finalization.
+            sqlx::query("UPDATE document_processing_jobs SET status='waiting_for_review', current_step='await_review' WHERE id=?1")
+                .bind(job.id().to_string()).execute(&pool).await.unwrap_or_else(|_| unreachable!());
+        }
+        for _ in 0..2 {
+            store
+                .cancel_processing(tenant, job.id(), user, Utc::now())
+                .await
+                .unwrap_or_else(|_| unreachable!());
+        }
+        assert_eq!(job_status(&pool, tenant, job.id()).await, "cancelled");
+        assert_eq!(outbox_count(&pool, tenant, CANCELLED_EVENT).await, 1);
+        assert_eq!(audit_count(&pool, tenant, "processing_cancelled").await, 1);
+        assert_eq!(
+            audit_count(&pool, tenant, "processing_cancel_requested").await,
+            1
+        );
+    }
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn cancellation_boundaries_rollback_and_survive_file_reopen() {
+    for boundary in ["request", "complete_step", "reclaim"] {
+        let path = std::env::temp_dir().join(format!("wave3-recovery-{}.db", Uuid::now_v7()));
+        let url = format!("sqlite://{}", path.to_string_lossy().replace('\\', "/"));
+        let (pool, tenant, document, user) = setup_url(&url).await;
+        let store = SqliteProcessingStore::new(pool.clone());
+        let job = queue_job(&store, tenant, document, user).await;
+        let fence = if boundary == "request" {
+            None
+        } else {
+            let fence = claim(&store).await;
+            store
+                .start_step(
+                    tenant,
+                    job.id(),
+                    ProcessingStepKind::ValidateSource,
+                    &fence,
+                    Utc::now(),
+                )
+                .await
+                .unwrap_or_else(|_| unreachable!());
+            store
+                .cancel_processing(tenant, job.id(), user, Utc::now())
+                .await
+                .unwrap_or_else(|_| unreachable!());
+            Some(fence)
+        };
+        let version: i64 =
+            sqlx::query_scalar("SELECT version FROM document_processing_jobs WHERE id=?1")
+                .bind(job.id().to_string())
+                .fetch_one(&pool)
+                .await
+                .unwrap_or_else(|_| unreachable!());
+        let before = job_status(&pool, tenant, job.id()).await;
+        let audit_before = audit_count(&pool, tenant, "processing_cancel_requested").await;
+        pool.execute("CREATE TRIGGER fail_cancel_audit BEFORE INSERT ON audit_events WHEN NEW.action='document_processing.processing_cancelled' BEGIN SELECT RAISE(ABORT,'test-cancel-rollback'); END")
+            .await.unwrap_or_else(|_| unreachable!());
+        let failed = match fence.as_ref() {
+            None => store
+                .cancel_processing(tenant, job.id(), user, Utc::now())
+                .await
+                .map(|_| ()),
+            Some(fence) if boundary == "complete_step" => store
+                .complete_step(
+                    tenant,
+                    job.id(),
+                    ProcessingStepKind::ValidateSource,
+                    None,
+                    fence,
+                    Utc::now(),
+                )
+                .await
+                .map(|_| ()),
+            Some(_) => store
+                .reclaim_expired_jobs(Utc::now() + Duration::seconds(120))
+                .await
+                .map(|_| ()),
+        };
+        assert!(failed.is_err(), "failure injection must abort {boundary}");
+        assert_eq!(job_status(&pool, tenant, job.id()).await, before);
+        let after: i64 =
+            sqlx::query_scalar("SELECT version FROM document_processing_jobs WHERE id=?1")
+                .bind(job.id().to_string())
+                .fetch_one(&pool)
+                .await
+                .unwrap_or_else(|_| unreachable!());
+        assert_eq!(version, after);
+        assert_eq!(outbox_count(&pool, tenant, CANCELLED_EVENT).await, 0);
+        assert_eq!(audit_count(&pool, tenant, "processing_cancelled").await, 0);
+        assert_eq!(audit_count(&pool, tenant, "job_reclaimed").await, 0);
+        assert_eq!(
+            audit_count(&pool, tenant, "processing_cancel_requested").await,
+            audit_before
+        );
+        pool.execute("DROP TRIGGER fail_cancel_audit")
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        drop(store);
+        pool.close().await;
+
+        let reopened = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect(&url)
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        let store = SqliteProcessingStore::new(reopened.clone());
+        // Re-open after the failed transaction, retry, then re-open after commit.
+        match fence.as_ref() {
+            None => {
+                store
+                    .cancel_processing(tenant, job.id(), user, Utc::now())
+                    .await
+                    .unwrap_or_else(|_| unreachable!());
+            }
+            Some(fence) if boundary == "complete_step" => {
+                store
+                    .complete_step(
+                        tenant,
+                        job.id(),
+                        ProcessingStepKind::ValidateSource,
+                        None,
+                        fence,
+                        Utc::now(),
+                    )
+                    .await
+                    .unwrap_or_else(|_| unreachable!());
+            }
+            Some(_) => {
+                assert_eq!(
+                    store
+                        .reclaim_expired_jobs(Utc::now() + Duration::seconds(120))
+                        .await
+                        .unwrap_or_else(|_| unreachable!()),
+                    1
+                );
+            }
+        }
+        drop(store);
+        reopened.close().await;
+        let reopened = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect(&url)
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        let store = SqliteProcessingStore::new(reopened.clone());
+        store
+            .cancel_processing(tenant, job.id(), user, Utc::now())
+            .await
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(
+            store
+                .reclaim_expired_jobs(Utc::now() + Duration::seconds(240))
+                .await
+                .unwrap_or_else(|_| unreachable!()),
+            0
+        );
+        assert_eq!(job_status(&reopened, tenant, job.id()).await, "cancelled");
+        assert_eq!(outbox_count(&reopened, tenant, CANCELLED_EVENT).await, 1);
+        assert_eq!(
+            audit_count(&reopened, tenant, "processing_cancelled").await,
+            1
+        );
+        assert_eq!(
+            audit_count(&reopened, tenant, "processing_cancel_requested").await,
+            1
+        );
+        drop(store);
+        reopened.close().await;
+        std::fs::remove_file(path).unwrap_or_else(|_| unreachable!());
+    }
+}
 
 /// While the job is still executing, a cancel request is intent only: it must
 /// not publish the cancellation fact event and must not claim the fact in the

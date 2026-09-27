@@ -3,13 +3,14 @@
 mod detail_query;
 mod list_query;
 mod mapper;
+mod migrations;
 mod unit_of_work;
 
 pub use detail_query::SqliteDocumentDetailQuery;
 pub use list_query::SqliteDocumentListQuery;
 pub use unit_of_work::SqliteCreateDocumentUnitOfWork;
 
-pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+pub use migrations::MIGRATOR;
 
 pub const MAX_SQLITE_CONNECTIONS: u32 = 4;
 

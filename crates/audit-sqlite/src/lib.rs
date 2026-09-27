@@ -309,13 +309,15 @@ impl AuditRow {
     fn into_event(self) -> Result<AuditEvent, AuditError> {
         let id = Uuid::parse_str(&self.id).map_err(|_| AuditError::Persistence)?;
         let tenant_id = Uuid::parse_str(&self.tenant_id).map_err(|_| AuditError::Persistence)?;
-        // Rows written before the unified chain columns existed carry NULL
-        // chain metadata (the same unverified-legacy boundary as the
-        // PostgreSQL 013/015 backfill): they read back as chain_version 0
-        // with no sequence and no hashes, matching `rehydrate`'s rule that
-        // legacy rows must not carry chain fields.
+        // Only the historical writer's all-NULL chain metadata may carry
+        // obsolete hashes. Explicit version 0 with hashes is contradictory
+        // metadata: retain it for rehydrate to reject rather than silently
+        // downgrading a corrupted protected row to valid legacy.
+        let legacy_null_format = self.chain_version.is_none()
+            && self.stream_sequence.is_none()
+            && self.recorded_at.is_none();
         let chain_version = self.chain_version.unwrap_or(0);
-        let (previous_hash, record_hash) = if chain_version == 0 {
+        let (previous_hash, record_hash) = if legacy_null_format {
             (None, None)
         } else {
             (self.previous_hash, self.record_hash)
