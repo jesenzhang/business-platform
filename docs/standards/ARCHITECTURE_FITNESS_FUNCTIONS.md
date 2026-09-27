@@ -348,6 +348,12 @@ or Application, and `AppState` fields containing `AppConfig`,
 - Domain/Application cannot depend on SQLx, SQLite, PostgreSQL or an ORM.
 - `document-postgres` and `document-sqlite` depend inward on `document`; shared
   contract support is dev-only.
+- The metadata-driven adapter inward-dependency rule evaluates normal (runtime)
+  Cargo edges only; `kind = "dev"` test-fixture edges are exempt because they
+  never ship in the library's runtime composition. This implements the
+  "dev-only" clause above (Wave 3: `document-sqlite` test fixtures compose the
+  independent processing catalog to reproduce the real business-api SQLite
+  deployment schema).
 - Query DTOs cannot derive `sqlx::FromRow`; SQL is prohibited in Application.
 - Aggregate repositories cannot add dashboard/report/export query methods.
 - `AppState` cannot contain a concrete PostgreSQL or SQLite pool.

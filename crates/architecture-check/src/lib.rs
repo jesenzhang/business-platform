@@ -59,6 +59,12 @@ impl ArchitectureMetadata {
 pub struct Dependency {
     pub name: String,
     pub path: Option<String>,
+    /// Cargo dependency kind: `None` (normal), `"dev"`, `"build"`. Test-only
+    /// dev-dependencies never ship in the library's runtime composition, so
+    /// the adapter inward-dependency rule exempts them (see
+    /// `docs/standards/ARCHITECTURE_FITNESS_FUNCTIONS.md` §23).
+    #[serde(default)]
+    pub kind: Option<String>,
 }
 
 #[allow(clippy::too_many_lines)]
@@ -183,6 +189,13 @@ pub fn validate(metadata: &Metadata) -> Result<(), Vec<String>> {
                 let Some(path) = dependency.path.as_deref() else {
                     continue;
                 };
+                // Dev-dependencies only exist for the crate's own tests and
+                // examples; they never appear in the shipped library's
+                // runtime dependency graph, so composition boundaries are
+                // not affected and the edge is exempt.
+                if dependency.kind.as_deref() == Some("dev") {
+                    continue;
+                }
                 if path.replace('\\', "/").contains("/crates/")
                     && !matches!(
                         dependency.name.as_str(),
@@ -263,6 +276,16 @@ mod tests {
             r#"{"packages":[{"name":"document-sqlite","manifest_path":"C:/repo/crates/document-sqlite/Cargo.toml","metadata":{"architecture":{"bounded_context":"document-management","layer":"infrastructure-adapter"}},"dependencies":[{"name":"document","path":"C:/repo/crates/document"},{"name":"messaging","path":"C:/repo/crates/messaging"}]}]}"#,
         );
         assert!(validate(&metadata).is_err());
+    }
+
+    #[test]
+    fn accepts_dev_dependency_edge_for_an_adapter() {
+        // Test-only dev-dependencies do not ship in the runtime composition
+        // graph (Wave 3 fixture composition of independent catalogs).
+        let metadata = parse(
+            r#"{"packages":[{"name":"document","manifest_path":"C:/repo/crates/document/Cargo.toml","metadata":{"architecture":{"bounded_context":"document-management","layer":"domain-and-application"}},"dependencies":[]},{"name":"document-sqlite","manifest_path":"C:/repo/crates/document-sqlite/Cargo.toml","metadata":{"architecture":{"bounded_context":"document-management","layer":"infrastructure-adapter"}},"dependencies":[{"name":"document","path":"C:/repo/crates/document"},{"name":"document-processing-sqlite","path":"C:/repo/crates/document-processing-sqlite","kind":"dev"}]}]}"#,
+        );
+        assert!(validate(&metadata).is_ok());
     }
 
     #[test]
