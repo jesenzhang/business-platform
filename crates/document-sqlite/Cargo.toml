@@ -20,7 +20,9 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+audit-sqlite = { path = "../audit-sqlite" }
 document-persistence-contracts = { path = "../document-persistence-contracts" }
+document-processing-sqlite = { path = "../document-processing-sqlite" }
 
 [lints]
 workspace = true

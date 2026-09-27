@@ -47,31 +47,12 @@ impl SqliteCreateDocumentUnitOfWork {
         let event_time = self
             .deterministic_event_time
             .ok_or(ApplicationPortError::Failed)?;
-        let audit = sqlx::query_as::<
-            _,
-            (
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                String,
-                Option<String>,
-                String,
-            ),
-        >(
+        let audit = sqlx::query_as::<_, RehearsalAuditRow>(
             "SELECT tenant_id, user_id, action, resource_type, resource_id,
                     details, created_at, occurred_at, operation_id, actor_type,
                     actor_id, result, changed_fields, schema_version,
-                    previous_hash, record_hash
+                    previous_hash, record_hash, chain_version, stream_sequence,
+                    recorded_at
              FROM audit_events WHERE id = ?1",
         )
         .bind(document.id().to_string())
@@ -83,7 +64,7 @@ impl SqliteCreateDocumentUnitOfWork {
             AuditAction::new("document.created").map_err(|_| ApplicationPortError::Failed)?;
         let resource = AuditResource::new("document", document.id().to_string())
             .map_err(|_| ApplicationPortError::Failed)?;
-        let expected = AuditEvent::new(
+        let event = AuditEvent::new(
             document.id(),
             document.tenant_id(),
             AuditActor {
@@ -110,42 +91,68 @@ impl SqliteCreateDocumentUnitOfWork {
             "audit.v1",
             event_time,
         )
-        .map_err(|_| ApplicationPortError::Failed)?
-        .with_chain(audit.14.clone())
         .map_err(|_| ApplicationPortError::Failed)?;
-        if audit.0 != expected.tenant_id().to_string()
-            || audit.1 != document.created_by().to_string()
-            || audit.2 != expected.action().as_str()
-            || audit.3 != expected.resource().resource_type
-            || audit.4 != expected.resource().resource_id
-            || audit.5 != expected.details().to_string()
-            || audit.6 != expected.occurred_at().to_rfc3339()
-            || audit.7 != expected.occurred_at().to_rfc3339()
-            || audit.8 != expected.operation_id().to_string()
-            || audit.9 != "user"
-            || audit.10 != expected.actor().actor_id.to_string()
-            || audit.11 != "succeeded"
-            || audit.12
+        // Rows written by the current writer are protected chain members and
+        // must be recomputed against their stored chain metadata, the same
+        // way `verify_chain` does. Rows written before the unified chain
+        // columns existed keep the legacy `with_chain` hash shape.
+        let expected = match (
+            audit.chain_version,
+            audit.stream_sequence,
+            audit.recorded_at.as_deref(),
+        ) {
+            (Some(1), Some(stream_sequence), Some(recorded_at)) => {
+                let recorded_at = chrono::DateTime::parse_from_rfc3339(recorded_at)
+                    .map(|value| value.with_timezone(&Utc))
+                    .map_err(|_| ApplicationPortError::Failed)?;
+                event.with_chain_metadata(
+                    stream_sequence,
+                    recorded_at,
+                    1,
+                    audit.previous_hash.clone(),
+                )
+            }
+            _ => event.with_chain(audit.previous_hash.clone()),
+        }
+        .map_err(|_| ApplicationPortError::Failed)?;
+        if audit.tenant_id != expected.tenant_id().to_string()
+            || audit.user_id != document.created_by().to_string()
+            || audit.action != expected.action().as_str()
+            || audit.resource_type != expected.resource().resource_type
+            || audit.resource_id != expected.resource().resource_id
+            || audit.details != expected.details().to_string()
+            || audit.created_at != expected.occurred_at().to_rfc3339()
+            || audit.occurred_at != expected.occurred_at().to_rfc3339()
+            || audit.operation_id != expected.operation_id().to_string()
+            || audit.actor_type != "user"
+            || audit.actor_id != expected.actor().actor_id.to_string()
+            || audit.result != "succeeded"
+            || audit.changed_fields
                 != serde_json::to_string(expected.changed_fields())
                     .map_err(|_| ApplicationPortError::Failed)?
-            || audit.13 != expected.schema_version()
-            || audit.14 != expected.previous_hash().map(ToOwned::to_owned)
-            || audit.15.as_str() != expected.record_hash().unwrap_or_default()
+            || audit.schema_version != expected.schema_version()
+            || audit.previous_hash != expected.previous_hash().map(ToOwned::to_owned)
+            || audit.record_hash.as_deref() != expected.record_hash()
         {
             return Err(ApplicationPortError::Failed);
         }
-        if let Some(previous_hash) = audit.14.as_deref() {
-            let previous_exists = sqlx::query_scalar::<_, i64>(
-                "SELECT 1 FROM audit_events WHERE tenant_id = ?1 AND record_hash = ?2 LIMIT 1",
-            )
-            .bind(document.tenant_id().to_string())
-            .bind(previous_hash)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(map_error)?
-            .is_some();
-            if !previous_exists {
-                return Err(ApplicationPortError::Failed);
+        if let Some(previous_hash) = audit.previous_hash.as_deref() {
+            // The chain head after genesis links to the tenant's genesis
+            // anchor, which is not a stored row; every other link must
+            // resolve to a persisted predecessor in the same tenant.
+            if previous_hash != audit::audit_chain_genesis(document.tenant_id()) {
+                let previous_exists = sqlx::query_scalar::<_, i64>(
+                    "SELECT 1 FROM audit_events WHERE tenant_id = ?1 AND record_hash = ?2 LIMIT 1",
+                )
+                .bind(document.tenant_id().to_string())
+                .bind(previous_hash)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_error)?
+                .is_some();
+                if !previous_exists {
+                    return Err(ApplicationPortError::Failed);
+                }
             }
         }
 
@@ -176,6 +183,32 @@ impl SqliteCreateDocumentUnitOfWork {
         }
         Ok(())
     }
+}
+
+/// Audit row shape read back by `verify_rehearsal_events`; the chain columns
+/// are optional because rows written before the unified chain existed (and
+/// the rehearsal fixtures that emulate them) carry NULL there.
+#[derive(sqlx::FromRow)]
+struct RehearsalAuditRow {
+    tenant_id: String,
+    user_id: String,
+    action: String,
+    resource_type: String,
+    resource_id: String,
+    details: String,
+    created_at: String,
+    occurred_at: String,
+    operation_id: String,
+    actor_type: String,
+    actor_id: String,
+    result: String,
+    changed_fields: String,
+    schema_version: String,
+    previous_hash: Option<String>,
+    record_hash: Option<String>,
+    chain_version: Option<i16>,
+    stream_sequence: Option<i64>,
+    recorded_at: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -587,18 +620,31 @@ async fn insert_audit(
         occurred_at,
     )
     .map_err(|_| ApplicationPortError::Failed)?;
+    // ADR-0013 Revision 1: join the tenant-local `chain_version=1` append
+    // stream exactly like the canonical audit adapter (audit-sqlite and
+    // document-postgres use this shape). Writing chain metadata here keeps
+    // the row readable by `SqliteAuditStore` and `verify_chain`; the outer
+    // `BEGIN IMMEDIATE` single-writer reservation serializes the append.
     let previous = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT record_hash FROM audit_events WHERE tenant_id=?1 ORDER BY occurred_at DESC,id DESC LIMIT 1",
+        "SELECT record_hash FROM audit_events WHERE tenant_id = ?1 AND chain_version = 1 ORDER BY stream_sequence DESC LIMIT 1",
     )
     .bind(document.tenant_id().to_string())
     .fetch_optional(&mut *tx)
     .await
     .map_err(map_error)?
-    .flatten();
+    .flatten()
+    .unwrap_or_else(|| audit::audit_chain_genesis(document.tenant_id()));
+    let sequence = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(stream_sequence), 0) + 1 FROM audit_events WHERE tenant_id = ?1",
+    )
+    .bind(document.tenant_id().to_string())
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(map_error)?;
     let event = event
-        .with_chain(previous)
+        .with_chain_metadata(sequence, Utc::now(), 1, Some(previous))
         .map_err(|_| ApplicationPortError::Failed)?;
-    sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16)")
+    sqlx::query("INSERT INTO audit_events (id,tenant_id,user_id,action,resource_type,resource_id,details,created_at,occurred_at,recorded_at,stream_sequence,chain_version,operation_id,actor_type,actor_id,result,changed_fields,schema_version,previous_hash,record_hash) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)")
         .bind(event.id().to_string())
         .bind(event.tenant_id().to_string())
         .bind(document.created_by().to_string())
@@ -607,6 +653,9 @@ async fn insert_audit(
         .bind(&event.resource().resource_id)
         .bind(event.details().to_string())
         .bind(event.occurred_at().to_rfc3339())
+        .bind(event.recorded_at().to_rfc3339())
+        .bind(event.stream_sequence())
+        .bind(event.chain_version())
         .bind(event.operation_id().to_string())
         .bind("user")
         .bind(event.actor().actor_id.to_string())

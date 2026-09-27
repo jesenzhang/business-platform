@@ -214,6 +214,7 @@ jobs:
           cargo test -p document-processing --all-features
           cargo test -p document-processing-sqlite --all-features --tests
           cargo test -p document-processing-postgres --test contracts --all-features -- --include-ignored --test-threads=1
+          cargo test -p document-processing-postgres --test cancel_factuality_pg --all-features -- --include-ignored --test-threads=1
           cargo test -p document-persistence-contracts --all-features
           cargo test -p document-postgres --test query_contracts --all-features -- --include-ignored --test-threads=1
           cargo test -p identity-authorization-contracts --all-features
@@ -227,6 +228,7 @@ jobs:
           cargo test -p policy-postgres --test perf_authorize --all-features -- --include-ignored --nocapture --test-threads=1
           cargo test -p runtime-migration --all-features
           cargo test -p audit --all-features
+          cargo test -p audit-postgres --test chain_pg --all-features -- --include-ignored --test-threads=1
           cargo test -p data-integrity --all-features
           cargo test -p data-repair --all-features
           cargo test -p runtime-governance --all-features

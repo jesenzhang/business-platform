@@ -284,6 +284,7 @@ dependencies = [
  "chrono",
  "serde_json",
  "sqlx",
+ "tokio",
  "uuid",
 ]
 
@@ -1545,9 +1546,11 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "audit",
+ "audit-sqlite",
  "chrono",
  "document",
  "document-persistence-contracts",
+ "document-processing-sqlite",
  "serde_json",
  "sqlx",
  "tokio",
