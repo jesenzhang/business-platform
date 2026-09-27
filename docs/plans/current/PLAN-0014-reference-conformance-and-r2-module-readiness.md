@@ -550,6 +550,51 @@ corrected / NOT INTEGRATED`；外部复审不构成 R2 admission PASS，Step F f
 未回填；R1 / R2 BLOCKED / NOT CLAIMED 维持；G-201 真实工件组装残项、G-202、G-203、
 G-09 保留。
 
+### Wave 3 execution record — 2026-09-27
+
+分支 `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`，Base
+`443a11cabdce1dd34006feaf08aa8be3382150c1`（Wave 2 closeout 提交，Wave 2 本身仍
+NOT INTEGRATED）；`main` 未修改、未 push、未合并、未启动 Wave 4/5、未激活
+PLAN-0015/PLAN-0006。固定参考取 tag→SHA 双记录并源码取证：Temporal v1.32.0、
+Restate v1.7.12（BSL，仅读语义）、Trigger.dev `trigger.dev@3.3.17`+`v4.6.4`、
+jarvis-rs vendored 提交（私有、无 license，仅作 floor 对照）、ZITADEL v4.18.0、
+immudb v1.11.2（BSL，仅读语义）、Infisical 0.165.16（audit 服务属 EE）、
+Debezium v3.6.3.Final、NATS v2.15.0、Kafka 4.3.1；"AgentOS"（agent0ai/agent-os）
+与 Quarkus outbox 序号列均 NOT FOUND，如实记录且不推断。
+
+有证据支持的 C0/C1 以 failing-first 修复（提交 `217e950`、`4b4ee71`）：D-G01
+取消事实性——意图（`processing_cancel_requested` 审计）与事实
+（`document.processing.cancelled.v1` 事件 + `processing_cancelled` 审计）分离，
+事实在全部转换路径（立即取消、step 边界、失败处置、release/reclaim 取消优先、
+AI 取消终态）恰好一次；SQLite `cancel_factuality` 5 测试先红后绿，PG 镜像 5 测试
+`#[ignore]` 并接入 CI。A-G01 document-sqlite 审计链写入静默断裂——17 列 legacy
+INSERT（省略 chain 列）改为完整 20 列 v1 链写入（MAX+1 序号、genesis 回退、
+`with_chain_metadata`），读路径对 legacy NULL 行归一化（对齐 PG 013/015 边界）；
+`audit_chain` 3 测试先红后绿，PG `chain_pg` 3 测试镜像 ignored+接入 CI。D-G02
+适配层 stale-fence/reclaim 负向直测补齐（`lease_fence` 4 测试绿）。architecture
+fitness 对 dev-kind 测试夹具 Cargo 边给出原则性豁免（运行时组合边仍受约束，含
+单测与标准文档 §23 同步）。
+
+Gap registry：C0=0；C1 关闭×3（D-G01、A-G01、D-G02）；D-G06/A-G07 事件 envelope
+缺 correlation/causation/producer 属 C1-by-standard，因改变公开契约面，注册为
+独立设计提案（显式 blocker，不在本 Wave 静默改契约）；C2×9（D-G03 pipeline
+version 列、D-G04 Attempt/provider 关联、D-G05 legacy claim-port seam、A-G02..
+A-G06、A-G08）注册并附决定，参考模式 REJECT 清单（Temporal matching/sticky、
+Restate journal 架构、Kafka transactional EOS、通用 DAG/调度器/registry/broker）
+记录理由。失败矩阵 D01-D11 / A01-A08 逐行绑定测试路径+名称、命令、环境与结论，
+缺口写 GAP/NOT RUN，不以 mock 充数。
+
+门禁（本地 Windows，原始日志+退出码存 `docs/reviews/2026-09-27-wave3-gates/`）：
+fmt/check/clippy(-D warnings)/test/architecture/`git diff --check` 全部 exit 0；
+735 passed、50 ignored、0 failed；tamper-evidence 措辞经六参考校准无 overclaim，
+尾部截断不可检测由测试断言固化。全部 PostgreSQL lane 本地 BLOCKED（本机 :5432
+认证不可用，服务未动；专用测试库复跑命令见 gates/07），8 个新增 PG 测试在本会话
+从未执行，历史 CI / 当前本地 / 当前集成三类证据分开记录。当前状态：`Wave 3
+implementation reviewed / self-verified / READY FOR INDEPENDENT REVIEW /
+NOT INTEGRATED`；R1 foundation，非 R2 admission，独立 reviewer verdict 待回填。
+审阅记录 `docs/reviews/2026-09-27-saas-align-durable-execution.md`、
+`docs/reviews/2026-09-27-saas-align-audit-messaging.md`。
+
 ## 6. 日程
 
 ### Wave 0 — Baseline & tooling

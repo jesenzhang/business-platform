@@ -668,3 +668,29 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > reviewed / documentation corrected / NOT INTEGRATED`；外部复审不构成 R2 admission PASS，
 > Step F formal verdict 未回填；R1 / R2 BLOCKED / NOT CLAIMED 维持；G-201 真实工件组装
 > 残项、G-202、G-203、G-09 保留。
+
+> 2026-09-27: PLAN-0014 Wave 3 Durable Task Execution / Audit / Messaging
+> reference conformance 在分支
+> `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`（Base `443a11c`＝Wave 2
+> closeout，未 push、未合并）完成：固定 Temporal v1.32.0、Restate v1.7.12、
+> Trigger.dev 3.3.17+v4.6.4、jarvis-rs vendored、ZITADEL v4.18.0、immudb v1.11.2、
+> Infisical 0.165.16、Debezium v3.6.3.Final、NATS v2.15.0、Kafka 4.3.1 的 tag→SHA
+> 参考并源码取证（BSL/AGPL/EE 仅读语义；AgentOS NOT FOUND、Quarkus outbox seq 列
+> NOT FOUND 均如实记录）。修复（failing-first）：D-G01 取消事实事件/审计在全部转换
+> 路径恰好一次（意图 `processing_cancel_requested` 与事实 `cancelled.v1`+`processing_cancelled`
+> 分离，SQLite 5 测试绿 + PG 镜像 ignored 接入 CI）；A-G01 document-sqlite 审计链写入
+> 静默断裂（17 列 legacy INSERT 改为 20 列 v1 链，3 测试绿 + PG `chain_pg` 镜像）；
+> D-G02 适配层 stale-fence/reclaim 负向直测补齐（4 测试）。注册未修：D-G03 pipeline
+> version 列、D-G04 Attempt/provider 关联、D-G05 legacy claim-port seam、A-G03 无外部
+> 反截断 checkpoint、A-G08 黑名单式 redaction 等 C2；D-G06/A-G07 事件 envelope
+> correlation/causation 为 C1-by-standard，因属公开契约变更走独立设计提案（显式
+> blocker）。门禁本地全绿（fmt/check/clippy/test/architecture/diff-check exit 0，
+> 735 passed / 50 ignored，原始日志存 `docs/reviews/2026-09-27-wave3-gates/`）；全部
+> PostgreSQL lane 本地 BLOCKED（原因与专用库复跑命令见 gates/07），8 个新增 PG 测试
+> 从未在本会话执行，不得记为通过。tamper-evidence 措辞经六个参考校准无 overclaim，
+> 尾部截断不可检测以测试断言固化。当前状态 `Wave 3 implementation reviewed /
+> self-verified / READY FOR INDEPENDENT REVIEW / NOT INTEGRATED`；R1 foundation，
+> 非 R2 admission，独立 reviewer verdict 待回填；未启动 Wave 4/5，未激活
+> PLAN-0015/PLAN-0006。审阅记录
+> `docs/reviews/2026-09-27-saas-align-durable-execution.md`、
+> `docs/reviews/2026-09-27-saas-align-audit-messaging.md`。
