@@ -532,6 +532,24 @@ digest 继续 Wave 5 NOT RUN；(5) 计数与 ADR-0021 表述校准。focused 现
 未改 manifest/compile 兼容行为。修复后状态为 `READY FOR INDEPENDENT RE-REVIEW /
 NOT INTEGRATED`；PostgreSQL、真实发布工件、workspace 外消费者证据维持 NOT RUN。
 
+Wave 2 closeout 与外部复审（同分支，2026-09-27，docs-only）：实现者之外的外部只读复审
+已记录于 review §14——Codex 独立只读复审，Reviewed HEAD
+`93b18ab67c0426e6e5efc4f065260d7068995f38`，审阅修复范围
+`50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f` → Reviewed HEAD：代码修复通过；文档兼容性
+表述不确——review §5 规则 3 原"contract_digest 不变 ⇒ 兼容面不变"高估摘要语义，已改为
+"contract_digest 相同仅表示纳入摘要的公开声明面相同；compatibility、dependencies、
+module_version 等仍须通过 compile/dry_plan 的独立兼容性校验，不能据摘要相同推断可互换"。
+复审独立执行 focused 113 passed / 12 suites、Architecture Fitness PASS、
+`git diff --check` PASS（closeout 在 Reviewed HEAD 复测同值）；全 workspace 四项门禁
+与外部参考取证本轮未独立重跑；PostgreSQL / 真实发布工件 / workspace 外消费者维持
+NOT RUN。验收分项校准：review §10 十二条 = 10 PASS（A-01..A-09、A-11；A-09 验证范围为
+声明一致性，非真实工件/外部消费者）+ 1 PARTIAL（A-10 workspace 内部分）+ 1 NOT RUN
+（A-12）；此前"可运行 9 条 PASS"为 A-09 恢复后未跟随更新的誊写计数。Round 1/2 历史与
+失败记录未改写。Wave 2 当前状态：`Wave 2 implementation reviewed / documentation
+corrected / NOT INTEGRATED`；外部复审不构成 R2 admission PASS，Step F formal verdict
+未回填；R1 / R2 BLOCKED / NOT CLAIMED 维持；G-201 真实工件组装残项、G-202、G-203、
+G-09 保留。
+
 ## 6. 日程
 
 ### Wave 0 — Baseline & tooling

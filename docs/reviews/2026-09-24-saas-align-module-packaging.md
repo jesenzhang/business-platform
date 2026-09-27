@@ -1,12 +1,14 @@
 # PLAN-0014 Wave 2 — Business Module Packaging Reference Conformance Review
 
 > Review ID: REVIEW-SaaS-module-packaging-2026-09-24
-> Status: READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED（Round 2 独立审阅发现见 §16；
-> 缺口已在同一分支修复并以新测试证据逐项恢复，等待实现者之外的 reviewer 只读复审；
-> 本文不自行填写 PASS）
+> Status: Wave 2 implementation reviewed / documentation corrected / NOT INTEGRATED
+> （Round 2 独立审阅发现与修复见 §16；外部只读复审见 §14——代码修复通过，
+> 本文档兼容性表述已在 2026-09-27 closeout 修正；本次复审不构成 R2 admission PASS，
+> 本文不自行填写 Step F formal verdict）
 > Module: Business Module Packaging foundation — `business-module-contracts` + `business-application-compiler`（P0-B）
 > Module revision: 见 §2 基线与候选（代码 candidate 为候选链首提交）
-> Reviewer: 实现者自检（本 agent）；独立 reviewer 待指派（§14）
+> Reviewer: 实现者自检（本 agent）；外部只读复审（Codex，2026-09-27）已记录于 §14；
+> Step F formal verdict 仍待具备资格的独立 reviewer 回填，未被该复审替代
 > Review date: 2026-09-24
 > Related plan: PLAN-0014（Wave 2 / P0-B）
 > 执行环境: 全部命令与写入均在本地 Windows（Git Bash，`F:\Workspace\business-platform`）；未连接任何远程服务器；无 push、无合并、main 未修改。
@@ -237,7 +239,11 @@ Lifecycle/发布规则（既有契约 + 本轮钉定，均有测试）：
 1. **独立契约工件**：contract_digest 可脱离构建独立复算（permutation 不变性测试）；
 2. **迁移命名空间**：`migration_revision.migration_namespace` 必须过 manifest 同一语法校验；
    物理文件隔离现状为 workspace-flat，关闭条件记 G-203；
-3. **兼容窗口**：`CompatibilityDescriptor` 参与 compile/plan；contract_digest 不变 ⇒ 兼容面不变；
+3. **兼容窗口**：`CompatibilityDescriptor` 参与 compile/plan；`contract_digest` 相同仅表示
+   纳入摘要的公开声明面相同；`compatibility`、`dependencies`、`module_version` 等仍须通过
+   compile/dry_plan 的独立兼容性校验，不能据摘要相同推断可互换
+   （2026-09-27 closeout 修正：原表述"digest 不变 ⇒ 兼容面不变"高估了摘要的兼容语义，
+   外部复审发现，见 §14；A-02 恰好证明发布元数据变化不改摘要而兼容性仍由 compile 判定）；
 4. **forward-only**：Downgrade 在 compile/dry_plan 拒绝（既有测试）；
 5. **rollback**：不提供 schema 自动回滚（与 Frappe DDL 不可回滚、Odoo forward-only+自愈一致），
    回滚 = Retained 数据上恢复先前 release identity；
@@ -304,7 +310,9 @@ C0（阻断 correctness/tenant-isolation）：**无**——本轮未发现新 C0
   影响：`identity`/`policy`/`contracts-compiler` 均不可宣布 R2。owner 边界：Wave 5 pilot
   （pilot #3 = contracts/compiler bundle，可先于业务模块证明工件+消费者闭环）。
   关闭条件：pilot 工件带 release identity 且外部工程仅依赖发布产物编译/测试通过。
-  必需测试：§10 条目 A-09/A-10（本轮 NOT RUN）。
+  必需测试：§10 条目 A-10 的 workspace 外消费者部分与 A-12（NOT RUN）。2026-09-27 校准：
+  A-09 已以 `verify_release_identity` 验证**声明一致性**并 PASS，不属于本 gap 的 NOT RUN 范围；
+  本 gap 缺的是真实发布工件组装与 workspace 外消费者证据，不得与 A-09 的 PASS 互混。
 - **G-203：migration 所有权仍是 workspace 平面序列**。`migration_namespace` 是声明字段，
   `migrations/001..019.sql`+单一 `MANIFEST.sha256` 未按模块隔离；`runtime-migration` embed 全目录。
   影响：多模块共存时无法证明单模块迁移可独立演进/校验。owner 边界：pilot 模块的迁移落
@@ -389,10 +397,15 @@ review（见其 Validation 表），不构成本轮或 R2 证据；本轮为 con
 | A-06 | 版本不兼容（含 Downgrade 拒绝、compat 窗口） | 既有 compiler/planning tests | `cargo test -p business-application-compiler --all-features` | PASS |
 | A-07 | 依赖环 | 既有 compiler tests（`DependencyCycle`） | 同 A-06 | PASS |
 | A-08 | 非法 platform dependency / 跨模块 private ref / manifest 非法字段 | 既有 contracts integration tests（`tests/` 22 项：contribution、private ref、schema 版本、unknown field 等）+ `release.rs` 11 unit（`release_contracts_reject_unknown_fields_and_bad_digest_bytes`、Round 2 `release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions` 等） | `cargo test -p business-module-contracts --all-features` | PASS |
-| A-09 | **release 一致性验证（Round 2 重写）**：`verify_release_identity` 对 `compile()` 输出重算 contract digest 与 compiled declaration fingerprint 并比较，核对 module_id/module_version/manifest_schema_version/（钉定时）migration namespace；每种单字段错配独立负向；release 层 SemVer（identity module_version、bundle crate_version）拒绝非 SemVer token | `release_surface_digest.rs::verify_release_identity_accepts_identity_recomputed_from_compiled_evidence`、`..._accepts_stateless_identity_without_migration_revision`、`..._rejects_pinned_module_id_not_in_evidence`、`..._rejects_pinned_module_version_mismatch`、`..._rejects_pinned_manifest_schema_version_mismatch`、`..._rejects_pinned_contract_digest_mismatch`、`..._rejects_pinned_package_digest_mismatch`、`..._rejects_pinned_migration_namespace_mismatch`、`..._rejects_identity_failing_shape_validation`、`package_fingerprint_matches_the_planner_per_module_digest` + `release.rs::release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions` | `cargo test -p business-application-compiler -p business-module-contracts --all-features` | PASS（Round 1 曾以 shape-only `validate` + 手工同值装配记 PASS——高估，Round 2 审阅判 NOT MET 后以本行证据恢复 MET，§16） |
+| A-09 | **release 一致性验证（Round 2 重写）**：`verify_release_identity` 对 `compile()` 输出重算 contract digest 与 compiled declaration fingerprint 并比较，核对 module_id/module_version/manifest_schema_version/（钉定时）migration namespace；每种单字段错配独立负向；release 层 SemVer（identity module_version、bundle crate_version）拒绝非 SemVer token | `release_surface_digest.rs::verify_release_identity_accepts_identity_recomputed_from_compiled_evidence`、`..._accepts_stateless_identity_without_migration_revision`、`..._rejects_pinned_module_id_not_in_evidence`、`..._rejects_pinned_module_version_mismatch`、`..._rejects_pinned_manifest_schema_version_mismatch`、`..._rejects_pinned_contract_digest_mismatch`、`..._rejects_pinned_package_digest_mismatch`、`..._rejects_pinned_migration_namespace_mismatch`、`..._rejects_identity_failing_shape_validation`、`package_fingerprint_matches_the_planner_per_module_digest` + `release.rs::release_identity_requires_semver_module_version`、`bundle_requires_semver_crate_versions` | `cargo test -p business-application-compiler -p business-module-contracts --all-features` | PASS（范围 = 声明一致性：对 `compile()` 输出重算摘要/指纹并核对字段；真实发布工件与 workspace 外消费者不在本条，见 A-10 后半/A-12。Round 1 曾以 shape-only `validate` + 手工同值装配记 PASS——高估，Round 2 审阅判 NOT MET 后以本行证据恢复 MET，§16） |
 | A-10 | 独立消费者无 concrete adapter 编译/测试 | workspace 内证据：两 crate 依赖白名单（fitness）+ 全部 51 个 compiler/contracts 测试仅用纯 contract 类型（本轮 PASS）；workspace 外独立工程 | Wave 5：外部 cargo 工程仅依赖发布产物（fixture 见 §9 T6） | 内部 PASS / 外部 **NOT RUN** |
 | A-11 | live consumer 移除阻断、uninstall≠purge | 既有 planning tests（BlockedRemoval、RemoveModule data_retained） | 同 A-06 | PASS |
 | A-12 | 真实模块 release 工件 + PG 迁移 lane | — | Wave 5 pilot #1/#2/#3（fixture 见 §9 T4/T5） | **NOT RUN** |
+
+分项合计（2026-09-27 closeout 校准，与本表逐行状态一致）：12 条验收 = **10 PASS**
+（A-01..A-09、A-11；其中 A-09 验证的是声明一致性，非真实工件/外部消费者）+ **1 PARTIAL**
+（A-10：workspace 内证据 PASS，workspace 外独立消费者 NOT RUN）+ **1 NOT RUN**（A-12）。
+此前"本轮可运行 9 条全 PASS"为 A-09 在 Round 2 恢复 PASS 后未跟随更新的誊写计数。
 
 ## 11. R2 readiness（P0-B foundation crates）
 
@@ -420,7 +433,7 @@ G-09 C2 保留）。
 | Exit condition | Verdict | Basis |
 |---|---|---|
 | canonical module release identity defined | **MET（Round 2 修复后）**；Round 2 审阅曾判 **NOT MET**——A-09 引用的 `validate` 是 shape-only、agent 公开契约面未入摘要、package digest 语义被写成工件内容（§16）。现值契约 + 一致性门禁 + SemVer + fitness 全部有测试证据 | §5/§16；`verify_release_identity` 与 SemVer 测试（A-09）、`contract_digest` agent 面（A-03） |
-| R2 packaging acceptance executable | **MET（定义+本轮可运行部分全部 PASS；A-09 以真实一致性验证恢复）**；工件/外部消费者/PG 条目如实 NOT RUN，属 Wave 5 | §10 A-01..A-12 |
+| R2 packaging acceptance executable | **MET（定义+本轮可运行部分：10 PASS + A-10 PARTIAL + A-12 NOT RUN；A-09 以真实一致性验证恢复，范围为声明一致性）**；工件/外部消费者/PG 条目如实 NOT RUN，属 Wave 5 | §10 A-01..A-12（分项合计见 §10 表末） |
 | no forced microservice split | **MET** | 零新增部署单元；`apps/*`、infra、数据库拓扑零改动；改动仅 2 个纯 crate + 1 个 fitness 脚本 + 文档（Round 2 同） |
 
 ## 13. Reviewer questions（供独立审阅）
@@ -450,9 +463,35 @@ G-09 C2 保留）。
   compiler lib+tests、fitness、Cargo.lock）+ 本文档/PLAN-0014/ARCHITECTURE_STATUS
   同步文档提交（候选链末端 = 分支顶端，SHA 见 `git log`；文档提交仅 markdown，
   不影响任何门禁输入）。
-- 状态：**READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED**。未 push、未合并 main、
-  未启动 Wave 3/Wave 5、未宣布任何模块 R2。
-- 独立 verdict（由实现者之外的 reviewer 只读填写）：
+- 外部复审记录（2026-09-27 收口录入；实现者之外的只读复审，非 Step F formal verdict、
+  非 R2 admission）：
+
+```
+Reviewer:            Codex 独立只读复审
+Reviewed HEAD:       93b18ab67c0426e6e5efc4f065260d7068995f38（Round 2 文档提交链顶）
+Reviewed fix range:  50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f → Reviewed HEAD
+Result:              代码修复通过；文档兼容性表述不确——§5 规则 3 原"contract_digest
+                     不变 ⇒ 兼容面不变"高估摘要语义，已在本次 docs-only closeout 改为
+                     "摘要相同仅表示纳入摘要的公开声明面相同；compatibility、
+                     dependencies、module_version 等仍须通过 compile/dry_plan 的独立
+                     兼容性校验，不能据摘要相同推断可互换"
+独立执行:            cargo test -p business-module-contracts -p business-application-compiler
+                     --all-features → 113 passed / 12 suites；
+                     scripts/check-architecture.ps1 → Architecture Fitness PASS；
+                     git diff --check → PASS
+本轮未独立重跑:     全 workspace fmt/check/clippy/test 四项门禁；外部参考取证
+                     （§3 固定 revision 的源码证据复核）
+NOT RUN:            PostgreSQL lane / 真实发布工件 / workspace 外消费者（不变，G-202）
+边界:                本复审不能写为 R2 admission PASS；R1 / R2 BLOCKED / NOT CLAIMED 维持
+```
+
+  上述"独立执行"三项证据在 closeout 时于 Reviewed HEAD 复测复核，结果一致
+  （2026-09-27，本地 Windows Git Bash；closeout 为 markdown-only，不改任何门禁输入）。
+- 状态（closeout 2026-09-27）：**Wave 2 implementation reviewed / documentation corrected /
+  NOT INTEGRATED**。未 push、未合并 main、未启动 Wave 5、未宣布任何模块 R2；G-201 真实
+  工件组装残项、G-202、G-203 与继承的 G-09 全部保留。
+- 独立 verdict（由实现者之外的 reviewer 只读填写；上方 Codex 复审为该范围内的复审记录，
+  不替代本 formal verdict）：
 
 ```
 Reviewer:            <pending>
@@ -468,15 +507,18 @@ Wave 2 交付：(1) canonical module release identity 从"字段缺失"（Base �
 `module-release.identity.v1` 值契约 + `ModuleReleaseBundle` + compiler canonical
 `contract_digest` seam + Round 2 的 `verify_release_identity` 一致性门禁与 release 层
 SemVer，并以 fitness 与两轮共 28 项新测试锁定；(2) R2 packaging acceptance 12 条全部
-具有可执行入口，本轮可运行的 9 条全 PASS（A-09 在 Round 2 以真实一致性验证恢复），
-需要发布工具/外部工程/PostgreSQL 的条目以精确 fixture 记 NOT RUN；(3) 四个固定 revision
+具有可执行入口：10 PASS（A-01..A-09、A-11；A-09 在 Round 2 以真实一致性验证恢复，
+范围为声明一致性）、1 PARTIAL（A-10 workspace 内部分）、1 NOT RUN（A-12）；需要发布
+工具/外部工程/PostgreSQL 的条目以精确 fixture 记 NOT RUN；(3) 四个固定 revision
 的外部参考对照产生 8 项决定与 7 项缺口（C0=0；C1×3——其中 G-201 契约层关闭、G-202/G-203
 保持 R2 阻断；C2×3 含继承的 G-09；C3 与 REJECT 各成清单）。Round 1 独立审阅发现的
 A-09 高估、contract digest 漏面、package digest 语义夸大、79 计数错误与 ADR-0021
 表述失准已记录于 §16 并修复。Business Module Packaging foundation 与 Identity/
 Organization/Policy 一律维持 R1；R2 宣布被 G-202（独立发布工件与外部消费者证据）显式
-阻断，归 Wave 5。本轮未 push、未合并、未启动 Wave 3/Wave 5；等待实现者之外的独立
-reviewer 对 Round 2 candidate 只读复审并回填 §14。
+阻断，归 Wave 5。本轮未 push、未合并、未启动 Wave 5。实现者之外的外部只读复审
+（Codex，2026-09-27）已记录于 §14：代码修复通过，本文档兼容性表述（§5 规则 3）已在
+closeout 修正；Wave 2 当前状态为 implementation reviewed / documentation corrected /
+NOT INTEGRATED，Step F formal verdict 与 R2 admission 仍待回填 / 未宣称。
 
 ## 16. Round 2 independent review findings and remediation（2026-09-24）
 

@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-24
+> 最后更新：2026-09-27
 > 当前阶段：Enterprise AI SaaS Platform Baseline 已对齐；PLAN-0014 Reference Conformance / R2 Readiness Active；Contract 真实垂直切片仍是下一主要业务实现
 > 当前计划：PLAN-0014 Reference Conformance / R2 Readiness Active（review-first，2026-09-23→2026-10-23）；Contract Business Vertical Slice 仍是下一主要业务代码计划；PLAN-0006 Revision 1 Proposed / BLOCKED
 > 集成方式：GitHub PR merge
@@ -653,3 +653,18 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > 恢复 MET（review §12/§16）。G-202/G-203 关闭条件不变；两个 crate 仍维持
 > R1 / R2 BLOCKED / NOT CLAIMED。当前状态 READY FOR INDEPENDENT RE-REVIEW /
 > NOT INTEGRATED，独立 reviewer 复审 verdict 待回填。
+
+> 2026-09-27 closeout（docs-only）: PLAN-0014 Wave 2 外部复审已记录（review §14）——
+> Codex 独立只读复审 Reviewed HEAD `93b18ab67c0426e6e5efc4f065260d7068995f38`（审阅修复
+> 范围 `50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f` → Reviewed HEAD）：代码修复通过；文档
+> 兼容性表述不确——review §5 规则 3 原"contract_digest 不变 ⇒ 兼容面不变"高估摘要语义，
+> 已改为"contract_digest 相同仅表示纳入摘要的公开声明面相同；compatibility、dependencies、
+> module_version 等仍须通过 compile/dry_plan 的独立兼容性校验，不能据摘要相同推断可互换"。
+> 复审独立执行 focused 113 passed / 12 suites、Architecture Fitness PASS、
+> `git diff --check` PASS，closeout 在 Reviewed HEAD 复测同值；全 workspace 四项门禁与
+> 外部参考取证未独立重跑。验收分项校准为 12 条 = 10 PASS（A-01..A-09、A-11；A-09 验证
+> 范围为声明一致性，非真实工件/外部消费者）+ 1 PARTIAL（A-10 workspace 内部分）+
+> 1 NOT RUN（A-12）。Round 1/2 历史未改写。Wave 2 当前状态 `Wave 2 implementation
+> reviewed / documentation corrected / NOT INTEGRATED`；外部复审不构成 R2 admission PASS，
+> Step F formal verdict 未回填；R1 / R2 BLOCKED / NOT CLAIMED 维持；G-201 真实工件组装
+> 残项、G-202、G-203、G-09 保留。
