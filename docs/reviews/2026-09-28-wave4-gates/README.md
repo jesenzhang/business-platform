@@ -38,6 +38,15 @@ exemption widened to reach green.
 | OTLP exporter / Collector | no Collector available in this environment | — | **NOT RUN / BLOCKED** (recorded as gap `OBS-W4-06`, not as a pass) |
 | Hosted provider (real AWS S3, MinIO) | MinIO open-source binaries are discontinued (`dl.min.io` returns HTTP 410; no Windows asset on the last release); no AWS credentials in scope | — | **NOT RUN**; RustFS stands in as the S3-compatible implementation actually chosen |
 
+> **Round 2 correction (2026-09-28, same wave).** Two claims above did not survive
+> re-checking: the S3 row's "0 objects left" verdict came from a single
+> `ListObjectsV2` page and never inspected incomplete multipart uploads, and the
+> observability provider-suppression fix was bypassable through `RUST_LOG`. Both
+> are re-closed in Round 2 — see
+> [`../2026-09-28-wave4-round2-gates/`](../2026-09-28-wave4-round2-gates/) and
+> [`../2026-09-28-wave4-round2-storage-lane/`](../2026-09-28-wave4-round2-storage-lane/).
+> The rows above are left as Round 1 recorded them.
+
 ## 3. Key file digests at the code commit (SHA-256)
 
 ```

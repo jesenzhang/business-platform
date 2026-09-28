@@ -1,0 +1,35 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpg8kndrf-0695kl3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpg8knlbu-09dlko3-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: `observability` (lib) generated 1 warning
+   Compiling object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_fault_injection-1v0hcwgivhcok\s-hmpgbmalwk-1xejymq-working`
+
+warning: `object-storage` (test "s3_lane_fault_injection") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.43s
+     Running tests\s3_lane_fault_injection.rs (target\debug\deps\s3_lane_fault_injection-ccc3635f91fdff41.exe)
+
+running 4 tests
+test a_failed_contract_run_is_still_cleaned_up ... CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (a) contract step exit=Some(101) left 6 object(s) under plan0014-wave4/r2-20260928-065142/
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (a) contract step exit=Some(101) (still a failure) and cleanup step exit=0 with 6 object(s) removed
+ok
+test a_failure_and_its_cleanup_leave_other_prefixes_untouched ... CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+ok
+test an_interrupted_multipart_upload_is_found_and_aborted ... CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (b) interrupted upload visible to ListMultipartUploads: 1 entry(s) (test child_entry_point ... PLAN0014-FAULT-ARMED left incomplete upload plan0014-wave4/r2-20260928-065142/interrupted/multipart.bin#ZGNmZmE0YTctYzAwOS00YzlmLTgzMzEtNWJlYzA1ZDYyOTY0LjZiMmMwNTljLWE0NDktNGJkOC04Y2FiLWNiYjFjN2QwZmY2N3gxNzkwNTc4MzIyNzY0NTIzOTAw)
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=1 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065142/ objects_deleted=0 uploads_aborted=1 remaining_objects=0 remaining_uploads=0 errors=0
+ok
+test child_entry_point ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s

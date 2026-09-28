@@ -1,0 +1,31 @@
+PLAN-0014 Wave 4 Round 2 — trust store panic: environment probe
+host = Microsoft Windows NT 10.0.19045.0; rustc = rustc 1.94.1 (e408947bf 2026-03-25)
+OBSERVATION (recorded earlier in this round, before the test change):
+  cargo test -p object-storage --lib -- --exact client::tests::presign_rejects_out_of_range_expiry_without_calling_the_provider
+    restricted file-access sandbox : panicked - TrustStore configured to enable native roots but no valid root certificates parsed!
+    normal file access (same binary): passed
+  => the panic depends on the execution environment's ability to read the OS root certificate
+     store, not on repository code. Source of the panic: aws-smithy-runtime's rustls provider
+     (aws-smithy-http-client rustls provider: debug_assert! after rustls_native_certs::load_native_certs()
+     yields zero roots; the root set is a LazyLock, so it is loaded once per process).
+
+DECISION: treated as an execution-environment difference. Production TLS verification is
+unchanged; the parameter-rejection unit tests no longer construct an SDK client with the
+default HTTPS connector at all - they install a no-network transport (src/client.rs
+tests::offline_client), so they never read the host trust store.
+
+CHECK: no TLS-weakening configuration anywhere in the workspace
+  danger_accept_invalid_certs                hits=0
+  danger_accept_invalid_hostnames            hits=0
+  use_native_roots_invalid_certificates      hits=0
+  NoCertVerification                         hits=0
+  CertVerifier                               hits=0
+  accept_invalid_certs                       hits=0
+  ssl_verify                                 hits=0
+  tls_verify=false                           hits=0
+
+CHECK: current object-storage unit suite (includes the three parameter/transport tests) under normal access
+test client::tests::presign_rejects_out_of_range_expiry_without_calling_the_provider ... ok
+test client::tests::a_transport_failure_is_not_mistaken_for_a_missing_object ... ok
+test client::tests::the_offline_transport_is_the_client_transport ... ok
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

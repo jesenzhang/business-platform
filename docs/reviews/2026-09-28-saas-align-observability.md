@@ -148,9 +148,26 @@ SECURITY_ARCHITECTURE（不得把未校验输入反射进公开响应）。
 
 ### C2 / C3
 
-* **OBS-W4-02 · C2 · 已修复**：provider crate 噪声压制（含测试
-  `provider_debug_events_are_pinned_while_platform_debug_survives`）。剩余限制：
-  第三方仍可能在 `warn` 级别输出桶/键，运维侧需要 Collector 过滤。
+* **OBS-W4-02 · C1（Round 1 判为 C2「已修复」，Round 2 复核后重新关闭）**：
+  provider crate 在 `DEBUG`/`TRACE` 输出桶名、对象键、完整请求 URI 与凭证标识，
+  违反 AGENTS §10（日志不得出现 Secret/签名 URL/底层连接信息），因此按**安全修复**
+  重新登记，而不是「provider 噪声优化」。
+  Round 1 的修复方式（在 `EnvFilter` 指令串尾部追加 `<target>=warn`）**没有关闭**
+  该缺陷，两条绕过路径都仍然成立：
+  1. `RUST_LOG` 一旦设置就整体替换指令串，追加的 `=warn` 直接消失；
+  2. `EnvFilter` 取最具体匹配，`aws_sigv4::http_request::sign=trace` 这类子目标
+     指令优先于父目标的 `=warn`。
+  并且 fmt 会把**外层 span 的字段**渲染成每行前缀，所以只过滤事件/落盘点也不够：
+  `DEBUG signing{bucket=… access_key_id=…}: <应用日志行>` 仍然泄露。
+  Round 2 的修复是一个独立于 `EnvFilter` 的安全边界层 `ProviderSafetyFilter`：
+  对被压制目标以 `Interest::never()` 关闭 callsite，并同时实现 `enabled` 与
+  `event_enabled`（后者是独立 hook，默认 `true`，只覆盖 `enabled` 会漏掉事件），
+  使记录根本不被构造——fmt 日志与 OTLP span 两条出口同时生效，且任何 `EnvFilter`
+  都无法重开。应用自身的 `DEBUG` 诊断保留，provider 的 `WARN`/`ERROR` 保留。
+  **明确不声明**已解决 `WARN`/`ERROR` 自由文本与一般脱敏问题：那是 OBS-W4-07，
+  仍然 open。也不存在「设置 `RUST_LOG` 即可放开」的例外。
+  证据：`2026-09-28-wave4-round2-gates/`（修复前 RED、修复后 GREEN 原始日志）。
+  剩余限制：见 OBS-W4-07。
 * **OBS-W4-04 · C3**：适配器诊断信息过窄。位置：
   `crates/document-sqlite/src/unit_of_work.rs:428`（注释明确登记）。为了让
   `document idempotency read failed` 不再携带驱动文本，诊断能力下降为固定消息；
@@ -160,11 +177,13 @@ SECURITY_ARCHITECTURE（不得把未校验输入反射进公开响应）。
 
 | # | 测试路径 | 用例 | 命令 | 环境 | Verdict |
 |---|---|---|---|---|---|
-| O1 | `crates/observability/src/lib.rs` | `provider_debug_events_are_pinned_while_platform_debug_survives`、`default_directives_keep_the_requested_service_level`、`log_format_parse_is_case_insensitive_and_rejects_unknown` | `cargo test -p observability --all-features` | 进程内 recording layer | pass |
+| O1 | `crates/observability/src/lib.rs` | Round 1：`default_directives_keep_the_requested_service_level`、`log_format_parse_is_case_insensitive_and_rejects_unknown`。Round 2 复核后新增：`provider_debug_events_are_pinned_while_platform_debug_survives`、`boundary_holds_against_the_most_permissive_env_filter`、`boundary_holds_against_more_specific_subtarget_directives`、`boundary_holds_whatever_order_the_layers_are_installed_in`、`provider_spans_are_never_constructed`、`without_the_boundary_a_permissive_filter_leaks`、`only_debug_and_trace_are_within_the_boundary`、`suppression_matches_targets_on_module_boundaries` | `cargo test -p observability --all-features` | 进程内 recording layer | pass（Round 1 记为 pass 的两个绕过场景在 Round 2 先 RED 后修复） |
 | O2 | `crates/observability/src/metrics.rs` | `install_is_idempotent_and_render_exposes_prometheus_text`、`duration_histograms_render_as_bucketed_prometheus_histograms` | 同上 | 进程内 | pass |
 | O3 | `apps/business-api/src/metrics.rs` | `duration_metrics_render_as_bucketed_histograms` | `cargo test -p business-api --all-features` | 进程内 | pass（修复前 red：输出 `{quantile=`） |
 | O4 | `apps/business-worker/src/main.rs` `metrics::tests` | 标签基数有界 | `cargo test -p business-worker --all-features` | 进程内 | pass |
-| O5 | `crates/object-storage/tests/log_hygiene.rs` | 存储引用不进入日志 | `cargo test -p object-storage --test log_hygiene` | 自建 subscriber | pass |
+| O5 | `crates/object-storage/tests/log_hygiene.rs` | `storage_references_never_enter_the_log_stream`：`object_storage*` 目标不含键/桶/路径片段；并断言捕获确实见到第三方记录（否则上一条为空断言） | `cargo test -p object-storage --test log_hygiene --all-features` | 自建 subscriber（故意不过滤） | pass（修复前 red） |
+| O5b | `crates/object-storage/tests/sdk_log_hygiene.rs` | 真实 AWS SDK 调用经 `observability::init_tracing`：`every_configured_case_keeps_storage_references_out_of_the_log_stream`（含桶/键/凭证/签名 URL 的**负向断言** + 无边界对照组）、`turning_every_provider_target_to_trace_does_not_leak`、`sentinels_do_not_contain_each_other` | `cargo test -p object-storage --test sdk_log_hygiene --all-features` | 子进程 ×6（RUST_LOG 未设置/debug/trace/子目标 trace/json/无边界对照），端点不可路由，不依赖主机信任库 | pass（对照组必须泄露，防止空断言） |
+| O5c | `crates/observability/tests/provider_log_safety.rs` | 真实 `init_tracing` 的 9 个子进程用例：`no_case_leaks_provider_debug_or_trace_material`、`no_case_loses_the_application_own_debug_output`、`no_case_silences_provider_warn_diagnostics`、`rust_log_unset_debug_service_level_does_not_leak`、`rust_log_debug_does_not_leak`、`rust_log_trace_does_not_leak`、`more_specific_provider_subtarget_directives_do_not_leak`、`provider_span_directives_do_not_leak`、`json_format_does_not_change_the_boundary`、`otlp_branch_keeps_the_same_boundary_for_span_output`、`child_processes_actually_emit_the_application_records` | `cargo test -p observability --all-features` | 每用例独立子进程（隔离全局 subscriber 与 `RUST_LOG`） | pass（修复前 7 failed / 5 passed，见 Round 2 RED 日志） |
 | O6 | governance-worker 初始化 | 无专用测试（组合根初始化） | `cargo check --workspace --all-targets --all-features` | — | 编译级验证；运行期由 governance lanes 覆盖 |
 | O7 | exporter 故障隔离 | — | — | 无 Collector | **NOT RUN / BLOCKED**（OBS-W4-06） |
 
@@ -178,6 +197,11 @@ OBS-W4-07（日志脱敏控制）。三者都在本波之前不存在任何证�
 
 1. 在 ADR-0028 之前，是否可先只做「服务端生成 + 回显长度约束 + 结构化日志字段」而不引入任何跨进程信封？
 2. `SUPPRESSED_TARGETS` 固定在 `warn` 是否会掩盖 provider 侧真实的可重试错误（例如 5xx 只在 debug 出现）？
+   —— Round 2 答复：边界只关闭 `DEBUG`/`TRACE`，`INFO`/`WARN`/`ERROR` 保持可达
+   （`only_debug_and_trace_are_within_the_boundary` 与子进程用例
+   `no_case_silences_provider_warn_diagnostics` 双向固定）。取舍是明确的：牺牲
+   provider 侧 DEBUG 排障细节，换取凭证标识与存储引用不进入日志/trace；仍待
+   reviewer 判断的是 `WARN`/`ERROR` 自由文本（OBS-W4-07）。
 3. 日志脱敏 layer 的键名黑名单是否与审计侧 `redact_details` 统一口径？
 
 ## 9. Verdict

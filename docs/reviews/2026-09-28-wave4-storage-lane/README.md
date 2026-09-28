@@ -1,5 +1,14 @@
 # PLAN-0014 Wave 4 — real S3-compatible provider lane
 
+> **Read together with Round 2.** The cleanup and bucket-teardown cases described
+> below no longer exist: Round 2 found that `lane_leaves_no_objects_under_the_run_prefix`
+> listed the prefix once (one page of up to 1000 keys) and never inspected
+> incomplete multipart uploads, so its "prefix empty" verdict could not be
+> trusted, and the teardown case could delete CI's shared `contract-test-bucket`.
+> The records below are kept verbatim as what Round 1 observed; the corrected
+> split (contract step · fault scenarios · final cleanup) and its re-execution are
+> in [`../2026-09-28-wave4-round2-storage-lane/`](../2026-09-28-wave4-round2-storage-lane/).
+
 ## Provider actually used (and why)
 
 | Item | Value |

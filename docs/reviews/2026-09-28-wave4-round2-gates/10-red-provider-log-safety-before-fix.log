@@ -1,0 +1,268 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-13o3oquetxrf5\s-hmpf086wrb-1lgf209-working`
+
+warning: `observability` (lib) generated 1 warning
+   Compiling observability v0.1.0 (F:\Workspace\business-platform\crates\observability)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.35s
+     Running tests\provider_log_safety.rs (target\debug\deps\provider_log_safety-366b70e9181b46ef.exe)
+
+running 12 tests
+test child_entry_point ... ok
+test more_specific_provider_subtarget_directives_do_not_leak ... FAILED
+test child_processes_actually_emit_the_application_records ... ok
+test provider_span_directives_do_not_leak ... FAILED
+test rust_log_unset_debug_service_level_does_not_leak ... ok
+test rust_log_debug_does_not_leak ... FAILED
+test rust_log_trace_does_not_leak ... FAILED
+test json_format_does_not_change_the_boundary ... FAILED
+test no_case_leaks_provider_debug_or_trace_material ... FAILED
+test otlp_branch_keeps_the_same_boundary_for_span_output ... FAILED
+test no_case_loses_the_application_own_debug_output ... ok
+test no_case_silences_provider_warn_diagnostics ... ok
+
+failures:
+
+---- more_specific_provider_subtarget_directives_do_not_leak stdout ----
+
+thread 'more_specific_provider_subtarget_directives_do_not_leak' (48116) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-specific-provider-subtargets (subtarget directives more specific than the pinned parents): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.267865Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.267979Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.267994Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.268017Z DEBUG aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.268032Z TRACE aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-TRACE aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.268050Z DEBUG aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.268062Z TRACE aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-TRACE aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.268078Z DEBUG aws_sigv4::http_request::sign: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.268089Z TRACE aws_sigv4::http_request::sign: PLAN0014-PROVIDER-TRACE aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.268100Z DEBUG aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.268263Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.268307Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.268338Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- provider_span_directives_do_not_leak stdout ----
+
+thread 'provider_span_directives_do_not_leak' (38844) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-span-directive (a span directive must not open a provider span either): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.325768Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.325802Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.325808Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.325957Z DEBUG orchestrating{key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.325980Z DEBUG orchestrating{key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.325993Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+
+---- rust_log_debug_does_not_leak stdout ----
+
+thread 'rust_log_debug_does_not_leak' (46540) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-debug (RUST_LOG=debug replaces the whole filter): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.342042Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.342097Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.342112Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.342129Z DEBUG aws_sdk_s3: PLAN0014-PROVIDER-DEBUG aws_sdk_s3 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342152Z DEBUG aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::client::orchestrator bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342178Z DEBUG aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342195Z DEBUG aws_smithy_runtime: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342213Z DEBUG aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342236Z DEBUG aws_sigv4: PLAN0014-PROVIDER-DEBUG aws_sigv4 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342385Z DEBUG aws_sigv4::http_request::sign: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342410Z DEBUG aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342429Z DEBUG aws_runtime::auth: PLAN0014-PROVIDER-DEBUG aws_runtime::auth bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342447Z DEBUG hyper::client::connect::http: PLAN0014-PROVIDER-DEBUG hyper::client::connect::http bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342466Z DEBUG h2::frame::settings: PLAN0014-PROVIDER-DEBUG h2::frame::settings bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342483Z DEBUG rustls::msgs::handshake: PLAN0014-PROVIDER-DEBUG rustls::msgs::handshake bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342500Z DEBUG reqwest::connect: PLAN0014-PROVIDER-DEBUG reqwest::connect bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.342592Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.342620Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.342642Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+
+---- rust_log_trace_does_not_leak stdout ----
+
+thread 'rust_log_trace_does_not_leak' (48032) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-trace (RUST_LOG=trace): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.351790Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.351827Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.351834Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.351843Z DEBUG aws_sdk_s3: PLAN0014-PROVIDER-DEBUG aws_sdk_s3 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351855Z TRACE aws_sdk_s3: PLAN0014-PROVIDER-TRACE aws_sdk_s3 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351864Z DEBUG aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::client::orchestrator bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351880Z TRACE aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-TRACE aws_sdk_s3::client::orchestrator bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351894Z DEBUG aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351910Z TRACE aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-TRACE aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351926Z DEBUG aws_smithy_runtime: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351941Z TRACE aws_smithy_runtime: PLAN0014-PROVIDER-TRACE aws_smithy_runtime bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351950Z DEBUG aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351961Z TRACE aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-TRACE aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351971Z DEBUG aws_sigv4: PLAN0014-PROVIDER-DEBUG aws_sigv4 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351981Z TRACE aws_sigv4: PLAN0014-PROVIDER-TRACE aws_sigv4 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.351988Z DEBUG aws_sigv4::http_request::sign: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.351997Z TRACE aws_sigv4::http_request::sign: PLAN0014-PROVIDER-TRACE aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352005Z DEBUG aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352018Z TRACE aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-TRACE aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352026Z DEBUG aws_runtime::auth: PLAN0014-PROVIDER-DEBUG aws_runtime::auth bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352036Z TRACE aws_runtime::auth: PLAN0014-PROVIDER-TRACE aws_runtime::auth bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352045Z DEBUG hyper::client::connect::http: PLAN0014-PROVIDER-DEBUG hyper::client::connect::http bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352056Z TRACE hyper::client::connect::http: PLAN0014-PROVIDER-TRACE hyper::client::connect::http bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352068Z DEBUG h2::frame::settings: PLAN0014-PROVIDER-DEBUG h2::frame::settings bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352079Z TRACE h2::frame::settings: PLAN0014-PROVIDER-TRACE h2::frame::settings bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352092Z DEBUG rustls::msgs::handshake: PLAN0014-PROVIDER-DEBUG rustls::msgs::handshake bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352109Z TRACE rustls::msgs::handshake: PLAN0014-PROVIDER-TRACE rustls::msgs::handshake bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352123Z DEBUG reqwest::connect: PLAN0014-PROVIDER-DEBUG reqwest::connect bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.352137Z TRACE reqwest::connect: PLAN0014-PROVIDER-TRACE reqwest::connect bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" signature="synthsig-plan0014-value"
+2026-09-28T06:16:47.352199Z DEBUG orchestrating{key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.352218Z DEBUG orchestrating{key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.352232Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+
+---- json_format_does_not_change_the_boundary stdout ----
+
+thread 'json_format_does_not_change_the_boundary' (44804) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case json-rust-log-debug (json format with RUST_LOG=debug): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... {"timestamp":"2026-09-28T06:16:47.369647Z","level":"DEBUG","fields":{"message":"PLAN0014-APP-DEBUG application diagnostics"},"target":"plan0014_app"}
+{"timestamp":"2026-09-28T06:16:47.369692Z","level":"INFO","fields":{"message":"PLAN0014-APP-INFO application info"},"target":"plan0014_app"}
+{"timestamp":"2026-09-28T06:16:47.369707Z","level":"DEBUG","fields":{"message":"PLAN0014-APP-DEBUG application debug with a safe field","request_id":"plan0014-synth-request"},"target":"plan0014_app"}
+{"timestamp":"2026-09-28T06:16:47.369723Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sdk_s3","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sdk_s3"}
+{"timestamp":"2026-09-28T06:16:47.369747Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sdk_s3::client::orchestrator","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sdk_s3::client::orchestrator"}
+{"timestamp":"2026-09-28T06:16:47.369771Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sdk_s3::endpoint::parts"}
+{"timestamp":"2026-09-28T06:16:47.369798Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_smithy_runtime","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_smithy_runtime"}
+{"timestamp":"2026-09-28T06:16:47.369821Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_smithy_runtime::client::http::hyper_014"}
+{"timestamp":"2026-09-28T06:16:47.369845Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sigv4","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sigv4"}
+{"timestamp":"2026-09-28T06:16:47.369867Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sigv4::http_request::sign"}
+{"timestamp":"2026-09-28T06:16:47.369894Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_sigv4::http_request::canonical_request"}
+{"timestamp":"2026-09-28T06:16:47.369920Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG aws_runtime::auth","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"aws_runtime::auth"}
+{"timestamp":"2026-09-28T06:16:47.369940Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG hyper::client::connect::http","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"hyper::client::connect::http"}
+{"timestamp":"2026-09-28T06:16:47.369964Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG h2::frame::settings","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"h2::frame::settings"}
+{"timestamp":"2026-09-28T06:16:47.369987Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG rustls::msgs::handshake","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"rustls::msgs::handshake"}
+{"timestamp":"2026-09-28T06:16:47.370010Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG reqwest::connect","bucket":"synth-bucket-plan0014","key":"tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source","access_key_id":"AKIASYNTHETICPLAN0014","secret_access_key":"synth-secret-plan0014-do-not-log","signature":"synthsig-plan0014-value","signed_url":"https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"},"target":"reqwest::connect"}
+{"timestamp":"2026-09-28T06:16:47.370102Z","level":"DEBUG","fields":{"message":"PLAN0014-PROVIDER-DEBUG nested inside provider spans"},"target":"aws_smithy_runtime::client::http::hyper_014","span":{"access_key_id":"AKIASYNTHETICPLAN0014","bucket":"synth-bucket-plan0014","name":"signing"},"spans":[{"access_key_id":"AKIASYNTHETICPLAN0014","bucket":"synth-bucket-plan0014","name":"signing"}]}
+{"timestamp":"2026-09-28T06:16:47.370184Z","level":"DEBUG","fields":{"message":"PLAN0014-APP-DEBUG inside provider spans"},"target":"plan0014_app","span":{"access_key_id":"AKIASYNTHETICPLAN0014","bucket":"synth-bucket-plan0014","name":"signing"},"spans":[{"access_key_id":"AKIASYNTHETICPLAN0014","bucket":"synth-bucket-plan0014","name":"signing"}]}
+{"timestamp":"2026-09-28T06:16:47.370220Z","level":"WARN","fields":{"message":"PLAN0014-PROVIDER-WARN retryable provider failure"},"target":"aws_sdk_s3::client::orchestrator"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+
+---- no_case_leaks_provider_debug_or_trace_material stdout ----
+
+thread 'no_case_leaks_provider_debug_or_trace_material' (46184) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-debug (RUST_LOG=debug replaces the whole filter): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.395555Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.395588Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.395595Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.395605Z DEBUG aws_sdk_s3: PLAN0014-PROVIDER-DEBUG aws_sdk_s3 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395617Z DEBUG aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::client::orchestrator bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395632Z DEBUG aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395643Z DEBUG aws_smithy_runtime: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395654Z DEBUG aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395667Z DEBUG aws_sigv4: PLAN0014-PROVIDER-DEBUG aws_sigv4 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395679Z DEBUG aws_sigv4::http_request::sign: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395689Z DEBUG aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395701Z DEBUG aws_runtime::auth: PLAN0014-PROVIDER-DEBUG aws_runtime::auth bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395713Z DEBUG hyper::client::connect::http: PLAN0014-PROVIDER-DEBUG hyper::client::connect::http bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395723Z DEBUG h2::frame::settings: PLAN0014-PROVIDER-DEBUG h2::frame::settings bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395731Z DEBUG rustls::msgs::handshake: PLAN0014-PROVIDER-DEBUG rustls::msgs::handshake bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395743Z DEBUG reqwest::connect: PLAN0014-PROVIDER-DEBUG reqwest::connect bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.395797Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.395816Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.395830Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+
+--- end ---
+
+---- otlp_branch_keeps_the_same_boundary_for_span_output stdout ----
+
+thread 'otlp_branch_keeps_the_same_boundary_for_span_output' (47120) panicked at crates\observability\tests\provider_log_safety.rs:347:9:
+case text-rust-log-debug-with-otlp (OTLP branch: the span layer must carry the same boundary): provider material reached the log pipeline; the output contains "synth-bucket-plan0014"
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:16:47.286468Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application diagnostics
+2026-09-28T06:16:47.286526Z  INFO plan0014_app: PLAN0014-APP-INFO application info
+2026-09-28T06:16:47.286537Z DEBUG plan0014_app: PLAN0014-APP-DEBUG application debug with a safe field request_id="plan0014-synth-request"
+2026-09-28T06:16:47.286548Z DEBUG aws_sdk_s3: PLAN0014-PROVIDER-DEBUG aws_sdk_s3 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286561Z DEBUG aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::client::orchestrator bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286580Z DEBUG aws_sdk_s3::endpoint::parts: PLAN0014-PROVIDER-DEBUG aws_sdk_s3::endpoint::parts bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286592Z DEBUG aws_smithy_runtime: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286604Z DEBUG aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG aws_smithy_runtime::client::http::hyper_014 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286620Z DEBUG aws_sigv4: PLAN0014-PROVIDER-DEBUG aws_sigv4 bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286631Z DEBUG aws_sigv4::http_request::sign: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::sign bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286642Z DEBUG aws_sigv4::http_request::canonical_request: PLAN0014-PROVIDER-DEBUG aws_sigv4::http_request::canonical_request bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286654Z DEBUG aws_runtime::auth: PLAN0014-PROVIDER-DEBUG aws_runtime::auth bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286665Z DEBUG hyper::client::connect::http: PLAN0014-PROVIDER-DEBUG hyper::client::connect::http bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286677Z DEBUG h2::frame::settings: PLAN0014-PROVIDER-DEBUG h2::frame::settings bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286688Z DEBUG rustls::msgs::handshake: PLAN0014-PROVIDER-DEBUG rustls::msgs::handshake bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286699Z DEBUG reqwest::connect: PLAN0014-PROVIDER-DEBUG reqwest::connect bucket="synth-bucket-plan0014" key="tenants/synth-tenant/documents/synth-doc/revisions/synth-rev/source" access_key_id="AKIASYNTHETICPLAN0014" secret_access_key="synth-secret-plan0014-do-not-log" signature="synthsig-plan0014-value" signed_url="https://synth-bucket-plan0014.s3.invalid/tenants/synth-tenant/x"
+2026-09-28T06:16:47.286984Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: aws_smithy_runtime::client::http::hyper_014: PLAN0014-PROVIDER-DEBUG nested inside provider spans
+2026-09-28T06:16:47.287016Z DEBUG signing{bucket="synth-bucket-plan0014" access_key_id="AKIASYNTHETICPLAN0014"}: plan0014_app: PLAN0014-APP-DEBUG inside provider spans
+2026-09-28T06:16:47.287040Z  WARN aws_sdk_s3::client::orchestrator: PLAN0014-PROVIDER-WARN retryable provider failure
+2026-09-28T06:16:47.287419Z DEBUG hyper_util::client::legacy::connect::http: connecting to 127.0.0.1:1
+2026-09-28T06:16:49.331208Z DEBUG tonic::transport::channel::service::reconnect: reconnect::poll_ready: ConnectError(ConnectError("tcp connect error", 127.0.0.1:1, Os { code: 10061, kind: ConnectionRefused, message: "由于目标计算机积极拒绝，无法连接。" }))
+2026-09-28T06:16:49.331714Z DEBUG tower::buffer::worker: service.ready=true processing request
+2026-09-28T06:16:49.331879Z DEBUG tonic::transport::channel::service::reconnect: error: tcp connect error
+2026-09-28T06:16:49.332065Z DEBUG opentelemetry_sdk:  name="TracerProvider.Drop.ShutdownError" error="Exporter otlp encountered the following error(s): the grpc server returns error (The service is currently unavailable): , detailed error message: tcp connect error"
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 2.05s
+
+failed to shutdown tracer provider: [ExportFailed(Status { code: Unavailable, message: ", detailed error message: tcp connect error" })]
+
+--- end ---
+
+
+failures:
+    json_format_does_not_change_the_boundary
+    more_specific_provider_subtarget_directives_do_not_leak
+    no_case_leaks_provider_debug_or_trace_material
+    otlp_branch_keeps_the_same_boundary_for_span_output
+    provider_span_directives_do_not_leak
+    rust_log_debug_does_not_leak
+    rust_log_trace_does_not_leak
+
+test result: FAILED. 5 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s
+
+error: test failed, to rerun pass `-p observability --test provider_log_safety`

@@ -421,6 +421,12 @@ docs/reviews/
   2026-10-xx-saas-align-observability-notification.md
 ```
 
+> Wave 4 交付时把最后一项拆成两份独立评审记录：
+> `docs/reviews/2026-09-28-saas-align-observability.md` 与
+> `docs/reviews/2026-09-28-saas-align-notification.md`。上表是计划阶段的命名，
+> 引用评审结论时使用实际文件名（Round 2 已修正 `crates/notification/src/lib.rs`
+> 指向合并名的失效引用）。
+
 使用：
 
 `docs/templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md`

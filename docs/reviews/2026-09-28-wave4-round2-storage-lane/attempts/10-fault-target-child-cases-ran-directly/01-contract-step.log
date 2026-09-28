@@ -1,0 +1,36 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpg8knlbu-09dlko3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpg8kndrf-0695kl3-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: `object-storage` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.09s
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-b59e9facc6492b72.exe)
+
+running 6 tests
+test contract_step_reports_its_scope ... LANE contract step scope bucket=plan0014-wave4-bucket prefix=plan0014-wave4/r2-20260928-065007/ endpoint=http://127.0.0.1:19100 page_size=3
+LANE contract step performs no cleanup of the run prefix and deletes no bucket
+ok
+test lane_delete_of_absent_object_is_idempotent ... LANE created bucket plan0014-wave4-bucket
+ok
+test lane_presigned_url_is_key_scoped_and_expires ... LANE created bucket plan0014-wave4-bucket
+ok
+test lane_records_provider_capabilities ... LANE created bucket plan0014-wave4-bucket
+CAPABILITY multipart upload_part error: service error
+CAPABILITY multipart upload_part_5mib: false
+CAPABILITY multipart complete_multipart_upload: false
+CAPABILITY multipart abort_multipart_upload: true
+CAPABILITY multipart explicit_outcome: true
+LANE created bucket plan0014-wave4-bucket
+CAPABILITY conditional_read if_match: true
+CAPABILITY conditional_read stale_etag_rejected: true
+CAPABILITY object_checksums put_with_sdk_crc32: true
+CAPABILITY object_checksums write_echoed=Some("xjIjIw==") head_returns_checksum=true
+CAPABILITY object_versioning status: Ok("unconfigured")
+ok
+test lane_reports_missing_object_as_not_found ... LANE created bucket plan0014-wave4-bucket
+ok
+test lane_round_trips_object_metadata_and_payload ... LANE created bucket plan0014-wave4-bucket
+ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.89s

@@ -133,3 +133,32 @@ difference is recorded in the review's "Accepted differences" section.
 | Gate results | fmt 0 · check 0 · clippy `-D warnings` 0 · workspace tests 759 passed / 0 failed / 59 ignored · architecture fitness PASS · `git diff --check` 0 |
 | Real lanes | PostgreSQL (dedicated `plan0014_wave4`, dropped) 3/3 · RustFS S3-compatible lane 7/7 + cleanup + teardown |
 | Independent reviewer verdict | *pending — left blank on purpose* |
+
+## 5. Round 2 addendum (2026-09-28, same wave, not a replacement)
+
+Round 2 re-checked two of the rows above and found both weaker than recorded.
+The Round 1 rows are left untouched; this addendum is the correction.
+
+| Round 1 statement | Round 2 finding | Evidence |
+|---|---|---|
+| "RustFS S3-compatible lane 7/7 + cleanup + teardown" | The cleanup case listed the prefix once, so with more than one page of residue it deleted the first page and still reported an empty prefix; incomplete multipart uploads were never looked at; bucket teardown could delete CI's shared `contract-test-bucket`. Contract execution and final cleanup are now separate test targets and separate CI steps (`if: always()`, one shared RUN_ID) | `docs/reviews/2026-09-28-wave4-round2-storage-lane/` |
+| OBS-W4-02 "provider 噪声压制 · 已修复" (C2) | The fix was an `EnvFilter` directive suffix, bypassed by any `RUST_LOG` value and by more-specific subtarget directives, and fmt renders enclosing span fields — so credential identifiers and storage references still reached output. Re-closed in Round 2 as a **security fix** via an `EnvFilter`-independent layer; OBS-W4-07 (WARN/ERROR payload, general redaction) stays open | `docs/reviews/2026-09-28-wave4-round2-gates/` |
+
+Round 2 also records one execution-environment finding: the `TrustStore configured
+to enable native roots but no valid root certificates parsed!` panic reproduced
+only under a restricted file-access sandbox — the same test binary passed with
+normal access — so it is an environment difference, not a repository defect.
+Production TLS verification was **not** changed; the parameter-rejection unit
+tests now install a no-network transport instead of pointing at a dead endpoint,
+which is why they no longer read the host trust store at all. The probe log, the
+"no TLS-weakening configuration anywhere" grep and the passing unit suite are in
+`docs/reviews/2026-09-28-wave4-round2-gates/40-truststore-environment-probe.log`.
+
+| Round 2 item | Value |
+|---|---|
+| Branch | `codex/plan-0014-wave4-reference-conformance` (not integrated) |
+| Round 2 code candidate | `8be1d1b152bbc726fc1cb3002e3f462d2ebad328` |
+| Evidence dirs | `docs/reviews/2026-09-28-wave4-round2-gates/`, `docs/reviews/2026-09-28-wave4-round2-storage-lane/` |
+| Round 2 gates | fmt 0 · check 0 · clippy `-D warnings` 0 · workspace tests 784 passed / 0 failed / 69 ignored (179 suites) · architecture fitness PASS · `git diff --check` 0 |
+| Round 2 real lane | RustFS 1.0.1-preview.11 (same archive digest as Round 1), RUN_ID `r2-20260928-065142`: contract 0 · fault cases 0 · final cleanup 0 · cleanup again 0 |
+| Terminal state | READY FOR INDEPENDENT REVIEW / NOT INTEGRATED |

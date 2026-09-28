@@ -1,0 +1,49 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpg8kndrf-0695kl3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpg8knlbu-09dlko3-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: `observability` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s
+     Running tests\s3_lane_fault_injection.rs (target\debug\deps\s3_lane_fault_injection-ccc3635f91fdff41.exe)
+
+running 5 tests
+test a_failed_contract_run_is_still_cleaned_up ... CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (a) contract step exit=Some(101) left 6 object(s) under plan0014-wave4/r2-20260928-065007/
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (a) contract step exit=Some(101) (still a failure) and cleanup step exit=0 with 6 object(s) removed
+ok
+test a_failure_and_its_cleanup_leave_other_prefixes_untouched ... CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+ok
+test an_interrupted_multipart_upload_is_found_and_aborted ... CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0
+FAULT (b) interrupted upload visible to ListMultipartUploads: 1 entry(s) (test child_upload_then_interrupt ... PLAN0014-FAULT-ARMED left incomplete upload plan0014-wave4/r2-20260928-065007/interrupted/multipart.bin#ZGNmZmE0YTctYzAwOS00YzlmLTgzMzEtNWJlYzA1ZDYyOTY0LmM5YmVmOGIwLTdjNDQtNDI1MS04Y2RjLTEwZmYzZDhjODM5NHgxNzkwNTc4MjE5ODkyMjAzMjAw)
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=1 remaining_objects=0 remaining_uploads=0 errors=0
+CLEANUP prefix=plan0014-wave4/r2-20260928-065007/ objects_deleted=0 uploads_aborted=1 remaining_objects=0 remaining_uploads=0 errors=0
+ok
+test child_contract_that_fails ... PLAN0014-FAULT-ARMED contract case failed after writing objects
+
+thread 'child_contract_that_fails' (48284) panicked at crates\object-storage\tests\s3_lane_fault_injection.rs:44:5:
+injected contract failure: the lane must still clean up after this
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test child_upload_then_interrupt ... PLAN0014-FAULT-ARMED left incomplete upload plan0014-wave4/r2-20260928-065007/interrupted/multipart.bin#ZGNmZmE0YTctYzAwOS00YzlmLTgzMzEtNWJlYzA1ZDYyOTY0LmJkOTYwNzdhLTk3NjItNDIwMC04NWFjLWVlODE2ZTg4YzZlNngxNzkwNTc4MjIwMzAxODI5MjAw
+
+thread 'child_upload_then_interrupt' (48428) panicked at crates\object-storage\tests\s3_lane_fault_injection.rs:56:5:
+injected interruption: the upload above was never completed or aborted
+FAILED
+
+failures:
+
+failures:
+    child_contract_that_fails
+    child_upload_then_interrupt
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.50s
+
+error: test failed, to rerun pass `-p object-storage --test s3_lane_fault_injection`

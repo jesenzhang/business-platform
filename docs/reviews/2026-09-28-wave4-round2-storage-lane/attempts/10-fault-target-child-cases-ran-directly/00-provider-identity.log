@@ -1,0 +1,13 @@
+rustfs 1.0.1-preview.11
+build time   : 2026-09-24 10:16:46 +00:00
+build profile: release
+build os     : windows-x86_64
+rust version : rustc 1.98.1 (48a229cea 2026-09-01)
+rust channel : stable-x86_64-pc-windows-msvc
+git branch   :
+git commit   : 0913686b12845eefc69a2f4ed4ee6a8161e25742
+git tag      : 1.0.1-preview.11
+git status   :
+
+health: 200
+run_id=r2-20260928-064937 prefix=plan0014-wave4/r2-20260928-064937/ bucket=plan0014-wave4-bucket page_size=3

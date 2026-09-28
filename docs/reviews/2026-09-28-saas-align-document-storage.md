@@ -150,6 +150,8 @@ local adapters implement it; "真实环境验证?" = proven in this wave's lanes
 | checksum on write / verify on read | no | no | provider accepts SDK-managed CRC32 and echoes it via `HeadObject` | not declarable (ST-W4-01) |
 | conditional write/read (`If-Match`, `If-None-Match`) | no | no | provider honours `If-Match` and rejects a stale ETag | not declarable (ST-W4-01) |
 | object versioning | no | no | provider reports no versioning status | not declarable (ST-W4-01) |
+| listing beyond one page (`ListObjectsV2` continuation) | **no** (the port exposes no listing) | no | lane cleanup follows continuation tokens with `WAVE4_S3_CLEANUP_PAGE_SIZE=3`; verified on RustFS | cleanup-only concern; the port stays listing-free (ST-W4-01) |
+| incomplete multipart upload discovery (`ListMultipartUploads` + abort) | **no** | no | provider lists an interrupted upload and accepts the abort (`uploads_aborted=1`, `remaining_uploads=0`); cleanup therefore reaches zero residue | if a provider did *not* list them, cleanup would print `PROVIDER-LIMITATION` instead of claiming an abort |
 | revision-scoped content reference | yes | both backends | yes on SQLite (row read back); PG by migration only | n/a |
 | append-only revisions | enforced by DB triggers | both backends | SQLite: UPDATE/DELETE rejected by trigger; PG: definition only | trigger raises (SQLite `ABORT`, PG `55000`) |
 | evidence/artifact binding to a revision | partially (processing job carries `document_revision_id`) | SQLite triggers; PG none | SQLite triggers fired in the lane-equivalent unit tests | application-level check exists for jobs (PG `lib.rs:526-527`) |
@@ -186,9 +188,9 @@ storage reference through a public contract in the current composition.
 * 复现方式：`cargo test -p object-storage --test log_hygiene`（修复前失败并打印 `object_storage::client::put_stream key=ObjectKey("tenants/…")`）
 * 影响：debug 级别日志（以及任何采集该日志的系统）获得完整对象键与桶名，等价于把内部存储拓扑复制到观测后端
 * 修复范围：`#[instrument(skip(self, body, key, metadata))]` + 只记录 `content_length`；驱动错误文本改为 crate 内 `tracing::warn!` 固定消息
-* 测试：`crates/object-storage/tests/log_hygiene.rs`（自建 subscriber，断言 `object_storage*` 目标不含 `tenants/`、`revisions/`、桶名、`source`；第三方 crate 泄漏仅打印为证据，不由本仓断言）
-* 证据：`2026-09-28-wave4-gates/03-test-workspace.log`；测试文件即回归门禁
-* 剩余限制：第三方（aws-sdk）日志仍会输出桶/键，只能靠 `OBS-W4-02` 的级别压制 + Collector 侧过滤，属于运维边界
+* 测试：`crates/object-storage/tests/log_hygiene.rs`（自建 subscriber，断言 `object_storage*` 目标不含 `tenants/`、`revisions/`、桶名、`source`，并断言该捕获确实看到第三方记录，避免空断言）；Round 2 补 `crates/object-storage/tests/sdk_log_hygiene.rs`：真实 SDK 调用经 `observability::init_tracing`，对桶名/对象键/凭证标识/签名 URL 作**负向断言**，并保留一个「无边界对照组」——对照组必须泄露，否则其他用例就是在什么也没测
+* 证据：`2026-09-28-wave4-gates/03-test-workspace.log`；Round 2 见 `2026-09-28-wave4-round2-gates/`（含 `13-sdk-log-hygiene-run.log`）；测试文件即回归门禁
+* 剩余限制：本仓断言覆盖「DEBUG/TRACE 记录不进入日志与 trace」。第三方在 `WARN`/`ERROR` 自由文本里输出桶/键仍未关闭 → 归 OBS-W4-07，不得据此声称日志脱敏已完成
 
 **ST-W4-03 · C1 · 已修复**
 * 代码位置：`crates/object-storage/src/client.rs` `LocalStorageClient::presign`
@@ -243,9 +245,12 @@ storage reference through a public contract in the current composition.
 | T2 | `crates/document-postgres/tests/tenant_fence_pg.rs` | 同上（PG） | `cargo test -p document-postgres --all-features -- --include-ignored --test-threads=1` | 专用库 `plan0014_wave4`，PG 18.4，`DATABASE_URL` 指向该库 | pass（`06-postgres-lane.log`） |
 | T3 | `crates/document-sqlite/tests/content_reference.rs` | 键形状/`change_reason`/`sha256`；revision UPDATE+DELETE 被触发器拒绝 | `cargo test -p document-sqlite --all-features` | SQLite | pass |
 | T4 | `crates/document-persistence-contracts/src/lib.rs` `verify_count` | count==分页行数 / 无匹配=0 / 跨租户=0 | `cargo test -p document-sqlite --all-features`；PG：T2 命令 | SQLite + PG | pass 双后端 |
-| T5 | `crates/object-storage/tests/log_hygiene.rs` | `object_storage*` 目标日志不含键/桶/路径片段 | `cargo test -p object-storage --test log_hygiene --all-features` | 无外部依赖 | pass（修复前 red） |
-| T6 | `crates/object-storage` 单元测试 | presign 上下界、本地 presign 拒绝、键校验等 15 例 | `cargo test -p object-storage --lib --all-features` | 无外部依赖 | pass |
-| T7 | `crates/object-storage/tests/s3_contract_lane.rs` | 7 例：round trip、缺失=NotFound、delete 幂等、presign 键作用域+过期、能力矩阵、prefix 清理、桶删除 | `cargo test -p object-storage --test s3_contract_lane --all-features -- --ignored --test-threads=1 --nocapture` | RustFS 1.0.1-preview.11，专用桶+prefix，RUN_ID `run-20260928-110319` | 7 passed / 0 failed；二次调用清理后 prefix 0 对象；桶已删除 |
+| T5 | `crates/object-storage/tests/log_hygiene.rs` | `storage_references_never_enter_the_log_stream`：`object_storage*` 目标日志不含键/桶/路径片段 | `cargo test -p object-storage --test log_hygiene --all-features` | 无外部依赖 | pass（修复前 red） |
+| T5b | `crates/object-storage/tests/sdk_log_hygiene.rs` | 真实 SDK 经正式观测初始化的负向断言（桶/键/凭证/签名 URL）+ 无边界对照组必须泄露 | `cargo test -p object-storage --test sdk_log_hygiene --all-features` | 6 个隔离子进程；端点不可路由，不触碰主机信任库 | pass（Round 2 新增；首版曾因 harness 自身输出含 `signed_url` 误报，见 `2026-09-28-wave4-round2-gates/12-object-storage-unit-and-sdk-log-tests.log`） |
+| T6 | `crates/object-storage` 单元测试 | presign 上下界（含「未调用 provider」的调用计数断言）、离线 transport 自检、transport 失败不得当作 NotFound、本地 presign 拒绝、键校验等 17 例 | `cargo test -p object-storage --lib --all-features` | 无外部依赖（参数拒绝类用例走无网络 transport，不读主机根证书库） | pass |
+| T7 | `crates/object-storage/tests/s3_contract_lane.rs` | **契约步骤**：`lane_round_trips_object_metadata_and_payload`、`lane_reports_missing_object_as_not_found`、`lane_delete_of_absent_object_is_idempotent`、`lane_presigned_url_is_key_scoped_and_expires`、`lane_records_provider_capabilities`、`contract_step_reports_its_scope`（6 例；Round 1 的 `lane_leaves_no_objects_under_the_run_prefix` 与 `lane_deletes_the_dedicated_bucket_when_requested` 已移出本步骤） | `cargo test -p object-storage --test s3_contract_lane --all-features -- --ignored --test-threads=1 --nocapture` | RustFS 1.0.1-preview.11，专用桶 `plan0014-wave4-bucket` + 专用 prefix，RUN_ID `r2-20260928-065142` | **契约通过**：6 passed / 0 failed，exit 0（`2026-09-28-wave4-round2-storage-lane/01-contract-step.log`） |
+| T7b | `crates/object-storage/tests/s3_lane_cleanup.rs` | **清理步骤**：分页删除 + 分页 abort 未完成 multipart upload + 「0 对象且 0 upload」终态断言 + RUN_ID 缺失/空白/带 `/` 拒绝 + 清理失败必须单独失败 + 拒删受保护桶 + prefix 外对象不受影响（7 例） | `cargo test -p object-storage --test s3_lane_cleanup --all-features -- --ignored --test-threads=1 --nocapture` | 同上，`WAVE4_S3_CLEANUP_PAGE_SIZE=3` | **清理通过**：7 passed / 0 failed，exit 0；重复执行仍 7 passed（`03-`/`04-final-cleanup*.log`） |
+| T7c | `crates/object-storage/tests/s3_lane_fault_injection.rs` | 故障场景 (a) 契约失败后仍清理且不改写契约失败、(b) 中断的 multipart upload 被发现并 abort、(c) prefix 外对象不受影响（4 例，含 no-op 的 `child_entry_point`） | `cargo test -p object-storage --test s3_lane_fault_injection --all-features -- --ignored --test-threads=1 --nocapture` | 同上；故障由子进程注入 | pass：4 passed / 0 failed，exit 0；`contract step exit=101` 与 `cleanup step exit=0` 同时记录（`02-cleanup-fault-scenarios.log`） |
 | T8 | `apps/business-worker/src/main.rs` `missing_object_boundary` | 元数据存在但对象缺失 → `source_not_found`，文本不含键 | `cargo test -p business-worker --all-features` | fakes only | pass |
 | T9 | `apps/business-api/src/metrics.rs` | duration 渲染为 histogram bucket，无 `{quantile=` | `cargo test -p business-api --all-features` | 进程内 | pass |
 | T10 | 全量门禁 | fmt/check/clippy/test/architecture/diff | 见 `2026-09-28-wave4-gates/README.md` | 本机 | 全部 exit 0；workspace 759 passed / 0 failed / 59 ignored |

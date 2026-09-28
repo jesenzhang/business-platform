@@ -1,0 +1,142 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpfr88e3q-0bnx4en-working`
+
+   Compiling object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+warning: `observability` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpfs7wuzc-0c386n0-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-3rru1ibgpseb5\s-hmpfs7x6ob-0wipf07-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_cleanup-2tz6pukszz0ol\s-hmpfsakncz-1k67gex-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_fault_injection-1e6intnvu51l5\s-hmpfsalea9-0si4o97-working`
+
+warning: `object-storage` (test "s3_lane_fault_injection") generated 1 warning
+warning: `object-storage` (test "s3_lane_cleanup") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\log_hygiene-2g88bmkm83d7e\s-hmpfsaled9-1onu62j-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\sdk_log_hygiene-0tujijh7i7h8x\s-hmpfsakogp-0vjs7fh-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\minio_contract-27ku9b847jkx4\s-hmpfsakolc-1cgtmod-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-0dae7wqhyzmyz\s-hmpfsakval-14ty1h8-working`
+
+warning: `object-storage` (lib test) generated 1 warning
+warning: `object-storage` (test "log_hygiene") generated 1 warning
+warning: `object-storage` (test "minio_contract") generated 1 warning
+warning: `object-storage` (test "sdk_log_hygiene") generated 1 warning
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.39s
+     Running unittests src\lib.rs (target\debug\deps\object_storage-f76115f586e5a787.exe)
+
+running 17 tests
+test client::tests::presign_expiry_bounds_are_enforced_by_the_platform ... ok
+test key::tests::rejects_absolute_paths ... ok
+test key::tests::rejects_empty ... ok
+test key::tests::rejects_nul ... ok
+test key::tests::rejects_empty_segments ... ok
+test key::tests::rejects_path_traversal ... ok
+test key::tests::rejects_too_long ... ok
+test key::tests::rejects_unc_paths ... ok
+test key::tests::rejects_windows_drive ... ok
+test key::tests::valid_keys ... ok
+test client::tests::local_storage_refuses_presign_instead_of_exposing_a_path ... ok
+test client::tests::local_storage_rejects_symlink_escape_when_supported ... ok
+test client::tests::presign_rejects_out_of_range_expiry_without_calling_the_provider ... ok
+test client::tests::a_transport_failure_is_not_mistaken_for_a_missing_object ... ok
+test client::tests::the_offline_transport_is_the_client_transport ... ok
+test client::tests::local_storage_failed_stream_does_not_publish_partial_object ... ok
+test client::tests::local_storage_streams_and_deletes ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\log_hygiene.rs (target\debug\deps\log_hygiene-afe704424da90740.exe)
+
+running 1 test
+test storage_references_never_enter_the_log_stream ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+     Running tests\minio_contract.rs (target\debug\deps\minio_contract-51ee991d6ba175d3.exe)
+
+running 10 tests
+test content_type_is_preserved ... ignored, requires running MinIO (docker compose up)
+test delete_is_idempotent ... ignored, requires running MinIO (docker compose up)
+test delete_removes_object ... ignored, requires running MinIO (docker compose up)
+test exists_returns_false_for_missing ... ignored, requires running MinIO (docker compose up)
+test get_missing_returns_not_found ... ignored, requires running MinIO (docker compose up)
+test large_object_is_streamed_without_small_object_buffering ... ignored, requires running MinIO (docker compose up)
+test presigned_url_is_valid ... ignored, requires running MinIO (docker compose up)
+test put_and_get_roundtrip ... ignored, requires running MinIO (docker compose up)
+test special_character_keys ... ignored, requires running MinIO (docker compose up)
+test user_metadata_is_preserved ... ignored, requires running MinIO (docker compose up)
+
+test result: ok. 0 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-98f03a33bf196b9f.exe)
+
+running 7 tests
+test lane_delete_of_absent_object_is_idempotent ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_deletes_the_dedicated_bucket_when_requested ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_leaves_no_objects_under_the_run_prefix ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_presigned_url_is_key_scoped_and_expires ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_records_provider_capabilities ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_reports_missing_object_as_not_found ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_round_trips_object_metadata_and_payload ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_cleanup.rs (target\debug\deps\s3_lane_cleanup-9e3ba08006cd3b00.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_fault_injection.rs (target\debug\deps\s3_lane_fault_injection-ac8a0b970956a5d3.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\sdk_log_hygiene.rs (target\debug\deps\sdk_log_hygiene-8366b20d6a8a4503.exe)
+
+running 5 tests
+test child_entry_point ... ok
+test sentinels_do_not_contain_each_other ... ok
+test real_sdk_operations_never_leak_storage_references_or_credentials ... FAILED
+test json_output_is_filtered_the_same_way ... FAILED
+test real_sdk_operations_keep_their_own_diagnostics has been running for over 60 seconds
+test real_sdk_operations_keep_their_own_diagnostics ... ok
+
+failures:
+
+---- real_sdk_operations_never_leak_storage_references_or_credentials stdout ----
+
+thread 'real_sdk_operations_never_leak_storage_references_or_credentials' (47260) panicked at crates\object-storage\tests\sdk_log_hygiene.rs:288:9:
+case text-rust-log-unset-debug-level (no RUST_LOG, service level debug): the log pipeline carries the SDK marker "signed_url", so a provider record was emitted
+--- child output ---
+
+running 1 test
+test child_entry_point ... 2026-09-28T06:32:42.525017Z DEBUG put_stream{content_length=17 content_type="application/octet-stream"}: object_storage::client: streaming upload to object storage content_length=17
+2026-09-28T06:32:42.529458Z DEBUG put_stream{content_length=17 content_type="application/octet-stream"}: aws_smithy_http_client::client: new connector created in 564.4µs
+PLAN0014-SDK-OP put_stream
+PLAN0014-SDK-OP head
+PLAN0014-SDK-OP exists
+PLAN0014-SDK-OP open_stream
+PLAN0014-SDK-OP delete
+PLAN0014-SDK-OP presigned_url
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 32.74s
+
+
+--- end ---
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- json_output_is_filtered_the_same_way stdout ----
+
+thread 'json_output_is_filtered_the_same_way' (45952) panicked at crates\object-storage\tests\sdk_log_hygiene.rs:288:9:
+case json-rust-log-debug (json output must be filtered the same way): the log pipeline carries the SDK marker "signed_url", so a provider record was emitted
+--- child output ---
+
+running 1 test

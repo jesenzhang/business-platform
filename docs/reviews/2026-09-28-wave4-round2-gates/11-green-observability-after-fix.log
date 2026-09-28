@@ -1,0 +1,52 @@
+   Compiling observability v0.1.0 (F:\Workspace\business-platform\crates\observability)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-2lmfnv63c9xse\s-hmpfyjhxgl-1x46k6p-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-13o3oquetxrf5\s-hmpfyjhplm-1dfhiqc-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\provider_log_safety-3i1pj7s3vuums\s-hmpfyouxqw-0uxnb1l-working`
+
+warning: `observability` (lib test) generated 1 warning
+warning: `observability` (test "provider_log_safety") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.65s
+     Running unittests src\lib.rs (target\debug\deps\observability-9210b84b109a8562.exe)
+
+running 12 tests
+test tests::only_debug_and_trace_are_within_the_boundary ... ok
+test tests::log_format_parse_is_case_insensitive_and_rejects_unknown ... ok
+test tests::suppression_matches_targets_on_module_boundaries ... ok
+test tests::default_directives_keep_the_requested_service_level ... ok
+test tests::provider_debug_events_are_pinned_while_platform_debug_survives ... ok
+test tests::boundary_holds_against_more_specific_subtarget_directives ... ok
+test tests::provider_spans_are_never_constructed ... ok
+test tests::boundary_holds_against_the_most_permissive_env_filter ... ok
+test tests::boundary_holds_whatever_order_the_layers_are_installed_in ... ok
+test tests::without_the_boundary_a_permissive_filter_leaks ... ok
+test metrics::tests::install_is_idempotent_and_render_exposes_prometheus_text ... ok
+test metrics::tests::duration_histograms_render_as_bucketed_prometheus_histograms ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests\provider_log_safety.rs (target\debug\deps\provider_log_safety-366b70e9181b46ef.exe)
+
+running 12 tests
+test child_entry_point ... ok
+test rust_log_unset_debug_service_level_does_not_leak ... ok
+test more_specific_provider_subtarget_directives_do_not_leak ... ok
+test rust_log_trace_does_not_leak ... ok
+test otlp_branch_keeps_the_same_boundary_for_span_output ... ok
+test child_processes_actually_emit_the_application_records ... ok
+test rust_log_debug_does_not_leak ... ok
+test provider_span_directives_do_not_leak ... ok
+test json_format_does_not_change_the_boundary ... ok
+test no_case_loses_the_application_own_debug_output ... ok
+test no_case_leaks_provider_debug_or_trace_material ... ok
+test no_case_silences_provider_warn_diagnostics ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+   Doc-tests observability
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

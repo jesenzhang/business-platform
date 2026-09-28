@@ -1,0 +1,21 @@
+PLAN-0014 Wave 4 Round 2 - real provider lane
+utc_start         = 2026-09-28T06:51:42.7619801Z
+run_id            = r2-20260928-065142
+prefix            = plan0014-wave4/r2-20260928-065142/
+bucket            = plan0014-wave4-bucket
+endpoint          = http://127.0.0.1:19100
+cleanup_page_size = 3
+provider          = rustfs 1.0.1-preview.11 (build 2026-09-24 10:16:46 +00:00, release)
+provider archive  = rustfs-windows-x86_64-v1.0.1-preview.11.zip
+archive sha256    = cae2628159a8759118d8a68cd043c389a05ee9a6a13ceb9e188e9414578453d5
+archive verified  = matches the upstream release SHA256SUMS and the Wave 4 Round 1 digest
+
+step2 contract           target=s3_contract_lane           exit=0  duration=12.7s  log=01-contract-step.log
+    test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.94s
+step3 fault cases        target=s3_lane_fault_injection    exit=0  duration=7.3s  log=02-cleanup-fault-scenarios.log
+    test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s
+step4 final cleanup      target=s3_lane_cleanup            exit=0  duration=7.1s  log=03-final-cleanup.log
+    test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.50s
+step4b cleanup again     target=s3_lane_cleanup            exit=0  duration=2.4s  log=04-final-cleanup-again.log
+    test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+utc_end = 2026-09-28T06:52:12.3323033Z
