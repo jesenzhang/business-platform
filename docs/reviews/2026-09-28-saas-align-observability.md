@@ -28,7 +28,7 @@ on the governance scan/repair path was silently dropped. This wave fixed that
 `GOVERNANCE_LOG_LEVEL`, format `GOVERNANCE_LOG_FORMAT` parsed fail-closed,
 optional `GOVERNANCE_OTLP_ENDPOINT`).
 
-**Provider noise.** `SUPPRESSED_TARGETS` (`crates/observability/src/lib.rs:69-77`)
+**Provider noise.** `SUPPRESSED_TARGETS` (`crates/observability/src/lib.rs:68-77`)
 pins `aws_sdk_s3`, `aws_smithy_runtime`, `aws_sigv4`, `aws_runtime`, `hyper`,
 `h2`, `rustls`, `reqwest` to `warn`, and `default_filter_directives` appends
 `<target>=warn` per entry; `RUST_LOG` still overrides. This is a

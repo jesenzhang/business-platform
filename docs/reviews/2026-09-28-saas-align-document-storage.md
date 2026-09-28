@@ -78,10 +78,19 @@ Consequence: presign is an internal capability with no consumer (ST-W4-07).
   from `010_document_processing_mvp.sql:2`; `document_revisions` uses
   `FOREIGN KEY (tenant_id, document_id) REFERENCES documents (tenant_id, id)` in
   `016:26`), so the fence is feasible without new unique infrastructure (D-W4-02).
-* `pre_trash_lifecycle` exists on both backends
-  (`document-postgres/src/unit_of_work.rs:141`,
-  `document-sqlite/src/unit_of_work.rs:465`) but no test drives a
-  trash→restore→pre-trash round trip (D-W4-07).
+* There is no `lifecycle_state` column: `documents` stores `status`,
+  `deletion_state` and `pre_trash_lifecycle` only
+  (`migrations/016_document_revision_evidence_foundation.sql:7,56-57`,
+  SQLite `004_…:6`). Both adapters therefore parse `pre_trash_lifecycle` once
+  and assign it to the aggregate's two lifecycle fields
+  (`document-postgres/src/unit_of_work.rs:127-129,145-147` and `:260,281`;
+  `document-sqlite/src/unit_of_work.rs:291,316` and `:441,468`). Under the
+  current transitions the two aggregate fields are provably always equal —
+  `trash()` copies `lifecycle_state` into `pre_trash_lifecycle` without changing
+  it, and `restore_from_trash()` copies it back
+  (`crates/document/src/domain/entity.rs:560-590`) — so the collapse is
+  reversible today, but the column carries no independent information and **no
+  test drives a trash→restore round trip** (D-W4-07).
 
 ### Failure/retry/idempotency
 Idempotent create is atomic with its audit and outbox side effects, and a
@@ -218,7 +227,7 @@ storage reference through a public contract in the current composition.
 * **D-W4-03**：`DocumentRepository::save` 不写 audit/outbox 且**无生产调用方**（仅 `revision_history.rs`）。位置：`crates/document/src/domain/repository.rs`、两个 `save` 实现。违反：API/事件标准「正式写入必须产生审计」；影响：R2 不能声称 revision 写入有正式事实。修复范围：与 create 路径对齐（审计 + outbox + 期望版本），并需要真正的调用方（更新用例）——属能力缺口而非缺陷，建议独立小波。测试：save 后审计链可验证 + 版本冲突拒绝。证据：`grep` 显示仅测试调用。剩余限制：无。
 * **D-W4-04**：PG 的 revision 不可变只由迁移定义，未在真实通道断言（SQLite 已由 `content_reference.rs` 断言）。修复范围：把同样的 UPDATE/DELETE 拒绝断言加入 PG lane。测试位置建议：`tenant_fence_pg.rs` 或新 `content_reference_pg.rs`。剩余限制：本波 PG 通道已建立，成本很低，建议 R2 前完成。
 * **D-W4-05 · 已修复**：`DocumentListQuery::count` 此前**零适配器覆盖**。位置：`crates/document-persistence-contracts/src/lib.rs`（新增 `verify_count`）。断言：count 必须等于同一 filter 分页取回的行数、无匹配必须为 0、跨租户必须为 0；两个后端均通过。
-* **D-W4-07**：`pre_trash_lifecycle` 有列有写入但无恢复用例。位置：`document-postgres/src/unit_of_work.rs:141`、`document-sqlite/src/unit_of_work.rs:465`。修复范围：加 trash→restore 往返断言（可能需要聚合补 accessor）。
+* **D-W4-07**：`pre_trash_lifecycle` 列在当前转换下与 `lifecycle_state` 恒等（见 §3），不携带独立信息，且 trash→restore 往返无测试。位置：`document-postgres/src/unit_of_work.rs:147,281`、`document-sqlite/src/unit_of_work.rs:316,468`。修复范围：补往返断言；若要让两列真正承载不同语义，需要先确定 lifecycle 的权威编码（设计问题）。
 * **D-W4-10**：双后端 outbox 载荷与中继列不一致（PG 载荷含 `object_key`，SQLite 仅 `document_id`+`original_filename`；SQLite 无 `published_at`/attempts）但同标 `schema_version='v1'`。位置：`crates/document-sqlite/src/unit_of_work.rs:161` 与 PG 对应处。违反：API/事件标准「事件包含…版本」+ 同一版本必须同一载荷形状。修复范围：统一载荷 v1 形状（并移除载荷中的存储引用）。
 * **D-W4-12 · C3**：SQLite 时间戳为 TEXT，`'…Z'` 与 `'…+00:00'` 混用会按字典序影响游标。位置：SQLite 迁移与写入格式化处。修复范围：统一写入格式或在读写边界规范化。
 * **ST-W4-01 · DEFER**：端口未声明 multipart / checksum / 条件请求 / 版本化。见 §4；本轮明确**不实现**（无业务用例，PLAN-0004/0003 也未要求），但真实通道已记录 provider 行为，未来新增能力必须同时补 provider 矩阵行。

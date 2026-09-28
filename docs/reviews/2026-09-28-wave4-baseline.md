@@ -63,7 +63,7 @@ Maturity vocabulary (used consistently in all three Wave 4 documents):
 | 元数据存在但对象缺失 | Document Processing（读取侧）+ Document Management（引用） | `ProcessingSource::read_source` | `business-worker` `StorageSource` | 稳定错误码 `source_not_found` | 无 | **新增** `apps/business-worker` 单元测试（fake repository + fake storage） | — | 真实组合边界已验证 |
 | 租户 / 资源作用域 / ACL | Identity+Policy（授权事实）；Document（数据） | `Authorize`(policy)、`TenantContext` | `business-api` composition | `Authorization` 中间件 | identity/policy lanes | 文档路由只做租户隔离，**未调用 policy 授权**（仅 `admin.rs` 走 `authorize_governance`） | **D-W4-06** | 仅接口（对 document 资源） |
 | 下载 / presign 对外能力 | Document Management | `ObjectStorageClient::presign` | `S3Client` | **无路由** | 本波新增 presign 单元测试 + 真实通道 presign 用例 | presign 端口与真实 provider 已验证，但无消费方 | ST-W4-07 | 仅接口（对外） |
-| 保留 / 删除契约（purge hold、tombstone） | Document Management | 领域状态 + `document_purge_holds` | 双后端表 | 状态查询 | 生命周期测试 | 无本波通道；`pre_trash_lifecycle` 列存在但恢复路径未持久化 | **D-W4-07** | 已实现（带限制） |
+| 保留 / 删除契约（purge hold、tombstone） | Document Management | 领域状态 + `document_purge_holds` | 双后端表 | 状态查询 | 生命周期测试 | 无本波通道；`pre_trash_lifecycle` 已持久化但在现有转换下与 `lifecycle_state` 恒等（不带独立信息），trash→restore 往返无测试 | **D-W4-07** | 已实现（带限制） |
 | 元数据 ↔ 对象一致性核对 | Document Management + Data Integrity | `data-integrity` 扫描框架 | 无对象存储扫描器 | 管理端扫描端点 | integrity lanes（不含对象侧） | 未运行 | **D-W4-08** | 未实现（对象侧） |
 | 公开 DTO / 错误 / 日志不泄露 object key、bucket、路径、签名 URL | 各上下文 + API 标准 | DTO 定义 | `business-api`、`object-storage` | OpenAPI | 无（本波新增） | **新增** `log_hygiene.rs`（自建 subscriber 捕获 `object_storage` 目标全部记录）+ DTO 字段审查 | ST-W4-08（`StorageError::NotFound` Display 内嵌 key） | 已实现（带限制） |
 
