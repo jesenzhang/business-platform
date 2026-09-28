@@ -21,6 +21,14 @@
 //! contract step whatever that step concluded, and its own exit code is its
 //! own.
 //!
+//! Round 3 closed the gap this step was still open on: a listing that did not
+//! run to completion used to yield an empty remainder, so `remaining_objects=0`
+//! could have meant "we stopped looking". It cannot now — a truncated page
+//! without a usable cursor, a repeated cursor, or a missing `IsTruncated` answer
+//! is an error, and `CleanupReport::ok()` refuses a report whose listing was
+//! incomplete. This step exits non-zero rather than reporting zero residue it
+//! never finished measuring.
+//!
 //! Everything is scoped to `plan0014-wave4/<WAVE4_S3_RUN_ID>/`. Nothing here
 //! lists, deletes or touches a key outside that prefix, and nothing deletes a
 //! bucket on the protected list.
