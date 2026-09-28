@@ -18,6 +18,24 @@ use crate::key::ObjectKey;
 
 const MAX_SMALL_OBJECT_BYTES: usize = 16 * 1024 * 1024;
 
+/// Shortest presigned URL lifetime the platform accepts.
+pub const MIN_PRESIGN_EXPIRES_SECS: u64 = 1;
+
+/// Longest presigned URL lifetime the platform accepts. Signature Version 4
+/// caps presigned URLs at seven days, and the bound is enforced here so every
+/// adapter answers with the same error instead of a provider specific one
+/// (PLAN-0014 Wave 4 gap ST-W4-04).
+pub const MAX_PRESIGN_EXPIRES_SECS: u64 = 604_800;
+
+fn presign_expiry(expires_secs: u64) -> Result<Duration, StorageError> {
+    if !(MIN_PRESIGN_EXPIRES_SECS..=MAX_PRESIGN_EXPIRES_SECS).contains(&expires_secs) {
+        return Err(StorageError::Presign(format!(
+            "presign expiry must be between {MIN_PRESIGN_EXPIRES_SECS} and {MAX_PRESIGN_EXPIRES_SECS} seconds"
+        )));
+    }
+    Ok(Duration::from_secs(expires_secs))
+}
+
 pub type ObjectStream =
     Pin<Box<dyn Stream<Item = Result<Bytes, StorageError>> + Send + Sync + 'static>>;
 
@@ -147,7 +165,7 @@ impl S3Client {
 
 #[async_trait]
 impl ObjectStorageClient for S3Client {
-    #[instrument(skip(self, body), fields(bucket = %self.bucket))]
+    #[instrument(skip(self, body, key, metadata))]
     async fn put_stream(
         &self,
         key: &ObjectKey,
@@ -156,7 +174,10 @@ impl ObjectStorageClient for S3Client {
         content_type: &str,
         metadata: &BTreeMap<String, String>,
     ) -> Result<(), StorageError> {
-        debug!(key = %key, content_length, "streaming upload to S3");
+        // Gap ST-W4-02: the object key and bucket name are internal storage
+        // references (AGENTS §15 / PLAN-0003 rules) and must not enter the log
+        // stream, so only the bounded transfer size is recorded here.
+        debug!(content_length, "streaming upload to object storage");
         let body = body.map(|chunk| {
             chunk
                 .map(Frame::data)
@@ -275,7 +296,8 @@ impl ObjectStorageClient for S3Client {
     }
 
     async fn presign(&self, key: &ObjectKey, expires_secs: u64) -> Result<String, StorageError> {
-        let config = PresigningConfig::expires_in(Duration::from_secs(expires_secs))
+        let expiry = presign_expiry(expires_secs)?;
+        let config = PresigningConfig::expires_in(expiry)
             .map_err(|error| StorageError::Presign(format!("invalid presign config: {error}")))?;
         self.client
             .get_object()
@@ -439,7 +461,13 @@ impl ObjectStorageClient for LocalStorageClient {
     }
 
     async fn presign(&self, key: &ObjectKey, _expires_secs: u64) -> Result<String, StorageError> {
-        Ok(format!("file://{}", self.object_path(key).display()))
+        // Gap ST-W4-03: this adapter cannot sign a request and has no expiry, so
+        // returning a path would hand out unbounded access that bypasses every
+        // caller's authorization check. Unsupported is stated, not faked.
+        let _ = key;
+        Err(StorageError::Presign(
+            "presigned URLs are not supported by the local filesystem adapter".to_string(),
+        ))
     }
 }
 
@@ -526,5 +554,71 @@ mod tests {
         let parent = directory.path().join("atomic");
         let mut entries = tokio::fs::read_dir(parent).await.expect("read directory");
         assert!(entries.next_entry().await.expect("next entry").is_none());
+    }
+
+    /// Gap ST-W4-03: the local adapter can neither sign nor expire a URL, so it
+    /// must refuse instead of returning a filesystem path that bypasses both.
+    #[tokio::test]
+    #[allow(clippy::panic)]
+    async fn local_storage_refuses_presign_instead_of_exposing_a_path() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let client = LocalStorageClient::new(directory.path())
+            .await
+            .expect("client");
+        let key = ObjectKey::new("presign/file.bin").expect("key");
+
+        let result = client.presign(&key, 300).await;
+        let Err(error) = result else {
+            panic!(
+                "local presign must be refused, got {:?}",
+                result.expect("presigned url")
+            );
+        };
+        assert!(
+            matches!(error, StorageError::Presign(_)),
+            "unexpected error: {error:?}"
+        );
+        let text = error.to_string();
+        assert!(
+            !text.contains("file://") && !text.contains("presign/file.bin"),
+            "the refusal must not disclose a storage path: {text}"
+        );
+    }
+
+    /// Gap ST-W4-04: presign expiry bounds belong to the platform contract, not
+    /// to whatever the configured provider happens to reject.
+    #[test]
+    fn presign_expiry_bounds_are_enforced_by_the_platform() {
+        assert!(presign_expiry(0).is_err(), "zero second expiry accepted");
+        assert!(
+            presign_expiry(MIN_PRESIGN_EXPIRES_SECS).is_ok(),
+            "the minimum expiry must be accepted"
+        );
+        assert!(
+            presign_expiry(MAX_PRESIGN_EXPIRES_SECS).is_ok(),
+            "the maximum expiry must be accepted"
+        );
+        assert!(
+            presign_expiry(MAX_PRESIGN_EXPIRES_SECS + 1).is_err(),
+            "an expiry beyond the platform bound was accepted"
+        );
+    }
+
+    /// The presign bound must be applied before any provider round trip.
+    #[tokio::test]
+    async fn presign_rejects_out_of_range_expiry_without_calling_the_provider() {
+        let client = S3Client::new(
+            "http://127.0.0.1:1",
+            "wave4-access",
+            "wave4-secret",
+            "plan0014-wave4-bucket",
+            "us-east-1",
+        );
+        let key = ObjectKey::new("presign/bounded.bin").expect("key");
+        let result = client.presign(&key, MAX_PRESIGN_EXPIRES_SECS + 1).await;
+        assert!(
+            matches!(result, Err(StorageError::Presign(_))),
+            "expected a bounded presign refusal, got {result:?}"
+        );
     }
 }

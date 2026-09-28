@@ -416,14 +416,17 @@ async fn execute_in_transaction(
     deterministic_event_time: Option<DateTime<Utc>>,
 ) -> Result<CreateDocumentResult, ApplicationPortError> {
     let existing = sqlx::query_as::<_, ExistingCreateRow>(
-            "SELECT i.request_fingerprint, i.fingerprint_version, d.id, d.tenant_id, d.original_filename, d.content_type, d.object_key, d.status, d.version, d.content_revision, d.current_revision_id, d.deletion_state, d.pre_trash_lifecycle, d.size_bytes, d.created_by, d.created_at, d.updated_at FROM document_idempotency i JOIN documents d ON d.id = i.document_id WHERE i.tenant_id = ?1 AND i.idempotency_key = ?2",
+            "SELECT i.request_fingerprint, i.fingerprint_version, d.id, d.tenant_id, d.original_filename, d.content_type, d.object_key, d.status, d.version, d.content_revision, d.current_revision_id, d.deletion_state, d.pre_trash_lifecycle, d.size_bytes, d.created_by, d.created_at, d.updated_at FROM document_idempotency i JOIN documents d ON d.id = i.document_id AND d.tenant_id = i.tenant_id WHERE i.tenant_id = ?1 AND i.idempotency_key = ?2",
         )
         .bind(command.document.tenant_id().to_string())
         .bind(&command.idempotency_key)
         .fetch_optional(&mut *connection)
         .await
         .map_err(|error| {
-            eprintln!("document idempotency read failed: {error:?}");
+            // Bounded signal only: the raw driver error stays out of the log
+            // stream (AGENTS §10) and the classified error is what callers act
+            // on. Gap OBS-W4-04 tracks richer adapter diagnostics.
+            tracing::warn!("document idempotency read failed");
             map_error(error)
         })?;
     if let Some(existing) = existing {
@@ -470,6 +473,12 @@ async fn execute_in_transaction(
             updated_at: parse_timestamp(&existing.updated_at)?,
         })
         .map_err(|_| ApplicationPortError::Failed)?;
+        // Defense in depth for gap D-W4-01: `document_idempotency.document_id`
+        // is only a foreign key onto `documents(id)`, so a mis-bound durable
+        // row must never be replayed across the tenant boundary.
+        if document.tenant_id() != command.document.tenant_id() {
+            return Err(ApplicationPortError::Failed);
+        }
         return Ok(CreateDocumentResult {
             document,
             replayed: true,

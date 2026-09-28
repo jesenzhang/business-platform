@@ -52,7 +52,7 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
                    d.current_revision_id, d.deletion_state, d.pre_trash_lifecycle,
                    d.size_bytes, d.created_by, d.created_at, d.updated_at
             FROM document_idempotency i
-            JOIN documents d ON d.id = i.document_id
+            JOIN documents d ON d.id = i.document_id AND d.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1 AND i.idempotency_key = $2
             ",
         )
@@ -69,6 +69,12 @@ impl CreateDocumentUnitOfWork for PostgresCreateDocumentUnitOfWork {
                 return Err(ApplicationPortError::IdempotencyConflict);
             }
             let document = existing.into_document()?;
+            // Defense in depth for gap D-W4-01: `document_idempotency.document_id`
+            // is only a foreign key onto `documents(id)`, so a mis-bound durable
+            // row must never be replayed across the tenant boundary.
+            if document.tenant_id() != command.document.tenant_id() {
+                return Err(ApplicationPortError::Failed);
+            }
             transaction.commit().await.map_err(map_sqlx_error)?;
             return Ok(CreateDocumentResult {
                 document,

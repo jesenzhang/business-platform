@@ -32,6 +32,11 @@ http = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tempfile = "3"
 reqwest = { workspace = true }
+# The real-provider contract lane (tests/s3_contract_lane.rs) needs raw SDK
+# calls for bucket bootstrap, cleanup and capability discovery, which the
+# provider-neutral port deliberately does not expose.
+aws-sdk-s3 = { version = "1", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
+aws-smithy-types = "1"
 
 [lints]
 workspace = true

@@ -51,6 +51,43 @@ impl Drop for TracingGuard {
     }
 }
 
+/// Provider and transport crates log the full request URI, bucket names, object
+/// keys and credential identifiers at DEBUG/TRACE. Those are storage references
+/// and credential material, so they must not enter the log or trace pipeline
+/// (AGENTS §10, PLAN-0003/PLAN-0004 storage reference rules).
+///
+/// Wave 4 gap OBS-W4-02: the default filter pins these targets to `warn` even
+/// when the service itself runs at `debug`. Measured evidence: at `debug` the
+/// AWS SDK emits `endpoint_params { bucket, key }`,
+/// `signing request request=SignableRequest { uri: …/<bucket>/<key> }` and the
+/// static credential's `access_key_id` (PLAN-0014 Wave 4 evidence
+/// `23-object-storage-log-hygiene.log`).
+///
+/// Setting `RUST_LOG` replaces the whole filter, so an operator can still turn
+/// these targets up deliberately.
+const SUPPRESSED_TARGETS: [&str; 8] = [
+    "aws_sdk_s3",
+    "aws_smithy_runtime",
+    "aws_sigv4",
+    "aws_runtime",
+    "hyper",
+    "h2",
+    "rustls",
+    "reqwest",
+];
+
+/// Build the default [`EnvFilter`] directives for a service log level.
+#[must_use]
+pub fn default_filter_directives(log_level: &str) -> String {
+    let mut directives = String::from(log_level.trim());
+    for target in SUPPRESSED_TARGETS {
+        directives.push(',');
+        directives.push_str(target);
+        directives.push_str("=warn");
+    }
+    directives
+}
+
 /// Initialize the global tracing subscriber.
 ///
 /// When `config.otlp_endpoint` is `Some`, an OpenTelemetry OTLP exporter is
@@ -63,8 +100,8 @@ pub fn init_tracing(
     log_format: LogFormat,
     otlp_endpoint: Option<&str>,
 ) -> anyhow::Result<TracingGuard> {
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(default_filter_directives(log_level)));
 
     let fmt_layer = tracing_subscriber::fmt::layer().with_target(true);
     let fmt_layer = match log_format {
@@ -108,7 +145,31 @@ pub fn init_tracing(
 
 #[cfg(test)]
 mod tests {
-    use super::LogFormat;
+    use super::{default_filter_directives, LogFormat};
+    use std::sync::{Arc, Mutex};
+    use tracing::Event;
+    use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+    use tracing_subscriber::EnvFilter;
+
+    #[derive(Clone, Default)]
+    struct RecordingLayer {
+        seen: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    impl RecordingLayer {
+        fn record(&self, target: &'static str) {
+            self.seen
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(target);
+        }
+    }
+
+    impl<S: tracing::Subscriber> Layer<S> for RecordingLayer {
+        fn on_event(&self, event: &Event<'_>, _context: Context<'_, S>) {
+            self.record(event.metadata().target());
+        }
+    }
 
     #[test]
     fn log_format_parse_is_case_insensitive_and_rejects_unknown() {
@@ -117,5 +178,62 @@ mod tests {
         assert_eq!(LogFormat::parse("text"), Some(LogFormat::Text));
         assert_eq!(LogFormat::parse("xml"), None);
         assert_eq!(LogFormat::parse(""), None);
+    }
+
+    /// Gap OBS-W4-02: provider crates log bucket names, object keys, full
+    /// request URIs and credential identifiers at DEBUG. A service running at
+    /// `debug` must not carry those into logs or traces.
+    #[test]
+    fn provider_debug_events_are_pinned_while_platform_debug_survives() {
+        let recorder = RecordingLayer::default();
+        let seen = Arc::clone(&recorder.seen);
+        let subscriber = tracing_subscriber::registry()
+            .with(EnvFilter::new(default_filter_directives("debug")))
+            .with(recorder);
+
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::debug!(target: "aws_sigv4::http_request::sign", "provider debug");
+            tracing::debug!(target: "aws_sdk_s3::endpoint_auth", "provider debug");
+            tracing::debug!(target: "hyper::client::connect::http", "provider debug");
+            tracing::warn!(target: "aws_sdk_s3::client::orchestrator", "provider warn");
+            tracing::debug!(target: "object_storage::client", "platform debug");
+        });
+
+        let seen = seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for suppressed in [
+            "aws_sigv4::http_request::sign",
+            "aws_sdk_s3::endpoint_auth",
+            "hyper::client::connect::http",
+        ] {
+            assert!(
+                !seen.contains(&suppressed),
+                "provider target {suppressed} must be pinned out of the pipeline at log level debug, saw {seen:?}"
+            );
+        }
+        assert!(
+            seen.contains(&"aws_sdk_s3::client::orchestrator"),
+            "provider WARN events must still reach operators, saw {seen:?}"
+        );
+        assert!(
+            seen.contains(&"object_storage::client"),
+            "the service's own DEBUG events must stay enabled, saw {seen:?}"
+        );
+    }
+
+    #[test]
+    fn default_directives_keep_the_requested_service_level() {
+        let directives = default_filter_directives("info");
+        assert!(
+            directives.starts_with("info,"),
+            "the service log level must stay the leading directive: {directives}"
+        );
+        assert!(
+            directives.contains("aws_sigv4=warn"),
+            "credential-bearing provider targets must be pinned: {directives}"
+        );
+        // The directive string must parse as a real EnvFilter.
+        let _ = EnvFilter::new(directives);
     }
 }

@@ -787,4 +787,126 @@ mod tests {
         assert_eq!(total.completed, 2);
         assert_eq!(total.join_errors, 1);
     }
+
+    /// PLAN-0014 Wave 4 (§四.4): document metadata can exist while the object
+    /// behind it does not. The worker boundary must classify that as a stable
+    /// `source_not_found` failure and must not leak the object key.
+    mod missing_object_boundary {
+        use super::super::StorageSource;
+        use async_trait::async_trait;
+        use document::domain::{DocumentMetadata, DocumentRepository, RepositoryError};
+        use document_processing::{ExtractionError, ProcessingSource};
+        use object_storage::{
+            ObjectKey, ObjectMetadata, ObjectStorageClient, ObjectStream, StorageError,
+            StoredObject,
+        };
+        use std::collections::BTreeMap;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        struct PresentDocument {
+            tenant_id: Uuid,
+            document_id: Uuid,
+        }
+
+        #[async_trait]
+        impl DocumentRepository for PresentDocument {
+            async fn load(
+                &self,
+                tenant_id: Uuid,
+                document_id: Uuid,
+            ) -> Result<Option<DocumentMetadata>, RepositoryError> {
+                if tenant_id != self.tenant_id || document_id != self.document_id {
+                    return Ok(None);
+                }
+                let document = DocumentMetadata::create(
+                    tenant_id,
+                    "missing-object.pdf".to_string(),
+                    "application/pdf".to_string(),
+                    "uploads/missing-object.pdf".to_string(),
+                    Uuid::now_v7(),
+                    Some(9),
+                )
+                .map_err(|_| RepositoryError::Failed)?;
+                Ok(Some(document))
+            }
+
+            async fn save(
+                &self,
+                _document: &DocumentMetadata,
+                _new_revision: Option<&document::domain::DocumentRevision>,
+                _expected_version: document::domain::AggregateVersion,
+            ) -> Result<(), RepositoryError> {
+                Err(RepositoryError::Failed)
+            }
+        }
+
+        struct ObjectAbsent;
+
+        #[async_trait]
+        impl ObjectStorageClient for ObjectAbsent {
+            async fn put_stream(
+                &self,
+                _key: &ObjectKey,
+                _body: ObjectStream,
+                _content_length: u64,
+                _content_type: &str,
+                _metadata: &BTreeMap<String, String>,
+            ) -> Result<(), StorageError> {
+                Ok(())
+            }
+
+            async fn open_stream(&self, key: &ObjectKey) -> Result<StoredObject, StorageError> {
+                Err(StorageError::NotFound(key.to_string()))
+            }
+
+            async fn head(&self, key: &ObjectKey) -> Result<ObjectMetadata, StorageError> {
+                Err(StorageError::NotFound(key.to_string()))
+            }
+
+            async fn delete(&self, _key: &ObjectKey) -> Result<(), StorageError> {
+                Ok(())
+            }
+
+            async fn exists(&self, _key: &ObjectKey) -> Result<bool, StorageError> {
+                Ok(false)
+            }
+
+            async fn presign(
+                &self,
+                _key: &ObjectKey,
+                _expires_secs: u64,
+            ) -> Result<String, StorageError> {
+                Err(StorageError::Presign("unsupported".to_string()))
+            }
+        }
+
+        #[tokio::test]
+        #[allow(clippy::panic)]
+        async fn metadata_without_object_fails_as_source_not_found() {
+            let tenant_id = Uuid::now_v7();
+            let document_id = Uuid::now_v7();
+            let source = StorageSource {
+                documents: Arc::new(PresentDocument {
+                    tenant_id,
+                    document_id,
+                }),
+                storage: Arc::new(ObjectAbsent),
+            };
+
+            let result = source.read_source(tenant_id, document_id, 1).await;
+            let Err(error) = result else {
+                panic!("a missing object must not be reported as success");
+            };
+            assert_eq!(error, ExtractionError::SourceNotFound);
+            assert_eq!(error.code(), "source_not_found");
+            let rendered = error.to_string();
+            for forbidden in ["tenants/", "revisions/", "uploads/", ".pdf"] {
+                assert!(
+                    !rendered.contains(forbidden),
+                    "the failure text must not carry a storage reference ({forbidden}): {rendered}"
+                );
+            }
+        }
+    }
 }

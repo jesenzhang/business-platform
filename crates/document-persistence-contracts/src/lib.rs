@@ -27,8 +27,8 @@ pub async fn verify_document_persistence_contract(
     verify_tenant_isolation(&detail, &list, &context).await?;
     verify_filters(&unit_of_work, &list, &context).await?;
     verify_cursor(&unit_of_work, &list, &context).await?;
-    verify_invalid_stored_data();
-    Ok(())
+    verify_count(&list, &context).await?;
+    verify_stored_content_reference_binds_tenant()
 }
 
 #[derive(Clone)]
@@ -362,20 +362,85 @@ async fn verify_cursor(
     Ok(())
 }
 
-fn verify_invalid_stored_data() {
+/// Gap D-W4-05: `DocumentListQuery::count` backs the production list totals and
+/// had no adapter coverage at all. It must agree with the rows the same filter
+/// pages through, and it must stay inside the tenant.
+async fn verify_count(
+    list: &Arc<dyn DocumentListQuery>,
+    context: &ContractContext,
+) -> Result<(), String> {
+    let filter = DocumentListFilter {
+        filename_contains: Some("cursor-".to_string()),
+        ..DocumentListFilter::default()
+    };
+    let page = list
+        .execute(DocumentListRequest {
+            tenant_id: context.tenant,
+            filter: filter.clone(),
+            cursor: None,
+            limit: 200,
+        })
+        .await
+        .map_err(|error| format!("count baseline page: {error}"))?;
+    let counted = list
+        .count(context.tenant, filter)
+        .await
+        .map_err(|error| format!("count query: {error}"))?;
+    if counted == 0 || counted != page.items.len() as u64 {
+        return Err(format!(
+            "count ({counted}) disagrees with the rows the same filter returned ({})",
+            page.items.len()
+        ));
+    }
+
+    let no_match = list
+        .count(
+            context.tenant,
+            DocumentListFilter {
+                filename_contains: Some("does-not-exist".to_string()),
+                ..DocumentListFilter::default()
+            },
+        )
+        .await
+        .map_err(|error| format!("no-match count query: {error}"))?;
+    if no_match != 0 {
+        return Err(format!(
+            "count matched {no_match} rows for a filter that matches nothing"
+        ));
+    }
+
+    let foreign = list
+        .count(context.other_tenant, DocumentListFilter::default())
+        .await
+        .map_err(|error| format!("cross-tenant count query: {error}"))?;
+    if foreign != 0 {
+        return Err(format!(
+            "count crossed the tenant boundary and returned {foreign} rows"
+        ));
+    }
+    Ok(())
+}
+
+/// A stored content reference that names a different tenant's namespace must
+/// fail closed on rehydration instead of producing a document that can be read
+/// by the wrong tenant.
+fn verify_stored_content_reference_binds_tenant() -> Result<(), String> {
+    let tenant = Uuid::now_v7();
+    let document_id = Uuid::now_v7();
     let result = DocumentMetadata::rehydrate(RehydrateDocumentMetadata {
-        id: Uuid::now_v7(),
-        tenant_id: Uuid::now_v7(),
+        id: document_id,
+        tenant_id: tenant,
         original_filename: "invalid.pdf".to_string(),
         content_type: "application/pdf".to_string(),
         object_key: format!(
-            "tenants/{}/documents/{}/v1/invalid.pdf",
+            "tenants/{}/documents/{}/revisions/{}/source",
             Uuid::now_v7(),
+            document_id,
             Uuid::now_v7()
         ),
         status: DocumentStatus::Active,
-        aggregate_version: AggregateVersion::new(1).unwrap_or_else(|_| unreachable!()),
-        content_revision: ContentRevision::new(1).unwrap_or_else(|_| unreachable!()),
+        aggregate_version: AggregateVersion::new(1).map_err(|error| error.to_string())?,
+        content_revision: ContentRevision::new(1).map_err(|error| error.to_string())?,
         current_revision_id: Uuid::now_v7(),
         lifecycle_state: DocumentLifecycleState::Active,
         deletion_state: DocumentDeletionState::Present,
@@ -385,10 +450,10 @@ fn verify_invalid_stored_data() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     });
-    assert!(
-        result.is_err(),
-        "invalid persisted version must fail closed"
-    );
+    match result {
+        Ok(_) => Err("a content reference from another tenant namespace was accepted".to_string()),
+        Err(_) => Ok(()),
+    }
 }
 
 fn rehydrated_document(

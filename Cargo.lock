@@ -1556,6 +1556,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -1933,6 +1934,7 @@ dependencies = [
  "document-processing-postgres",
  "document-processing-sqlite",
  "document-sqlite",
+ "observability",
  "runtime-governance",
  "runtime-governance-postgres",
  "runtime-governance-sqlite",
