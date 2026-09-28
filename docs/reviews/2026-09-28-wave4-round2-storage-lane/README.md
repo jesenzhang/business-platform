@@ -88,6 +88,16 @@ RustFS 1.0.1-preview.11 在本次运行中的答复（`01-contract-step.log` 的
 
 ### 4.3 清理通过（本轮新增的判定）
 
+> **Round 3 校准（原文保留，不追改）**：下表第 2 行「分页列举未完成 multipart
+> upload 并 abort」的 `uploads_aborted=1` 是**一个 upload、一页、没有游标**的场景，
+> 因此它证明的是 abort 可用，**不是 multipart 分页已验证**。Round 2 真实运行里
+> `ListMultipartUploads` 只有一页可走，分页分支根本没被执行。同 key 多 upload 的
+> 多页验证在 Round 3 才成立（7 upload / page_size 3 / 3 页，见
+> [`../2026-09-28-wave4-round3-storage-lane/`](../2026-09-28-wave4-round3-storage-lane/) §4）。
+> 第 1 行的对象多页清理不受此校准影响：6 对象 / page_size 3 → 2 页，确为多页。
+> 另：本表「provider 列出该 upload」当时的判定是**结果非空**，而非「列出了自己创建的
+> 那一个」；Round 3 已改为精确配对判定（`PLAN0014-CREATED-UPLOAD` 结构化回传）。
+
 | 断言 | 结果 | 记录 |
 |---|---|---|
 | 分页列举并删除本 RUN_ID prefix 下对象 | pass | `objects_deleted=6`，`remaining_objects=0` |
@@ -119,6 +129,14 @@ RustFS 1.0.1-preview.11 在本次运行中的答复（`01-contract-step.log` 的
   清理报告 `uploads_aborted=1` 且 `remaining_uploads=0`。
   若 provider 不列举未完成 upload，测试会打印 `PROVIDER-LIMITATION` 而不是把
   「清理成功」伪装成「中止成功」——本次运行中 RustFS 支持列举，因此走的是断言分支。
+  > **Round 3 校准（原文保留）**：这一条当时的判定强度是**列表非空**，不是「列出了
+  > 子进程实际创建的那个 key + upload-id」；而 `PROVIDER-LIMITATION` 分支只打印说明、
+  > **仍以退出码 0 结束**，也就是 provider「接受了创建却什么都不返回」时该场景会全绿。
+  > Round 3 已改为：子进程以 `PLAN0014-CREATED-UPLOAD {json}` 结构化回传真实创建对象，
+  > 父进程断言确切配对出现在列举中，否则先做受限补偿 abort、单独记录补偿结果，
+  > 并**让本场景失败**——补偿成功也不得把「未验证发现能力」改成 pass。
+  > 见 [`../2026-09-28-wave4-round3-storage-lane/`](../2026-09-28-wave4-round3-storage-lane/) §1 R3-3。
+
 * **(c) prefix 之外的对象不变**：在 `plan0014-wave4-sentinel/<RUN_ID>/` 与
   `plan0014-wave4-sibling/<RUN_ID>` 各放一个对象，经历「契约失败 + 清理」后内容与
   数量均不变。

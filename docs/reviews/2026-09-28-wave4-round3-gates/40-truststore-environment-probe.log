@@ -1,0 +1,61 @@
+PLAN-0014 Wave 4 Round 3 - trust store retest (closes the Round 2 environment item)
+utc = 2026-09-28T14:10Z  rustc = rustc 1.94.1  host = Windows NT 10.0.19045.0
+
+ITEM UNDER RETEST
+  Round 2 recorded that SDK tests which build a client with the SDK's default HTTPS
+  connector can abort with "TrustStore configured to enable native roots but no valid
+  root certificates parsed!" and classified it as an execution-environment difference.
+  Round 3 was asked to retest it in an environment that can, and not to weaken TLS.
+
+WHAT Round 3 SAW, IN THE ORDER IT HAPPENED
+  1. cargo test -p object-storage --all-features           -> exit 101
+       log_hygiene::storage_references_never_enter_the_log_stream
+       sdk_log_hygiene::turning_every_provider_target_to_trace_does_not_leak
+       sdk_log_hygiene::every_configured_case_keeps_storage_references_out_of_the_log_stream
+     panicked at aws-smithy-http-client-1.4.0/src/client/tls/rustls_provider.rs:163
+       TrustStore configured to enable native roots but no valid root certificates parsed!
+     underlying cause, from the SDK's own WARN line:
+       native root CA certificate loading errors: [Error { context: "failed to open
+       current user certificate store", kind: Os(Os { code: 5, kind: PermissionDenied,
+       message: "(access denied)" }) }]
+     The three tests touch no code this round changed; they build a real HTTPS client and
+     die inside rustls while reading the OS trust store.
+
+  2. Proof it is not a Round 3 regression:
+       git stash push -- crates/object-storage/tests/support/mod.rs
+                           crates/object-storage/tests/s3_lane_fault_injection.rs
+       cargo test -p object-storage --all-features --test log_hygiene   -> same panic, exit 101
+       git stash pop
+     The code under the stash is exactly HEAD 7fb9f735a7e0a787666d7b62592f08ac5161245a.
+
+  3. Retest with the session able to open the Windows certificate store (the failure above
+     is the file-access sandbox denying the current-user certificate store, OS error 5):
+       cargo test -p object-storage --all-features --test log_hygiene --test sdk_log_hygiene
+       test result: ok. 1 passed; 0 failed          (log_hygiene)
+       test result: ok. 4 passed; 0 failed          (sdk_log_hygiene)
+       exit 0
+     See 31-test-object-storage.log for the same suite green end to end.
+
+  CONCLUSION: an execution-environment restriction on the OS root certificate store, not a
+  repository defect and not a Round 3 regression. Nothing was changed to make it pass: no
+  certificate verification was disabled, no custom verifier was installed, no dependency
+  feature was altered. The tests pass unchanged once the process may read the store.
+
+SUPPORTING MEASUREMENT, taken in the unrestricted session where the tests pass
+  Cert:\LocalMachine\Root = 57 certificate(s)
+  Cert:\CurrentUser\Root  = 57 certificate(s)
+  The store is populated and readable outside the file-access sandbox, which is what the
+  diagnosis predicts: the sandbox is denied opening the current-user store (OS error 5),
+  the store itself is fine, and no certificate or verifier configuration differs.
+SCOPE OF THE RESTRICTION
+  The lane under test here is unaffected either way: it talks plain HTTP to a loopback
+  endpoint and installs no TLS at all.
+
+CHECK: no TLS-weakening configuration anywhere in the tracked workspace
+  danger_accept_invalid_certs              hits=0
+  danger_accept_invalid_hostnames          hits=0
+  use_native_roots_invalid_certificates    hits=0
+  NoCertVerification                       hits=0
+  accept_invalid_certs                     hits=0
+  ssl_verify                               hits=0
+  tls_verify                               hits=0

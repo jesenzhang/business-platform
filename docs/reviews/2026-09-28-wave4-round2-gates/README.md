@@ -113,6 +113,10 @@ Round 2 的修复是独立于 `EnvFilter` 的边界层 `ProviderSafetyFilter`
 * **契约通过**：provider-neutral port 在 RustFS 上的 round trip / NotFound / delete 幂等 / presign 作用域与过期。
 * **能力观察**：`CAPABILITY …` 行（multipart 完成失败、条件读可用、校验和回显、版本化未配置、`ListMultipartUploads` 可用）。不参与通过判定。
 * **清理通过**：分页删除 + 分页 abort + 「0 对象且 0 未完成 upload」终态 + RUN_ID 守卫 + 清理失败单独失败 + 拒删受保护桶 + prefix 外对象不受影响。
+  > **Round 3 校准（原文保留）**：此处「分页 abort」应读作「abort 可用」。Round 2 真实运行的
+  > multipart abort 计数为 1，列举只有一页、没有游标，multipart **分页**路径未被执行；
+  > 对象侧 6 对象 / 2 页的多页删除成立。同 key 多 upload 的多页验证见
+  > [`../2026-09-28-wave4-round3-storage-lane/README.md`](../2026-09-28-wave4-round3-storage-lane/README.md) §4。
 * **未执行 / BLOCKED**：`tests/minio_contract.rs`（MinIO 停发）；CI 上的 lane 两步（需 PR 触发）；OTLP exporter 隔离（OBS-W4-06）。
 
 ## 7. 本轮未做的事
