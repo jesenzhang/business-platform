@@ -8,9 +8,11 @@
   `crates/audit-postgres/tests/chain_pg.rs`, `Cargo.lock`). This document and the
   status/navigation updates are a separate closeout commit on top of it, so the
   candidate stays reviewable without evidence churn.
-- Final HEAD after this closeout: recorded by `git rev-parse HEAD` when this file
-  was committed; see the Round 2c entry in
-  [PLAN-0014](../plans/current/PLAN-0014-reference-conformance-and-r2-module-readiness.md).
+- Commit chain: base `0ac031af1344af4a8fa4d91c314cf3563065e1bf` -> code candidate
+  `8946e46b03ac5516e7bf6e09f4f58382aafd4bd3` -> documentation closeout
+  `016b9ed070bfc64787ac4c7f58248db0cb7f698a` -> the pointer commit that adds this
+  line. A commit cannot contain its own SHA, so the branch tip is stated in the
+  delivery report and readable from `git log --oneline`.
 - Scope: audit timestamp canonicalization and historical recovery only.
 - Status: **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**.
 - These are implementation checks by the repair author. No independent reviewer

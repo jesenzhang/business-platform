@@ -928,6 +928,8 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   outbox_reliability 7、inbox_idempotency 4）。六项完整门禁结果见同一目录 `10`–`15`。
 - **Round 2b 的 22 项 PostgreSQL 通过不覆盖本次历史恢复缺陷**：PostgreSQL 存储即微秒，无纳秒尾数可被读回破坏；
   只有 SQLite 文本存储能保存会被错误归一化的历史，而当时没有测试读回这类行。
+- 提交链：base `0ac031af1344af4a8fa4d91c314cf3563065e1bf` → 代码候选 `8946e46b03ac5516e7bf6e09f4f58382aafd4bd3`
+  → 文档 closeout `016b9ed070bfc64787ac4c7f58248db0cb7f698a` → 本提交（仅记录提交链的指针提交，其自身 SHA 见交付报告与 `git log`）。
 - 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**。实现者不自填独立 PASS；两份 Wave 3 评审的独立记录仍为 `<pending>`。
   R1 声明仍需独立复审；**R2 BLOCKED**；Wave 4/5 未启动；ADR-0027/ADR-0028 仍 Proposed / NOT ACCEPTED。
   修复前写入 PostgreSQL 的不可验证行仍属需另行评审的运维事项，本轮不枚举、不重签名。
