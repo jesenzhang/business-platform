@@ -284,3 +284,112 @@ async fn legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them()
 
     cleanup(&pool, tenant_id).await;
 }
+
+/// Real `PostgreSQL` precision round trip: an event built from a nanosecond
+/// `occurred_at` must be signed at microsecond precision, stored by `TIMESTAMPTZ`
+/// without loss, and re-verify from the stored row. This is the property that
+/// made every `PostgreSQL` chain row unverifiable before the precision fix, and
+/// no `SQLite` test can observe it because `SQLite` stores RFC 3339 text.
+#[tokio::test]
+#[ignore = "requires running PostgreSQL"]
+async fn nanosecond_input_verifies_after_a_postgres_precision_round_trip() {
+    let pool = setup_pool().await;
+    run_migrations(&pool).await;
+    let tenant_id = Uuid::now_v7();
+
+    // A tail of 123456789 ns: the last three digits cannot survive TIMESTAMPTZ.
+    let requested = chrono::DateTime::parse_from_rfc3339("2026-09-26T12:00:00.123456789Z")
+        .expect("fixture instant")
+        .with_timezone(&chrono::Utc);
+    let event = AuditEvent::new(
+        Uuid::now_v7(),
+        tenant_id,
+        AuditActor {
+            actor_type: AuditActorType::Service,
+            actor_id: Uuid::now_v7(),
+        },
+        AuditAction::new("governance.precision-probe").expect("fixture action"),
+        AuditResource::new("probe", "precision").expect("fixture resource"),
+        Uuid::now_v7(),
+        None,
+        None,
+        None,
+        None,
+        AuditResult::Succeeded,
+        None,
+        None,
+        None,
+        vec!["probe".to_string()],
+        serde_json::json!({"probe": "precision"}),
+        "audit.v1",
+        requested,
+    )
+    .expect("fixture event must be valid");
+    // Normalization happens before signing, not after storage.
+    assert_eq!(
+        event.occurred_at().timestamp_subsec_nanos(),
+        123_456_000,
+        "a new event must be signed at the precision every backend can store"
+    );
+
+    append_postgres(&pool, &event)
+        .await
+        .expect("audit append must succeed");
+
+    // Storage kept exactly what was signed for the business timestamp.
+    // `append_postgres` assigns `recorded_at` from the adapter clock while signing
+    // the row, so the pre-append event's `recorded_at` is deliberately not the
+    // stored value; the property that matters is that the stored pair reproduces
+    // the stored digest, which the repository check below proves.
+    let stored: (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
+        "SELECT occurred_at, recorded_at FROM audit_events WHERE id = $1 AND tenant_id = $2",
+    )
+    .bind(event.id())
+    .bind(tenant_id)
+    .fetch_one(&pool)
+    .await
+    .expect("stored row must be readable");
+    assert_eq!(
+        stored.0,
+        event.occurred_at(),
+        "TIMESTAMPTZ must round trip the signed occurred_at"
+    );
+    assert_eq!(
+        stored.0.timestamp_subsec_nanos(),
+        123_456_000,
+        "the stored business timestamp must equal the microsecond value that was signed"
+    );
+    assert_eq!(
+        stored.1.timestamp_subsec_nanos() % 1_000,
+        0,
+        "the adapter-assigned recorded_at must be signed at stored precision"
+    );
+
+    // The repository read reproduces the digest written at append time.
+    let store = PostgresAuditStore::new(pool.clone());
+    let read_back = store
+        .get(tenant_id, event.id())
+        .await
+        .expect("repository read must succeed")
+        .expect("appended row must be readable");
+    let signed = read_back
+        .record_hash()
+        .expect("v1 row must carry a record hash")
+        .to_string();
+    assert_eq!(
+        audit::hash_record(&read_back).expect("hash must compute"),
+        signed,
+        "the digest recomputed from the stored row must equal the stored digest"
+    );
+
+    let verification = store
+        .verify_chain(scope(tenant_id))
+        .await
+        .expect("chain verification must run");
+    assert!(
+        verification.valid && verification.verified_count == 1,
+        "a freshly appended row must verify on PostgreSQL: {verification:?}"
+    );
+
+    cleanup(&pool, tenant_id).await;
+}

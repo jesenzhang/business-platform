@@ -5,7 +5,7 @@
 //! transaction.
 
 use async_trait::async_trait;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -284,6 +284,14 @@ impl AuditEvent {
             schema_version,
             occurred_at,
         )?;
+        // `new` canonicalizes `occurred_at` to microsecond precision because a
+        // newly built event is about to be signed and written. A stored row must
+        // come back byte for byte instead: history can carry nanosecond
+        // `occurred_at` values, and restoring the stored instant verbatim is what
+        // lets `hash_record` reproduce the digest the row was signed with.
+        // Assigning only `recorded_at` here would silently truncate the other
+        // hashed timestamp and report intact history as broken.
+        event.occurred_at = occurred_at;
         event.recorded_at = recorded_at;
         event.stream_sequence = stream_sequence;
         event.chain_version = chain_version;
@@ -314,6 +322,14 @@ impl AuditEvent {
             return Err(AuditValidationError::InvalidChainMetadata.into());
         }
         self.stream_sequence = stream_sequence;
+        // Both hashed timestamps are normalized here, not just `recorded_at`.
+        // This is the transition that signs a protected row about to be written,
+        // so the event must carry the precision every supported backend can
+        // store even when it reached the adapter through `rehydrate` carrying a
+        // historical nanosecond `occurred_at`. Normalizing only at construction
+        // would let a re-signed historical row recreate the unverifiable-row
+        // defect on `PostgreSQL`.
+        self.occurred_at = canonical_timestamp(self.occurred_at);
         self.recorded_at = canonical_timestamp(recorded_at);
         self.chain_version = chain_version;
         self.previous_hash = previous_hash;
@@ -552,12 +568,20 @@ pub fn hash_record(event: &AuditEvent) -> Result<String, AuditError> {
 /// digest written at append time no longer matches the digest recomputed from
 /// the stored row, and a freshly written chain reports itself as broken.
 ///
+/// Only the sub-second remainder is truncated. The implementation must not
+/// rebuild the instant from `timestamp_micros() * 1_000`, because the epoch
+/// microsecond count exceeds `i64` nanoseconds past the year 2262: that
+/// arithmetic overflows instead of normalizing. Truncating the sub-second
+/// component in place keeps the calendar date and the whole second identical for
+/// every representable `DateTime`, including pre-epoch instants.
+///
 /// `rehydrate` deliberately does not normalize. Verification compares against
 /// the bytes a row was actually signed with, so stored timestamps are preserved
 /// exactly and existing history is never reinterpreted or re-signed.
 #[must_use]
 pub fn canonical_timestamp(value: DateTime<Utc>) -> DateTime<Utc> {
-    Utc.timestamp_nanos(value.timestamp_micros() * 1_000)
+    let microsecond_nanos = value.timestamp_subsec_nanos() / 1_000 * 1_000;
+    value.with_nanosecond(microsecond_nanos).unwrap_or(value)
 }
 
 #[must_use]
@@ -656,6 +680,9 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Only the tests still build instants from raw nanosecond counts; production
+    // code normalizes sub-seconds in place and needs no `TimeZone`.
+    use chrono::TimeZone as _;
 
     fn event(result: AuditResult, details: Value) -> Result<AuditEvent, AuditValidationError> {
         AuditEvent::new(
@@ -693,6 +720,227 @@ mod tests {
             serde_json::json!({"lease_token": "hidden"})
         )
         .is_err());
+    }
+
+    /// Fixed instants and identifiers for the historical-compatibility fixture.
+    /// `occurred_at` and `recorded_at` both carry a non-zero nanosecond tail,
+    /// which is what `SQLite` history can contain because it stores RFC 3339 text.
+    const HISTORICAL_NANOS: u32 = 123_456_789;
+    const HISTORICAL_OCCURRED_AT: &str = "2026-09-26T12:00:00.123456789Z";
+    const HISTORICAL_ID: &str = "49ed89fe-7a4a-4c82-9b6a-3f1c2d5e6a01";
+    const HISTORICAL_TENANT: &str = "49ed89fe-7a4a-4c82-9b6a-3f1c2d5e6a02";
+    const HISTORICAL_ACTOR: &str = "49ed89fe-7a4a-4c82-9b6a-3f1c2d5e6a03";
+    const HISTORICAL_OPERATION: &str = "49ed89fe-7a4a-4c82-9b6a-3f1c2d5e6a04";
+    /// `record_hash` of the fixture above, produced by the historical
+    /// (pre-normalization) algorithm: SHA-256 over the canonical payload with
+    /// both timestamps at full nanosecond precision. It is a literal on purpose.
+    /// Deriving it from the constructor or from `canonical_timestamp` would make
+    /// the assertion circular and hide exactly the regression it pins, so it was
+    /// frozen once and independently re-hashed outside this crate.
+    const HISTORICAL_RECORD_HASH: &str =
+        "12b8823dbe1ea4ebaaf7896c676a52b790dbc004668166b203988e42f7cdf815";
+
+    fn historical_instant() -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(HISTORICAL_OCCURRED_AT)
+            .unwrap_or_else(|_| unreachable!("fixture instant is valid RFC 3339"))
+            .with_timezone(&Utc)
+    }
+
+    fn fixed_uuid(value: &str) -> Uuid {
+        Uuid::parse_str(value).unwrap_or_else(|_| unreachable!("fixture uuid is canonical"))
+    }
+
+    /// Reads the fixture row back through the real `rehydrate` entry point every
+    /// adapter uses, with the digest the row was historically signed with.
+    fn rehydrate_historical_row(
+        occurred_at: DateTime<Utc>,
+        recorded_at: DateTime<Utc>,
+        record_hash: &str,
+    ) -> Result<AuditEvent, AuditError> {
+        let tenant_id = fixed_uuid(HISTORICAL_TENANT);
+        AuditEvent::rehydrate(
+            fixed_uuid(HISTORICAL_ID),
+            tenant_id,
+            AuditActor {
+                actor_type: AuditActorType::System,
+                actor_id: fixed_uuid(HISTORICAL_ACTOR),
+            },
+            AuditAction::new("document.created").unwrap_or_else(|_| unreachable!()),
+            AuditResource::new("document", "doc-historical").unwrap_or_else(|_| unreachable!()),
+            fixed_uuid(HISTORICAL_OPERATION),
+            None,
+            None,
+            Some("trace-historical".to_string()),
+            None,
+            AuditResult::Succeeded,
+            None,
+            None,
+            None,
+            vec!["title".to_string()],
+            serde_json::json!({"source": "round-2c"}),
+            "audit.v1".to_string(),
+            occurred_at,
+            recorded_at,
+            1,
+            1,
+            Some(audit_chain_genesis(tenant_id)),
+            Some(record_hash.to_string()),
+        )
+    }
+
+    #[test]
+    fn rehydrate_preserves_historical_nanosecond_signed_content() {
+        // Reading history back must not change what history was signed over.
+        // A nanosecond tail is the only case that distinguishes the two, and
+        // truncating it turns an intact chain into a reported-broken chain.
+        let stored_instant = historical_instant();
+        assert_eq!(
+            stored_instant.timestamp_subsec_nanos(),
+            HISTORICAL_NANOS,
+            "fixture must actually carry a sub-microsecond tail"
+        );
+
+        let event =
+            rehydrate_historical_row(stored_instant, stored_instant, HISTORICAL_RECORD_HASH)
+                .unwrap_or_else(|_| unreachable!("fixture row is a valid v1 row"));
+
+        assert_eq!(
+            event.occurred_at(),
+            stored_instant,
+            "rehydrate must restore the stored occurred_at verbatim"
+        );
+        assert_eq!(
+            event.recorded_at(),
+            stored_instant,
+            "rehydrate must restore the stored recorded_at verbatim"
+        );
+        assert_eq!(
+            event.occurred_at().timestamp_subsec_nanos(),
+            HISTORICAL_NANOS,
+            "a hashed timestamp must not be silently truncated on read"
+        );
+
+        // The stored digest reproduces exactly, so a chain verifier accepts it.
+        assert_eq!(
+            hash_record(&event).unwrap_or_else(|_| unreachable!()),
+            HISTORICAL_RECORD_HASH,
+            "a historically signed nanosecond row must re-verify after rehydrate"
+        );
+        assert_eq!(event.record_hash(), Some(HISTORICAL_RECORD_HASH));
+        assert_eq!(event.chain_version(), 1);
+        assert_eq!(event.stream_sequence(), 1);
+
+        // Negative control: verification is live, not skipped. One nanosecond of
+        // drift on either hashed timestamp must break the match.
+        let drifted_occurred = stored_instant
+            .with_nanosecond(HISTORICAL_NANOS - 1)
+            .unwrap_or_else(|| unreachable!("sub-second tail stays in range"));
+        let tampered =
+            rehydrate_historical_row(drifted_occurred, stored_instant, HISTORICAL_RECORD_HASH)
+                .unwrap_or_else(|_| unreachable!());
+        assert_ne!(
+            hash_record(&tampered).unwrap_or_else(|_| unreachable!()),
+            HISTORICAL_RECORD_HASH,
+            "the fixture digest must stay nanosecond sensitive"
+        );
+        let drifted_recorded = stored_instant
+            .with_nanosecond(HISTORICAL_NANOS + 1)
+            .unwrap_or_else(|| unreachable!("sub-second tail stays in range"));
+        let tampered =
+            rehydrate_historical_row(stored_instant, drifted_recorded, HISTORICAL_RECORD_HASH)
+                .unwrap_or_else(|_| unreachable!());
+        assert_ne!(
+            hash_record(&tampered).unwrap_or_else(|_| unreachable!()),
+            HISTORICAL_RECORD_HASH
+        );
+    }
+
+    #[test]
+    fn re_signing_a_historical_row_leaves_no_nanosecond_hashed_input() {
+        // Reading history verbatim must not leak into a row that is about to be
+        // written: an adapter that rehydrates a nanosecond row and then signs it
+        // onto a chain would otherwise store a digest PostgreSQL cannot reproduce.
+        let stored_instant = historical_instant();
+        let historical =
+            rehydrate_historical_row(stored_instant, stored_instant, HISTORICAL_RECORD_HASH)
+                .unwrap_or_else(|_| unreachable!("fixture row is a valid v1 row"));
+        assert_eq!(
+            historical.occurred_at().timestamp_subsec_nanos(),
+            HISTORICAL_NANOS
+        );
+
+        let resigned = historical
+            .with_chain_metadata(
+                2,
+                stored_instant,
+                1,
+                Some(HISTORICAL_RECORD_HASH.to_string()),
+            )
+            .unwrap_or_else(|_| unreachable!("re-signing a valid row must succeed"));
+
+        assert_eq!(
+            resigned.occurred_at().timestamp_subsec_nanos(),
+            123_456_000,
+            "a row being signed for storage must not keep a sub-microsecond tail"
+        );
+        assert_eq!(resigned.recorded_at().timestamp_subsec_nanos(), 123_456_000);
+        let resigned_digest = resigned
+            .record_hash()
+            .unwrap_or_else(|| unreachable!("row was just signed"))
+            .to_string();
+        assert_eq!(
+            hash_record(&resigned).unwrap_or_else(|_| unreachable!()),
+            resigned_digest,
+            "the re-signed digest must be reproducible from stored precision"
+        );
+        assert_ne!(
+            resigned.record_hash.as_deref(),
+            Some(HISTORICAL_RECORD_HASH),
+            "re-signing is a new row, never a silent rewrite of the historical digest"
+        );
+    }
+
+    #[test]
+    fn canonical_timestamp_truncates_without_leaving_the_representable_range() {
+        let nanosecond_instant = historical_instant();
+        let truncated = canonical_timestamp(nanosecond_instant);
+        assert_eq!(truncated.timestamp_subsec_nanos(), 123_456_000);
+        assert_eq!(canonical_timestamp(truncated), truncated);
+
+        // Instants outside the i64 nanosecond window, in both directions: the
+        // whole second and the calendar date must survive, and normalization
+        // must not panic. Rebuilding an instant as epoch micros * 1_000 overflows
+        // past the year 2262 instead of truncating.
+        for text in [
+            "1969-07-20T20:17:40.123456789Z",
+            "1900-01-01T00:00:00.000000001Z",
+            "2262-01-01T00:00:00.999999999Z",
+            "2500-12-31T23:59:59.987654321Z",
+        ] {
+            let value = DateTime::parse_from_rfc3339(text)
+                .unwrap_or_else(|_| unreachable!("fixture instant {text} is valid"))
+                .with_timezone(&Utc);
+            let truncated = canonical_timestamp(value);
+            assert_eq!(
+                truncated.timestamp(),
+                value.timestamp(),
+                "{text}: normalization must not move the whole second"
+            );
+            assert_eq!(
+                truncated.naive_utc().date(),
+                value.naive_utc().date(),
+                "{text}: normalization must not move the calendar date"
+            );
+            assert_eq!(
+                truncated.timestamp_subsec_nanos() % 1_000,
+                0,
+                "{text}: the result must be microsecond aligned"
+            );
+            assert!(
+                truncated.timestamp_subsec_nanos() <= value.timestamp_subsec_nanos(),
+                "{text}: sub-second remainder must be truncated, never rounded up"
+            );
+        }
     }
 
     #[test]

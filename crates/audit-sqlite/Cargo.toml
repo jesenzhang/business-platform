@@ -19,5 +19,14 @@ serde_json = { workspace = true }
 sqlx = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+# Test-only: the shared `audit_events` schema is bootstrapped by the document
+# SQLite migration catalog, so the chain regression tests run against real
+# migrations instead of a hand-copied `CREATE TABLE`. Dev-dependency only, the
+# reverse edge (`document-sqlite` dev-depends on `audit-sqlite`) means no
+# production dependency cycle is introduced.
+document-sqlite = { path = "../document-sqlite" }
+tokio = { workspace = true }
+
 [lints]
 workspace = true

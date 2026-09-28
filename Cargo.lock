@@ -295,8 +295,10 @@ dependencies = [
  "async-trait",
  "audit",
  "chrono",
+ "document-sqlite",
  "serde_json",
  "sqlx",
+ "tokio",
  "uuid",
 ]
 
