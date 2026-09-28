@@ -259,3 +259,13 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - [Round 2c gates incl. re-run PostgreSQL lanes — commit 8946e46](reviews/2026-09-27-wave3-round2c-gates/README.md).
 - [ADR-0027 Pipeline version pinning — Proposed](adr/ADR-0027-processing-pipeline-version-pinning.md).
 - [ADR-0028 Event envelope evolution — Proposed](adr/ADR-0028-processing-event-envelope-evolution.md).
+
+## PLAN-0014 Wave 4 reference conformance (2026-09-28)
+
+- [Wave 4 baseline — capability table + fixed references](reviews/2026-09-28-wave4-baseline.md).
+- [Document / Object Storage conformance review](reviews/2026-09-28-saas-align-document-storage.md).
+- [Observability conformance review](reviews/2026-09-28-saas-align-observability.md).
+- [Notification conformance review](reviews/2026-09-28-saas-align-notification.md).
+- [Wave 4 gates incl. real PostgreSQL lane — code commit 6fb9487](reviews/2026-09-28-wave4-gates/README.md).
+- [Real S3-compatible provider lane (RustFS) and teardown](reviews/2026-09-28-wave4-storage-lane/README.md).
+- ADR-0027 / ADR-0028 remain Proposed, NOT ACCEPTED; Wave 4 records them as R2 dependencies and invents no event envelope.

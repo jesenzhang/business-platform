@@ -761,3 +761,33 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
 - 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**。实现者不自填独立 PASS；两份 Wave 3 评审的独立记录仍为 `<pending>`。
   R1 声明仍需独立复审；**R2 BLOCKED**；Wave 4/5 未启动；ADR-0027/ADR-0028 仍 Proposed / NOT ACCEPTED。
   修复前写入 PostgreSQL 的不可验证行仍属需另行评审的运维事项，本轮不枚举、不重签名。
+
+## 2026-09-28 PLAN-0014 Wave 4 — Document / Object Storage / Observability / Notification reference conformance
+
+> Wave 4 在分支 `codex/plan-0014-wave4-reference-conformance`（Base `a4c2f74b`，未 push、未合并，`main`
+> 未改动）完成，代码候选 `6fb9487d045108c70efd41c88ccc95f0861ba603`。上一轮结论原文照录且未扩大：
+> 「Round 2c 修复通过；Wave 3 保持 R1 / NOT INTEGRATED；R2 阻塞项继续有效」。
+> 评审：`docs/reviews/2026-09-28-wave4-baseline.md`（Step A 能力基线 + Step B 固定参考）、
+> `docs/reviews/2026-09-28-saas-align-document-storage.md`、
+> `docs/reviews/2026-09-28-saas-align-observability.md`、
+> `docs/reviews/2026-09-28-saas-align-notification.md`；
+> 证据：`docs/reviews/2026-09-28-wave4-gates/`、`docs/reviews/2026-09-28-wave4-storage-lane/`。
+
+- 固定参考到 tag→SHA（Paperless-ngx v3.2.1、Documenso v2.18.0、Open Contracts v3.1.1、OTel spec
+  v1.61.0、Collector v0.161.0、RustFS 1.0.1-preview.11）；Novu 与 Mayan EDMS 在本环境无法固定，
+  按 BLOCKED 记录且不引用其行为结论。
+- 修复（failing-first）：幂等重放租户围栏 D-W4-01（SQLite+PG）；对象键/桶名进入日志与驱动错误文本
+  ST-W4-02；本地适配器伪 presign ST-W4-03；presign 过期无界 ST-W4-04；governance-worker 无 subscriber
+  OBS-W4-01；business-api 自建指标与客户端摘要 OBS-W4-03；provider 噪声 OBS-W4-02；`count()` 零覆盖
+  D-W4-05；notification 文档虚报。
+- 注册未修 C1：D-W4-02 复合外键、D-W4-06 文档资源无授权路径、D-W4-08/ST-W4-05 无元数据↔对象一致性扫描、
+  D-W4-09 PostgreSQL 缺 evidence↔revision/artifact 绑定触发器、D-W4-11 `document_links` 无 revision 绑定、
+  OBS-W4-05 无服务端关联身份（依赖 ADR-0028）、OBS-W4-06 exporter BLOCKED、OBS-W4-07 日志无脱敏、
+  N-G05 outbox relay 未接线。多数属 schema/公开契约变更 → 需设计提案，本轮未实现。
+- 真实通道：PostgreSQL 18.4 专用库 `plan0014_wave4`（3 target 全绿，结束后仅 DROP `plan0014_wave4%`）；
+  真实 S3-compatible 改用 RustFS（MinIO 开源二进制 `dl.min.io` → HTTP 410 已停发），专用桶+前缀，
+  lane 7/7、前缀 0 残留、桶已删、进程已停；`minio_contract.rs` 仍 BLOCKED/NOT RUN。
+- 门禁全绿：fmt / check / clippy `-D warnings` / workspace 测试 **759 passed / 0 failed / 59 ignored** /
+  architecture fitness PASS / `git diff --check`。59 ignored 不计为已执行。
+- 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**；R1 foundation，独立 verdict 待回填；
+  C1 未清零 ⇒ **R2 BLOCKED**；Wave 5 / PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。

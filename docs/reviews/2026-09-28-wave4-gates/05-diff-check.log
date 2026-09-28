@@ -1,0 +1,9 @@
+cmd: git diff --check
+start: 2026-09-28T11:05:12.9449800+08:00
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/business-worker/src/main.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/governance-worker/src/main.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/operational.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/notification/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/observability/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+diff_exit=0

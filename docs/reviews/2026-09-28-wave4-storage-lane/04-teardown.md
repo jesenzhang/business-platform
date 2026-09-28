@@ -1,0 +1,2 @@
+Provider teardown: rustfs.exe process stopped on 2026-09-28T11:04:02.3838020+08:00; GET /minio/health/live afterwards returned 000 (connection refused).
+Resources created and removed by this round: bucket plan0014-wave4-bucket (DeleteBucket Ok; anonymous HEAD then 403), objects under plan0014-wave4/run-20260928-110319/ (0 remaining), volume F:\Workspace\business-platform\.scratch\wave4-s3\data (deleted below).

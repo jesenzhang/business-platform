@@ -1,0 +1,133 @@
+clippy start 2026-09-28T10:57:11.8007062+08:00
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-2cnps1sc9fk0x\s-hmp79vxfiy-0jf0z9z-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-37kq18mklmghq\s-hmp79w8y3k-012qs8k-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-2dl19u7lovu03\s-hmp79w8isq-1gh6lvs-working`
+
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-0xc744e5gkvtl\s-hmp79wa1eb-1kbkern-working`
+
+warning: `audit-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-31zt1vyee5228\s-hmp9k5jdg5-1i6f981-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-350jy0cltfkxm\s-hmp79wa3ji-0as5rd8-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: `document-processing-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_postgres-2celgxe9ddziy\s-hmp79x4lfs-1wspq5m-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_sqlite-336tm49nm9opr\s-hmp79x5182-1lzdec6-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-1psicng3976rq\s-hmp9ib9q0y-1ypr71i-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-2b4o1avr5zrbi\s-hmp79x5s71-03hiok3-working`
+
+warning: `runtime-governance-postgres` (lib) generated 1 warning
+warning: `runtime-governance-sqlite` (lib) generated 1 warning
+warning: `document-postgres` (lib) generated 1 warning
+warning: `identity-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-3ce9g635n5ajb\s-hmp79x5b72-1vyj3e3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-1kfjl5vrg9lux\s-hmp79x61gq-0dfczww-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_postgres-3dx5tzzhek8hy\s-hmp79x61h0-1hoyce5-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_postgres-0jlod5og7rmww\s-hmp79x8s82-1rgckdn-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_postgres-3np2gdwlmp8il\s-hmp79x8s8x-05zwr3u-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_persistence_contracts-0ta2drxmmou8e\s-hmp9ibafxo-1hvy07b-working`
+
+warning: `organization-sqlite` (lib) generated 1 warning
+warning: `policy-sqlite` (lib) generated 1 warning
+warning: `policy-postgres` (lib) generated 1 warning
+warning: `identity-postgres` (lib) generated 1 warning
+warning: `organization-postgres` (lib) generated 1 warning
+warning: `document-persistence-contracts` (lib) generated 1 warning
+    Checking governance-worker v0.1.0 (F:\Workspace\business-platform\apps\governance-worker)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-0t32hu6950btk\s-hmook1c9zc-19ezb56-working`
+
+warning: `architecture-check` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2axxsc6tj2flw\s-hmp9k5m0to-1suz9bw-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-1h69uvifpgd4x\s-hmook1lc27-1xl67zq-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-1sx9chkktembf\s-hmook1ll61-07iuz3g-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2wxcenhfcf00z\s-hmp9k5pyox-0xxcs52-working`
+
+    Checking plan-0009-rehearsal v0.1.0 (F:\Workspace\business-platform\apps\plan-0009-rehearsal)
+    Checking agent-adapter v0.1.0 (F:\Workspace\business-platform\apps\agent-adapter)
+warning: `object-storage` (lib) generated 1 warning
+warning: `architecture-check` (bin "architecture-check") generated 1 warning
+warning: `architecture-check` (bin "architecture-check" test) generated 1 warning
+warning: `object-storage` (lib test) generated 1 warning
+    Checking business-api v0.1.0 (F:\Workspace\business-platform\apps\business-api)
+    Checking business-worker v0.1.0 (F:\Workspace\business-platform\apps\business-worker)
+    Checking ai-worker v0.1.0 (F:\Workspace\business-platform\apps\ai-worker)
+    Checking object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+    Checking document-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\agent_adapter-2y1cm2xawdm8n\s-hmp9urfsji-1ovibye-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\ai_worker-2oimg3sb6odgd\s-hmp9urjv3h-0qtoa17-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\minio_contract-3oqo8is29svli\s-hmp9urjuyk-1vaxqr2-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\agent_adapter-1tgn0hdnahc32\s-hmp9url5dp-0rqsej4-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\ai_worker-1bushtb1x65pm\s-hmp9urpnum-1e8ll4a-working`
+
+warning: `object-storage` (test "minio_contract") generated 1 warning
+    Checking document-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-sqlite)
+error: this function has too many lines (102/100)
+  --> apps\governance-worker\src\main.rs:18:7
+   |
+18 | async fn main() -> anyhow::Result<()> {
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_lines
+   = note: `-D clippy::too-many-lines` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::too_many_lines)]`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\perf_resolve-27z75ccu8bplk\s-hmp79zg3va-0qtwdnz-working`
+
+warning: `identity-postgres` (test "perf_resolve") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-21h0sdiqery2p\s-hmp9ibltj0-0k1s42w-working`
+
+warning: `document-postgres` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-1vb6poflggqp9\s-hmp79ylbp8-0sjim8y-working`
+
+warning: `identity-postgres` (test "contract") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\perf_authorize-1raillh10bb27\s-hmp79yp3xj-0vt5fw3-working`
+
+warning: `policy-postgres` (test "perf_authorize") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-20yga48w0tpx4\s-hmp79yikpq-05s36x2-working`
+
+warning: `organization-sqlite` (test "contract") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-359yh449j0os3\s-hmp79yp3vl-1ezukmb-working`
+
+warning: `organization-postgres` (test "contract") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\query_contracts-23ls6egatmbd3\s-hmp9k5rekk-1m0v5sf-working`
+
+warning: `document-postgres` (test "query_contracts") generated 1 warning
+error: could not compile `governance-worker` (bin "governance-worker") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: `agent-adapter` (bin "agent-adapter") generated 1 warning
+warning: `agent-adapter` (bin "agent-adapter" test) generated 1 warning
+error: could not compile `governance-worker` (bin "governance-worker" test) due to 1 previous error
+error: `panic` should not be present in production code
+   --> apps\business-worker\src\main.rs:898:17
+    |
+898 |                 panic!("a missing object must not be reported as success");
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#panic
+    = note: requested on the command line with `-D clippy::panic`
+
+error: could not compile `business-worker` (bin "business-worker" test) due to 1 previous error
+warning: `ai-worker` (bin "ai-worker") generated 1 warning
+warning: `ai-worker` (bin "ai-worker" test) generated 1 warning
+clippy_exit=101
