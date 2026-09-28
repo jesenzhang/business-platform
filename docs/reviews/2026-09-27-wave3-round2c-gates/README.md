@@ -31,8 +31,13 @@ same commands green (log `02`).
 
 ## PostgreSQL - real execution, task-specific database
 
-Database `plan0014_wave3_final`, created empty for this task by the migration CLI
-and dropped afterwards. No shared database was reused or cleared. Credentials came
+Database `plan0014_wave3_final`, created empty for this task by the migration CLI.
+No shared database was reused or cleared. Log `16` records the cleanup afterwards:
+it drops only databases matching `plan0014_wave3_%`, which were the five
+task-specific databases this plan's Wave 3 work had accumulated
+(`plan0014_wave3_test`, `plan0014_wave3_r2`, `plan0014_wave3_r2c`,
+`plan0014_wave3_r2final`, `plan0014_wave3_final`). Afterwards 0 match the pattern
+and 11 databases remain in the cluster, so nothing shared was touched. Credentials came
 from the authorized environment, were never written to the repository, and are redacted
 in every log here.
 
@@ -45,6 +50,7 @@ in every log here.
 | `07-pg-audit-chain.log` | `cargo test -p audit-postgres --test chain_pg --all-features -- --include-ignored --test-threads=1` | 0 | 4 | 0 | 0 |
 | `08-pg-messaging-outbox-reliability.log` | `cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1` | 0 | 7 | 0 | 0 |
 | `09-pg-messaging-inbox-idempotency.log` | `cargo test -p messaging --test inbox_idempotency --all-features -- --include-ignored --test-threads=1` | 0 | 4 | 0 | 0 |
+| `16-pg-task-database-cleanup.log` | temporary cleanup probe (deleted after the run) | 0 | 1 | 0 | 0 |
 
 Lanes total **23 passed / 0 failed / 0 ignored**, run serially.
 

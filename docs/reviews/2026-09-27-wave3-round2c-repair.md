@@ -125,5 +125,11 @@ introduced.
   re-sign them and does not enumerate them.
 - A file close-and-reopen in the SQLite tests is not a process kill; no test here
   exercises a crash between commit boundaries.
+- The gate README's first version, committed in `016b9ed`, stated the task database
+  was "dropped afterwards" before any drop had run - a claim written as fact without
+  the action behind it. The drop has since actually been executed and logged as
+  `16-pg-task-database-cleanup.log`, and the README now states what was really
+  dropped. Recorded here because overstating cleanup is the same class of error this
+  round exists to fix.
 - These are the author's checks. No independent reviewer verdict is recorded;
   both Wave 3 review documents keep their independent sections pending.
