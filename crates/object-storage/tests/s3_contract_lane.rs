@@ -1,13 +1,24 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
-//! PLAN-0014 Wave 4 - real S3-compatible provider contract lane.
+//! PLAN-0014 Wave 4 - real S3-compatible provider **contract step**.
 //!
 //! Wave 4 requires that the provider-neutral `ObjectStorageClient` contract is
 //! proven against a real S3-compatible implementation, not only against the
 //! in-memory fake or the local filesystem adapter. Every test here is
 //! `#[ignore]`d so the default workspace gate stays free of infrastructure
 //! dependencies, and is executed with `--ignored` against a dedicated endpoint,
-//! bucket and prefix (PLAN-0014 Wave 4 evidence directory
-//! `2026-09-28-wave4-storage-lane/`).
+//! bucket and prefix.
+//!
+//! Wave 4 Round 2 splits the lane in two. **This target is contract execution
+//! only.** Final cleanup lives in `tests/s3_lane_cleanup.rs`, and the fault
+//! scenarios for that split in `tests/s3_lane_fault_injection.rs`. They are
+//! separate binaries because CI runs them as separate steps, the cleanup step
+//! with `if: always()` and the same run id, so that:
+//!
+//! * cleanup happens even when every contract case failed;
+//! * a cleanup failure is reported as a cleanup failure, and cannot be folded
+//!   into a capability observation that passed;
+//! * a cleanup success cannot hide a contract failure, because the contract
+//!   step's own exit code is what the job reports.
 //!
 //! Required environment (never committed):
 //!
@@ -17,94 +28,28 @@
 //! * `WAVE4_S3_BUCKET`      - dedicated test bucket, created when missing
 //! * `WAVE4_S3_REGION`      - provider region, for example `us-east-1`
 //! * `WAVE4_S3_RUN_ID`      - unique id; all keys live under its prefix
+//! * `WAVE4_S3_CLEANUP_PAGE_SIZE` - optional, listing page size for cleanup
 //!
-//! Cleanup is limited to keys under `plan0014-wave4/<WAVE4_S3_RUN_ID>/`.
-//!
-//! Leak proof protocol: the harness runs tests in its own order, so the lane is
-//! executed twice with the same `WAVE4_S3_RUN_ID`. The first run performs the
-//! contract cases; the second run executes only
-//! `lane_leaves_no_objects_under_the_run_prefix`, which deletes and then counts
-//! whatever the first run left behind. Only that second invocation proves the
-//! whole lane is leak free.
+//! Everything this lane writes lives under `plan0014-wave4/<WAVE4_S3_RUN_ID>/`,
+//! and only the cleanup step deletes anything.
+
+mod support;
 
 use std::collections::BTreeMap;
 
 use bytes::Bytes;
 use futures_util::stream;
 use object_storage::{ObjectKey, ObjectStorageClient, S3Client, StorageError};
-
-#[allow(clippy::expect_used)]
-fn env(name: &str) -> String {
-    std::env::var(name).unwrap_or_else(|_| panic!("{name} must be set for the S3 contract lane"))
-}
-
-#[allow(clippy::expect_used)]
-fn run_prefix() -> String {
-    format!("plan0014-wave4/{}/", env("WAVE4_S3_RUN_ID"))
-}
-
-fn key_under_prefix(suffix: &str) -> String {
-    format!("{}{}", run_prefix(), suffix)
-}
-
-#[allow(clippy::expect_used)]
-fn client() -> S3Client {
-    S3Client::new(
-        &env("WAVE4_S3_ENDPOINT"),
-        &env("WAVE4_S3_ACCESS_KEY"),
-        &env("WAVE4_S3_SECRET_KEY"),
-        &env("WAVE4_S3_BUCKET"),
-        &env("WAVE4_S3_REGION"),
-    )
-}
-
-#[allow(clippy::expect_used)]
-fn sdk_client() -> aws_sdk_s3::Client {
-    use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
-    let credentials = Credentials::new(
-        env("WAVE4_S3_ACCESS_KEY"),
-        env("WAVE4_S3_SECRET_KEY"),
-        None,
-        None,
-        "contract-lane",
-    );
-    let config = aws_sdk_s3::Config::builder()
-        .behavior_version(BehaviorVersion::latest())
-        .endpoint_url(env("WAVE4_S3_ENDPOINT"))
-        .region(Region::new(env("WAVE4_S3_REGION")))
-        .credentials_provider(credentials)
-        .force_path_style(true)
-        .build();
-    aws_sdk_s3::Client::from_conf(config)
-}
-
-/// Create the dedicated test bucket when it does not exist yet. The lane never
-/// touches a bucket it was not given through `WAVE4_S3_BUCKET`.
-async fn ensure_bucket() {
-    let sdk = sdk_client();
-    let bucket = env("WAVE4_S3_BUCKET");
-    match sdk.create_bucket().bucket(&bucket).send().await {
-        Ok(_) => println!("LANE created dedicated bucket {bucket}"),
-        Err(error) => {
-            let text = error.to_string();
-            assert!(
-                text.contains("BucketAlreadyOwnedByYou")
-                    || text.contains("BucketAlreadyExists")
-                    || text.contains("already exist"),
-                "creating the dedicated bucket {bucket} failed: {text}"
-            );
-        }
-    }
-}
+use support::{bucket, ensure_bucket, env, key_under_prefix, port_client, run_prefix, sdk_client};
 
 async fn lane_client() -> S3Client {
     ensure_bucket().await;
-    client()
+    port_client()
 }
 
-async fn put(client: &S3Client, key: &str, body: &'static [u8], sha256: &str) {
+async fn put(client: &S3Client, key: &str, body: &[u8], sha256: &str) {
     let object_key = ObjectKey::new(key).expect("valid key");
-    let chunks = stream::iter([Ok(Bytes::from_static(body))]);
+    let chunks = stream::iter([Ok(Bytes::from(body.to_vec()))]);
     let mut metadata = BTreeMap::new();
     metadata.insert("sha256".to_string(), sha256.to_string());
     client
@@ -461,62 +406,21 @@ async fn lane_records_provider_capabilities() {
     delete_key(&client, &conditional_key).await;
 }
 
-/// The lane must not leave objects behind: cleanup is limited to this run's
-/// prefix and asserts the prefix is empty afterwards.
-#[tokio::test]
+/// What this step did *not* do, recorded so the evidence is read correctly:
+/// the contract step never deletes anything outside the individual cases' own
+/// cleanup, and it never deletes a bucket. Residue counting, incomplete
+/// multipart uploads and bucket teardown belong to
+/// `tests/s3_lane_cleanup.rs`, which CI runs as a separate `if: always()` step
+/// with the same `WAVE4_S3_RUN_ID`.
+#[test]
 #[ignore = "requires a running S3-compatible provider (WAVE4_S3_* environment)"]
-async fn lane_leaves_no_objects_under_the_run_prefix() {
-    ensure_bucket().await;
-    let sdk = sdk_client();
-    let bucket = env("WAVE4_S3_BUCKET");
-    let prefix = run_prefix();
-    let list = sdk
-        .list_objects_v2()
-        .bucket(&bucket)
-        .prefix(&prefix)
-        .send()
-        .await
-        .expect("list_objects_v2");
-    let mut removed = 0_usize;
-    for object in list.contents() {
-        if let Some(key) = object.key() {
-            sdk.delete_object()
-                .bucket(&bucket)
-                .key(key)
-                .send()
-                .await
-                .unwrap_or_else(|error| panic!("cleanup must delete {key}: {error}"));
-            removed += 1;
-        }
-    }
-    let after = sdk
-        .list_objects_v2()
-        .bucket(&bucket)
-        .prefix(&prefix)
-        .send()
-        .await
-        .expect("list_objects_v2 after cleanup");
-    let remaining = after.key_count().unwrap_or_default();
-    println!("LANE cleanup removed {removed} objects, remaining under {prefix}: {remaining}");
-    assert_eq!(remaining, 0, "the run prefix must be empty");
-}
-
-/// Optional teardown for a one-off lane run: removes the dedicated bucket
-/// itself. Only runs when `WAVE4_S3_DELETE_BUCKET=true`, so a bucket prepared
-/// for repeated runs is kept.
-#[tokio::test]
-#[ignore = "requires a running S3-compatible provider (WAVE4_S3_* environment)"]
-async fn lane_deletes_the_dedicated_bucket_when_requested() {
-    if std::env::var("WAVE4_S3_DELETE_BUCKET").ok().as_deref() != Some("true") {
-        println!("LANE bucket deletion skipped (WAVE4_S3_DELETE_BUCKET != true)");
-        return;
-    }
-    let sdk = sdk_client();
-    let bucket = env("WAVE4_S3_BUCKET");
-    sdk.delete_bucket()
-        .bucket(&bucket)
-        .send()
-        .await
-        .unwrap_or_else(|error| panic!("deleting the dedicated bucket {bucket} failed: {error}"));
-    println!("LANE deleted dedicated bucket {bucket}");
+fn contract_step_reports_its_scope() {
+    println!(
+        "LANE contract step scope bucket={} prefix={} endpoint={} page_size={}",
+        bucket(),
+        run_prefix(),
+        env("WAVE4_S3_ENDPOINT"),
+        support::page_size(),
+    );
+    println!("LANE contract step performs no cleanup of the run prefix and deletes no bucket");
 }

@@ -205,9 +205,23 @@ async fn storage_references_never_enter_the_log_stream() {
         }
     }
 
-    // Recorded for the review, not asserted: third-party spans (hyper, the AWS
-    // SDK) may carry the request URI, which contains the object key.
-    let leaking: Vec<String> = foreign_records(&captured)
+    // This subscriber captures everything on purpose, including the third-party
+    // records, so it can say nothing about whether they *would* be logged in
+    // production: it bypasses every filter. What it can say is that the capture
+    // really did see the provider's own records, which is what makes the
+    // assertion above non-vacuous — and it is the reason the SDK material has to
+    // be dropped at the observability boundary rather than trusted to the SDK.
+    // The negative assertion over those third-party records, including the
+    // bucket, object key, credential identifier and signed URL, is
+    // `tests/sdk_log_hygiene.rs`, which runs the same port through the
+    // production `observability::init_tracing`.
+    let foreign = foreign_records(&captured);
+    assert!(
+        !foreign.is_empty(),
+        "the capture saw no third-party records at all, so the provider-side \
+         premise of this test would be unverified"
+    );
+    let leaking: Vec<String> = foreign
         .iter()
         .map(ToString::to_string)
         .filter(|rendered| {
@@ -215,11 +229,14 @@ async fn storage_references_never_enter_the_log_stream() {
         })
         .collect();
     println!(
-        "third-party records containing a storage reference: {}",
+        "third-party records captured ({}), of which {} carry a storage reference \
+         that the observability boundary must drop: {}",
+        foreign.len(),
+        leaking.len(),
         if leaking.is_empty() {
-            "none".to_string()
+            "none on this SDK version".to_string()
         } else {
-            leaking.join(" | ")
+            "recorded; see tests/sdk_log_hygiene.rs for the assertion".to_string()
         }
     );
 }

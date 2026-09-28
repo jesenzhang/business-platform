@@ -16,7 +16,7 @@
 //! Anything that currently needs a notification must therefore not treat a
 //! successful submit as a successful delivery. The gap registry (gaps `N-G01`
 //! … `N-G04`) and the acceptance preconditions live in
-//! `docs/reviews/2026-09-28-saas-align-observability-notification.md`; the
+//! `docs/reviews/2026-09-28-saas-align-notification.md`; the
 //! decision there is to keep this crate inert until a real use case schedules
 //! it, rather than building a notification platform for reference alignment.
 //!

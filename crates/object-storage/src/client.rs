@@ -475,6 +475,8 @@ impl ObjectStorageClient for LocalStorageClient {
 #[allow(clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn local_storage_streams_and_deletes() {
@@ -604,21 +606,148 @@ mod tests {
         );
     }
 
+    /// Connector that fails on the first call and never opens a socket. See
+    /// [`offline_client`] for why the unit tests need one.
+    #[derive(Debug)]
+    struct OfflineConnector {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl aws_smithy_runtime_api::client::http::HttpConnector for OfflineConnector {
+        fn call(
+            &self,
+            _request: aws_smithy_runtime_api::client::orchestrator::HttpRequest,
+        ) -> aws_smithy_runtime_api::client::http::HttpConnectorFuture {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            aws_smithy_runtime_api::client::http::HttpConnectorFuture::new(std::future::ready(Err(
+                aws_smithy_runtime_api::client::result::ConnectorError::other(
+                    OFFLINE_TRANSPORT_MESSAGE.into(),
+                    None,
+                ),
+            )))
+        }
+    }
+
+    /// Selects [`OfflineConnector`], which replaces the SDK's
+    /// `default-https-client` connector.
+    #[derive(Debug, Clone)]
+    struct OfflineTransport {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl aws_smithy_runtime_api::client::http::HttpClient for OfflineTransport {
+        fn http_connector(
+            &self,
+            _settings: &aws_smithy_runtime_api::client::http::HttpConnectorSettings,
+            _components: &aws_smithy_runtime_api::client::runtime_components::RuntimeComponents,
+        ) -> aws_smithy_runtime_api::client::http::SharedHttpConnector {
+            aws_smithy_runtime_api::client::http::SharedHttpConnector::new(OfflineConnector {
+                calls: Arc::clone(&self.calls),
+            })
+        }
+    }
+
+    const OFFLINE_TRANSPORT_MESSAGE: &str = "plan0014-offline-test-transport";
+
+    /// Build an `S3Client` whose transport cannot reach a network.
+    ///
+    /// Two reasons this exists instead of pointing `S3Client::new` at a dead
+    /// endpoint:
+    ///
+    /// * installing a transport replaces the SDK's `default-https-client`
+    ///   connector, so the client is built without reading the operating
+    ///   system's root certificate store. A test that only checks that the
+    ///   platform rejected a parameter has no business depending on the host
+    ///   trust store, which a restricted container may not be able to open
+    ///   (`rustls` then panics with `TrustStore configured to enable native
+    ///   roots but no valid root certificates parsed!`). This is an execution
+    ///   environment difference, not a repository defect, and production TLS
+    ///   validation is left exactly as it is;
+    /// * it counts calls, so "rejected without calling the provider" becomes an
+    ///   observed fact rather than an assumption about code order.
+    ///
+    /// The struct fields are private to this module, and that is the seam: no
+    /// production constructor is added for test purposes.
+    #[must_use]
+    fn offline_client() -> (S3Client, Arc<AtomicUsize>) {
+        use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
+        let calls = Arc::new(AtomicUsize::new(0));
+        let config = aws_sdk_s3::Config::builder()
+            .behavior_version(BehaviorVersion::latest())
+            .endpoint_url("http://127.0.0.1:1")
+            .region(Region::new("us-east-1"))
+            .credentials_provider(Credentials::new(
+                "wave4-access",
+                "wave4-secret",
+                None,
+                None,
+                "offline-test",
+            ))
+            .force_path_style(true)
+            .http_client(OfflineTransport {
+                calls: Arc::clone(&calls),
+            })
+            .build();
+        (
+            S3Client {
+                client: aws_sdk_s3::Client::from_conf(config),
+                bucket: "plan0014-wave4-bucket".to_string(),
+            },
+            calls,
+        )
+    }
+
     /// The presign bound must be applied before any provider round trip.
     #[tokio::test]
     async fn presign_rejects_out_of_range_expiry_without_calling_the_provider() {
-        let client = S3Client::new(
-            "http://127.0.0.1:1",
-            "wave4-access",
-            "wave4-secret",
-            "plan0014-wave4-bucket",
-            "us-east-1",
-        );
+        let (client, calls) = offline_client();
         let key = ObjectKey::new("presign/bounded.bin").expect("key");
         let result = client.presign(&key, MAX_PRESIGN_EXPIRES_SECS + 1).await;
         assert!(
             matches!(result, Err(StorageError::Presign(_))),
             "expected a bounded presign refusal, got {result:?}"
+        );
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            0,
+            "the bound must be enforced before the transport is used"
+        );
+    }
+
+    /// Proves the offline transport above is really the one wired in. Without
+    /// this, the zero-call assertion could be passing because the client never
+    /// got as far as selecting a connector at all.
+    #[tokio::test]
+    async fn the_offline_transport_is_the_client_transport() {
+        let (client, calls) = offline_client();
+        let key = ObjectKey::new("transport/probe.bin").expect("key");
+        let error = client
+            .delete(&key)
+            .await
+            .expect_err("an offline transport cannot delete an object");
+        assert!(
+            matches!(error, StorageError::S3(_)),
+            "an offline transport must surface as a provider failure, got {error:?}"
+        );
+        assert!(
+            calls.load(Ordering::Relaxed) > 0,
+            "the offline transport recorded no call, so the SDK used something else"
+        );
+    }
+
+    /// A transport failure must not be reported as "not found": callers decide
+    /// visibility from that variant.
+    #[tokio::test]
+    async fn a_transport_failure_is_not_mistaken_for_a_missing_object() {
+        let (client, _calls) = offline_client();
+        let key = ObjectKey::new("visibility/probe.bin").expect("key");
+        let error = client
+            .head(&key)
+            .await
+            .expect_err("an offline transport cannot read metadata");
+        assert!(
+            !matches!(error, StorageError::NotFound(_)),
+            "an offline transport was reported as a missing object: {error}"
         );
     }
 }

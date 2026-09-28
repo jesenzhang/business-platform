@@ -197,6 +197,25 @@ jobs:
         command: server /data
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/business_platform
+      # PLAN-0014 Wave 4: the real S3-compatible provider lane runs against the
+      # job's own throwaway MinIO service and only ever writes under its
+      # dedicated `plan0014-wave4/<run id>/` prefix. Job-level, not step-level,
+      # so the contract step and the always() cleanup step below are guaranteed
+      # to agree on one run id: the cleanup scope is derived from it, and a
+      # mismatch would make cleanup clean a prefix that was never written and
+      # leave the real residue in the bucket.
+      WAVE4_S3_ENDPOINT: http://127.0.0.1:9000
+      WAVE4_S3_ACCESS_KEY: minioadmin
+      WAVE4_S3_SECRET_KEY: minioadmin
+      # Shared by every run of this job, therefore on the lane's protected list:
+      # the cleanup step refuses to delete it. Only keys under the run prefix
+      # are ever touched.
+      WAVE4_S3_BUCKET: contract-test-bucket
+      WAVE4_S3_REGION: us-east-1
+      WAVE4_S3_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      # Small on purpose: cleanup has to follow continuation tokens, and a page
+      # size of 1000 would let a single listing hide any residue.
+      WAVE4_S3_CLEANUP_PAGE_SIZE: "3"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.94.1
@@ -209,16 +228,10 @@ jobs:
       - name: Apply migrations
         run: cargo run -p migration -- --backend postgres up
       - name: Run real infrastructure and E2E tests
-        env:
-          # PLAN-0014 Wave 4: the real S3-compatible contract lane runs against
-          # the job's own throwaway MinIO service and only ever writes under its
-          # dedicated `plan0014-wave4/<run id>/` prefix, which it deletes again.
-          WAVE4_S3_ENDPOINT: http://127.0.0.1:9000
-          WAVE4_S3_ACCESS_KEY: minioadmin
-          WAVE4_S3_SECRET_KEY: minioadmin
-          WAVE4_S3_BUCKET: contract-test-bucket
-          WAVE4_S3_REGION: us-east-1
-          WAVE4_S3_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        # The S3 provider lane is not in this list: it is two steps of its own
+        # below, so that cleanup can run with `if: always()` after it, and so a
+        # cleanup failure is never reported as a contract failure (or the other
+        # way round). `WAVE4_S3_*` lives at job level for the same reason.
         run: |
           cargo test -p document-sqlite --all-features
           cargo test -p document-processing --all-features
@@ -251,8 +264,8 @@ jobs:
           cargo test -p messaging --test inbox_idempotency --all-features -- --include-ignored --test-threads=1
           cargo test -p object-storage --lib --all-features
           cargo test -p object-storage --test log_hygiene --all-features
+          cargo test -p object-storage --test sdk_log_hygiene --all-features
           cargo test -p object-storage --test minio_contract --all-features -- --include-ignored --test-threads=1
-          cargo test -p object-storage --test s3_contract_lane --all-features -- --ignored --test-threads=1 --nocapture
           cargo test -p business-api --test documents_postgres --all-features -- --include-ignored --test-threads=1
           cargo test -p business-api --test plan_0008_postgres_minio --all-features -- --include-ignored --test-threads=1
           cargo test -p business-api --test e2e_admin_bootstrap_postgres --all-features -- --include-ignored --test-threads=1
@@ -260,6 +273,37 @@ jobs:
           cargo test -p business-worker --all-features
           cargo test -p business-worker --test postgres_minio_processing --all-features -- --include-ignored --test-threads=1
           bash scripts/test-postgres-minio-multiprocess.sh
+      # ---- PLAN-0014 Wave 4 Round 2: the S3 provider lane, in two steps ----
+      # Step 1 records the provider under test, because "the lane passed" only
+      # means something with a version attached to it.
+      - name: S3 lane — record the provider under test
+        if: always()
+        run: |
+          echo "provider image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z"
+          curl -sS -o /dev/null -D - http://127.0.0.1:9000/ | grep -i -E '^(server|x-amz-[a-z-]*):' || true
+          echo "scope: bucket=${WAVE4_S3_BUCKET} prefix=plan0014-wave4/${WAVE4_S3_RUN_ID}/ page=${WAVE4_S3_CLEANUP_PAGE_SIZE}"
+      # Step 2: contract execution. Writes only; deletes only what each case
+      # created inside its own key. Its exit code is the contract verdict.
+      - name: S3 lane — contract step
+        run: |
+          cargo test -p object-storage --test s3_contract_lane --all-features -- --ignored --test-threads=1 --nocapture
+      # Step 3: the split itself, under injected failure. These cases fail a
+      # child process on purpose and assert cleanup still empties the scope
+      # afterwards; they are the only proof that the always() step below is
+      # doing something other than tidying an already-clean bucket.
+      - name: S3 lane — cleanup fault scenarios
+        if: always()
+        run: |
+          cargo test -p object-storage --test s3_lane_fault_injection --all-features -- --ignored --test-threads=1 --nocapture
+      # Step 4: final cleanup. `if: always()` because the residue that matters
+      # is exactly the residue a failed contract run leaves behind, and the same
+      # job-level WAVE4_S3_RUN_ID because the prefix to empty is derived from it.
+      # Its own exit code: a cleanup failure fails this step and nothing else,
+      # and a clean-up-green never overwrites a contract-red.
+      - name: S3 lane — final cleanup (always)
+        if: always()
+        run: |
+          cargo test -p object-storage --test s3_lane_cleanup --all-features -- --ignored --test-threads=1 --nocapture
       - name: Backup/restore drill selftest (path guards, cleanup ownership)
         run: DRILL_SELFTEST=1 bash deploy/operations/drill-backup-restore.sh
       - name: Install MinIO client (pinned release, checksum-verified)

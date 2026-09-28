@@ -37,6 +37,17 @@ reqwest = { workspace = true }
 # provider-neutral port deliberately does not expose.
 aws-sdk-s3 = { version = "1", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "sigv4a"] }
 aws-smithy-types = "1"
+# tests/sdk_log_hygiene.rs drives a real S3 SDK operation through the
+# production observability initialisation, so the provider safety boundary is
+# verified on the crate that actually emits the material.
+observability = { workspace = true }
+# Only for the unit tests' no-network transport (see
+# `src/client.rs` `tests::offline_client`): implementing `HttpClient` needs the
+# trait, and it is the same crate version the SDK already compiles against.
+# Test-only — no production target depends on it.
+aws-smithy-runtime-api = "1"
+# tests/sdk_log_hygiene.rs needs a raw fmt subscriber for its negative control.
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
