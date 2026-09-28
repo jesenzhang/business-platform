@@ -17,9 +17,17 @@
 | 5 | Architecture | `pwsh -NoProfile -File scripts/check-architecture.ps1` | 0 | Cargo metadata fitness PASS, OpenAPI contract PASS, architecture fitness PASS (`04-check-architecture.log`) |
 | 6 | Diff hygiene | `git diff --check` | 0 | no whitespace errors; only CRLF-normalisation warnings (`05-diff-check.log`) |
 
-Superseded intermediate runs are kept under
-`superseded-intermediate-run2/` (they captured the clippy findings that were
-fixed inside this wave; nothing is deleted).
+`superseded-intermediate-run2/` keeps the last superseded gate pair: clippy
+flagged `clippy::too_many_lines` in `governance-worker::main` and
+`clippy::panic` in the new worker test, and `cargo test` failed the new
+`business-worker` missing-object case because its own assertion was wrong (it
+forbade the substring `source`, which the legitimate message
+"source object was not found" contains). Both were fixed before the recorded
+green run. Two earlier intermediate runs were overwritten by the next gate
+invocation rather than archived; their findings are described in
+`../2026-09-28-wave4-storage-lane/README.md` (the capability-probe bugs) and in
+the commit messages. No test was deleted, no assertion weakened and no
+exemption widened to reach green.
 
 ## 2. Real infrastructure lanes
 
