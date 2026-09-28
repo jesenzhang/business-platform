@@ -899,3 +899,35 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
 - 状态：**READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED**（PG BLOCKED 已解除）。实现者不自填独立 PASS；
   两份正式评审的独立记录仍为 `<pending>`。R1 仅在独立复审通过后成立，**R2 BLOCKED**；Wave 4/5 未启动，
   PLAN-0015 / PLAN-0006 未激活。
+
+## 2026-09-27 Wave 3 Round 2c 审计时间精度回归修复
+
+- 起点 HEAD `0ac031af1344af4a8fa4d91c314cf3563065e1bf`（Round 2b closeout）。本轮只处理审计时间规范化、历史恢复与相应回归证据。
+- **R1（产品缺陷，Round 2b 引入的回归）**：`AuditEvent::rehydrate` 通过 `Self::new` 做校验，而 `new` 会规范化 `occurred_at`；
+  `rehydrate` 只回写 `recorded_at`，未回写原始 `occurred_at`。SQLite 以 RFC 3339 文本存储时间，历史行可带纳秒尾数，
+  读取时被截断导致 `hash_record` 不再等于库中 `record_hash`，`verify_chain` 把完好的历史链判为损坏。
+  Round 2b 的记录与持久化架构文档当时写的是“`rehydrate` 不做归一化”，**代码与文档不一致**——文档描述的是应有行为，代码未实现。
+  修复：`rehydrate` 在 `new` 完成全部领域校验后，按存储值原样回写 `occurred_at` 与 `recorded_at`。
+- **R2（产品缺陷）**：`canonical_timestamp` 用 `Utc.timestamp_nanos(timestamp_micros() * 1_000)` 重建时刻；
+  epoch 微秒数 ×1000 在公元 2262-04-11 之后超出 `i64` 纳秒范围，debug 下 panic、release 下回绕后进入签名。
+  修复：只原位截断亚秒部分（`with_nanosecond(timestamp_subsec_nanos() / 1_000 * 1_000)`），不做 epoch 级乘法，
+  任意可表示时刻的日期与整秒均不变（含 1970 年以前）。
+- **顺带加固**：`with_chain_metadata` 原先只规范化 `recorded_at`。它是“即将写入并签名”的转换点，
+  若事件经 `rehydrate` 携带历史纳秒精度再签名，会在 PostgreSQL 上重现不可验证行缺陷；现同时规范化 `occurred_at`。
+- 未改变哈希算法、canonical payload、`chain_version` 语义、genesis、排序或历史签名；未重签名任何历史记录；无迁移触碰历史时间戳。
+- 失败先行证据：`docs/reviews/2026-09-27-wave3-round2c-gates/`。`00` 为两项修复同时回退时的失败复现
+  （溢出 panic + `occurred_at` 未按存储值恢复），`01` 为仅回退 R1 时 SQLite 真实 repository 层失败，
+  `superseded-intermediate-run/` 保留被加固改动超越的中间一次 lane 运行及其原因。
+  历史 `record_hash` 期望值 `12b8823d…f815` 为按修复前历史算法冻结、并在本 crate 之外独立重算校验的常量，不由被测构造路径生成。
+- 测试：audit 单测新增历史恢复、边界范围、重签名三类；`crates/audit-sqlite/tests/historical_chain.rs`
+  经真实 `SqliteAuditStore` + 真实迁移目录验证纳秒历史行读回后摘要复现、链校验通过，且新的微秒精度写入可链入其后并含篡改负例；
+  `chain_pg.rs` 新增真实 PostgreSQL 精度往返测试。
+- 验证：`cargo test -p audit -p audit-sqlite -p document-sqlite --all-features` 25 passed / 0 failed；
+  任务专用空库 `plan0014_wave3_r2final`（PostgreSQL 18.4，`occurred_at`/`recorded_at` 实测 `datetime_precision = 6`）
+  上迁移 CLI 退出码 0，五条 lane **23 passed / 0 failed / 0 ignored**（contracts 3、cancel_factuality_pg 5、chain_pg 4、
+  outbox_reliability 7、inbox_idempotency 4）。六项完整门禁结果见同一目录 `10`–`15`。
+- **Round 2b 的 22 项 PostgreSQL 通过不覆盖本次历史恢复缺陷**：PostgreSQL 存储即微秒，无纳秒尾数可被读回破坏；
+  只有 SQLite 文本存储能保存会被错误归一化的历史，而当时没有测试读回这类行。
+- 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**。实现者不自填独立 PASS；两份 Wave 3 评审的独立记录仍为 `<pending>`。
+  R1 声明仍需独立复审；**R2 BLOCKED**；Wave 4/5 未启动；ADR-0027/ADR-0028 仍 Proposed / NOT ACCEPTED。
+  修复前写入 PostgreSQL 的不可验证行仍属需另行评审的运维事项，本轮不枚举、不重签名。

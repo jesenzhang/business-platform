@@ -1,0 +1,18 @@
+== cargo test -p messaging --test outbox_reliability --all-features -- --include-ignored --test-threads=1 ==
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.67s
+     Running tests\outbox_reliability.rs (target\debug\deps\outbox_reliability-06f8f52e776617d4.exe)
+
+running 7 tests
+test concurrent_claim_100_has_unique_ownership ... ok
+test concurrent_claim_no_duplicates ... ok
+test deterministic_claim_order ... ok
+test expired_lease_recovery ... ok
+test failure_schedules_retry ... ok
+test max_attempts_reached ... ok
+test stale_worker_cannot_publish_or_fail ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.95s
+
+
+EXIT_CODE=0
+

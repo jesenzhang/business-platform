@@ -13,7 +13,11 @@ same base/candidate; cross-references D-Gxx).
 
 > Current status: Round 2 final candidate `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a`;
 > real PostgreSQL lanes EXECUTED on PostgreSQL 18.4 (22 passed / 0 failed / 0 ignored),
-> which exposed and closed one further C1 (A-G09). NOT INTEGRATED; independent
+> which exposed and closed one further C1 (A-G09). Round 2c then found that A-G09's
+> fix had regressed recovery of historically signed rows (A-G10) and that the normalization
+> helper itself overflowed (A-G11); both reproduced by failing tests, then repaired, and
+> the lanes re-EXECUTED on a fresh database (23 passed / 0 failed / 0 ignored).
+> NOT INTEGRATED; independent
 > re-review pending. See §14.
 
 ## 1. Review question and method
@@ -213,6 +217,30 @@ obligation: PostgreSQL rows written before the fix remain unverifiable and
 require a separate reviewed repair plus an operator-facing detection query —
 not automatic re-signing. Wave 4 follow-up.
 
+### Found and repaired in Round 2c (author-repaired, awaiting independent review)
+
+**A-G10 - Round 2b's precision fix broke recovery of historically signed rows.**
+Current behavior (pre-fix, at `0ac031a`): `AuditEvent::rehydrate` validated a row by
+delegating to `AuditEvent::new`, which canonicalizes `occurred_at`, and then wrote
+back only `recorded_at`. A stored `occurred_at` carrying a sub-microsecond tail came
+back truncated, so `hash_record` no longer equalled the stored `record_hash` and
+`verify_chain` reported an intact chain as broken. `SQLite` stores timestamps as
+RFC 3339 text, so pre-Round 2b rows genuinely carry that tail. The Round 2b record
+and `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE` both asserted that
+`rehydrate` does not normalize - the documentation described the required behavior
+and the code did not implement it.
+Violated contract: SECURITY_ARCHITECTURE audit-integrity (tamper verification must
+not produce false positives against intact history).
+Repaired in Round 2c; see [Round 2c repair record](2026-09-27-wave3-round2c-repair.md).
+Independent review NOT RUN.
+
+**A-G11 - the timestamp conversion overflowed instead of normalizing.**
+`canonical_timestamp` rebuilt the instant as
+`Utc.timestamp_nanos(value.timestamp_micros() * 1_000)`. The epoch microsecond count
+times 1000 exceeds `i64` nanoseconds after 2262-04-11, so the conversion panicked in
+debug and wrapped in release - feeding a wrong instant into a signature. Boundary
+tests now pin 1900, 1969, 2262 and 2500. Repaired in Round 2c; independent review
+NOT RUN.
 ## 8. Decision register (references → dispositions)
 
 | Reference mechanism | Disposition | Why |
@@ -347,3 +375,33 @@ PASS / PASS WITH C2-C3 / FAIL. R2 admission is not on the table for Wave 3.</pen
 ## 13. Round 2 independent finding and repair
 
 Round 1 reviewed HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6`: **FAIL / NEEDS REPAIR**. Document-only migration/create regressed and explicit version-0 rows with protected hashes were silently downgraded to valid legacy. Both were reproduced before fixing. [Round 2 repair](2026-09-27-wave3-round2-repair.md) and [ADR-0028](../adr/ADR-0028-processing-event-envelope-evolution.md) describe changes and unresolved scope. Current matrix rows override historical overclaims; this repair is not an independent PASS.
+
+## 15. Round 2c - audit timestamp precision regression (2026-09-28)
+
+Round 2b closed the unverifiable-new-row defect by normalizing hashed timestamps
+before signing, and stated that `rehydrate` does not normalize. Round 2c found the
+code did not honour that statement (A-G10) and that the normalization helper itself
+overflowed (A-G11). Both were reproduced by failing tests before being fixed, and
+both are recorded in the [Round 2c repair record](2026-09-27-wave3-round2c-repair.md).
+
+**Round 2b's 22 passing PostgreSQL lanes did not cover this.** PostgreSQL stores
+`TIMESTAMPTZ` at microsecond precision - confirmed in this round's probe as
+`datetime_precision = 6` for both `occurred_at` and `recorded_at` - so on PostgreSQL
+there is no stored nanosecond tail for a reader to corrupt. Only the `SQLite`
+adapter, which stores RFC 3339 text, holds history that the Round 2b reader mangled,
+and no test read such a row back. The new coverage is deliberately at that layer:
+`crates/audit-sqlite/tests/historical_chain.rs` inserts a nanosecond historical row,
+reads it through the real `SqliteAuditStore`, and expects a digest frozen from the
+historical algorithm rather than recomputed by the code under test.
+
+Round 2c validation (author's own checks, not an independent verdict): targeted
+crates 25 passed / 0 failed; five PostgreSQL lanes on the fresh dedicated database
+`plan0014_wave3_r2final` 23 passed / 0 failed / 0 ignored, including a new real-
+PostgreSQL precision round-trip test; six repository gates in
+`docs/reviews/2026-09-27-wave3-round2c-gates/`. An intermediate lane run superseded
+by a later code change is retained under `superseded-intermediate-run/` with its
+reason, not deleted.
+
+State: **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**. Not integrated, not
+pushed, no merge, Wave 4 and Wave 5 not started. ADR-0027 and ADR-0028 remain
+Proposed / NOT ACCEPTED.

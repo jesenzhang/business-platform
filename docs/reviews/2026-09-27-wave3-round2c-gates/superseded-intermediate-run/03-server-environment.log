@@ -1,0 +1,33 @@
+== PostgreSQL server environment for the Round 2c run ==
+== database plan0014_wave3_r2c; temporary probe source deleted after this run ==
+   Compiling audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp6v8n5kq-04r6l80-working`
+
+   Compiling audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-32ayjsvkvf7bh\s-hmp6v986b7-0u0rnnz-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: `audit-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\wave3_pg_env_probe-3p9o4da1k6q9a\s-hmp6vamnx3-0d5tij2-working`
+
+warning: `audit-postgres` (test "wave3_pg_env_probe") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.66s
+     Running tests\wave3_pg_env_probe.rs (target\debug\deps\wave3_pg_env_probe-707fb7eb6ae3925d.exe)
+
+running 1 test
+test capture_server_environment ... PG_VERSION=PostgreSQL 18.4 on x86_64-windows, compiled by msvc-19.44.35227, 64-bit
+PG_SERVER_VERSION=18.4
+PG_LC_MESSAGES=Chinese (Simplified)_China.936
+PG_AUDIT_TIMESTAMP_COLUMN type="timestamp with time zone" datetime_precision=Some(6)
+PG_AUDIT_TIMESTAMP_COLUMN type="timestamp with time zone" datetime_precision=Some(6)
+PG_OUTBOX_TENANT_ID_TYPE=character varying
+PG_PUBLIC_TABLES_IN_CONNECTED_DB=43
+PG_APPLIED_MIGRATIONS=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+PG_AUDIT_ROWS_BEFORE_LANES=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+EXIT_CODE=0
+

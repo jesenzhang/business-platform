@@ -1,0 +1,12 @@
+{
+  "base": "0ac031af1344af4a8fa4d91c314cf3563065e1bf",
+  "code_candidate": "8946e46b03ac5516e7bf6e09f4f58382aafd4bd3",
+  "note": "SHA-256 of final working-tree bytes, identical to the tree committed as code_candidate. Gate logs 00-15 in this directory were produced against exactly these bytes. The closeout HEAD that carries this record is recorded in the repair document, not here, because this file is part of that closeout commit.",
+  "sha256": {
+    "crates/audit/src/lib.rs": "49940a0163bffafda66d4361c13024f96d2fa0754c87d69e51c21fdd61d856b7",
+    "crates/audit-sqlite/Cargo.toml": "fd5d73cb32b7c8ccf40021b51381ebff64bc8fd4f75d089d96e5e71907869244",
+    "crates/audit-sqlite/tests/historical_chain.rs": "37bf9078548844a157f155e1f2674229ae5120d9e66cfb269d969ff39356fcfd",
+    "crates/audit-postgres/tests/chain_pg.rs": "86868a9205b245e7d5f5fb8e54deef9fd67a65fd5b9aec1ca642242daecc62e3",
+    "Cargo.lock": "3932b1092b8a732d080239fe1fbecf5fafbd8f50394d9dc99d2ba02f33106c45"
+  }
+}

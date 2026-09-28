@@ -1,7 +1,7 @@
 # PLAN-0014 Wave 3 — Durable Task Execution Reference Conformance Review
 
 > Wave: PLAN-0014 Wave 3 (Durable Task Execution / Audit / Messaging)
-> Status: Round 1 independent verdict **FAIL / NEEDS REPAIR**; Round 2 final candidate `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` — PostgreSQL lanes EXECUTED on PostgreSQL 18.4 (22 passed / 0 failed / 0 ignored). NOT INTEGRATED; independent re-review pending. See §14
+> Status: Round 1 independent verdict **FAIL / NEEDS REPAIR**; Round 2 final candidate `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` — PostgreSQL lanes EXECUTED on PostgreSQL 18.4 (22 passed / 0 failed / 0 ignored). Round 2c repaired an audit timestamp regression that those 22 lanes did not cover; lanes re-EXECUTED on a fresh database (23 passed / 0 failed / 0 ignored). NOT INTEGRATED; independent re-review pending. See §14, §15
 > Review date: 2026-09-27 (actual start date of Wave 3; no date back-filling)
 > Branch: `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`
 > Base: `443a11cabdce1dd34006feaf08aa8be3382150c1` (Wave 2 closeout commit on the Wave 2 branch; Wave 2 itself remains NOT INTEGRATED)
@@ -344,3 +344,29 @@ not on the table for Wave 3.</pending>
 ## 13. Round 2 correction
 
 [Repair record](2026-09-27-wave3-round2-repair.md) supersedes Round 1 acceptance claims where they conflict. Historical gate logs remain historical. D-G03 is open C1 ([ADR-0027](../adr/ADR-0027-processing-pipeline-version-pinning.md)); D-G06 is open C1 ([ADR-0028](../adr/ADR-0028-processing-event-envelope-evolution.md)). Both proposals are NOT ACCEPTED. No independent PASS for the repair.
+
+## 15. Round 2c - messaging lanes re-run after an audit-side repair (2026-09-28)
+
+Round 2c changed no messaging code. It is recorded here because the same five
+lanes were the acceptance gate, and because the Round 2c defect is a limit on what
+§14's result can be read to prove.
+
+Round 2b's 22 PostgreSQL passes did not cover recovery of historically signed audit
+rows. `audit_events.occurred_at` and `recorded_at` are `timestamp with time zone`
+with `datetime_precision = 6` - re-confirmed by probe in this round - so a
+PostgreSQL row can never hold the sub-microsecond tail that Round 2b's reader
+truncated. The defect was only reachable through the `SQLite` adapter, which stores
+RFC 3339 text, and no test read such a row back. Messaging passed for the right
+reasons and simply never exercised the broken path. See A-G10 in the
+[audit review](2026-09-27-saas-align-audit-messaging.md) and the
+[Round 2c repair record](2026-09-27-wave3-round2c-repair.md).
+
+Re-run on the final tree against the fresh dedicated database
+`plan0014_wave3_r2final` (created empty by the migration CLI, 43 public tables,
+migration ledger 1-19, 0 audit rows before the lanes): `outbox_reliability` 7 passed,
+`inbox_idempotency` 4 passed, plus `contracts` 3, `cancel_factuality_pg` 5 and
+`chain_pg` 4 — **23 passed / 0 failed / 0 ignored**, all exit code 0. The +1 test is
+the new audit precision round-trip.
+
+State unchanged: **READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**, ADR-0027 and
+ADR-0028 Proposed / NOT ACCEPTED, Wave 4 and Wave 5 not started.

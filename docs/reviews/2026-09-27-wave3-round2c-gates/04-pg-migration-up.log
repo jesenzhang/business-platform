@@ -1,0 +1,47 @@
+== cargo run -p migration -- --backend postgres up  (creates the dedicated database) ==
+   Compiling audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+   Compiling audit-sqlite v0.1.0 (F:\Workspace\business-platform\crates\audit-sqlite)
+   Compiling document-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-sqlite)
+   Compiling document-processing-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-processing-sqlite)
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-0p0x36wa30eyi\s-hmp787a440-1juzohr-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-3g6yc4sajpect\s-hmp787c067-1blrnsk-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-2ojj5z4ikf8jv\s-hmp787dy5u-0xhx8x5-working`
+
+   Compiling organization-sqlite v0.1.0 (F:\Workspace\business-platform\crates\organization-sqlite)
+   Compiling policy-sqlite v0.1.0 (F:\Workspace\business-platform\crates\policy-sqlite)
+   Compiling identity-sqlite v0.1.0 (F:\Workspace\business-platform\crates\identity-sqlite)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-3t9lnn87gnawo\s-hmp7895r1f-09ahq1l-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-0xfo8jb4jey3g\s-hmp7895r1f-0krsvlw-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-2ckudq535vvuo\s-hmp78955nl-0s3mqw4-working`
+
+warning: `document-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: `organization-sqlite` (lib) generated 1 warning
+warning: `identity-sqlite` (lib) generated 1 warning
+warning: `policy-sqlite` (lib) generated 1 warning
+   Compiling migration v0.1.0 (F:\Workspace\business-platform\apps\migration)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\migration-0lbb2ohzone10\s-hmp78di1yu-0scdcn6-working`
+
+warning: `migration` (bin "migration") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.26s
+     Running `target\debug\migration.exe --backend postgres up`
+2026-09-28T01:22:18.224259Z  INFO migration: Creating database
+2026-09-28T01:22:19.566101Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary="CREATE DATABASE \"plan0014_wave3_final\"" db.statement="" rows_affected=0 rows_returned=0 elapsed=1.2781532s elapsed_secs=1.2781532 slow_threshold=1s
+2026-09-28T01:22:19.662838Z  INFO migration: Applying migrations
+2026-09-28T01:22:19.902660Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的列 "published_at" 已经存在，跳过
+2026-09-28T01:22:19.970143Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_status_check" 不存在
+2026-09-28T01:22:19.970184Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_attempt_count_check" 不存在
+2026-09-28T01:22:19.970210Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_max_attempts_check" 不存在
+2026-09-28T01:22:19.970219Z  INFO sqlx::postgres::notice: 关系 "outbox_events" 的 约束"outbox_published_compatibility_check" 不存在
+2026-09-28T01:22:20.216169Z  INFO migration: All migrations applied successfully
+
+EXIT_CODE=0
+

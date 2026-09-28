@@ -255,5 +255,7 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - [Round 2 candidate gates — commit 81640e7](reviews/2026-09-27-wave3-round2-gates/README.md).
 - [PostgreSQL lanes, first real run and root causes](reviews/2026-09-27-wave3-round2-gates/pg-discovery/README.md).
 - [Final candidate gates incl. real PostgreSQL lanes — commit 2f9976e](reviews/2026-09-27-wave3-round2-final-candidate-gates/README.md).
+- [Round 2c audit timestamp precision repair (R1/R2 regressions)](reviews/2026-09-27-wave3-round2c-repair.md).
+- [Round 2c gates incl. re-run PostgreSQL lanes — commit 8946e46](reviews/2026-09-27-wave3-round2c-gates/README.md).
 - [ADR-0027 Pipeline version pinning — Proposed](adr/ADR-0027-processing-pipeline-version-pinning.md).
 - [ADR-0028 Event envelope evolution — Proposed](adr/ADR-0028-processing-event-envelope-evolution.md).

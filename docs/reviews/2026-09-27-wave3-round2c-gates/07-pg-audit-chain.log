@@ -1,0 +1,25 @@
+== cargo test -p audit-postgres --test chain_pg --all-features -- --include-ignored --test-threads=1 ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-32ayjsvkvf7bh\s-hmp78kgxk1-0744o7b-working`
+
+warning: `audit-postgres` (lib) generated 1 warning
+   Compiling audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\chain_pg-2fv2p0by4gdbj\s-hmp78wzml5-1vl4w6a-working`
+
+warning: `audit-postgres` (test "chain_pg") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.80s
+     Running tests\chain_pg.rs (target\debug\deps\chain_pg-846e36de7caa8f3a.exe)
+
+running 4 tests
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ok
+test concurrent_appends_form_one_verified_tenant_chain ... ok
+test legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them ... ok
+test nanosecond_input_verifies_after_a_postgres_precision_round_trip ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+
+
+EXIT_CODE=0
+

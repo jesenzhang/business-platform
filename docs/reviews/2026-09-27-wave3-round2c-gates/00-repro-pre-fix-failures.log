@@ -1,0 +1,47 @@
+== REPRODUCTION: cargo test -p audit --lib against the PRE-FIX implementation ==
+Both Round 2c fixes temporarily restored to their pre-fix form, then reverted again:
+  1. canonical_timestamp: Utc.timestamp_nanos(value.timestamp_micros() * 1_000)
+  2. rehydrate: stored occurred_at not restored (only recorded_at)
+
+   Compiling audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-2jppmk4zyjsza\s-hmp6q21gp5-12qkj29-working`
+
+warning: `audit` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.67s
+     Running unittests src\lib.rs (target\debug\deps\audit-aee9a61d6c81f5a2.exe)
+
+running 7 tests
+test tests::canonical_timestamp_truncates_without_leaving_the_representable_range ... FAILED
+test tests::validates_and_redacts_sensitive_details ... ok
+test tests::rehydrate_preserves_historical_nanosecond_signed_content ... FAILED
+test tests::legacy_details_are_redacted_for_readers ... ok
+test tests::hash_inputs_survive_a_microsecond_persistence_round_trip ... ok
+test tests::append_sequence_is_independent_of_business_time ... ok
+test tests::hash_chain_detects_payload_change ... ok
+
+failures:
+
+---- tests::canonical_timestamp_truncates_without_leaving_the_representable_range stdout ----
+
+thread 'tests::canonical_timestamp_truncates_without_leaving_the_representable_range' (39840) panicked at crates\audit\src\lib.rs:574:25:
+attempt to multiply with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::rehydrate_preserves_historical_nanosecond_signed_content stdout ----
+
+thread 'tests::rehydrate_preserves_historical_nanosecond_signed_content' (31048) panicked at crates\audit\src\lib.rs:793:9:
+assertion `left == right` failed: rehydrate must restore the stored occurred_at verbatim
+  left: 2026-09-26T12:00:00.123456Z
+ right: 2026-09-26T12:00:00.123456789Z
+
+
+failures:
+    tests::canonical_timestamp_truncates_without_leaving_the_representable_range
+    tests::rehydrate_preserves_historical_nanosecond_signed_content
+
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p audit --lib`
+
+EXIT_CODE=101
+
