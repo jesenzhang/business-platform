@@ -98,6 +98,11 @@ packaging 3、pilot_candidates 10、provenance 6、verification_guards 8）；�
    上一轮把 `target\wave5a\consumers\…` 说成"物理上位于仓库之外"是不准确的：本轮两处
    都记，仓内那份只证明"不在 workspace 成员集内"，仓外那份才证明"不在仓库目录内"。
 
+7. 文档 closeout 提交之后（HEAD `295e25b07ff99a741fa64911528b372d76e1a244`，只比代码候选多了
+   文档）对钉住 `69d9a6b0…` 的同一份候选重新 `verify`：两模块仍各 `exit 0`。工具不要求
+   `source_revision` 等于当前 HEAD——它要求那个提交真实存在、且工件的每个输入都等于该提交里的
+   blob；因此「closeout 只加文档」不会让旧候选失效，而「改了来源却不提交」会让它立刻失效。
+   日志：`40-verify-after-closeout-identity.log`、`40-verify-after-closeout-policy.log`。
 ## 5. 负例
 
 15 个负例（11 个 verify 类 + 1 个 compare 类 + 3 个 guard 类）全部 **OK**：期望检查 ID 与
