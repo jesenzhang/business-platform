@@ -267,6 +267,100 @@ if ($businessApplicationCompilerSource -notmatch 'pub fn verify_release_identity
     throw "business-application-compiler must expose the release identity consistency verification seam"
 }
 
+# PLAN-0014 Wave 5A boundaries. The release-candidate tool assembles and verifies
+# local artifacts; it must do that by reusing the pure seams above, never by
+# widening them, reaching into business crates / adapters / applications, or
+# letting the host environment into a digest.
+$releaseToolCargo = Get-Content -Raw (Join-Path $root "tools/module-release-tool/Cargo.toml")
+foreach ($forbidden in @(
+    "apps/", "runtime-migration", "identity-sqlite", "policy-sqlite",
+    "document", "sqlx", "axum", "tokio", "reqwest", "tracing", "object-storage"
+)) {
+    if ($releaseToolCargo -match [regex]::Escape($forbidden)) {
+        throw "module-release-tool must not depend on '$forbidden'"
+    }
+}
+foreach ($required in @("business-module-contracts", "business-application-compiler")) {
+    if ($releaseToolCargo -notmatch [regex]::Escape($required)) {
+        throw "module-release-tool must reuse the '$required' seam instead of re-deriving digests"
+    }
+}
+Assert-NotContains "tools/module-release-tool/src" @(
+    "std::process::Command",
+    "SystemTime",
+    "Instant::now",
+    "chrono",
+    "COMPUTERNAME",
+    "gethostname",
+    "localtime"
+) "module release tool host-dependency violation (a release digest may not depend on the clock, the host or a subprocess)"
+# The wave must not have made the pure crates impure in the direction of this
+# repository: they may not learn the tool's name, spawn processes or read time.
+foreach ($pureCrate in @("crates/business-module-contracts/src", "crates/business-application-compiler/src")) {
+    Assert-NotContains $pureCrate @(
+        "module-release-tool",
+        "std::process",
+        "SystemTime",
+        "Instant::now"
+    ) "PLAN-0014 Wave 5A purity violation in $pureCrate"
+}
+# The consumer templates are deliberately outside the workspace member set, and
+# may only ever point at an artifact directory substituted by the script.
+$workspaceCargo = Get-Content -Raw (Join-Path $root "Cargo.toml")
+if ($workspaceCargo -notmatch 'tools/module-release-tool/consumers') {
+    throw "the workspace must exclude tools/module-release-tool/consumers from its member set"
+}
+foreach ($pilotModule in @("identity", "policy")) {
+    $consumerManifestPath = Join-Path $root "tools/module-release-tool/consumers/$pilotModule/Cargo.toml"
+    if (-not (Test-Path $consumerManifestPath)) {
+        throw "Missing Wave 5A consumer template for '$pilotModule'"
+    }
+    $consumerManifest = Get-Content -Raw $consumerManifestPath
+    if ($consumerManifest -notmatch '(?m)^\[workspace\]') {
+        throw "Wave 5A consumer '$pilotModule' must carry its own empty [workspace] table"
+    }
+    if ($consumerManifest -match '\.\./') {
+        throw "Wave 5A consumer '$pilotModule' must not use a relative path into the workspace"
+    }
+    $pathLines = @($consumerManifest -split "`n" | Where-Object { $_ -match 'path\s*=' })
+    if ($pathLines.Count -ne 1 -or $pathLines[0] -notmatch '__ARTIFACT_CRATE_DIR__') {
+        throw "Wave 5A consumer '$pilotModule' must depend on exactly the artifact directory placeholder"
+    }
+    $consumerTest = Join-Path $root "tools/module-release-tool/consumers/$pilotModule/tests/public_contract.rs"
+    if (-not (Test-Path $consumerTest)) {
+        throw "Wave 5A consumer '$pilotModule' must actually call a published contract"
+    }
+}
+# Pilot declarations: one file per module, ids that agree with the file name, a
+# module version of its own (never the platform version), and persistence that
+# agrees with the migration sets it declares.
+$platformVersion = $null
+if ($workspaceCargo -match '(?ms)\[workspace\.package\].*?^version\s*=\s*"([^"]+)"') {
+    $platformVersion = $Matches[1]
+}
+if (-not $platformVersion) {
+    throw "Architecture fitness could not read the platform version from the workspace manifest"
+}
+foreach ($pilotModule in @("identity", "policy")) {
+    $specPath = Join-Path $root "tools/module-release-tool/specs/$pilotModule.json"
+    if (-not (Test-Path $specPath)) {
+        throw "Missing Wave 5A release declaration: tools/module-release-tool/specs/$pilotModule.json"
+    }
+    $declaration = Get-Content -Raw $specPath | ConvertFrom-Json
+    if ($declaration.module_id -ne $pilotModule) {
+        throw "Release declaration '$pilotModule' declares module_id '$($declaration.module_id)'"
+    }
+    if ($declaration.module_version -eq $platformVersion) {
+        throw "Release declaration '$pilotModule' must carry its own version, not the platform version"
+    }
+    if ([bool]$declaration.persistent -ne ($declaration.migration_sets.Count -gt 0)) {
+        throw "Release declaration '$pilotModule' claims persistence without migration sets, or the reverse"
+    }
+    if ($declaration.persistent -and -not $declaration.migration_namespace) {
+        throw "Release declaration '$pilotModule' is persistent but declares no migration namespace"
+    }
+}
+
 $semanticSource = @(Get-ChildItem (Join-Path $root "crates/semantic-contract/src") -Recurse -File | ForEach-Object {
     Get-Content -Raw $_.FullName
 }) -join [Environment]::NewLine

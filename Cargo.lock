@@ -2828,6 +2828,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "module-release-tool"
+version = "0.1.0"
+dependencies = [
+ "business-application-compiler",
+ "business-module-contracts",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "multer"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
