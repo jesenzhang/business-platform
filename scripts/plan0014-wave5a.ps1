@@ -455,13 +455,15 @@ if (Test-Path -LiteralPath $compareCase) {
 Ensure-Directory $compareCase
 $damagedRight = Join-Path $compareCase (Split-Path -Leaf $pristine)
 Copy-Tree -From $pristine -To $damagedRight
+$compareBefore = Get-TreeHashes -Root $damagedRight
 $null = Invoke-Step -Name 'n12 baseline' -Title 'n12 : both sides must be identical before the damage' `
     -Arguments @('compare', '--left', $pristine, '--right', $damagedRight) `
     -LogFile (Join-Path $compareCase '00-compare-clean.log') -State $State
 $rightSource = Join-Path $damagedRight "package\contract\packages\$negModule\src\lib.rs"
 Add-Content -LiteralPath $rightSource -Value 'compile_error!("review tamper");' -Encoding utf8
-if (-not (Select-String -LiteralPath $rightSource -Pattern 'review tamper' -Quiet)) {
-    throw 'the n12 injection did not land'
+$compareInjection = @(Compare-InjectedTrees -Before $compareBefore -After (Get-TreeHashes -Root $damagedRight))
+if ($compareInjection.Count -eq 0 -or $compareInjection[0] -like 'nothing*') {
+    throw 'the n12 injection did not change any byte'
 }
 $compareRun = Invoke-Step -Name 'n12-compare-right-damaged' `
     -Title 'a damaged payload on the right side must be refused, not reported as a build difference' `
@@ -475,6 +477,26 @@ if ($compareVerdict -ne 'OK') {
 $State.Cases += [pscustomobject]@{
     Case = 'n12-compare-right-damaged'; Target = 'compare-payload-integrity'; Observed = $compareCheck; Verdict = $compareVerdict
 }
+@(
+    '# n12-compare-right-damaged',
+    '',
+    'case       : a damaged payload on the right side must be refused, not reported as a build difference',
+    'expect     : exit 1 refused by `compare-payload-integrity`',
+    "observed   : exit $($compareRun.Exit) refused by ``$compareCheck``",
+    "verdict    : $compareVerdict",
+    '',
+    '## what the injection actually changed (content hashes, pristine copy -> damaged copy)',
+    ''
+) + $compareInjection + @(
+    '',
+    '## commands',
+    '',
+    "1. ``module-release compare --left <pristine> --right <copy>`` before the injection — exit 0 expected",
+    "2. ``module-release compare --left <pristine> --right <copy>`` after the injection — exit $($compareRun.Exit)",
+    '',
+    'Raw logs: `00-compare-clean.log`, `10-compare-damaged.log` (archived beside this file).',
+    ''
+) | Set-Content -LiteralPath (Join-Path $compareCase 'case.md') -Encoding utf8
 # ------------------------------------------------- isolation negative cases ----
 # Three leak shapes the Wave 5A string scan could not see, injected into a real
 # `cargo metadata` document and handed to the same guard the passing case used.
@@ -513,6 +535,28 @@ function Invoke-GuardNegativeCase {
     if ($verdict -ne 'OK') {
         $State.Failures += "$Name : verdict $verdict (observed '$observed')"
     }
+    $documentHash = (Get-FileHash -LiteralPath $metadata -Algorithm SHA256).Hash.ToLowerInvariant()
+    @(
+        "# $Name",
+        '',
+        "case       : $Title",
+        "expect     : exit 1 refused by ``$ExpectCheck``",
+        "observed   : exit $($run.Exit) refused by ``$observed``",
+        "verdict    : $verdict",
+        '',
+        'The leak is injected into a real `cargo metadata` document taken from the',
+        "passing consumer run, so the guard sees exactly the shape a real build would",
+        'produce. The doctored document itself stays in the run directory (it embeds',
+        'absolute paths of this machine); its sha256 pins what was judged:',
+        '',
+        "document   : ``metadata.json`` sha256 ``$documentHash``",
+        "consumer   : ``$isoConsumer``",
+        "repo root  : ``$repo``",
+        "artifact   : ``$isoCrate``",
+        '',
+        'Raw log: `10-guard.log` (archived beside this file).',
+        ''
+    ) | Set-Content -LiteralPath (Join-Path $caseRoot 'case.md') -Encoding utf8
     $State.Cases += [pscustomobject]@{ Case = $Name; Target = $ExpectCheck; Observed = $observed; Verdict = $verdict }
 }
 
@@ -551,6 +595,10 @@ $null = Invoke-GuardNegativeCase -Name 'g03-transitive-into-repo' `
         }
     }
 
+# The per-case notes and raw logs live in the scratch run directory while the run
+# is going on; the evidence keeps a copy of every one of them.
+$archivedCases = Save-NegativeRecords -From $State.NegativeRoot -To (Join-Path $EvidenceDir 'negatives')
+
 # ------------------------------------------------------------ assembly log -----
 $summary = @(
     '# PLAN-0014 Wave 5A — assembly log',
@@ -561,6 +609,7 @@ $summary = @(
     "source revision under test: $(& git -C $repo rev-parse HEAD)",
     "working tree dirty entries: $(@(& git -C $repo status --porcelain).Count)",
     "outside-repository rebuild: $outsideNote",
+    "negative-case records     : $archivedCases file(s) archived under ``negatives/``",
     '',
     'Every row is one command this script ran, with the exit code it produced and the',
     'exit code it had to produce. "expected 1" rows are negative cases: a refusal is',

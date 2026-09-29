@@ -194,6 +194,7 @@ function Invoke-NegativeCase {
     Ensure-Directory $caseRoot
     $copy = Join-Path $caseRoot (Split-Path -Leaf $SourceArtifact)
     Copy-Tree -From $SourceArtifact -To $copy
+    $beforeHashes = Get-TreeHashes -Root $copy
 
     $baselineLog = Join-Path $caseRoot '00-baseline-verify.log'
     $baseline = Invoke-Step `
@@ -211,6 +212,7 @@ function Invoke-NegativeCase {
     }
 
     & $Inject $copy
+    $injection = @(Compare-InjectedTrees -Before $beforeHashes -After (Get-TreeHashes -Root $copy))
 
     $logFile = Join-Path $caseRoot '10-verify.log'
     $run = Invoke-Step `
@@ -237,9 +239,34 @@ function Invoke-NegativeCase {
         $verdict = 'WRONG DETAIL'
         $State.Failures += "$Name : refused by '$observed' but the log does not match '$ExpectPattern'"
     }
+    elseif ($injection.Count -eq 1 -and $injection[0] -like 'nothing*') {
+        $verdict = 'INJECTION DID NOT LAND'
+        $State.Failures += "$Name : the injection changed no bytes, so the refusal cannot be credited to it"
+    }
     else {
         $verdict = 'OK'
     }
+    @(
+        "# $($Name)",
+        '',
+        "case       : $Title",
+        "expect     : exit 1 refused by ``$ExpectCheck``",
+        "observed   : exit $($run.Exit) refused by ``$observed``",
+        "verdict    : $verdict",
+        '',
+        '## what the injection actually changed (content hashes, pristine copy -> damaged copy)',
+        ''
+    ) + $injection + @(
+        '',
+        '## commands',
+        '',
+        "1. ``module-release verify --artifact <copy>`` before the injection — exit $($baseline.Exit)",
+        "   (the copy has to be a candidate that verifies, or the case proves nothing)",
+        "2. ``module-release verify --artifact <copy>`` after the injection — exit $($run.Exit)",
+        '',
+        "Raw logs: ``00-baseline-verify.log``, ``10-verify.log`` (archived beside this file).",
+        ''
+    ) | Set-Content -LiteralPath (Join-Path $caseRoot 'case.md') -Encoding utf8
     $State.Cases += [pscustomobject]@{
         Case = $Name; Target = $ExpectCheck; Observed = $observed; Verdict = $verdict
     }
@@ -393,4 +420,67 @@ function Write-CargoConfigEvidence {
     Ensure-Directory (Split-Path -Parent $LogFile)
     $lines | Set-Content -LiteralPath $LogFile -Encoding utf8
     return [pscustomobject]@{ Found = $found; Conclusion = $lines[-1] }
+}
+# What an injection actually changed, in bytes: the file set of the pristine copy
+# against the damaged copy, by content hash. "I tampered with the artifact" is not
+# evidence; "package/CHANGELOG.md 6672a0f7… -> removed" is.
+function Get-TreeHashes {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $hashes = @{}
+    $prefix = $Root.TrimEnd('\', '/')
+    foreach ($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        $relative = $file.FullName.Substring($prefix.Length).TrimStart('\', '/') -replace '\\', '/'
+        $hashes[$relative] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    return $hashes
+}
+
+function Compare-InjectedTrees {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Before,
+        [Parameter(Mandatory = $true)][hashtable]$After
+    )
+    $lines = @()
+    foreach ($path in @($Before.Keys | Sort-Object)) {
+        if (-not $After.ContainsKey($path)) {
+            $lines += "removed   ``$path`` (was ``$($Before[$path].Substring(0, 12))…``)"
+        }
+        elseif ($After[$path] -ne $Before[$path]) {
+            $lines += "changed   ``$path`` (``$($Before[$path].Substring(0, 12))…`` -> ``$($After[$path].Substring(0, 12))…``)"
+        }
+    }
+    foreach ($path in @($After.Keys | Where-Object { -not $Before.ContainsKey($_) } | Sort-Object)) {
+        $lines += "added     ``$path`` (``$($After[$path].Substring(0, 12))…``)"
+    }
+    if ($lines.Count -eq 0) {
+        $lines += 'nothing — the injection did not change a single byte'
+    }
+    return $lines
+}
+
+# Case notes and per-case raw logs belong with the evidence, not in the gitignored
+# scratch directory: a reader has to be able to see why a case refused.
+function Save-NegativeRecords {
+    param(
+        [Parameter(Mandatory = $true)][string]$From,
+        [Parameter(Mandatory = $true)][string]$To
+    )
+    if (-not (Test-Path -LiteralPath $From)) {
+        return 0
+    }
+    Ensure-Directory $To
+    $saved = 0
+    # One level per case directory, on purpose: the damaged artifact copies live in a
+    # subdirectory of each case and only the run scratch needs them, while the notes
+    # and raw logs sit directly in the case root.
+    foreach ($caseDirectory in @(Get-ChildItem -LiteralPath $From -Directory -Force -ErrorAction SilentlyContinue)) {
+        $destinationDirectory = Join-Path $To $caseDirectory.Name
+        Ensure-Directory $destinationDirectory
+        foreach ($file in @(Get-ChildItem -LiteralPath $caseDirectory.FullName -File -Force -ErrorAction SilentlyContinue |
+                Where-Object { $_.Extension -in @('.log', '.md') })) {
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $destinationDirectory $file.Name) -Force
+            $saved++
+        }
+    }
+    return $saved
 }
