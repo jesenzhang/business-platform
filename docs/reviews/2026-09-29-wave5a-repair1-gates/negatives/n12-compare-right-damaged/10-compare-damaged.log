@@ -1,0 +1,7 @@
+title      : a damaged payload on the right side must be refused, not reported as a build difference
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe compare --left F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a\identity-0.1.0-rc.1 --right F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n12-compare-right-damaged\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075952Z
+module-release: artifact verification failed [compare-payload-integrity]: the right artifact's payload bytes are not what its own record claims: recomputed '144ccac6b33b0c438b970c992620e447c80aaf38353446cb06babc90a43c1f8c' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'contract/packages/identity/src/lib.rs': 'd700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6' (719 bytes) != 'd80179d9b1b44a9474473962aadcdcb98ab0c18e26a23637c3fc4ac701d5387c' (752 bytes)
+
+exit code : 1 (expected 1)

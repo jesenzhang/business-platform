@@ -981,8 +981,53 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
 - 确定性：9 条规范化规则（成员集合、POSIX 路径、字节序排序、文本规范化、逐条编码、总摘要、禁止宿主信息、JSON 规范序、migration set 编码）写进被摘要内容前缀；实现额外把「哈希前规范化」加强为「写出即规范化」，使磁盘字节等于被摘要字节（`contract/contract-surface.json` 逐字节豁免，因其是 `contract_digest` 的前镜像）。**不使用**随机 UUID、当前时间、机器名充当 release identity。两个不同临时目录生成后 `compare` 零差异，且该结论在测试内独立重做。
 - 真实构建：packed crate 在 payload 之外的副本上以自身为 workspace root 构建成功，构建后重跑 `verify` 仍 PASS（曾因在 payload 内构建写出 `Cargo.lock` 被该步骤捕获并改正）。两个 workspace 外消费者（自带空 `[workspace]` 表，path 指向工件目录，依赖精确锁定 `chrono =0.4.45` / `uuid =1.26.0` / `tokio =1.53.1`）实际 `build` → `test`（identity 1 例：先 `NoMembership` 拒绝再授成员关系后 `Active`；policy 2 例：未绑定权限默认 DENY，仅有权责目录不构成授权）→ 缓存预热后 `--locked --offline` 全绿；依赖树无 `sqlx` / `*-sqlite` / `axum` / `apps/*`，`Cargo.lock`+`Cargo.toml` 对 `<REPO>\crates`、`<REPO>\apps` 的引用命中 0。
 - 拒绝面：4 类篡改 × 2 试点全部退出 1 且检查项具名（改 packed 源字节 / 删 payload 成员 → `artifact-integrity-digest` 并报出成员；改 `release.json` 的 `module_version` / `module_id` → 更早的 `bundle-identity` 交叉校验；字段级 `UnknownModule` / `ModuleVersion` / `ContractDigest` / `PackageDigest` 由 `verify_release_identity` 测试单独证明）。迁移映射与正式 catalog 强绑定：虚构文件、把共享 PostgreSQL catalog 声称为模块独有均被拒。
-- 门禁：`cargo fmt --all -- --check` 0、`cargo check --workspace --all-targets --all-features` 0、`cargo clippy --workspace --all-targets --all-features -- -D warnings` 0、`cargo test --workspace --all-features` 0（**833 passed / 0 failed / 70 ignored**，187 suites）、`pwsh -NoProfile -File scripts/check-architecture.ps1` 0、`git diff --check` 0；定向 `cargo test -p module-release-tool --all-features` **30 passed**、`cargo test -p business-module-contracts -p business-application-compiler --all-features` 全绿。70 个 ignored 为既有 PostgreSQL lane，未执行、不计入通过。架构门禁新增 Wave 5A 边界（工具不得触达 `apps/*`、适配器、业务 crate；纯 crate 不得引入时钟/主机/子进程；消费者模板留在 workspace 成员集之外；试点声明自洽），并做过注入式反向验证。
+- 门禁：`cargo fmt --all -- --check` 0、`cargo check --workspace --all-targets --all-features` 0、`cargo clippy --workspace --all-targets --all-features -- -D warnings` 0、`cargo test --workspace --all-features` 0（**833 passed / 0 failed / 70 ignored**，187 suites）、`pwsh -NoProfile -File scripts/check-architecture.ps1` 0、`git diff --check` 0；定向 `cargo test -p module-release-tool --all-features` **30 passed**、`cargo test -p business-module-contracts -p business-application-compiler --all-features` 全绿。70 个 ignored 未执行、不计入通过（该句当时写的是「全部为既有 PostgreSQL lane」，2026-09-29 Repair 1 已按测试清单更正分类，见下方 Repair 1 记录）。架构门禁新增 Wave 5A 边界（工具不得触达 `apps/*`、适配器、业务 crate；纯 crate 不得引入时钟/主机/子进程；消费者模板留在 workspace 成员集之外；试点声明自洽），并做过注入式反向验证。
 - 证据：`docs/reviews/2026-09-29-wave5a-gates/`（`README.md` 为命令↔日志↔退出码对照 + 摘要表 + NOT RUN/BLOCKED 表 + 空的独立审阅栏；`assembly-log.md` 为 30 步编排汇总，正向步骤 0、篡改步骤 1 全部命中预期）。生成物落在与仓库同卷的 `target/wave5a/` 与 `target/tmp/`（git 忽略），收口时删除；系统盘不留残留。
 - 未执行 / BLOCKED：PostgreSQL 迁移执行与单模块独立安装/升级（本轮无数据库授权；identity 与 policy 与 organization 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、被 `runtime-migration` 全量 embed，工件内该条 `module_owned=false`）；publish / 注册 / install / upgrade / rollback；push / merge / tag / 部署；漏洞、许可证、镜像扫描；CI。SQLite 与离线证据**不**替代 PostgreSQL 结论。
 - 提交链：base `9b05ccd` → 编码前记录 `e2ce866` → 代码候选 `8036bc65ba7c77666e48afaa6439911ba7c083d7` → 本 closeout 文档提交（其自身 SHA 见 `git log` 与交付报告）。
 - 状态：**LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED**。打包与消费者证据**不等于** R2：Wave 1 G-01 / G-02、Wave 2 G-201 / G-202 / G-203、Wave 4 D-W4-02 / 06 / 08 / 09 / 11 等 C1 与观察项继续有效 ⇒ **R2 继续 BLOCKED**；独立审阅栏留空，实现者不自填 PASS。
+
+## 2026-09-29 Wave 5A Repair 1 执行记录 — 修的是验证链，不是工件
+
+- 起点：文档 HEAD `d0b2d81f`、代码候选 `8036bc65`。Wave 5A 独立审阅
+  （`docs/reviews/2026-09-29-wave5a-independent-review.md`，提交 `f1984544`）给出
+  **NEEDS REPAIR / NOT PUBLISHED** 与 F1–F5。承前结论继续原文照录、不扩大：**「Round 3 修复通过；
+  Wave 4 有界收口；既有 C1、R2 阻塞与未执行项继续有效。」**
+- 范围纪律：只改 `tools/module-release-tool`、`scripts/`、本轮证据与文档。两个纯 crate 源码
+  零改动；未改迁移 / SQL / 标准 / ADR 文本；未新增依赖（读 Git 走系统 `git` CLI，参数数组）。
+- **F1** `source_revision` 过去只是被写进记录、从不解析。新增 `src/git.rs`（工具内唯一子进程
+  出口：只 `git`、`--no-optional-locks`、`cat-file` 读 blob）与 `src/provenance.rs`，验证拆成
+  `source-revision-exists` 与 `source-inputs-match-revision`：40 个 0 的「revision」被拒，真实
+  但不含所声称输入的更早提交也被拒（点名缺哪个输入）；正向候选逐项比对了 17 个 payload 成员与
+  9 个喂入文件。`generate` 在写第一个字节之前先做同一比对。
+- **F2** `compare` 过去只比两条记录字符串。现在每侧先按自己的记录重算清单与逐成员摘要再比较，
+  单侧损坏以 `compare-payload-integrity` 拒绝并指明是哪一侧。
+- **F3** 新增 `artifact-record-format`（未知 schema / algorithm 直接拒）、`record-consistency`
+  （四份记录的 module_id / version / 两个摘要互洽）、`packed-crate-bindings`（bundle 的 crate
+  版本绑定与 payload 内 packed `Cargo.toml` 对照）。工具链一项改名为 `toolchain-declaration`
+  并在明细里自述「只验声明」。
+- **F4** 隔离不再看文本：新增 `src/isolation.rs` 与 `guard` 子命令，吃
+  `cargo metadata --format-version 1` 的完整解析图，要求每个 `source == null` 的包规范化后落在
+  消费者目录或声明的工件目录内。脚本自身不再含任何路径规则，架构门禁新增规则把这一点固化。
+- **F5** 负例机制重写：每例从刚验证通过的候选各自复制、JSON 走解析-改-序列化并回读证明改动
+  落地、同时断言退出码与被点名的检查 ID、按内容哈希记录注入改了什么；新脚本回归入口
+  `scripts/test-plan0014-wave5a.ps1`（9 条，其中 3 条是自测）。
+- 更正上一轮记录表述：**70 个 `#[ignore]` 不是「全部 PostgreSQL lane」**。按测试清单分类为
+  PostgreSQL 38、PostgreSQL 且对象存储 3、仅 S3/MinIO 对象存储 28、内网模型 provider 1
+  （`docs/reviews/2026-09-29-wave5a-repair1-gates/ignored-tests-classified.md`）；一律未执行。
+  另外作废一条旧结论：旧「错误 module_id 被拒」的日志其实拒在 `[bundle-identity]`，且是上一例
+  残留的损坏，不构成 module_id 的证据。
+- 工件与四类摘要**未变**（`identity` `3fed976b…` / `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，
+  21 成员；`policy` `52e788ff…` / `37e95a19…` / `f8add9e0…` / `1a5a43f8…`，23 成员）；随提交
+  变化的只有 `source_revision`。本轮补做一次**仓库目录之外**的同卷消费者复建（build + test +
+  guard 全绿），并记录该目录生效的 cargo 配置来源。
+- 门禁（代码候选 `69d9a6b01184db7d9f3d4aa3b688fb569387b2fc`）：fmt / check / clippy
+  `-D warnings` / `cargo test --workspace --all-features` **855 passed / 0 failed / 70 ignored**
+  （190 suites）/ 架构门禁 / `git diff --check` / 脚本回归全部 0；定向 `module-release-tool`
+  **52 passed**、两个纯 crate **113 passed**。编排 15 个负例全部因被断言的检查被拒。
+- 提交链：`d0b2d81f` →（审阅）`f1984544` → 代码 `b88745c4` → 代码 `69d9a6b0`（**本轮代码候选**）
+  → 本 closeout 文档提交。证据：`docs/reviews/2026-09-29-wave5a-repair1-gates/`（含修复前反例
+  复现 `red-run/` 与逐例注入说明 `negatives/`）；旧 `2026-09-29-wave5a-gates/` 原样保留。
+- 状态：**WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED**。未 push / merge /
+  tag / 部署；未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭；
+  成熟度未改 ⇒ **R2 继续 BLOCKED**；独立审阅栏留空。

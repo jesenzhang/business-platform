@@ -1,0 +1,117 @@
+title      : resolved dependencies and features of the policy consumer
+command    : cargo tree --manifest-path F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy\Cargo.toml -e features,normal
+workdir    : F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy
+utc        : 20260929T075902Z
+wave5a-consumer-policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy)
+├── policy feature "default"
+│   └── policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a\policy-0.1.0-rc.1\package\contract\packages\policy)
+│       ├── async-trait feature "default"
+│       │   └── async-trait v0.1.92 (proc-macro)
+│       │       ├── proc-macro2 feature "default"
+│       │       │   ├── proc-macro2 v1.0.107
+│       │       │   │   └── unicode-ident feature "default"
+│       │       │   │       └── unicode-ident v1.0.26
+│       │       │   └── proc-macro2 feature "proc-macro"
+│       │       │       └── proc-macro2 v1.0.107 (*)
+│       │       ├── quote feature "default"
+│       │       │   ├── quote v1.0.47
+│       │       │   │   └── proc-macro2 v1.0.107 (*)
+│       │       │   └── quote feature "proc-macro"
+│       │       │       ├── quote v1.0.47 (*)
+│       │       │       └── proc-macro2 feature "proc-macro" (*)
+│       │       ├── syn feature "clone-impls"
+│       │       │   └── syn v3.0.6
+│       │       │       ├── proc-macro2 v1.0.107 (*)
+│       │       │       ├── quote v1.0.47 (*)
+│       │       │       └── unicode-ident feature "default" (*)
+│       │       ├── syn feature "full"
+│       │       │   └── syn v3.0.6 (*)
+│       │       ├── syn feature "parsing"
+│       │       │   └── syn v3.0.6 (*)
+│       │       ├── syn feature "printing"
+│       │       │   └── syn v3.0.6 (*)
+│       │       ├── syn feature "proc-macro"
+│       │       │   ├── syn v3.0.6 (*)
+│       │       │   ├── proc-macro2 feature "proc-macro" (*)
+│       │       │   └── quote feature "proc-macro" (*)
+│       │       └── syn feature "visit-mut"
+│       │           └── syn v3.0.6 (*)
+│       ├── chrono feature "default"
+│       │   ├── chrono v0.4.45
+│       │   │   ├── num-traits v0.2.19
+│       │   │   ├── serde v1.0.229
+│       │   │   │   └── serde_core feature "result"
+│       │   │   │       └── serde_core v1.0.229
+│       │   │   └── windows-link feature "default"
+│       │   │       └── windows-link v0.2.1
+│       │   ├── chrono feature "clock"
+│       │   │   ├── chrono v0.4.45 (*)
+│       │   │   ├── chrono feature "iana-time-zone"
+│       │   │   │   └── chrono v0.4.45 (*)
+│       │   │   ├── chrono feature "now"
+│       │   │   │   ├── chrono v0.4.45 (*)
+│       │   │   │   └── chrono feature "std"
+│       │   │   │       ├── chrono v0.4.45 (*)
+│       │   │   │       └── chrono feature "alloc"
+│       │   │   │           └── chrono v0.4.45 (*)
+│       │   │   └── chrono feature "winapi"
+│       │   │       ├── chrono v0.4.45 (*)
+│       │   │       └── chrono feature "windows-link"
+│       │   │           └── chrono v0.4.45 (*)
+│       │   ├── chrono feature "oldtime"
+│       │   │   └── chrono v0.4.45 (*)
+│       │   ├── chrono feature "std" (*)
+│       │   └── chrono feature "wasmbind"
+│       │       ├── chrono v0.4.45 (*)
+│       │       ├── chrono feature "js-sys"
+│       │       │   └── chrono v0.4.45 (*)
+│       │       └── chrono feature "wasm-bindgen"
+│       │           └── chrono v0.4.45 (*)
+│       ├── chrono feature "serde"
+│       │   └── chrono v0.4.45 (*)
+│       ├── thiserror feature "default"
+│       │   ├── thiserror v2.0.20
+│       │   │   └── thiserror-impl feature "default"
+│       │   │       └── thiserror-impl v2.0.20 (proc-macro)
+│       │   │           ├── proc-macro2 feature "default" (*)
+│       │   │           ├── quote feature "default" (*)
+│       │   │           └── syn feature "default"
+│       │   │               ├── syn v3.0.6 (*)
+│       │   │               ├── syn feature "clone-impls" (*)
+│       │   │               ├── syn feature "derive"
+│       │   │               │   └── syn v3.0.6 (*)
+│       │   │               ├── syn feature "parsing" (*)
+│       │   │               ├── syn feature "printing" (*)
+│       │   │               └── syn feature "proc-macro" (*)
+│       │   └── thiserror feature "std"
+│       │       └── thiserror v2.0.20 (*)
+│       ├── uuid feature "default"
+│       │   ├── uuid v1.26.0
+│       │   │   ├── serde_core v1.0.229
+│       │   │   ├── sha1_smol v1.0.1
+│       │   │   └── getrandom feature "default"
+│       │   │       └── getrandom v0.4.3
+│       │   │           └── cfg-if feature "default"
+│       │   │               └── cfg-if v1.0.5
+│       │   └── uuid feature "std"
+│       │       └── uuid v1.26.0 (*)
+│       ├── uuid feature "serde"
+│       │   └── uuid v1.26.0 (*)
+│       ├── uuid feature "v4"
+│       │   ├── uuid v1.26.0 (*)
+│       │   └── uuid feature "rng"
+│       │       └── uuid v1.26.0 (*)
+│       ├── uuid feature "v5"
+│       │   ├── uuid v1.26.0 (*)
+│       │   └── uuid feature "sha1"
+│       │       └── uuid v1.26.0 (*)
+│       └── uuid feature "v7"
+│           ├── uuid v1.26.0 (*)
+│           └── uuid feature "rng" (*)
+├── policy feature "testing"
+│   └── policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a\policy-0.1.0-rc.1\package\contract\packages\policy) (*)
+├── uuid feature "default" (*)
+├── uuid feature "v4" (*)
+└── uuid feature "v7" (*)
+
+exit code : 0 (expected 0)

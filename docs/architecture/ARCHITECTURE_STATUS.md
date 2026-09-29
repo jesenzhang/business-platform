@@ -814,7 +814,8 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   （identity 1 例、policy 2 例，均默认拒绝方向），缓存预热后 `--locked --offline` 复建通过。
 - 门禁全绿：fmt / check / clippy `-D warnings` / workspace 测试 **833 passed / 0 failed / 70 ignored**
   （187 suites）/ architecture fitness PASS（新增 Wave 5A 边界，做过注入式反向验证）/
-  `git diff --check`；定向 `module-release-tool` 30 passed。70 ignored 为既有 PostgreSQL lane，不计为已执行。
+  `git diff --check`；定向 `module-release-tool` 30 passed。70 ignored 未执行、不计为已执行
+  （当时写的是「全部 PostgreSQL lane」，同日 Repair 1 已按测试清单更正分类，见下方 Repair 1 记录）。
 - 未执行 / BLOCKED：PostgreSQL 迁移执行与单模块独立安装/升级（无数据库授权；identity 与 policy 与
   organization 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、被
   `runtime-migration` 全量 embed）；publish / 注册 / install / upgrade / rollback；push / merge /
@@ -828,3 +829,37 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。
   评审与证据：`docs/reviews/2026-09-29-wave5a-implementation-record.md`、
   `docs/reviews/2026-09-29-wave5a-gates/`（独立审阅栏留空）。
+
+> 2026-09-29 Wave 5A Repair 1（修复验证链，未发布）在同一分支完成，代码候选
+> `69d9a6b01184db7d9f3d4aa3b688fb569387b2fc`。上一轮结论原文照录且未扩大：「Round 3 修复通过；
+> Wave 4 有界收口；既有 C1、R2 阻塞与未执行项继续有效」；Wave 5A 独立审阅结论为
+> **NEEDS REPAIR / NOT PUBLISHED**，本轮是其 §4 指令的实现。
+
+- 修的是**验证链**，不是工件：四类摘要与成员数与上一轮逐字相同（`identity` `3fed976b…` /
+  `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，21 成员；`policy` `52e788ff…` / `37e95a19…` /
+  `f8add9e0…` / `1a5a43f8…`，23 成员），唯一随提交变化的字段是 `source_revision`。
+- **来源绑定成为真检查**：`source_revision` 现在必须是真提交对象，且工件的每个输入
+  （changelog、各 crate 源文件、workspace manifest / lock、`rust-toolchain.toml`、spec、映射
+  点名的迁移）都要能在该提交里以相同字节取到；40 个 0 的 revision 与不含所声称输入的更早提交
+  都被拒。工具内只有 `src/git.rs` 可以起子进程，且只跑 `git`（参数数组，无 shell）。
+- **隔离由完整解析图判定**：`module-release guard` 读 `cargo metadata --format-version 1` 的
+  全部包，要求每个本地包规范化后落在消费者目录或声明的工件目录内；正/反斜杠、`..`、verbatim
+  前缀、传递性 path 泄漏与不可解析路径都有回归。Wave 5A 编排脚本不再含自有路径规则——
+  架构门禁禁止。
+- 验证索引由 5 项增至 10 项（新增记录格式、记录一致性、packed 绑定、来源两项、声明检查改名），
+  `compare` 现在两侧各自重算 payload 后才比较。工具链一项在明细里自述**只验声明**，构建来源
+  由运行日志外部佐证，不互相冒充。
+- 更正上一条记录的两处表述：70 个 `#[ignore]` 不是「全部 PostgreSQL lane」（实为 PostgreSQL
+  38 + PostgreSQL 且对象存储 3 + 仅对象存储 28 + 内网模型 provider 1，均未执行）；旧「错误
+  module_id 被具名检查拒绝」不成立，当时拒在 `[bundle-identity]` 且是上一例残留损坏。
+- 门禁（本候选）：fmt / check / clippy `-D warnings` / workspace 测试 **855 passed / 0 failed /
+  70 ignored**（190 suites）/ 架构 fitness PASS / `git diff --check` 0；定向
+  `module-release-tool` **52 passed**、两个纯 crate **113 passed**（源码零改动）；新增
+  `scripts/test-plan0014-wave5a.ps1` 脚本回归入口 9 条 PASS。
+- 证据：`docs/reviews/2026-09-29-wave5a-repair1-gates/`（`F1-F5-closure.md` 逐项闭环表、
+  `red-run/` 修复前反例复现、`negatives/` 逐例注入说明与原始日志、`gates/` 逐条门禁）。
+  旧 `2026-09-29-wave5a-gates/` 原样保留，被替代的结论在其 README §6 逐项列出。
+- 状态：**WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED**；`identity` /
+  `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署，
+  未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 观察项继续有效；
+  ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；独立审阅栏留空。

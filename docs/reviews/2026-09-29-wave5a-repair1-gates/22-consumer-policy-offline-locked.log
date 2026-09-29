@@ -1,0 +1,7 @@
+title      : re-build the policy consumer with a locked dependency set, offline
+command    : cargo build --manifest-path F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy\Cargo.toml --all-features --locked --offline
+workdir    : F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy
+utc        : 20260929T075902Z
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+
+exit code : 0 (expected 0)

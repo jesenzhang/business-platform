@@ -1,0 +1,25 @@
+{
+  "identity": {
+    "schema_version": "module-release.identity.v1",
+    "module_id": "policy",
+    "module_version": "0.1.0-rc.1",
+    "manifest_schema_version": "business-module.manifest.v1",
+    "source_revision": "69d9a6b01184db7d9f3d4aa3b688fb569387b2fc",
+    "contract_digest": "52e788ff3187846c4484cc42a3891aa7833f89ff65d666c7b3c7e1af831568c8",
+    "package_digest": "37e95a19b45c3dcc00e2f4099d91cc72ed63af71f19d769882412af8b2ddd4b6",
+    "migration_revision": {
+      "migration_namespace": "policy",
+      "set_digest": "1a5a43f8b269b3e3624b44a613fa9e498775ad7ccac0cf768018b891168ea597"
+    },
+    "build_toolchain": {
+      "toolchain_id": "rust-toolchain-1.94.1",
+      "version": "1.94.1"
+    }
+  },
+  "crate_versions": [
+    {
+      "crate_name": "policy",
+      "crate_version": "0.1.0-rc.1"
+    }
+  ]
+}

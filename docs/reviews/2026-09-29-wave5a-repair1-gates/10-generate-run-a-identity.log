@@ -1,0 +1,17 @@
+title      : generate identity (attempt run-a)
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe generate --module identity --out F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075735Z
+status=generated
+module_id=identity
+module_version=0.1.0-rc.1
+directory=F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a\identity-0.1.0-rc.1
+members=21
+contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107
+package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70
+artifact_integrity_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+source_revision=69d9a6b01184db7d9f3d4aa3b688fb569387b2fc
+toolchain=rust-toolchain-1.94.1 1.94.1
+platform_version=0.1.0
+
+exit code : 0 (expected 0)

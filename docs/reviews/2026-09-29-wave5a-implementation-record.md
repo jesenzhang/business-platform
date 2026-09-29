@@ -479,3 +479,154 @@ C1：Wave 1 **G-01**、**G-02**（本轮未连库，保持 BLOCKED）；Wave 2 *
 | 重复构建一致性是否成立 | `<pending>` |
 | G-01 / G-201 / G-202 / G-203 可否关闭 | `<pending>` |
 | R2 | **NOT CLAIMED**（实现者不判定） |
+
+---
+
+## 16. Wave 5A Repair 1（2026-09-29 独立审阅 §4 修复）
+
+### 16.1 起点与承前结论（原文照录，不扩大）
+
+- 上一轮独立审阅结论：**「Round 3 修复通过；Wave 4 有界收口；既有 C1、R2 阻塞与未执行项继续有效。」**
+- Wave 5A 独立审阅（`docs/reviews/2026-09-29-wave5a-independent-review.md`，提交
+  `f198454473ad6b2826ed6cd602845a0ec6bb9949`）：**NEEDS REPAIR / NOT PUBLISHED**，
+  对本记录 §13 的验收提出 F1–F5 五项缺陷，并给出可直接执行的 §4 指令。
+- 本轮只做 §4 授权范围内的事：修 F1–F5、补回归、重跑门禁、重做证据、更正被审阅否定的记录表述。
+  两个纯 crate 源码零改动；未改任何迁移 / SQL / 标准 / ADR 文本；未新增依赖（`git` 走系统 CLI）。
+- 分支不变：`codex/plan-0014-wave5a-local-release-pilot`；未 push、未 merge、未打 tag、未部署；
+  未启动 Wave 5B / PLAN-0006；ADR-0027 / ADR-0028 仍 **Proposed / NOT ACCEPTED**。
+
+### 16.2 先失败回归的顺序
+
+审阅要求「先加入失败回归，再修复」。两条证据线，性质不同，分得很清：
+
+1. **可复现的红**：`docs/reviews/2026-09-29-wave5a-repair1-gates/red-run/`
+   （`reproduce-red-counterexamples.ps1` 把反例重新打在修复前候选 `8036bc65` 上的一次性
+   worktree 里）。6 条反例全部 **RED CONFIRMED**：双零 `source_revision` 仍 `exit 0`；
+   右侧 payload 损坏后 `compare` 仍宣告 identical（同一份损坏走 `verify` 才拒绝，说明缺陷
+   精确地只在 compare）；未知 `artifact_integrity_algorithm`、`artifact-manifest.json`
+   声称另一个 `module_version`、bundle 绑定 `crate_version = 9.9.9` 三条都仍 `exit 0`。
+2. **过程记录**：修复过程中先把新回归放进工作树跑过一次，`verification_guards` 当时
+   1 passed / 7 failed（`exit=101`）。那次是会话内运行，未建证据目录，完整控制台输出未保留——
+   不拿它充当证据，只说明顺序确实是「先红后绿」。
+
+F4 与 F5 的修复前行为不需要复现：修复前脚本本体与它当时的日志都在版本库里。
+`docs/reviews/2026-09-29-wave5a-gates/25-consumer-identity-path-guard.txt` 是 `hits : 0 /
+result: PASS`，而 `52-tamper-wrong-version-identity.log` 与 `53-tamper-wrong-module-id-identity.log`
+的拒绝行**逐字相同**（都是 `[bundle-identity]`）——第 4 例跑的是仍带第 3 例改动的副本，
+`module_id` 从未被任何检查判定过。逐字摘录与解释在
+`docs/reviews/2026-09-29-wave5a-repair1-gates/red-run/F4-F5-from-retained-history.md`。
+
+### 16.3 F1–F5 关闭摘要
+
+逐项表（修复位置 / 回归名称 / 命令 / 日志 / 实际结果）在
+`docs/reviews/2026-09-29-wave5a-repair1-gates/F1-F5-closure.md`，此处只记结构性变化。
+
+| finding | 现在的判定方式 |
+|---|---|
+| F1 来源绑定 | 新增 `src/git.rs`（工具内唯一跑子进程的模块：只 `git`、参数数组、`--no-optional-locks`、`cat-file` 读 blob）与 `src/provenance.rs`。`source-revision-exists` 要求它是提交对象；`source-inputs-match-revision` 把 changelog、每个 crate 源文件、workspace manifest / lock、`rust-toolchain.toml`、spec、映射点名的迁移文件逐个与该提交的 blob 比对（正向候选：17 个 payload 成员 + 9 个喂入文件）。`generate` 在写第一个字节之前先做这个比对，来源对不上就不产出候选；`repo.rs` 里手写 `.git` 解析全部删除 |
+| F2 compare | 每侧先按自己的记录重跑清单与逐成员摘要（`check_side`），任一侧被损坏即 `compare-payload-integrity` 并指明 left / right；比较对象是**重算后**的值，结果文本明确 `verification.json` 与 `source_revision` 声明不在比较范围内 |
+| F3 记录一致性 | `artifact-record-format`（schema / algorithm 不认识就拒，成员路径与 sha256 必须合法，被排除成员必须恰是那 4 份记录且各有非空理由）、`record-consistency`（四份记录的 module_id / version / 两个摘要 + 载荷内 manifest + 映射命名空间互洽）、`packed-crate-bindings`（逐个读 payload 里 `contract/packages/<name>/Cargo.toml` 的 `[package]` 与 bundle 绑定对照） |
+| F4 隔离 | 新增 `src/isolation.rs` + `guard` 子命令：吃 `cargo metadata --format-version 1` 的**完整解析图**，凡 `source == null` 的包都要求规范化后落在消费者目录或声明的工件目录内；正/反斜杠、`..`、`\\?\` verbatim、盘符大小写、路径边界而非字符串前缀、无法解析即拒绝、`workspace_root` 自身也要判定。脚本侧不含任何自有路径规则，架构门禁把这条变成长期规则 |
+| F5 负例有效性 | `scripts/lib/plan0014-wave5a-lib.ps1`（被编排与脚本回归入口共用）：每例从刚 `verify` 通过的候选复制、JSON 走解析-改-序列化并回读证明改动落地、同时断言退出码**与**检查 ID、按内容哈希记录「注入到底改了哪些字节」、依赖步骤失败即停、run/evidence 目录已存在即拒绝、只删本次 scratch。`scripts/test-plan0014-wave5a.ps1` 是脚本回归入口，9 条含 3 条自测（错检查 ID 必须判 `WRONG REASON`、注入没改字节必须抛错、基线不绿必须判 `BROKEN`） |
+
+验证检查从 5 项变为 10 项（顺序即执行顺序）：`artifact-record-format` →
+`artifact-integrity-digest` → `contract-surface-file-digest` → `release-identity-consistency` →
+`record-consistency` → `packed-crate-bindings` →
+`migration-mapping-matches-formal-catalog` → `source-revision-exists` →
+`source-inputs-match-revision` → `toolchain-declaration`。只在失败时出现的内部 id：
+`artifact-inventory`、`bundle-identity`、`compare-payload-integrity`、
+`consumer-graph-isolation`、`repeat-build-consistency`、`compiled-package-present`、
+`migration-set-digest`。`toolchain-declaration` 的明细自述 **DECLARATION CHECK ONLY**：
+它比对身份与该提交里的 `rust-toolchain.toml`，不认证产出字节的进程用的是哪个工具链
+（后者由证据里的 `rustc -vV` 作为外部证据，两者不互相冒充）。
+
+### 16.4 对被审阅否定之记录表述的更正
+
+1. **§13.5「70 个 ignored 是既有 PostgreSQL lane」不成立**。按本次运行的测试清单逐条重新
+   分类（`docs/reviews/2026-09-29-wave5a-repair1-gates/ignored-tests-classified.md` 与其
+   JSON）：**38 PostgreSQL + 3 PostgreSQL 且对象存储 + 28 仅 S3/MinIO 对象存储 + 1 内网模型
+   provider = 70**。即 41 个与 PostgreSQL 有关、28 个与数据库无关、1 个是外部模型 provider。
+   ignored 一律未执行、不计入通过。
+2. **§13.4「4 类篡改 × 2 试点全部被拒（检查项具名）」需部分作废**：其中「错误 module_id」
+   一例当时先在 `bundle-identity` 被拒，且拒的是上一例残留的损坏，不能作为 module_id 的证据。
+   现在的对应证据是 `n05-record-module-id` → `[record-consistency]`（另有 `n06` 摘要翻转、
+   `n07` / `n08` bundle 绑定），逐例注入说明在 `negatives/<case>/case.md`。
+3. **§13.4 的「workspace 外消费者」措辞收紧**：`<repo>\target\wave5a\consumers\…` 只证明
+   「不在 workspace 成员集内」，物理上仍在仓库目录内。本轮额外做一次**仓库目录之外**的同卷
+   复建（`F:\wave5a-repair1-outside\<stamp>\consumers\identity`：build + test + guard 全绿），
+   并把该目录生效的 cargo 配置来源记入证据（`cargo config get` 是 nightly-only 子命令，
+   故按文档化搜索路径逐级列出 `.cargo/config.toml` 与 `CARGO_*`，给出结论行）。
+4. **§13.4「packed crate 真实构建」补一句它到底证明了什么**：`cargo build` 编译的是工件内
+   那份 manifest 与源文件（副本在 payload 之外，构建后原工件复验仍 PASS，证明构建没回写），
+   `cargo test` 在消费者侧编译并运行了调用已发布契约的用例。旧记录写了「构建成功」但没写清
+   楚被执行的就是工件内容本身。
+5. **§13.8 的复现命令已变化**：`pwsh -NoProfile -File scripts/plan0014-wave5a.ps1 -EvidenceDir
+   <新目录>`，临时根默认 `<repo>\target\wave5a-repair1\run-<UTC 时间戳>`，已存在的 run 或
+   evidence 目录一律拒绝复用；清理只作用于本次 run 根内部。
+6. **门禁数字更新**：`8036bc65` 一轮的 833 passed / 187 suites 是该提交的历史事实，保留；
+   本候选为 **855 passed / 190 suites / 0 failed / 70 ignored**（新增 3 个测试文件、22 个用例）。
+
+四类摘要未变，这一条值得单列：`identity` 仍 `contract 3fed976b… / package b9dfa42c… /
+integrity 68deba81… / migration set ef43cfa9…`，`policy` 仍 `52e788ff… / 37e95a19… /
+f8add9e0… / 1a5a43f8…`。本轮改的是**验证什么**，不是**打包什么**；随提交变化的只有
+`release.json.source_revision` 与 bundle 内同一字段。
+
+### 16.5 提交链与证据绑定
+
+| 提交 | 内容 |
+|---|---|
+| `d0b2d81f` | 本记录 §13 与原证据 `2026-09-29-wave5a-gates/`（被审阅对象，保留不改） |
+| `f1984544` | 归档 Wave 5A 独立审阅（修复指令） |
+| `b88745c4` | F1–F5 修复代码 + 新回归 + 脚本重写 |
+| `69d9a6b0` | 编排脚本把逐例注入说明与原始日志随证据归档；**本轮代码候选** |
+
+文档 closeout（本节所在提交）与代码候选分离，符合审阅 §4.3「先固定修复代码提交，再生成
+证据，最后做文档 closeout」。同日更早一次草稿编排（绑定 `b88745c4`）未进入版本库，其产物
+已移出仓库目录；本目录内所有日志来自 `69d9a6b0` 的一次连续运行。
+
+### 16.6 门禁结果（代码候选 `69d9a6b0`，逐条见 `gates/`）
+
+`cargo test -p module-release-tool --all-features` 0（**52 passed**：lib 4、canonical 5、
+compatibility 8、isolation 8、packaging 3、pilot_candidates 10、provenance 6、
+verification_guards 8）；两个纯 crate 定向 0（**113 passed / 0 failed**，源码零改动）；
+`cargo fmt --all -- --check` 0；`cargo check --workspace --all-targets --all-features` 0；
+`cargo clippy --workspace --all-targets --all-features -- -D warnings` 0；
+`cargo test --workspace --all-features` 0（**855 / 0 / 70 ignored**，190 个测试二进制）；
+`scripts/check-architecture.ps1` 0；`git diff --check` 0；
+`scripts/test-plan0014-wave5a.ps1` 0（9 条助手回归）。
+编排命令 `rtk proxy pwsh -NoProfile -File scripts/plan0014-wave5a.ps1 -OutRoot
+target/wave5a-repair1 -EvidenceDir docs/reviews/2026-09-29-wave5a-repair1-gates` 0，
+全部步骤命中预期退出码，15 个负例判定 OK。
+
+架构门禁新增三条规则，且都是会被违反者触发的真规则（写错即 `exit 1`，本轮实现让其回到 0）：
+只有 `src/git.rs` 可以起子进程且它不得起 shell；只有 `tempdir.rs` 可以删目录树；
+Wave 5A 编排必须用 `cargo metadata` + `guard` 判定隔离，出现自有路径匹配即失败。
+
+### 16.7 NOT RUN / BLOCKED（不得当作通过）
+
+| 项 | 状态 | 原因 |
+|---|---|---|
+| PostgreSQL 迁移执行、70 个 `#[ignore]` 用例 | **BLOCKED** | 无数据库授权（承前 G-02）；SQLite 与离线证据不得替代 PostgreSQL 结论 |
+| 单模块在 PostgreSQL 上独立安装 / 升级 / 回滚 | **BLOCKED** | 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、`runtime-migration` 全量 embed（G-203） |
+| publish / 注册 / install / upgrade / rollback | **NOT RUN** | 任务边界禁止 |
+| push / merge / tag / 部署 | **NOT RUN** | 同上 |
+| 漏洞、许可证、secret、镜像扫描；CI | **NOT RUN** | 未执行 |
+| 工具链构建来源认证 | **NOT PROVEN（工具侧）** | `toolchain-declaration` 只验声明；实际工具链由运行日志外部佐证 |
+
+### 16.8 未关闭、继续有效
+
+G-01、G-02、G-201 / G-202 / G-203；Wave 4 的 D-W4-02 / 06 / 08 / 09 / 11 与
+OBS-W4-05 / 06 / 07、N-G05；C2 backlog G-03…G-09、G-204、G-206；Wave 2 验收面维持
+A-01…A-09 + A-11 PASS、A-10 PARTIAL、A-12 NOT RUN。两个试点成熟度未改，**R2 仍 BLOCKED /
+NOT CLAIMED**，打包与验证成功不等于 R2。
+
+### 16.9 临时工件与清理
+
+生成物全部落在与仓库同卷的 `<repo>\target\`（`wave5a-repair1\run-<stamp>\`、`tmp\`）与同卷的
+`F:\wave5a-repair1-outside\<stamp>\`，均被 `.gitignore` 覆盖或位于仓库之外；收口时删除，
+系统盘不留残留。修复前候选的一次性 worktree 由红证据脚本自行移除。
+
+### 16.10 停止点
+
+**Wave 5A Repair 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED**。§15 的独立审阅栏继续留空
+（`<pending>`），实现者不自填 PASS；R2 判定仍属独立 reviewer。

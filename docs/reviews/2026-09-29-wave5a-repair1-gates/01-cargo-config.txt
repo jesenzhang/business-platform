@@ -1,0 +1,23 @@
+# cargo configuration in force for the repository build build
+start directory : F:\Workspace\business-platform
+CARGO_HOME      : C:\Users\admin\.cargo
+utc             : 20260929T075735Z
+
+CARGO_* environment variables (these override every config file):
+  (none)
+
+Config files cargo would read, nearest ancestor first:
+  absent  F:\Workspace\business-platform\.cargo\config.toml
+  absent  F:\Workspace\business-platform\.cargo\config
+  absent  F:\Workspace\.cargo\config.toml
+  absent  F:\Workspace\.cargo\config
+  absent  F:\.cargo\config.toml
+  absent  F:\.cargo\config
+  PRESENT C:\Users\admin\.cargo\config.toml (cargo home)
+      | [http]
+      | proxy = "http://127.0.0.1:7890"
+      | [https]
+      | proxy = "http://127.0.0.1:7890"
+  absent  C:\Users\admin\.cargo\config (cargo home)
+
+conclusion: 1 config file(s) apply: C:\Users\admin\.cargo\config.toml

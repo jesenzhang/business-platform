@@ -278,3 +278,15 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - Status: LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED. Nothing was pushed, merged, tagged,
   published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED, and a successful
   artifact build is not an R2 claim. PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.
+
+## PLAN-0014 Wave 5A Repair 1 — the verification chain itself fixed (2026-09-29)
+
+- [Wave 5A independent review — NEEDS REPAIR / NOT PUBLISHED, findings F1–F5 and the repair instruction](reviews/2026-09-29-wave5a-independent-review.md).
+- [Repair 1 evidence — gates, pre-fix red run, per-case negative records, F1–F5 closure table, code candidate 69d9a6b](reviews/2026-09-29-wave5a-repair1-gates/README.md).
+- [F1–F5 closure table: fix location, regression, command, log, observed result](reviews/2026-09-29-wave5a-repair1-gates/F1-F5-closure.md).
+- [What the 70 ignored tests actually are (correcting "all PostgreSQL lanes")](reviews/2026-09-29-wave5a-repair1-gates/ignored-tests-classified.md).
+- The implementation record gained a dated §16 closeout; the earlier Wave 5A section above stays as written,
+  and the two statements this round disproved are annotated there and listed in the new README §6.
+- Status: WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED. Still nothing pushed, merged,
+  tagged, published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED;
+  G-01 / G-02 / G-201..G-203 stay open; PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.

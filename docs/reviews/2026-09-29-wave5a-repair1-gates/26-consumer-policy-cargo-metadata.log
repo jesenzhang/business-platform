@@ -1,0 +1,10 @@
+title      : 26-consumer-policy : resolve the consumer dependency graph (cargo metadata, full graph)
+command    : cargo metadata --format-version 1 --locked --offline --filter-platform x86_64-pc-windows-msvc
+workdir    : F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\consumers\policy
+utc        : 20260929T075902Z
+
+The cargo metadata document this step printed is kept beside this log as `25-consumer-policy-cargo-metadata.json`,
+and that file is exactly what `module-release guard --metadata` was handed; its body
+is omitted here so the evidence directory stays small.
+
+exit code : 0 (expected 0)

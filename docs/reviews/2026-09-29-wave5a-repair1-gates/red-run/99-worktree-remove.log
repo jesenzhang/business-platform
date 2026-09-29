@@ -1,0 +1,4 @@
+
+=== 99-worktree-remove ===
+$ git worktree remove --force F:\wave5a-red-8036bc65
+exit code : 0

@@ -1,0 +1,7 @@
+title      : both identity records claim a revision that is not a commit
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n09-zero-revision\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075942Z
+module-release: artifact verification failed [source-revision-exists]: the artifact pins source_revision '0000000000000000000000000000000000000000' but Git has no such commit object in this repository, so no claim about where these bytes came from can be verified
+
+exit code : 1 (expected 1)

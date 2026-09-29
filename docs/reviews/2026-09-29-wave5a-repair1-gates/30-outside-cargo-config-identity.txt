@@ -1,0 +1,35 @@
+# cargo configuration in force for the outside-repository identity consumer build
+start directory : F:\wave5a-repair1-outside\20260929T075734Z\consumers\identity
+CARGO_HOME      : C:\Users\admin\.cargo
+utc             : 20260929T075902Z
+
+CARGO_* environment variables (these override every config file):
+  (none)
+
+Config files cargo would read, nearest ancestor first:
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\consumers\identity\.cargo\config.toml
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\consumers\identity\.cargo\config
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\consumers\.cargo\config.toml
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\consumers\.cargo\config
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\.cargo\config.toml
+  absent  F:\wave5a-repair1-outside\20260929T075734Z\.cargo\config
+  absent  F:\wave5a-repair1-outside\.cargo\config.toml
+  absent  F:\wave5a-repair1-outside\.cargo\config
+  absent  F:\.cargo\config.toml
+  absent  F:\.cargo\config
+  PRESENT C:\Users\admin\.cargo\config.toml (cargo home)
+      | [http]
+      | proxy = "http://127.0.0.1:7890"
+      | [https]
+      | proxy = "http://127.0.0.1:7890"
+  absent  C:\Users\admin\.cargo\config (cargo home)
+
+conclusion: 1 config file(s) apply: C:\Users\admin\.cargo\config.toml
+
+# where this rebuild happened
+outside root        : F:\wave5a-repair1-outside\20260929T075734Z
+outside consumer    : F:\wave5a-repair1-outside\20260929T075734Z\consumers\identity
+repository          : F:\Workspace\business-platform
+same volume         : True
+relative to repo    : ..\..\wave5a-repair1-outside\20260929T075734Z\consumers\identity
+artifact crate      : F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\run-a\identity-0.1.0-rc.1\package\contract\packages\identity

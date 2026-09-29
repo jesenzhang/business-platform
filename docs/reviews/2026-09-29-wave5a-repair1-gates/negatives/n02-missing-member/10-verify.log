@@ -1,0 +1,7 @@
+title      : a payload member removed: identity must fail the integrity digest
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n02-missing-member\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075921Z
+module-release: artifact verification failed [artifact-integrity-digest]: recomputed '2c2242fe480b57bcc9c23f0ed7ad3066df14dc522242497be05f368b491ed38c' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'CHANGELOG.md' is absent from the right artifact
+
+exit code : 1 (expected 1)

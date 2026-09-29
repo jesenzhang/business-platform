@@ -1,0 +1,7 @@
+title      : one packed source byte changed: identity must fail the integrity digest
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n01-payload-byte\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075917Z
+module-release: artifact verification failed [artifact-integrity-digest]: recomputed '67cadf750eed21ecb34b9056440acc8c65096eda0fbcf6e3384252bd6ed49242' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'contract/packages/identity/src/lib.rs': 'd700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6' (719 bytes) != '78b010e164fe179dfb3da846680a58e44f5e056fab9569e82d456187e57fed44' (736 bytes)
+
+exit code : 1 (expected 1)
