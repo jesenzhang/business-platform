@@ -543,3 +543,23 @@ PASS；Wave 2 exit 第一项由 MET（高估）→ 审阅时 NOT MET → 恢复 
 A-10..A-12 的原有证据不受影响，其中 A-01..A-03 因 F-1/F-2 扩展了覆盖面。修复未新增
 部署单元、未改 manifest/compile 兼容行为、未改 Accepted ADR，G-201 契约层关闭依据增强，
 G-202/G-203 关闭条件不变（Wave 5）。
+
+---
+
+## 追加（2026-09-29，Wave 5A）— 只加指针，不改写本文历史结论
+
+1. **T 级标签错位（登记，不修正本文原表）**：本文 §9 把 Performance 记作 T7、Release artifact
+   build 记作 T5、Out-of-workspace consumer 记作 T6；`PLAN-0014` §8 的定义是
+   **T5 = Recovery/Concurrency、T6 = Performance evidence、T7 = Release compatibility**。
+   Wave 5A 的进度记录一律按 PLAN 的阶梯书写，本文原单元格保持不变。
+2. **本文「Wave 5 fixture」留白已有首次执行**：`2026-09-29-wave5a-implementation-record.md` 与
+   `2026-09-29-wave5a-gates/` 首次产出 `identity` / `policy` 的真实发布候选工件（module id + 独立版本
+   `0.1.0-rc.1`、manifest、公开契约工件、四类摘要、兼容性范围、source revision + toolchain、changelog、
+   迁移映射、验证索引）、两目录重复构建一致，以及 workspace 外消费者真实编译并调用公开契约
+   （无 path 依赖回本仓库、无 DB adapter、无 `apps/*`、缓存预热后 `--locked --offline` 复建）。
+3. **本文结论未被上述证据改写**：`G-202`（独立发布工件 + 外部消费者）**仍未关闭**，缺的是授权数据库上
+   的单模块独立安装/升级与运维回滚证据；`G-201` 残项、`G-203`（PostgreSQL 共享 `019` 单文件、同
+   `public` schema、被 `runtime-migration` 全量 embed）继续有效。两个纯 crate 与 `identity` / `policy`
+   维持 **R1 / R2 BLOCKED / NOT CLAIMED**。
+4. 本文 §10 与 A-10 单元格的既有张力（「内部 PASS / 外部 NOT RUN」与合计 PARTIAL；focused 计数
+   51 与 113）仍按原样保留，Wave 5A 未代为修正。

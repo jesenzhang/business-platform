@@ -1,0 +1,15 @@
+title      : NEGATIVE: modifying a packed source must break artifact verification
+command    : cargo run -q -p module-release-tool -- verify --artifact F:\Workspace\business-platform\target\wave5a\tamper\policy
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-29T02:50:04Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmqd1fsuzc-1xjq7s9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmqdbgvphc-0zkwr7r-working`
+
+module-release: artifact verification failed [artifact-integrity-digest]: recomputed '49de0edead6b90dc519c3cb80ab426625e6702dbd9dc83c10fe4e3435f5562ec' but artifact-manifest.json pins 'f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243'; member differences: member 'contract/packages/policy/src/lib.rs': 'fa62bddd3c1c5de7fe1c248682ff811fd5c067afd1c04ad5bf245b11c8f83635' (1200 bytes) != '5d37ea75050d7c388536d16c0d8ef8aa0631894c795cc8a79d72491e953ecf33' (1257 bytes)
+
+exit code : 1 (expected 1)

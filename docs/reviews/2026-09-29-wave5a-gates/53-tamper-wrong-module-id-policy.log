@@ -1,0 +1,15 @@
+title      : NEGATIVE: a payload whose module_id differs from the pinned identity must be rejected
+command    : cargo run -q -p module-release-tool -- verify --artifact F:\Workspace\business-platform\target\wave5a\tamper\policy
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-29T02:50:06Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmqd1fsuzc-1xjq7s9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmqdbgvphc-0zkwr7r-working`
+
+module-release: artifact verification failed [bundle-identity]: release-bundle.json pins a different identity than release.json
+
+exit code : 1 (expected 1)

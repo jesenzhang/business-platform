@@ -1,0 +1,25 @@
+title      : generate identity (attempt run-b)
+command    : cargo run -q -p module-release-tool -- generate --module identity --out F:\Workspace\business-platform\target\wave5a\run-b
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-29T02:49:03Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmqd1fsuzc-1xjq7s9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmqdbgvphc-0zkwr7r-working`
+
+status=generated
+module_id=identity
+module_version=0.1.0-rc.1
+directory=F:\Workspace\business-platform\target\wave5a\run-b\identity-0.1.0-rc.1
+members=21
+contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107
+package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70
+artifact_integrity_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+source_revision=8036bc65ba7c77666e48afaa6439911ba7c083d7
+toolchain=rust-toolchain-1.94.1 1.94.1
+platform_version=0.1.0
+
+exit code : 0 (expected 0)

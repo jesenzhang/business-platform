@@ -1,0 +1,31 @@
+title      : run the out-of-workspace F:\Workspace\business-platform\target\wave5a\consumers\policy test that calls the published contract
+command    : cargo test --manifest-path F:\Workspace\business-platform\target\wave5a\consumers\policy\Cargo.toml --all-features
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-29T02:49:57Z
+   Compiling pin-project-lite v0.2.17
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling wave5a-consumer-policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a\consumers\policy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.99s
+     Running unittests src\lib.rs (target\debug\deps\wave5a_consumer_policy-ebc69e74d69d7e71.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\public_contract.rs (target\debug\deps\public_contract-471a3a54f636dba3.exe)
+
+running 2 tests
+test an_unbound_permission_is_denied_by_the_released_contract ... ok
+test a_permission_catalog_alone_does_not_grant_anything ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wave5a_consumer_policy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit code : 0 (expected 0)

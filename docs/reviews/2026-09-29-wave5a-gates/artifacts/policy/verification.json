@@ -1,0 +1,38 @@
+{
+  "schema_version": "plan-0014.wave5a.verification.v1",
+  "module_id": "policy",
+  "module_version": "0.1.0-rc.1",
+  "artifact_integrity_digest": "f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243",
+  "checks": [
+    {
+      "id": "artifact-integrity-digest",
+      "description": "SHA-256 over the canonicalised members of package/ recomputed from disk",
+      "outcome": "PASS",
+      "detail": "23 members, plan-0014.artifact-integrity.v1 = f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243"
+    },
+    {
+      "id": "contract-surface-file-digest",
+      "description": "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest",
+      "outcome": "PASS",
+      "detail": "52e788ff3187846c4484cc42a3891aa7833f89ff65d666c7b3c7e1af831568c8"
+    },
+    {
+      "id": "release-identity-consistency",
+      "description": "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)",
+      "outcome": "PASS",
+      "detail": "contract_digest=52e788ff3187846c4484cc42a3891aa7833f89ff65d666c7b3c7e1af831568c8 package_digest=37e95a19b45c3dcc00e2f4099d91cc72ed63af71f19d769882412af8b2ddd4b6 namespace=policy"
+    },
+    {
+      "id": "migration-mapping-matches-formal-catalog",
+      "description": "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk",
+      "outcome": "PASS",
+      "detail": "namespace=policy set_digest=1a5a43f8b269b3e3624b44a613fa9e498775ad7ccac0cf768018b891168ea597 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_policy_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED"
+    },
+    {
+      "id": "source-provenance",
+      "description": "the artifact pins the source revision and toolchain it was built from",
+      "outcome": "PASS",
+      "detail": "source_revision=8036bc65ba7c77666e48afaa6439911ba7c083d7 toolchain=rust-toolchain-1.94.1 1.94.1"
+    }
+  ]
+}

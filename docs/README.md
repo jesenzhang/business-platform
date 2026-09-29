@@ -269,3 +269,12 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - [Wave 4 gates incl. real PostgreSQL lane — code commit 6fb9487](reviews/2026-09-28-wave4-gates/README.md).
 - [Real S3-compatible provider lane (RustFS) and teardown](reviews/2026-09-28-wave4-storage-lane/README.md).
 - ADR-0027 / ADR-0028 remain Proposed, NOT ACCEPTED; Wave 4 records them as R2 dependencies and invents no event envelope.
+
+## PLAN-0014 Wave 5A — local module release candidates (2026-09-29)
+
+- [Wave 5A implementation record — pilot choice, artifact format, normalization rules, results](reviews/2026-09-29-wave5a-implementation-record.md).
+- [Wave 5A gates, artifact digests and out-of-workspace consumer evidence — code commit 8036bc6](reviews/2026-09-29-wave5a-gates/README.md).
+- [Assembly and verification step log (30 steps, `scripts/plan0014-wave5a.ps1`)](reviews/2026-09-29-wave5a-gates/assembly-log.md).
+- Status: LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED. Nothing was pushed, merged, tagged,
+  published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED, and a successful
+  artifact build is not an R2 claim. PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.

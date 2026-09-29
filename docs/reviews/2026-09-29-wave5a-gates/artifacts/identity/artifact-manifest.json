@@ -1,0 +1,191 @@
+{
+  "schema_version": "plan-0014.wave5a.artifact-manifest.v1",
+  "module_id": "identity",
+  "module_version": "0.1.0-rc.1",
+  "artifact_integrity_algorithm": "plan-0014.artifact-integrity.v1",
+  "artifact_integrity_digest": "68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700",
+  "contract_digest": "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107",
+  "package_digest": "b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70",
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "6672a0f735603e2273df3ade93bea7ea0ebec69c3f559ca45190849f315a9a1f",
+      "bytes": 3632
+    },
+    {
+      "path": "contract/contract-surface.json",
+      "sha256": "682124b67eb7eb67cf741b58654acd03cf5670d8d40cecb4f980577b4543532c",
+      "bytes": 753
+    },
+    {
+      "path": "contract/packages/identity/Cargo.toml",
+      "sha256": "65c01c4a2a3ef6ea638cabc820c6bf11e0e3b9ddb5a8b8f4423242892f7c4878",
+      "bytes": 680
+    },
+    {
+      "path": "contract/packages/identity/src/application/access.rs",
+      "sha256": "79690e29b72281e4485307f7f0ea036954907acd672fb755287cae5c627348db",
+      "bytes": 6064
+    },
+    {
+      "path": "contract/packages/identity/src/application/bootstrap.rs",
+      "sha256": "df536750b85365ba15a965312a63ced06379d1b26b6bfe37a0084b5d3abadbf4",
+      "bytes": 28089
+    },
+    {
+      "path": "contract/packages/identity/src/application/membership.rs",
+      "sha256": "6107abbadeabb8cff55ec0f438c07cb77420b1d69c0236d053b579edc0bf8769",
+      "bytes": 16827
+    },
+    {
+      "path": "contract/packages/identity/src/application/mod.rs",
+      "sha256": "6bf520444e42d5e44300a79cfd6cc557ef845aad30cf7f40486ae7942dee5694",
+      "bytes": 2415
+    },
+    {
+      "path": "contract/packages/identity/src/application/queries.rs",
+      "sha256": "9c924c37dfe9d9a5dbb93232c68401b9c8bba96bbee4e02a517c82c8898c0f29",
+      "bytes": 4353
+    },
+    {
+      "path": "contract/packages/identity/src/application/resolve.rs",
+      "sha256": "ee5e3badeedc804cbc2d0060a4e782c43cc571a3f696c69e23dd6a52c1475130",
+      "bytes": 8775
+    },
+    {
+      "path": "contract/packages/identity/src/application/user_status.rs",
+      "sha256": "271f9a530acc91bf1b6be8de98ddbe1ddc1a46262418287362c3c499f60e98a4",
+      "bytes": 4274
+    },
+    {
+      "path": "contract/packages/identity/src/domain/error.rs",
+      "sha256": "ee165707aa99b3450862142a31c17eaee0a6686896375b1b174ea18d579868c5",
+      "bytes": 2087
+    },
+    {
+      "path": "contract/packages/identity/src/domain/external_identity.rs",
+      "sha256": "aaaf9b4456caa00e98e28baf922415dd872e9b5902a97ac0a867edecc04260a1",
+      "bytes": 6035
+    },
+    {
+      "path": "contract/packages/identity/src/domain/membership.rs",
+      "sha256": "26796ad83874f27c35da5f2b8acea6dfd40a9d915872a983987a0e73af1ef355",
+      "bytes": 10881
+    },
+    {
+      "path": "contract/packages/identity/src/domain/mod.rs",
+      "sha256": "fd6842e8325c1cedf3b94c566d90eec0921b4286fcade23f35a270ff3eae48cc",
+      "bytes": 490
+    },
+    {
+      "path": "contract/packages/identity/src/domain/user.rs",
+      "sha256": "de4459068ed9eb0912d28ea289fe112908b3fdeb6e06c170a0b5b5512042dab6",
+      "bytes": 7347
+    },
+    {
+      "path": "contract/packages/identity/src/domain/version.rs",
+      "sha256": "41285bfab7025ffd87589bf5c92db08b11ba99920866205ea8758772ac2486f4",
+      "bytes": 1786
+    },
+    {
+      "path": "contract/packages/identity/src/lib.rs",
+      "sha256": "d700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6",
+      "bytes": 719
+    },
+    {
+      "path": "contract/packages/identity/src/ports.rs",
+      "sha256": "f77bf26b7ede5d50d3bc70c398b7c41ede209d2cc9f9f7663c4d0d5911aca61a",
+      "bytes": 16615
+    },
+    {
+      "path": "contract/packages/identity/src/testing.rs",
+      "sha256": "c89067c1edf142f77baa3c5b929b99a09d0b2228d13a9c995abe7deda4ef138b",
+      "bytes": 28448
+    },
+    {
+      "path": "migrations/migration-mapping.json",
+      "sha256": "b5a65fe358217e8358d1101798d54db1403f50702a67642e89a3b74cbb1f0057",
+      "bytes": 4941
+    },
+    {
+      "path": "module.manifest.json",
+      "sha256": "88b8994e50d2d608249a75724cfb6f729184805107444324645de03b5758cf57",
+      "bytes": 1107
+    }
+  ],
+  "excluded_members": [
+    {
+      "path": "artifact-manifest.json",
+      "reason": "descriptive record of the payload; hashing the record that contains the payload digest would make the digest self-referential"
+    },
+    {
+      "path": "release.json",
+      "reason": "external release identity record; it pins declaration digests and the source revision, not payload bytes"
+    },
+    {
+      "path": "release-bundle.json",
+      "reason": "audit mapping from module version to crate versions; derived from the same declaration digests"
+    },
+    {
+      "path": "verification.json",
+      "reason": "evidence index written after verification; excluding it keeps the payload digest stable across re-verification"
+    }
+  ],
+  "packaging_transforms": [
+    {
+      "crate_name": "identity",
+      "rule": "materialise-version-from-workspace",
+      "detail": "version.workspace = true -> version = \"0.1.0-rc.1\""
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-edition-from-workspace",
+      "detail": "edition.workspace = true -> edition = \"2021\""
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-rust-version-from-workspace",
+      "detail": "rust-version.workspace = true -> rust-version = \"1.94.1\""
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-workspace-dependency",
+      "detail": "chrono = { workspace = true } together with the workspace entry 'chrono = { version = \"0.4\", features = [\"serde\"] }' -> chrono = { version = \"=0.4.45\", features = [\"serde\"] }; the version is pinned to Cargo.lock"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-workspace-dependency",
+      "detail": "uuid = { workspace = true } together with the workspace entry 'uuid = { version = \"1\", features = [\"v4\", \"v5\", \"v7\", \"serde\"] }' -> uuid = { version = \"=1.26.0\", features = [\"serde\", \"v4\", \"v5\", \"v7\"] }; the version is pinned to Cargo.lock"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-workspace-dependency",
+      "detail": "async-trait = { workspace = true } together with the workspace entry 'async-trait = 0.1' -> async-trait = { version = \"=0.1.92\" }; the version is pinned to Cargo.lock"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-workspace-dependency",
+      "detail": "thiserror = { workspace = true } together with the workspace entry 'thiserror = 2' -> thiserror = { version = \"=2.0.20\" }; the version is pinned to Cargo.lock"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "materialise-workspace-dependency",
+      "detail": "sha2 = { workspace = true } together with the workspace entry 'sha2 = 0.10' -> sha2 = { version = \"=0.10.9\" }; the version is pinned to Cargo.lock"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "drop-section",
+      "detail": "[dev-dependencies] is not part of the published contract surface"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "drop-section",
+      "detail": "[lints] is not part of the published contract surface"
+    },
+    {
+      "crate_name": "identity",
+      "rule": "detach-workspace",
+      "detail": "append an empty [workspace] table so the packed crate builds identically inside and outside this repository"
+    }
+  ]
+}

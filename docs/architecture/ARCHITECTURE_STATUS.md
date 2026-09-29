@@ -791,3 +791,40 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   architecture fitness PASS / `git diff --check`。59 ignored 不计为已执行。
 - 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**；R1 foundation，独立 verdict 待回填；
   C1 未清零 ⇒ **R2 BLOCKED**；Wave 5 / PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。
+
+> 2026-09-29 Wave 5A（本地发布候选，未发布）在分支 `codex/plan-0014-wave5a-local-release-pilot`
+> （Base `9b05ccddb4964b363b0c9ae001c4303c1b7393db`，未 push、未 merge、未打正式发布 tag、未部署）
+> 完成。上一轮结论原文照录且未扩大：「Round 3 修复通过；Wave 4 有界收口；既有 C1、R2 阻塞与
+> 未执行项继续有效」。
+
+- 试点：`identity` 与 `policy` **两个模块**（PLAN-0014 §6 候选前两项）。`business-module-contracts`
+  与 `business-application-compiler` 同属一个 foundation，若日后登记只是**一个**模块
+  （`ModuleReleaseBundle.crate_versions` 映射两个 crate），本轮不用 bundle 凑模块数。
+- 新增 workspace 成员 `tools/module-release-tool`（`generate` / `verify` / `compare`）：复用
+  `contract_digest` / `package_fingerprint` / `verify_release_identity` seam，未修改两个纯 crate；
+  工具侧新增的物理工件摘要 `artifact_integrity_digest` **不并入** `ModuleReleaseIdentity`。
+- 工件：`identity-0.1.0-rc.1` / `policy-0.1.0-rc.1`，含 module id + 独立版本、manifest、公开契约
+  工件（`contract/contract-surface.json` 逐字节等于编译器哈希前镜像）、迁移映射、changelog、
+  L2 identity/bundle、L3 验证索引；四类摘要分列见 `docs/reviews/2026-09-29-wave5a-implementation-record.md`
+  §4.3 与 §13.2；`source_revision` 钉在代码候选提交 `8036bc65ba7c77666e48afaa6439911ba7c083d7`。
+- 确定性：两目录生成 + `compare` 零差异；宿主绝对路径 / 机器名 / 用户名 / 时间戳 / `target/`
+  不出现在 payload；release identity 不含随机 UUID、当前时间或机器名。
+- 真实构建：packed crate 在 payload 之外以自身为 workspace root 构建成功且构建后工件复验仍 PASS；
+  两个 workspace 外消费者（无 path 依赖回本仓库、无 DB adapter、无 `apps/*`）实际编译并调用公开契约
+  （identity 1 例、policy 2 例，均默认拒绝方向），缓存预热后 `--locked --offline` 复建通过。
+- 门禁全绿：fmt / check / clippy `-D warnings` / workspace 测试 **833 passed / 0 failed / 70 ignored**
+  （187 suites）/ architecture fitness PASS（新增 Wave 5A 边界，做过注入式反向验证）/
+  `git diff --check`；定向 `module-release-tool` 30 passed。70 ignored 为既有 PostgreSQL lane，不计为已执行。
+- 未执行 / BLOCKED：PostgreSQL 迁移执行与单模块独立安装/升级（无数据库授权；identity 与 policy 与
+  organization 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、被
+  `runtime-migration` 全量 embed）；publish / 注册 / install / upgrade / rollback；push / merge /
+  tag / 部署；漏洞、许可证、镜像扫描；CI。SQLite 与离线证据不替代 PostgreSQL 结论。
+- gap registry 不变：G-01 / G-02（Wave 1）、G-201 / G-202 / G-203（Wave 2）与 Wave 4 的
+  D-W4-02 / 06 / 08 / 09 / 11、OBS-W4-05 / 06 / 07、N-G05 继续有效。本轮证据只覆盖
+  「可打包、可校验、可脱离 workspace 被真实调用」，**不**关闭 G-202（缺授权数据库上的独立安装/升级
+  与运维回滚证据），亦不改写 `2026-09-24-saas-align-module-packaging.md` 的历史结论（该文档只追加带日期指针）。
+- 状态：**LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED**；`identity` / `policy` /
+  两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；打包成功**不等于** R2；Wave 5 剩余项与
+  PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。
+  评审与证据：`docs/reviews/2026-09-29-wave5a-implementation-record.md`、
+  `docs/reviews/2026-09-29-wave5a-gates/`（独立审阅栏留空）。

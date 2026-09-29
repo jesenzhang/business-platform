@@ -1,0 +1,15 @@
+title      : NEGATIVE: modifying a packed source must break artifact verification
+command    : cargo run -q -p module-release-tool -- verify --artifact F:\Workspace\business-platform\target\wave5a\tamper\identity
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-29T02:50:01Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmqd1fsuzc-1xjq7s9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmqdbgvphc-0zkwr7r-working`
+
+module-release: artifact verification failed [artifact-integrity-digest]: recomputed '6f18ea44bf8215e44428fcdc23ee1bc5aeed7809973d83e9de3cb5f2f85cd6ed' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'contract/packages/identity/src/lib.rs': 'd700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6' (719 bytes) != '4a99a3803400297a8483123168cfbaf470f758a2f9e75e3abe2720386face217' (776 bytes)
+
+exit code : 1 (expected 1)

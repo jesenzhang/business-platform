@@ -355,6 +355,8 @@ artifacts/<module>/{artifact-manifest,release,release-bundle,verification}.json
 
 不提交：完整 `target/`、无关构建缓存、任何凭据或数据库连接串。README 中的临时根以 `<TEMP>` 归一化；日志原文保留绝对路径以便核对（不含凭据）。
 
+实际落地时的命名与本节预写有四处差异（内容一致，仅命名更清楚）：证据目录名与本文一致；`assembly-log.md` 取代预写的 `README.md` 角色，`README.md` 改由人工撰写（命令↔日志↔退出码 + 摘要表 + NOT RUN/BLOCKED + 空的独立审阅栏）；消费者日志按 `20..25-consumer-<module>-*` 对两个试点同构命名（不分 `2x`/`3x`）；门禁日志统一 `60-gate-*`，定向测试为 `61-targeted-module-release-tool.log`、`62-targeted-contract-compiler.log`。临时根不再是系统盘 `<TEMP>`，而是仓库内被忽略的 `<REPO>\target\wave5a`（与仓库同卷，见 13.8）。
+
 ## 11. 终态定义
 
 本轮可达终态：**LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED**。
@@ -385,7 +387,80 @@ artifacts/<module>/{artifact-manifest,release,release-bundle,verification}.json
 
 ## 13. 执行结果
 
-由 closeout 提交追加：工件位置/版本/摘要表、外部消费者结果、门禁结果、NOT RUN / BLOCKED 表、剩余 C1 与 R2 阻塞、提交链。证据目录 `docs/reviews/2026-09-29-wave5a-gates/`。
+### 13.1 提交链与终态
+
+| 项 | 值 |
+|---|---|
+| 基线 | `9b05ccddb4964b363b0c9ae001c4303c1b7393db` |
+| 编码前实施记录 | `e2ce866616495b35974b704a5361853cf2b5b375`（本文 0–12 节，先于编码提交） |
+| 代码候选 | `8036bc65ba7c77666e48afaa6439911ba7c083d7`（工具 + 试点声明 + 测试 + 编排脚本 + 架构门禁，含 `Cargo.lock`） |
+| 文档收口 | 本提交（本文 13 节、证据目录、PLAN-0014 与状态文档同步） |
+| 分支 | `codex/plan-0014-wave5a-local-release-pilot`；未 push、未 merge、未打正式发布 tag、未部署 |
+| 终态 | **LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED** |
+
+候选工件的 `source_revision` 钉在代码候选提交 `8036bc65` 本身；生成时工作树只多出尚未提交的证据目录，代码状态与提交一致。
+
+### 13.2 候选工件位置与四类摘要
+
+生成位置（不提交；证据目录内保存 L2/L3 四个 JSON 记录副本）：`<REPO>\target\wave5a\run-a\{identity,policy}-0.1.0-rc.1\` 与 `run-b\` 同名目录。
+
+| 摘要 | identity | policy |
+|---|---|---|
+| `contract_digest` | `3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107` | `52e788ff3187846c4484cc42a3891aa7833f89ff65d666c7b3c7e1af831568c8` |
+| `package_digest` | `b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70` | `37e95a19b45c3dcc00e2f4099d91cc72ed63af71f19d769882412af8b2ddd4b6` |
+| `artifact_integrity_digest` | `68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700` | `f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243` |
+| `migration_revision.set_digest` | `ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03` | `1a5a43f8b269b3e3624b44a613fa9e498775ad7ccac0cf768018b891168ea597` |
+
+module id / version：`identity` / `0.1.0-rc.1`、`policy` / `0.1.0-rc.1`；`build_toolchain` = `rust-toolchain-1.94.1` / `1.94.1`；payload 成员 21 / 23；L2 四个文件在 `excluded_members` 中逐一声明排除理由（不是事后忽略）；`verification.json` 五个检查项全 PASS。完整清单、日志对照与 NOT RUN 表见 `docs/reviews/2026-09-29-wave5a-gates/README.md`。
+
+### 13.3 冻结设计与实现的一致性（含实现期细化）
+
+与 4–6 节冻结一致：三层工件结构、四类摘要分工、9 条规范化规则、自引用规避、版本来源、迁移映射与正式 catalog 强绑定、消费者脱离 workspace。实现期有四项细化，均不改冻结语义，但必须记录：
+
+1. **写出即规范化**（强于 4.4 第 4 条的「哈希前规范化」）：payload 成员在写盘前完成 BOM 剥离、`\r\n`/孤立 `\r` → `\n`、补末尾 `\n`，因此磁盘字节等于被摘要字节，第三方可用 `sha256sum` 逐成员复核 `artifact-manifest.json`。`contract/contract-surface.json` 是唯一豁免：它是编译器哈希的前镜像，必须逐字节保留（补一个换行就会让该文件的 SHA-256 不等于 `contract_digest`）。此项改动**不改变任何摘要**（哈希早已规范化），由 `packaging` 测试与重跑结果共同证明。
+2. **验证检查项是 5 个**，不是早期口径的 6 个：`artifact-integrity-digest`、`contract-surface-file-digest`、`release-identity-consistency`、`migration-mapping-matches-formal-catalog`、`source-provenance`。成员清单差异不单列一项，而是在第一个检查项内逐成员报出（缺文件 / 多文件 / 字节与长度差异均给成员名）。
+3. **依赖物化规则**：成员 crate 若以 `workspace = true` 继承依赖，工具把 workspace 条目 + `Cargo.lock` 精确版本 + workspace 与 member 的 feature 并集（**排序后**）写成独立声明（变换名 `materialise-workspace-dependency`）。feature 排序使 `identity` packed manifest 的 `uuid` feature 顺序由 `["v4","v5","v7","serde"]` 变为 `["serde","v4","v5","v7"]`，因此**工件字节完整性摘要与同日更早一轮草稿不同**；`contract_digest` 与 `package_digest` 逐项核对**与既有记录完全一致**（见 13.2）。选择排序而非原序，是因为顺序不携带语义且与 4.4 的确定性原则一致。
+4. **成员路径校验收紧**：`.`、`..`、空组件、以 `.` 结尾、含控制字符的组件一律拒绝。此前 `a/../b.md` 被接受，与错误文案自述矛盾，由 `canonical` 测试暴露后修正。
+
+与 7 节文件范围的差异（只多不少，均在同一目录内）：实际提交另含 `src/repo.rs`（仓库事实只读读取：`Cargo.toml` / `Cargo.lock` / `git rev-parse HEAD` / toolchain，独立成模块以免 `packaging` 直接触 filesystem）、`src/surface.rs`（从试点声明构造 `BusinessApplicationPackage` 的单一入口）、`src/tempdir.rs`（测试用临时目录，落 `<repo>\target\tmp\...` 并在 Drop 时自删，避免向系统盘写临时文件），以及随 workspace 成员变更必须一起提交的 `Cargo.lock`。消费者模板的依赖是 `path = "__ARTIFACT_CRATE_DIR__"` 占位符，由脚本替换为工件内 crate 的绝对路径，模板自身永不含仓库路径。
+
+同日更早一轮留下的证据日志与工件（旧 `artifact_integrity_digest` `8aeb53d8…` / `cbda6f7b…` 等）属**已废弃证据**：产自被误覆盖的旧源副本与旧 feature 顺序。本轮全部重跑覆盖，未以旧日志替代任何一次执行。
+
+### 13.4 重复构建、真实构建与外部消费者
+
+- 两个不同临时目录 `run-a` / `run-b` 分别生成，`compare` 逐成员与四类摘要零差异；同一件事在 `tests/packaging.rs` 内独立重做（并断言 payload 不含宿主绝对路径、机器名、用户名、时间戳、`target/` 路径）。
+- packed crate 在 payload 之外的副本上以自身为 workspace root 真实构建成功；构建后重跑 `verify` 仍 PASS，证明构建未回写工件（此前构建曾在 payload 内留下 `Cargo.lock`，由该步骤捕获并改正）。
+- 两个 workspace 外消费者（`<REPO>\target\wave5a\consumers\<module>`，依赖 path 指向工件目录、自带空 `[workspace]` 表）实际 `build` / `test` / `--locked --offline` 全绿：identity 1 个用例（先 `NoMembership` 拒绝，注入成员关系后 `Active`），policy 2 个用例（未绑定权限默认 DENY；仅有权责目录不构成授权）。依赖树中无 `sqlx`、无 `*-sqlite`、无 `axum`、无 `apps/*`；`Cargo.lock` 与 `Cargo.toml` 中对 `<REPO>\crates`、`<REPO>\apps` 的引用命中数为 0。
+- 4 类篡改 × 2 试点全部被拒（退出码 1，检查项具名）：改 packed 源字节与删 payload 成员在 `artifact-integrity-digest` 拒绝并报出成员；改 `release.json` 的 `module_version` / `module_id` 更早地在 `bundle-identity` 交叉校验被拒，字段级 `verify_release_identity` 拒绝（`UnknownModule` / `ModuleVersion` / `ContractDigest` / `PackageDigest`）由 `tests/pilot_candidates.rs` 单独证明。
+
+### 13.5 门禁结果
+
+6 条门禁全部执行且全部为 0：`cargo fmt --all -- --check`、`cargo check --workspace --all-targets --all-features`、`cargo clippy --workspace --all-targets --all-features -- -D warnings`、`cargo test --workspace --all-features`（187 个测试二进制，833 passed / 0 failed / 70 ignored）、`pwsh -NoProfile -File scripts/check-architecture.ps1`、`git diff --check`。定向：`module-release-tool` 30 passed（lib 4、canonical 5、compatibility 8、packaging 3、pilot_candidates 10）；两个纯 crate 定向全绿。70 个 ignored 是既有 PostgreSQL lane，本轮未执行、不计入通过。
+
+架构门禁新增 Wave 5A 规则做过反向验证（注入回指 path、把 module 版本改成平台版本，各自让门禁退出 1；还原后恢复 0），不是永真式。
+
+### 13.6 NOT RUN / BLOCKED（原样保留，不得当作通过）
+
+| 项 | 状态 | 原因 |
+|---|---|---|
+| PostgreSQL 迁移执行与 70 个 `#[ignore]` PG lane | **BLOCKED** | 本轮无数据库授权（承前 G-02）；SQLite 与离线证据不得替代 PostgreSQL 结论 |
+| 单模块在 PostgreSQL 上独立安装/升级 | **BLOCKED** | 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、`runtime-migration` 全量 embed（G-203）；工件内该条 `module_owned=false` |
+| publish / 注册 / install / upgrade / rollback 执行 | **NOT RUN** | 任务边界禁止；本轮只做本地候选工件 |
+| push / merge / 正式发布 tag / 部署 | **NOT RUN** | 同上；两个模块成熟度未改 |
+| 漏洞、许可证、镜像扫描；CI | **NOT RUN** | 未执行 |
+| Document ACL / Notification / 通用日志脱敏 | 不在本轮范围 | 承前边界 |
+
+### 13.7 本轮未关闭、继续有效的阻塞
+
+C1：Wave 1 **G-01**、**G-02**（本轮未连库，保持 BLOCKED）；Wave 2 **G-201 / G-202 / G-203**；Wave 4 **D-W4-02 / D-W4-06 / D-W4-08 / D-W4-09 / D-W4-11**；观察项 **OBS-W4-05 / OBS-W4-06 / OBS-W4-07**、**N-G05**。C2 backlog：G-03…G-09、G-204、G-206。Wave 2 验收面维持 A-01…A-09 + A-11 PASS、A-10 PARTIAL、A-12 NOT RUN。
+
+本轮**不**据此关闭任何一项：工件与消费者证据只覆盖「可打包、可校验、可脱离 workspace 被真实调用」，不覆盖授权数据库上的独立安装/升级与运维回滚。
+
+### 13.8 临时工件位置与清理
+
+本轮所有生成物落在与仓库同卷的 `<REPO>\target\`（`wave5a\` 候选与消费者、`tmp\` 测试与门禁辅助脚本），均被 `.gitignore` 覆盖；测试内的临时目录由 `TempDir` 在 Drop 时自删。**收口时已删除** `<REPO>\target\wave5a`、`<REPO>\target\tmp` 与系统盘上的历史残留；仓库里只保留 `docs/reviews/2026-09-29-wave5a-gates/` 内的文本证据与 `artifacts/<module>/` 的 L2/L3 记录副本。
+
+复现命令：`pwsh -NoProfile -File scripts/plan0014-wave5a.ps1 -EvidenceDir <证据目录>`（临时根默认 `<repo>\target\wave5a`，30 步全部应命中预期退出码）。注意 `release.json.source_revision` 取**生成时刻**的 HEAD：在本文档收口提交之后重跑会钉到新的 HEAD，此时四类摘要仍与 13.2 逐字相同（`contract_digest` / `package_digest` / `migration_set_digest` 不引用 revision，`artifact_integrity_digest` 只覆盖 L1 payload），唯一差异是 L2 里这一个字段；本记录的 13.2 值是 `8036bc65` 时刻的实测值。
 
 ## 14. 顺带发现（不属本轮修复范围，如实登记）
 
