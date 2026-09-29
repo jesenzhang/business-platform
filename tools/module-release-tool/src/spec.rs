@@ -27,6 +27,19 @@ use serde::{Deserialize, Serialize};
 use crate::repo::RepoContext;
 use crate::{ToolError, ToolResult};
 
+/// Directory the checked-in release specs live in.
+pub const SPEC_DIRECTORY: &str = "tools/module-release-tool/specs";
+
+/// Repository-relative path of one module's release spec.
+///
+/// Provenance has to prove that *this* file, as committed, is the declaration a
+/// candidate was compiled from, so the path is derived in exactly one place
+/// instead of being re-typed by every caller that needs it.
+#[must_use]
+pub fn spec_path(module: &str) -> String {
+    format!("{SPEC_DIRECTORY}/{module}.json")
+}
+
 /// One published command, query or event declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -173,8 +186,7 @@ pub struct ReleaseSpec {
 impl ReleaseSpec {
     /// Loads `tools/module-release-tool/specs/<module>.json`.
     pub fn load(context: &RepoContext, module: &str) -> ToolResult<Self> {
-        let path: PathBuf =
-            Path::new("tools/module-release-tool/specs").join(format!("{module}.json"));
+        let path: PathBuf = Path::new(SPEC_DIRECTORY).join(format!("{module}.json"));
         let shown = context.root().join(&path).display().to_string();
         let text = std::fs::read_to_string(context.root().join(&path)).map_err(|source| {
             ToolError::Spec {

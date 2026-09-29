@@ -12,7 +12,9 @@
 //! * dependency versions are pinned from `Cargo.lock`, so a packed crate cannot
 //!   silently resolve to something else later.
 //!
-//! No subprocess is spawned and nothing outside the repository is read.
+//! The only outside process used here is `git` itself, and only to ask what `HEAD`
+//! resolves to (see [`read_git_revision`]); no other external command is run and
+//! nothing outside the repository is read.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -224,7 +226,11 @@ fn read_file(path: &Path) -> ToolResult<String> {
     })
 }
 
-fn required(table: &BTreeMap<String, String>, key: &str, where_: &str) -> ToolResult<String> {
+pub(crate) fn required(
+    table: &BTreeMap<String, String>,
+    key: &str,
+    where_: &str,
+) -> ToolResult<String> {
     table
         .get(key)
         .cloned()
@@ -242,7 +248,7 @@ fn required(table: &BTreeMap<String, String>, key: &str, where_: &str) -> ToolRe
 /// it understands `key = "value"` and `key = { ... }` (stored as the raw right
 /// hand side). Anything it cannot classify is ignored rather than guessed, and
 /// callers fail closed when a key they need is missing.
-fn parse_section(content: &str, wanted: &str) -> ToolResult<BTreeMap<String, String>> {
+pub(crate) fn parse_section(content: &str, wanted: &str) -> ToolResult<BTreeMap<String, String>> {
     let mut pairs = BTreeMap::new();
     let mut inside = false;
     for raw_line in content.lines() {
@@ -337,48 +343,14 @@ fn parse_lock_versions(content: &str) -> ToolResult<BTreeMap<String, Vec<String>
     Ok(versions)
 }
 
+/// The commit `HEAD` resolves to, asked of Git itself.
+///
+/// This used to parse `.git/HEAD`, `refs/` and `packed-refs` by hand. That parser
+/// is the reason a pinned revision could not be trusted to mean "commit Git also
+/// means": it disagreed with Git for a linked worktree whose `gitdir:` pointer is
+/// relative, and for any ref layout it did not know. `git rev-parse HEAD` answers
+/// the same question for a normal checkout, a detached `HEAD` and a linked
+/// worktree, and it fails loudly instead of guessing.
 fn read_git_revision(root: &Path) -> ToolResult<String> {
-    let git = root.join(".git");
-    let metadata = std::fs::symlink_metadata(&git).map_err(|source| ToolError::Io {
-        path: git.display().to_string(),
-        source,
-    })?;
-    let git_directory = if metadata.is_dir() {
-        git
-    } else {
-        // Linked worktree / submodule: `.git` is a file containing `gitdir: …`.
-        let pointer = read_file(&git)?;
-        let target = pointer.trim().strip_prefix("gitdir:").ok_or_else(|| {
-            ToolError::Usage(format!(
-                "'{}' is neither a directory nor a gitdir pointer",
-                git.display()
-            ))
-        })?;
-        PathBuf::from(target.trim())
-    };
-    let head = read_file(&git_directory.join("HEAD"))?;
-    let head = head.trim().to_owned();
-    if let Some(reference) = head.strip_prefix("ref:") {
-        let reference = reference.trim();
-        let direct = git_directory.join(reference);
-        if direct.is_file() {
-            return Ok(read_file(&direct)?.trim().to_owned());
-        }
-        let packed = read_file(&git_directory.join("packed-refs")).unwrap_or_default();
-        for line in packed.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') || line.starts_with('^') {
-                continue;
-            }
-            if let Some((digest, name)) = line.split_once(' ') {
-                if name.trim() == reference {
-                    return Ok(digest.to_owned());
-                }
-            }
-        }
-        return Err(ToolError::Usage(format!(
-            "git HEAD points at '{reference}' which exists in neither refs nor packed-refs"
-        )));
-    }
-    Ok(head)
+    crate::git::Git::open(root)?.head()
 }

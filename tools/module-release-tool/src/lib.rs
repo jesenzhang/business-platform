@@ -44,8 +44,11 @@
 //! `module_version`, `source_revision` and the digests above.
 
 pub mod canonical;
+pub mod git;
+pub mod isolation;
 pub mod migrations;
 pub mod packaging;
+pub mod provenance;
 pub mod repo;
 pub mod spec;
 pub mod surface;
@@ -183,6 +186,16 @@ pub enum ToolError {
     /// The release identity is inconsistent with the compiled evidence.
     #[error(transparent)]
     IdentityMismatch(#[from] ReleaseIdentityMismatch),
+    /// A read-only Git command could not be run or returned something
+    /// unexpected. Provenance is answered by Git, so this is a verification
+    /// failure rather than something to guess around.
+    #[error("git could not answer (`git {command}`): {reason}")]
+    Git {
+        /// The Git command that was run.
+        command: String,
+        /// Why it failed.
+        reason: String,
+    },
     /// The command line or the requested module is not usable.
     #[error("usage error: {0}")]
     Usage(String),

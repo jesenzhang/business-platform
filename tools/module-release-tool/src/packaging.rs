@@ -12,6 +12,7 @@
 //!
 //! Nothing in step 1 hashes anything from steps 2–4, and no file hashes itself.
 
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -24,11 +25,13 @@ use business_module_contracts::{
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::{
-    artifact_integrity_digest, inventory, normalize_text_bytes, sha256_hex, ArtifactFile,
+    artifact_integrity_digest, inventory, normalize_text_bytes, sha256_hex, validate_member_path,
+    validate_sha256_hex, ArtifactFile,
 };
 use crate::migrations::{self, MigrationMapping};
+use crate::provenance::{Provenance, ProvenanceInput};
 use crate::repo::RepoContext;
-use crate::spec::ReleaseSpec;
+use crate::spec::{self, ReleaseSpec};
 use crate::surface;
 use crate::{
     ToolError, ToolResult, ARTIFACT_MANIFEST_FILE, ARTIFACT_MANIFEST_SCHEMA_VERSION,
@@ -192,19 +195,11 @@ pub fn generate(
     };
     bundle.validate()?;
 
-    let directory = out_root.join(format!("{}-{}", spec.module_id, spec.module_version));
-    if directory.exists() {
-        return Err(ToolError::Usage(format!(
-            "refusing to overwrite existing artifact '{}'; evidence is immutable, pick a new \
-             output directory",
-            directory.display()
-        )));
-    }
-    let payload = directory.join(PAYLOAD_DIRECTORY);
-    std::fs::create_dir_all(&payload).map_err(|source| ToolError::Io {
-        path: payload.display().to_string(),
-        source,
-    })?;
+    // Everything the payload is built from, before a single byte is written:
+    // the files copied verbatim into it, and the files that only feed a derived
+    // record. The same description drives the pre-flight below and `verify`, so
+    // "which inputs were packed" is never two different answers.
+    let inputs = collect_build_inputs(context, &spec, &mapping)?;
 
     let mut transforms = Vec::new();
     let mut members: Vec<(String, Vec<u8>)> = vec![
@@ -258,6 +253,46 @@ pub fn generate(
         };
         canonical.push((member, canonical_bytes));
     }
+
+    // Provenance pre-flight (review F1). The candidate is about to pin the commit
+    // Git resolves `HEAD` to, so every byte that reaches the payload — and every
+    // file that only feeds a derived record — must equal the blob that commit
+    // contains. Running this before the output directory exists means a
+    // modified-but-uncommitted input produces *no* candidate, instead of a
+    // candidate that pins a revision its inputs were not read from.
+    let provenance = Provenance::open(context.root(), context.revision())?;
+    let (packed, feeding) = provenance_inputs(context, &inputs, &|member: &str| {
+        canonical
+            .iter()
+            .find(|(name, _)| name == member)
+            .map(|(_, bytes)| bytes.clone())
+            .ok_or_else(|| ToolError::Verification {
+                check: crate::provenance::CHECK_INPUTS.to_owned(),
+                reason: format!(
+                    "'{member}' is declared as a verbatim payload member of '{}' but nothing \
+                     built it",
+                    spec.module_id
+                ),
+            })
+    })?;
+    provenance.compare_payload(&packed)?;
+    provenance.compare_sources(&feeding)?;
+    assert_declared_toolchain(&provenance, &identity)?;
+
+    let directory = out_root.join(format!("{}-{}", spec.module_id, spec.module_version));
+    if directory.exists() {
+        return Err(ToolError::Usage(format!(
+            "refusing to overwrite existing artifact '{}'; evidence is immutable, pick a new \
+             output directory",
+            directory.display()
+        )));
+    }
+    let payload = directory.join(PAYLOAD_DIRECTORY);
+    std::fs::create_dir_all(&payload).map_err(|source| ToolError::Io {
+        path: payload.display().to_string(),
+        source,
+    })?;
+
     for (relative, bytes) in &canonical {
         write_file(&payload.join(relative), bytes)?;
     }
@@ -331,7 +366,28 @@ pub fn verify(context: &RepoContext, artifact: &Path) -> ToolResult<Verification
         });
     }
 
+    // 0 — the record must be in a format this tool knows how to read, and every
+    // field it uses has to be present and well formed. Nothing below trusts a
+    // field this step has not accepted.
+    validate_artifact_record(&artifact_manifest)?;
+
     let mut checks = Vec::new();
+    checks.push(VerificationCheck {
+        id: "artifact-record-format".to_owned(),
+        description: "artifact-manifest.json is in a schema this tool implements, names an \
+                      integrity algorithm it can reproduce, lists only valid member paths and \
+                      SHA-256 digests, and declares every descriptive record it leaves outside \
+                      the digest together with a reason"
+            .to_owned(),
+        outcome: "PASS".to_owned(),
+        detail: format!(
+            "schema={} algorithm={} members={} excluded={}",
+            artifact_manifest.schema_version,
+            artifact_manifest.artifact_integrity_algorithm,
+            artifact_manifest.files.len(),
+            artifact_manifest.excluded_members.len()
+        ),
+    });
 
     // 1 — payload bytes.
     let files = inventory(&artifact.join(PAYLOAD_DIRECTORY))?;
@@ -431,6 +487,35 @@ pub fn verify(context: &RepoContext, artifact: &Path) -> ToolResult<Verification
         ),
     });
 
+    // 3b — the descriptive records describe one release, and the bundle describes
+    // the crate manifests that are actually in the payload.
+    assert_records_agree(&artifact_manifest, &identity, &manifest, &mapping)?;
+    checks.push(VerificationCheck {
+        id: "record-consistency".to_owned(),
+        description: "artifact-manifest.json, release.json, the shipped module.manifest.json and \
+                      the shipped migration mapping agree on module_id, module_version, manifest \
+                      schema, contract digest, package digest and migration namespace"
+            .to_owned(),
+        outcome: "PASS".to_owned(),
+        detail: format!(
+            "module_id={} module_version={} contract_digest={} package_digest={}",
+            identity.module_id,
+            identity.module_version,
+            identity.contract_digest,
+            identity.package_digest
+        ),
+    });
+    let bindings = assert_packed_bindings(&bundle, artifact, &files)?;
+    checks.push(VerificationCheck {
+        id: "packed-crate-bindings".to_owned(),
+        description: "release-bundle.json's crate_versions matches the [package] name and version \
+                      of every Cargo.toml in the payload: a missing, extra, duplicated or renamed \
+                      crate, or a version that differs from the packed manifest, is refused"
+            .to_owned(),
+        outcome: "PASS".to_owned(),
+        detail: bindings,
+    });
+
     // 4 — migration mapping still matches the formal catalog.
     if let Some(revision) = &identity.migration_revision {
         if revision.set_digest.to_string() != mapping.set_digest {
@@ -477,17 +562,73 @@ pub fn verify(context: &RepoContext, artifact: &Path) -> ToolResult<Verification
         ),
     });
 
-    // 5 — provenance.
+    // 5 — provenance: the pinned revision has to be a commit, and the bytes that
+    // reached this payload have to be the blobs that commit contains.
+    let provenance = Provenance::open(context.root(), identity.source_revision.as_str())?;
     checks.push(VerificationCheck {
-        id: "source-provenance".to_owned(),
-        description: "the artifact pins the source revision and toolchain it was built from"
+        id: crate::provenance::CHECK_REVISION_EXISTS.to_owned(),
+        description: "release.json's source_revision names a commit object in this repository, \
+                      resolved by git rather than by reading .git/HEAD, refs and packed-refs by \
+                      hand, so a detached HEAD, a linked worktree and a shallow clone all mean \
+                      the same commit here that git means"
             .to_owned(),
         outcome: "PASS".to_owned(),
         detail: format!(
-            "source_revision={} toolchain={} {}",
+            "source_revision={} resolves; HEAD currently resolves to {}",
             identity.source_revision,
-            identity.build_toolchain.toolchain_id,
-            identity.build_toolchain.version
+            context.revision()
+        ),
+    });
+    let inputs = collect_build_inputs(context, &spec, &mapping)?;
+    let (packed, feeding) = provenance_inputs(context, &inputs, &|member: &str| {
+        let path = payload_path(artifact, member);
+        if path.is_file() {
+            read_bytes(&path)
+        } else {
+            Err(ToolError::Verification {
+                check: crate::provenance::CHECK_INPUTS.to_owned(),
+                reason: format!(
+                    "'{member}' is a source file of the packed crate but the payload has no such \
+                     member, so this candidate was not built from the tree the pinned commit \
+                     describes",
+                ),
+            })
+        }
+    })?;
+    assert_source_members_match(&files, &inputs)?;
+    let bound_payload = provenance.compare_payload(&packed)?;
+    let bound_sources = provenance.compare_sources(&feeding)?;
+    checks.push(VerificationCheck {
+        id: crate::provenance::CHECK_INPUTS.to_owned(),
+        description: "every payload member that copies a repository file verbatim, and every file \
+                      that only feeds a derived record (the crate manifests before packing, the \
+                      workspace manifest, Cargo.lock, rust-toolchain.toml, the release spec and \
+                      the migration catalog files), equals the blob stored at that path in the \
+                      pinned commit; a modified-but-uncommitted input therefore cannot produce a \
+                      candidate, and cannot leave an older candidate verifying"
+            .to_owned(),
+        outcome: "PASS".to_owned(),
+        detail: format!(
+            "{bound_payload} payload member(s) and {bound_sources} feeding file(s) compared with \
+             commit '{}'; the derived members (module.manifest.json, contract-surface.json, \
+             migration-mapping.json and the packed Cargo.toml files) are re-derived by the \
+             compile, digest and catalog checks above from exactly these inputs",
+            identity.source_revision
+        ),
+    });
+    let declared_toolchain = assert_declared_toolchain(&provenance, &identity)?;
+    checks.push(VerificationCheck {
+        id: crate::provenance::CHECK_TOOLCHAIN.to_owned(),
+        description: "DECLARATION CHECK ONLY — release.json's build_toolchain states the channel \
+                      that rust-toolchain.toml declares at the pinned commit. It does not, and \
+                      cannot, prove which compiler build produced these bytes; that evidence is \
+                      the rustc -vV line recorded in the run log outside the artifact"
+            .to_owned(),
+        outcome: "PASS".to_owned(),
+        detail: format!(
+            "declared channel '{declared_toolchain}'; identity toolchain_id={} derives from \
+             [workspace.package] rust-version, whose file is covered by the input comparison",
+            identity.build_toolchain.toolchain_id
         ),
     });
 
@@ -511,61 +652,142 @@ pub struct Comparison {
     pub identical: bool,
     /// Human-readable per-record differences.
     pub differences: Vec<String>,
-    /// Digest of the left payload.
+    /// Digest of the left payload, recomputed from its bytes.
     pub left_digest: String,
-    /// Digest of the right payload.
+    /// Digest of the right payload, recomputed from its bytes.
     pub right_digest: String,
+    /// What was actually compared, so a report can never overstate its reach.
+    pub scope: String,
+}
+
+/// Reads one side of a comparison and checks it against its own record first.
+///
+/// A comparison is only meaningful if each side means what it says. So the
+/// payload of each side is re-listed and re-hashed from the bytes on disk and
+/// verified against *that side's own* manifest before anything is compared: a
+/// candidate whose record no longer describes its payload is refused as
+/// inconsistent, not reported as "these two builds differ".
+fn check_side(side: &str, directory: &Path) -> ToolResult<CheckedSide> {
+    let manifest: ArtifactManifest = read_json(&directory.join(ARTIFACT_MANIFEST_FILE))?;
+    validate_artifact_record(&manifest).map_err(|error| ToolError::Verification {
+        check: "compare-payload-integrity".to_owned(),
+        reason: format!("the {side} artifact fails its own record check: {error}"),
+    })?;
+    let files =
+        inventory(&directory.join(PAYLOAD_DIRECTORY)).map_err(|error| ToolError::Verification {
+            check: "compare-payload-integrity".to_owned(),
+            reason: format!("the {side} artifact's payload cannot be read: {error}"),
+        })?;
+    let digest = artifact_integrity_digest(&files);
+    if digest != manifest.artifact_integrity_digest {
+        return Err(ToolError::Verification {
+            check: "compare-payload-integrity".to_owned(),
+            reason: format!(
+                "the {side} artifact's payload bytes are not what its own record claims: {}",
+                describe_inventory_difference(
+                    &manifest.files,
+                    &files,
+                    &digest,
+                    &manifest.artifact_integrity_digest,
+                )
+            ),
+        });
+    }
+    if files != manifest.files {
+        return Err(ToolError::Verification {
+            check: "compare-payload-integrity".to_owned(),
+            reason: format!(
+                "the {side} artifact's payload inventory differs from the listing in its own \
+                 artifact-manifest.json, even though the aggregate digest matched"
+            ),
+        });
+    }
+    Ok(CheckedSide {
+        directory: directory.to_path_buf(),
+        manifest,
+        files,
+        digest,
+    })
+}
+
+/// One side of a comparison, re-read from disk and self-verified.
+struct CheckedSide {
+    /// Where it was read from.
+    directory: PathBuf,
+    /// The descriptive record it ships.
+    manifest: ArtifactManifest,
+    /// Its payload inventory, recomputed from the bytes on disk.
+    files: Vec<ArtifactFile>,
+    /// Its integrity digest, recomputed from the bytes on disk.
+    digest: String,
 }
 
 /// Compares two independently generated candidates.
+///
+/// Both sides' payload bytes are read and verified against their own records
+/// first; only then are the recomputed digests, the recomputed inventories and
+/// the descriptive records compared. The scope of the comparison is stated in
+/// [`Comparison::scope`]: it covers the packed bytes and the declaration digests,
+/// and it deliberately does not compare `verification.json` (an evidence index
+/// written after the fact) or the `source_revision` claim (a provenance question
+/// that [`verify`] answers against the commit itself).
 pub fn compare(left: &Path, right: &Path) -> ToolResult<Comparison> {
-    let left_manifest: ArtifactManifest = read_json(&left.join(ARTIFACT_MANIFEST_FILE))?;
-    let right_manifest: ArtifactManifest = read_json(&right.join(ARTIFACT_MANIFEST_FILE))?;
+    let left = check_side("left", left)?;
+    let right = check_side("right", right)?;
     let mut differences = Vec::new();
     for (field, before, after) in [
         (
-            "artifact_integrity_digest",
-            left_manifest.artifact_integrity_digest.clone(),
-            right_manifest.artifact_integrity_digest.clone(),
+            "artifact_integrity_digest (recomputed from payload bytes)",
+            left.digest.clone(),
+            right.digest.clone(),
         ),
         (
             "contract_digest",
-            left_manifest.contract_digest.clone(),
-            right_manifest.contract_digest.clone(),
+            left.manifest.contract_digest.clone(),
+            right.manifest.contract_digest.clone(),
         ),
         (
             "package_digest",
-            left_manifest.package_digest.clone(),
-            right_manifest.package_digest.clone(),
+            left.manifest.package_digest.clone(),
+            right.manifest.package_digest.clone(),
         ),
         (
             "module_id",
-            left_manifest.module_id.clone(),
-            right_manifest.module_id.clone(),
+            left.manifest.module_id.clone(),
+            right.manifest.module_id.clone(),
         ),
         (
             "module_version",
-            left_manifest.module_version.clone(),
-            right_manifest.module_version.clone(),
+            left.manifest.module_version.clone(),
+            right.manifest.module_version.clone(),
         ),
     ] {
         if before != after {
             differences.push(format!("{field}: '{before}' != '{after}'"));
         }
     }
-    for entry in diff_entries(&left_manifest.files, &right_manifest.files) {
-        differences.push(entry);
+    for entry in diff_entries(&left.files, &right.files) {
+        differences.push(format!("payload bytes — {entry}"));
     }
-    if left_manifest.packaging_transforms != right_manifest.packaging_transforms {
+    if left.manifest.packaging_transforms != right.manifest.packaging_transforms {
         differences.push("packaging_transforms differ".to_owned());
     }
+    if left.manifest.excluded_members != right.manifest.excluded_members {
+        differences.push("excluded_members differ".to_owned());
+    }
     Ok(Comparison {
-        left: left.to_path_buf(),
-        right: right.to_path_buf(),
+        left: left.directory,
+        right: right.directory,
         identical: differences.is_empty(),
         differences,
-        left_digest: left_manifest.artifact_integrity_digest,
-        right_digest: right_manifest.artifact_integrity_digest,
+        left_digest: left.digest,
+        right_digest: right.digest,
+        scope: format!(
+            "{} payload member(s) re-read from both sides and re-hashed, plus the contract, \
+             package and integrity digests and the packaging transforms each side records; \
+             verification.json and the source_revision claim are out of scope",
+            left.files.len()
+        ),
     })
 }
 
@@ -971,13 +1193,44 @@ fn pack_crate_sources(
     context: &RepoContext,
     crate_spec: &crate::spec::PackedCrateSpec,
 ) -> ToolResult<Vec<(String, Vec<u8>)>> {
+    Ok(crate_sources(context, crate_spec)?
+        .into_iter()
+        .map(|(relative, bytes)| {
+            (
+                // The packed crate has to look like the crate it came from, so
+                // the `src/` level is kept inside the artifact.
+                format!("{PACKAGES_MEMBER}/{}/src/{relative}", crate_spec.crate_name),
+                bytes,
+            )
+        })
+        .collect())
+}
+
+/// Repository-relative path of each source file of one packed crate.
+fn crate_source_paths(
+    context: &RepoContext,
+    crate_spec: &crate::spec::PackedCrateSpec,
+) -> ToolResult<Vec<String>> {
+    let directory = crate_spec.source_dir.trim_end_matches('/');
+    Ok(crate_sources(context, crate_spec)?
+        .into_iter()
+        .map(|(relative, _)| format!("{directory}/src/{relative}"))
+        .collect())
+}
+
+/// Every `.rs` file of one packed crate, as paths relative to its `src`
+/// directory, plus the bytes that will be shipped for it.
+fn crate_sources(
+    context: &RepoContext,
+    crate_spec: &crate::spec::PackedCrateSpec,
+) -> ToolResult<Vec<(String, Vec<u8>)>> {
     let root = context.root().join(&crate_spec.source_dir).join("src");
-    let mut members = Vec::new();
-    collect_sources(crate_spec, &root, &root, &mut members)?;
-    members.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
-    if members
+    let mut sources = Vec::new();
+    collect_sources(&root, &root, &mut sources)?;
+    sources.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
+    if !sources
         .iter()
-        .all(|(path, _)| !path.ends_with("/lib.rs") && !path.ends_with("lib.rs"))
+        .any(|(relative, _)| relative == "lib.rs" || relative.ends_with("/lib.rs"))
     {
         return Err(ToolError::Packaging {
             crate_name: crate_spec.crate_name.clone(),
@@ -987,11 +1240,10 @@ fn pack_crate_sources(
             ),
         });
     }
-    Ok(members)
+    Ok(sources)
 }
 
 fn collect_sources(
-    crate_spec: &crate::spec::PackedCrateSpec,
     root: &Path,
     directory: &Path,
     members: &mut Vec<(String, Vec<u8>)>,
@@ -1016,7 +1268,7 @@ fn collect_sources(
             });
         }
         if metadata.is_dir() {
-            collect_sources(crate_spec, root, &path, members)?;
+            collect_sources(root, &path, members)?;
             continue;
         }
         if !metadata.is_file() {
@@ -1041,12 +1293,7 @@ fn collect_sources(
             path: path.display().to_string(),
             source,
         })?;
-        members.push((
-            // `root` is the crate's `src` directory, and the packed crate has to
-            // look like the crate it came from, so the `src/` level is kept.
-            format!("{PACKAGES_MEMBER}/{}/src/{relative}", crate_spec.crate_name),
-            bytes,
-        ));
+        members.push((relative, bytes));
     }
     Ok(())
 }
@@ -1089,5 +1336,481 @@ fn write_file(path: &Path, bytes: &[u8]) -> ToolResult<()> {
     std::fs::write(path, bytes).map_err(|source| ToolError::Io {
         path: path.display().to_string(),
         source,
+    })
+}
+
+// ------------------------------------------------------------- build inputs --
+
+/// The repository files one candidate is built from, split by how they reach the
+/// payload.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct BuildInputs {
+    /// Copied verbatim into the payload: `(repository path, payload member)`.
+    verbatim: Vec<(String, String)>,
+    /// Only feed a derived record: the crate manifests before packing, the
+    /// workspace manifest and lock, the toolchain declaration, the release spec
+    /// and the migration catalog files the mapping pins.
+    feeding: Vec<String>,
+}
+
+/// Lists the build inputs of one candidate.
+///
+/// This is the single answer to "which repository files were packed", used by the
+/// generation pre-flight and by `verify` alike, so the two can never drift apart
+/// and so neither of them re-invents the input list from a guess.
+fn collect_build_inputs(
+    context: &RepoContext,
+    spec: &ReleaseSpec,
+    mapping: &MigrationMapping,
+) -> ToolResult<BuildInputs> {
+    let mut inputs = BuildInputs {
+        verbatim: vec![(spec.changelog_file.clone(), CHANGELOG_MEMBER.to_owned())],
+        feeding: vec![
+            "Cargo.toml".to_owned(),
+            "Cargo.lock".to_owned(),
+            "rust-toolchain.toml".to_owned(),
+            spec::spec_path(&spec.module_id),
+        ],
+    };
+    for crate_spec in &spec.packed_crates {
+        let directory = crate_spec.source_dir.trim_end_matches('/');
+        inputs.feeding.push(format!("{directory}/Cargo.toml"));
+        for path in crate_source_paths(context, crate_spec)? {
+            let prefix = format!("{directory}/src/");
+            let member = path
+                .strip_prefix(&prefix)
+                .unwrap_or(path.as_str())
+                .to_owned();
+            inputs.verbatim.push((
+                path,
+                format!("{PACKAGES_MEMBER}/{}/src/{member}", crate_spec.crate_name),
+            ));
+        }
+    }
+    for file in &mapping.files {
+        inputs
+            .feeding
+            .push(format!("{}/{}", file.catalog, file.file_name));
+        inputs.feeding.push(file.catalog_manifest.clone());
+    }
+    inputs.verbatim.sort();
+    inputs.verbatim.dedup();
+    inputs.feeding.sort();
+    inputs.feeding.dedup();
+    for path in inputs
+        .verbatim
+        .iter()
+        .map(|(path, _)| path)
+        .chain(inputs.feeding.iter())
+    {
+        if !context.root().join(path).is_file() {
+            return Err(ToolError::Usage(format!(
+                "'{path}' is a build input of '{}' but is not a file in the repository",
+                spec.module_id
+            )));
+        }
+    }
+    Ok(inputs)
+}
+
+/// Turns the build inputs into the two comparisons provenance performs.
+///
+/// `member_bytes` supplies a payload member's bytes in the form they ship: from
+/// memory during generation, from disk during verification. Comparing *those*
+/// bytes against the commit — rather than re-reading the working tree — is what
+/// makes the payload itself, not just the tool's intent, bound to the revision.
+fn provenance_inputs(
+    context: &RepoContext,
+    inputs: &BuildInputs,
+    member_bytes: &dyn Fn(&str) -> ToolResult<Vec<u8>>,
+) -> ToolResult<(Vec<ProvenanceInput>, Vec<ProvenanceInput>)> {
+    let mut packed = Vec::with_capacity(inputs.verbatim.len());
+    for (repo_path, member) in &inputs.verbatim {
+        packed.push(ProvenanceInput::from_member(
+            repo_path.clone(),
+            member,
+            member_bytes(member)?,
+        ));
+    }
+    let mut feeding = Vec::with_capacity(inputs.feeding.len());
+    for repo_path in &inputs.feeding {
+        feeding.push(ProvenanceInput::from_working_tree(
+            repo_path.clone(),
+            read_bytes(&context.root().join(repo_path))?,
+        ));
+    }
+    Ok((packed, feeding))
+}
+
+/// Compares the identity's toolchain field with the declaration committed at the
+/// pinned revision.
+///
+/// This is a *declaration* check in both directions: it proves `release.json`
+/// states the pin `rust-toolchain.toml` carries at that commit (`toolchain_id`
+/// itself derives from the pinned workspace manifest, which the input comparison
+/// covers). It never claims to know which compiler build produced the bytes —
+/// that evidence is the `rustc -vV` line in the run log, outside the artifact.
+fn assert_declared_toolchain(
+    provenance: &Provenance,
+    identity: &ModuleReleaseIdentity,
+) -> ToolResult<String> {
+    let declared = provenance.declared_toolchain_channel()?;
+    if declared != identity.build_toolchain.version {
+        return Err(ToolError::Verification {
+            check: crate::provenance::CHECK_TOOLCHAIN.to_owned(),
+            reason: format!(
+                "release.json declares build toolchain '{}' while 'rust-toolchain.toml' at \
+                 commit '{}' declares '{declared}'; the identity must state the declared pin",
+                identity.build_toolchain.version,
+                provenance.revision(),
+            ),
+        });
+    }
+    Ok(declared)
+}
+
+// --------------------------------------------------- record consistency ------
+
+/// Rejects a descriptive record whose format or algorithm this tool does not
+/// know, instead of verifying it by its own rules.
+///
+/// A reader that silently accepts `artifact_integrity_algorithm:
+/// "unknown-algorithm.v9"` reports a digest it did not compute and cannot
+/// reproduce, so an unrecognised identifier is a refusal, not a label.
+fn validate_artifact_record(manifest: &ArtifactManifest) -> ToolResult<()> {
+    let refused = |reason: String| ToolError::Verification {
+        check: "artifact-record-format".to_owned(),
+        reason,
+    };
+    if manifest.schema_version != ARTIFACT_MANIFEST_SCHEMA_VERSION {
+        return Err(refused(format!(
+            "artifact-manifest.json declares schema_version '{}' which this tool does not \
+             understand; it only writes '{ARTIFACT_MANIFEST_SCHEMA_VERSION}'",
+            manifest.schema_version
+        )));
+    }
+    if manifest.artifact_integrity_algorithm != crate::canonical::ARTIFACT_INTEGRITY_ALGORITHM {
+        return Err(refused(format!(
+            "artifact-manifest.json declares artifact_integrity_algorithm '{}' which this tool \
+             does not implement; the digest it records cannot be reproduced",
+            manifest.artifact_integrity_algorithm
+        )));
+    }
+    for file in &manifest.files {
+        validate_member_path(&file.path).map_err(|error| {
+            refused(format!(
+            "artifact-manifest.json lists member '{}' which is not a valid payload path: {error}",
+            file.path
+        ))
+        })?;
+        validate_sha256_hex(&file.sha256, "artifact-manifest.json member digest").map_err(
+            |error| {
+                refused(format!(
+                    "artifact-manifest.json member '{}' does not carry a SHA-256 digest: {error}",
+                    file.path
+                ))
+            },
+        )?;
+    }
+    let known = [
+        ARTIFACT_MANIFEST_FILE,
+        RELEASE_IDENTITY_FILE,
+        RELEASE_BUNDLE_FILE,
+        VERIFICATION_FILE,
+    ];
+    let declared: Vec<&str> = manifest
+        .excluded_members
+        .iter()
+        .map(|member| member.path.as_str())
+        .collect();
+    for path in &declared {
+        if !known.contains(path) {
+            return Err(refused(format!(
+                "artifact-manifest.json excludes '{path}', which is not one of the descriptive \
+                 records this tool writes ({})",
+                known.join(", ")
+            )));
+        }
+        let reason = manifest
+            .excluded_members
+            .iter()
+            .find(|member| member.path == *path)
+            .map_or("", |member| member.reason.as_str());
+        if reason.trim().is_empty() {
+            return Err(refused(format!(
+                "artifact-manifest.json excludes '{path}' without a reason; an exclusion has to \
+                 say why the member is outside the digest"
+            )));
+        }
+    }
+    if declared.len() != known.len() {
+        let missing: Vec<&str> = known
+            .iter()
+            .copied()
+            .filter(|p| !declared.contains(p))
+            .collect();
+        return Err(refused(format!(
+            "artifact-manifest.json declares {} excluded member(s) but this artifact writes {}; \
+             no descriptive record may be silently treated as payload ({})",
+            declared.len(),
+            known.len(),
+            missing.join(", ")
+        )));
+    }
+    Ok(())
+}
+
+/// The four descriptive records must describe one and the same release.
+///
+/// Each field is named on failure, together with the two records that disagree,
+/// so a reader can locate the tampering without re-deriving anything.
+#[allow(clippy::too_many_lines)]
+fn assert_records_agree(
+    artifact_manifest: &ArtifactManifest,
+    identity: &ModuleReleaseIdentity,
+    shipped: &BusinessModuleManifest,
+    mapping: &MigrationMapping,
+) -> ToolResult<()> {
+    let disagreed = |field: &str, in_record: &str, in_identity: &str| ToolError::Verification {
+        check: "record-consistency".to_owned(),
+        reason: format!(
+            "artifact-manifest.json says {field} = '{in_record}' while release.json says \
+                 '{in_identity}'; one artifact may not describe two releases"
+        ),
+    };
+    if artifact_manifest.module_id != identity.module_id.as_str() {
+        return Err(disagreed(
+            "module_id",
+            &artifact_manifest.module_id,
+            identity.module_id.as_str(),
+        ));
+    }
+    if artifact_manifest.module_version != identity.module_version.as_str() {
+        return Err(disagreed(
+            "module_version",
+            &artifact_manifest.module_version,
+            identity.module_version.as_str(),
+        ));
+    }
+    if artifact_manifest.contract_digest != identity.contract_digest.as_str() {
+        return Err(disagreed(
+            "contract_digest",
+            &artifact_manifest.contract_digest,
+            identity.contract_digest.as_str(),
+        ));
+    }
+    if artifact_manifest.package_digest != identity.package_digest.as_str() {
+        return Err(disagreed(
+            "package_digest",
+            &artifact_manifest.package_digest,
+            identity.package_digest.as_str(),
+        ));
+    }
+    if shipped.module_id != identity.module_id {
+        return Err(ToolError::Verification {
+            check: "record-consistency".to_owned(),
+            reason: format!(
+                "the shipped payload manifest declares module_id '{}' while release.json \
+                 declares '{}'",
+                shipped.module_id, identity.module_id
+            ),
+        });
+    }
+    if shipped.module_version != identity.module_version {
+        return Err(ToolError::Verification {
+            check: "record-consistency".to_owned(),
+            reason: format!(
+                "the shipped payload manifest declares module_version '{}' while release.json \
+                 declares '{}'",
+                shipped.module_version, identity.module_version
+            ),
+        });
+    }
+    if shipped.manifest_schema_version != identity.manifest_schema_version {
+        return Err(ToolError::Verification {
+            check: "record-consistency".to_owned(),
+            reason: format!(
+                "the shipped payload manifest declares manifest_schema_version '{}' while \
+                 release.json declares '{}'",
+                shipped.manifest_schema_version, identity.manifest_schema_version
+            ),
+        });
+    }
+    if let Some(revision) = &identity.migration_revision {
+        if mapping.migration_namespace != revision.migration_namespace {
+            return Err(ToolError::Verification {
+                check: "record-consistency".to_owned(),
+                reason: format!(
+                    "the shipped migration mapping declares namespace '{}' while release.json \
+                     pins '{}'",
+                    mapping.migration_namespace, revision.migration_namespace
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// `release-bundle.json` must describe the crate manifests actually shipped.
+///
+/// The bundle is the record that says which crates a module release consists of,
+/// so it is cross-checked against the packed `Cargo.toml` files themselves:
+/// missing, extra, duplicated or differently-named crates and any version that
+/// differs from the packed manifest is a refusal. A bundle that names crates the
+/// artifact does not contain is worse than no bundle at all.
+fn assert_packed_bindings(
+    bundle: &ModuleReleaseBundle,
+    artifact: &Path,
+    files: &[ArtifactFile],
+) -> ToolResult<String> {
+    let prefix = format!("{PACKAGES_MEMBER}/");
+    let mut shipped: Vec<(String, String, String)> = Vec::new();
+    for file in files {
+        let Some(rest) = file.path.strip_prefix(&prefix) else {
+            continue;
+        };
+        if rest.strip_suffix("/Cargo.toml").is_none() {
+            continue;
+        }
+        let directory = rest.trim_end_matches("/Cargo.toml");
+        let bytes = read_bytes(&payload_path(artifact, &file.path))?;
+        let (name, version) = package_identity(&bytes, &file.path)?;
+        if name != directory {
+            return Err(ToolError::Verification {
+                check: "packed-crate-bindings".to_owned(),
+                reason: format!(
+                    "payload member '{}' sits in the directory '{directory}' but its [package] \
+                     name is '{name}'",
+                    file.path
+                ),
+            });
+        }
+        if shipped.iter().any(|(shipped, _, _)| shipped == &name) {
+            return Err(ToolError::Verification {
+                check: "packed-crate-bindings".to_owned(),
+                reason: format!("the payload ships the crate '{name}' more than once"),
+            });
+        }
+        shipped.push((name, version, file.path.clone()));
+    }
+
+    let mut bindings = Vec::new();
+    for binding in &bundle.crate_versions {
+        if bindings.contains(&binding.crate_name) {
+            return Err(ToolError::Verification {
+                check: "packed-crate-bindings".to_owned(),
+                reason: format!(
+                    "release-bundle.json lists crate '{}' twice; the module-to-crate mapping must \
+                     be one entry per crate",
+                    binding.crate_name
+                ),
+            });
+        }
+        bindings.push(binding.crate_name.clone());
+        let shipped = shipped
+            .iter()
+            .find(|(name, _, _)| *name == binding.crate_name)
+            .ok_or_else(|| ToolError::Verification {
+                check: "packed-crate-bindings".to_owned(),
+                reason: format!(
+                    "release-bundle.json binds crate '{}' at version '{}' but the payload ships no \
+                     such crate manifest",
+                    binding.crate_name, binding.crate_version
+                ),
+            })?;
+        if shipped.1 != binding.crate_version {
+            return Err(ToolError::Verification {
+                check: "packed-crate-bindings".to_owned(),
+                reason: format!(
+                    "release-bundle.json binds crate '{}' at version '{}' but '{}' declares '{}'",
+                    binding.crate_name, binding.crate_version, shipped.2, shipped.1
+                ),
+            });
+        }
+    }
+    if let Some(extra) = shipped.iter().find(|(name, _, _)| !bindings.contains(name)) {
+        return Err(ToolError::Verification {
+            check: "packed-crate-bindings".to_owned(),
+            reason: format!(
+                "the payload ships crate '{}' ({}) which release-bundle.json does not bind",
+                extra.0, extra.2
+            ),
+        });
+    }
+    Ok(shipped
+        .iter()
+        .map(|(name, version, _)| format!("{name}={version}"))
+        .collect::<Vec<_>>()
+        .join(","))
+}
+
+/// Reads the `[package]` name and version out of a packed Cargo manifest.
+fn package_identity(bytes: &[u8], where_: &str) -> ToolResult<(String, String)> {
+    let text = String::from_utf8(bytes.to_vec()).map_err(|_| ToolError::NotUtf8 {
+        path: where_.to_owned(),
+    })?;
+    let section =
+        crate::repo::parse_section(&text, "package").map_err(|error| ToolError::Verification {
+            check: "packed-crate-bindings".to_owned(),
+            reason: format!("'{where_}' has no readable [package] section: {error}"),
+        })?;
+    let name = crate::repo::required(&section, "name", where_).map_err(|error| {
+        ToolError::Verification {
+            check: "packed-crate-bindings".to_owned(),
+            reason: format!("'{where_}' declares no [package] name: {error}"),
+        }
+    })?;
+    let version = crate::repo::required(&section, "version", where_).map_err(|error| {
+        ToolError::Verification {
+            check: "packed-crate-bindings".to_owned(),
+            reason: format!("'{where_}' declares no [package] version: {error}"),
+        }
+    })?;
+    Ok((name, version))
+}
+
+/// The payload's crate sources must be exactly the crate's current sources.
+///
+/// Comparing the payload against the commit answers "are these bytes committed".
+/// This answers the other half — "is this *all* of them": a member the tree no
+/// longer has, or a source file the candidate left out, is a candidate built from
+/// a different tree, even though the digest of what it does contain is correct.
+fn assert_source_members_match(files: &[ArtifactFile], inputs: &BuildInputs) -> ToolResult<()> {
+    let prefix = format!("{PACKAGES_MEMBER}/");
+    let shipped: BTreeSet<&str> = files
+        .iter()
+        .filter(|file| {
+            file.path.starts_with(&prefix)
+                && file.path.contains("/src/")
+                && !file.path.ends_with("/Cargo.toml")
+        })
+        .map(|file| file.path.as_str())
+        .collect();
+    let expected: BTreeSet<&str> = inputs
+        .verbatim
+        .iter()
+        .filter(|(_, member)| member.starts_with(&prefix) && member.contains("/src/"))
+        .map(|(_, member)| member.as_str())
+        .collect();
+    let missing: Vec<&str> = expected.difference(&shipped).copied().collect();
+    let extra: Vec<&str> = shipped.difference(&expected).copied().collect();
+    if missing.is_empty() && extra.is_empty() {
+        return Ok(());
+    }
+    let mut reason =
+        String::from("the packed crate sources are not the crate sources of the pinned commit: ");
+    if !missing.is_empty() {
+        let _ = write!(
+            reason,
+            "absent from the artifact [{}]; ",
+            missing.join(", ")
+        );
+    }
+    if !extra.is_empty() {
+        let _ = write!(reason, "not in the commit [{}]; ", extra.join(", "));
+    }
+    Err(ToolError::Verification {
+        check: crate::provenance::CHECK_INPUTS.to_owned(),
+        reason,
     })
 }

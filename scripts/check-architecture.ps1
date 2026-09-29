@@ -286,7 +286,6 @@ foreach ($required in @("business-module-contracts", "business-application-compi
     }
 }
 Assert-NotContains "tools/module-release-tool/src" @(
-    "std::process::Command",
     "SystemTime",
     "Instant::now",
     "chrono",
@@ -294,6 +293,36 @@ Assert-NotContains "tools/module-release-tool/src" @(
     "gethostname",
     "localtime"
 ) "module release tool host-dependency violation (a release digest may not depend on the clock, the host or a subprocess)"
+# Deliberate, narrowed exception (PLAN-0014 Wave 5A repair 1, review F1): source
+# provenance has to be answered by Git, not by re-implementing `.git/HEAD`,
+# `refs/` and `packed-refs`, because a hand-written reader silently disagrees with
+# Git for a linked worktree, a detached HEAD or a ref store it does not know.
+# So exactly one file may spawn anything, it may spawn exactly one program, and it
+# may only pass arguments as an array — never a shell command line.
+foreach ($toolSource in Get-ChildItem -Path (Join-Path $root "tools/module-release-tool/src") -Filter '*.rs' -File) {
+    $text = Get-Content -Raw $toolSource.FullName
+    if (($text -match 'std::process::Command' -or $text -match 'Command::new\(') -and $toolSource.Name -ne 'git.rs') {
+        throw "only tools/module-release-tool/src/git.rs may spawn a process; '$($toolSource.Name)' does"
+    }
+    if ($text -match 'std::fs::remove_dir_all' -and $toolSource.Name -ne 'tempdir.rs') {
+        throw "only the tempdir helper may delete a directory tree; '$($toolSource.Name)' does"
+    }
+}
+$gitSource = Get-Content -Raw (Join-Path $root "tools/module-release-tool/src/git.rs")
+foreach ($spawned in @('Command::new("cmd")', 'Command::new("powershell")', 'Command::new("pwsh")', 'Command::new("sh")')) {
+    if ($gitSource -match [regex]::Escape($spawned)) {
+        throw "provenance must not invoke a shell: '$spawned'"
+    }
+}
+if ($gitSource -notmatch 'Command::new\("git"\)') {
+    throw 'provenance may only spawn git, as Command::new("git")'
+}
+if ($gitSource -notmatch 'args\(' -or $gitSource -notmatch '--no-optional-locks') {
+    throw "the git invocation must pass an argument array and --no-optional-locks (read-only, no lock files)"
+}
+if ($gitSource -notmatch 'fn blob' -or $gitSource -notmatch 'cat-file') {
+    throw "provenance must read committed content through git (`cat-file blob`), not through the working tree"
+}
 # The wave must not have made the pure crates impure in the direction of this
 # repository: they may not learn the tool's name, spawn processes or read time.
 foreach ($pureCrate in @("crates/business-module-contracts/src", "crates/business-application-compiler/src")) {
@@ -329,6 +358,38 @@ foreach ($pilotModule in @("identity", "policy")) {
     $consumerTest = Join-Path $root "tools/module-release-tool/consumers/$pilotModule/tests/public_contract.rs"
     if (-not (Test-Path $consumerTest)) {
         throw "Wave 5A consumer '$pilotModule' must actually call a published contract"
+    }
+}
+# Consumer isolation is decided by the resolved dependency graph, in exactly one
+# place: `module-release guard` (tools/module-release-tool/src/isolation.rs), fed
+# by `cargo metadata`. A PowerShell-side approximation — searching a manifest or a
+# lock file for a path — was the Wave 5A defect (review F4): it missed a
+# forward-slash path, a relative path and any transitive path dependency. The
+# orchestration script therefore has to delegate, and may not keep its own rule.
+$wave5aScriptFiles = @(
+    "scripts/plan0014-wave5a.ps1",
+    "scripts/lib/plan0014-wave5a-lib.ps1",
+    "scripts/test-plan0014-wave5a.ps1"
+)
+foreach ($wave5aScriptFile in $wave5aScriptFiles) {
+    $wave5aScriptPath = Join-Path $root $wave5aScriptFile
+    if (-not (Test-Path $wave5aScriptPath)) {
+        throw "Missing Wave 5A orchestration file: $wave5aScriptFile"
+    }
+}
+$wave5aScript = ''
+foreach ($wave5aScriptFile in @("scripts/plan0014-wave5a.ps1", "scripts/lib/plan0014-wave5a-lib.ps1")) {
+    $wave5aScript += Get-Content -Raw (Join-Path $root $wave5aScriptFile)
+}
+if ($wave5aScript -notmatch "'metadata'" -or $wave5aScript -notmatch "'--format-version'" -or $wave5aScript -notmatch "'--locked'" -or $wave5aScript -notmatch "'--offline'") {
+    throw "the Wave 5A orchestration must resolve the consumer graph with cargo metadata (--format-version 1 --locked --offline)"
+}
+if ($wave5aScript -notmatch "'guard'" -or $wave5aScript -notmatch "'--metadata'") {
+    throw "the Wave 5A orchestration must judge isolation through 'module-release guard --metadata …'"
+}
+foreach ($ownRule in @('-like\s*"\$\{?repo', '\.StartsWith\(', 'Select-String.*Cargo\.lock')) {
+    if ($wave5aScript -match $ownRule) {
+        throw "the Wave 5A orchestration re-implements path containment ('/$ownRule'); isolation belongs in tools/module-release-tool/src/isolation.rs"
     }
 }
 # Pilot declarations: one file per module, ids that agree with the file name, a

@@ -73,17 +73,38 @@ fn every_pilot_candidate_verifies_against_the_repository_and_traces_its_revision
         assert_eq!(index.module_id, module);
         let ids: Vec<&str> = index.checks.iter().map(|check| check.id.as_str()).collect();
         for expected in [
+            "artifact-record-format",
             "artifact-integrity-digest",
             "contract-surface-file-digest",
             "release-identity-consistency",
+            "record-consistency",
+            "packed-crate-bindings",
             "migration-mapping-matches-formal-catalog",
-            "source-provenance",
+            "source-revision-exists",
+            "source-inputs-match-revision",
+            "toolchain-declaration",
         ] {
             assert!(
                 ids.contains(&expected),
                 "verification skipped the '{expected}' check; ran {ids:?}"
             );
         }
+        assert_eq!(
+            ids.len(),
+            10,
+            "the verification index grew or shrank without this test being updated: {ids:?}"
+        );
+        let provenance = index
+            .checks
+            .iter()
+            .find(|check| check.id == "source-inputs-match-revision")
+            .expect("provenance input check");
+        assert!(
+            provenance.detail.contains(context.revision())
+                && provenance.detail.contains("payload member"),
+            "the input check has to say what it compared: {}",
+            provenance.detail
+        );
         for check in &index.checks {
             assert_eq!(
                 check.outcome, "PASS",
