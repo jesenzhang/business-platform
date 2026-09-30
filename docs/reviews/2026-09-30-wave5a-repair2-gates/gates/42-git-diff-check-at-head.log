@@ -1,0 +1,8 @@
+title      : git diff --check (re-run at the final HEAD)
+command    : rtk proxy git diff --check
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-30 04:02:15Z
+--- output ------------------------------------------------------------------------
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+
+exit code  : 0

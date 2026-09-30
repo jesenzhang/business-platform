@@ -26,7 +26,7 @@ NOT PUBLISHED，等待的正是这份审阅。
 | `00-anchors.txt` | 本轮起点 HEAD、起点 dirty 列表、工具链与 git 版本 |
 | `red/` | 修复前（`77a4fbd2…`）的失败回归：9 条 `source_derivation` 用例全 RED，退出码 101 |
 | `green/` | 同一命令在候选上的结果（`9 passed`、工具全套 `61 passed`） |
-| `gates/` | 审阅 §5.5 每条门禁命令的原始输出与退出码（编号 30–38） |
+| `gates/` | 审阅 §5.5 每条门禁命令的原始输出与退出码（编号 30–38；39–42 是在最终 HEAD 上对受脚本改动影响的门禁的复跑，33-* 是 workspace 测试被环境阻塞的那两次尝试） |
 | `script-regression/` | `scripts/test-plan0014-wave5a.ps1` 本轮报告（14 条，含新增 `R7a/R7b/R8a-c`） |
 | `pilot/` | `scripts/plan0014-wave5a.ps1` 在候选 SHA 上的完整归档（生成 / compare / verify / packed crate 构建 / 消费者 / guard / 19 个负例 `negatives/*/case.md` / 候选 JSON `artifacts/`） |
 | `F1-closure.md` | F1-A / F1-B 逐项关闭表 + §5.4.4/§5.4.5/§5.4.6 落点 + §5.5 兼容矩阵 + 门禁表 + NOT RUN 表 |

@@ -115,6 +115,12 @@ inventory 与 integrity digest 使损坏在物理层面自洽——失败原因�
 | `pwsh -NoProfile -File scripts/check-architecture.ps1` | 0 | `gates/34-check-architecture.log` |
 | `git diff --check` | 0 | `gates/35-git-diff-check.log` |
 | pilot（候选固定后） `scripts/plan0014-wave5a.ps1 … -SkipOutsideConsumer` | 0 | `pilot/assembly-log.md` + `pilot/negatives/*/case.md`（19 例全 OK） |
+| 在最终 HEAD（`a98e45c`）复跑 fmt / 架构门禁 / 脚本回归 / `git diff --check` | 4 × 0 | `gates/39-fmt-at-head.log`、`40-check-architecture-at-head.log`、`41-script-regression-at-head.log`、`42-git-diff-check-at-head.log` |
+
+上表 30 / 31 / 32 / 37 / 38 是在 `f7e2af9c` 的内容上跑的；此后仅有两个提交，且只改
+`scripts/plan0014-wave5a.ps1` 一个文件（`git diff --name-only f7e2af9c..a98e45c -- '*.rs' 'Cargo.toml' 'Cargo.lock'` 为空），
+因此 Rust 侧门禁无需重跑。会读该脚本的两条门禁（架构门禁、脚本回归）与另外两条廉价门禁在最终 HEAD 上复跑，
+结果见上表最后一行——不复用旧日志充当当前门禁。
 
 架构门禁本轮新增的可执行约束（`scripts/check-architecture.ps1`）：`git.rs` 必须出现
 `ls-tree` / `"-r"` / `"-z"` 且**不得**出现 `show`；`src/commit.rs` 必须存在并包含
