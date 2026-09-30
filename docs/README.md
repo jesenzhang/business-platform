@@ -310,3 +310,35 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
   open; the outside-repository consumer lane, PostgreSQL execution, publish/install and scans stay NOT RUN,
   and `cargo test --workspace` in the default build directory is blocked by two binaries another process
   holds (the same code was run in an isolated build directory instead, both logs archived).
+
+## PLAN-0014 Wave 5A Repair 2 reviewed + Wave 5B-0 migration isolation design (2026-09-30)
+
+- [Wave 5A Repair 2 independent review — PASS for the bounded repair, NOT INTEGRATED, and the Wave 5B-0 instruction](reviews/2026-09-30-wave5a-repair2-independent-review.md).
+- [R2 admission matrix — G-01/G-201, G-02, G-202, G-203, A-01..A-12, per-module C0/C1 and the open Wave 4 items, each with its verbatim original closure condition, pinned SHA, evidence path and date, executed scope, status, remaining action and owner](reviews/2026-09-30-wave5b-r2-admission-matrix.md).
+- [Wave 5B-0 migration isolation design package — Proposed, design only, no code and no database work](plans/current/PLAN-0014-wave5b-migration-isolation-design.md).
+- [ADR-0029 module-namespaced migration catalogs and platform migration ledger — Proposed, not accepted](adr/ADR-0029-module-namespaced-migration-catalogs-and-ledger.md).
+- The independent verdict on Repair 2 is **PASS (Wave 5A Repair 2 bounded repair) / NOT INTEGRATED** over
+  `7180eec7..c73955e`. It covers that bounded repair only: it is not the PLAN-0014 acceptance and not an R2
+  admission, so `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED. The evidence README now carries a
+  pointer to that verdict instead of `<pending>`; its NOT RUN / BLOCKED rows and every number are untouched.
+- Admission counts stay at **10 PASS + 1 PARTIAL + 1 NOT RUN** with **0 of 12 acceptance items closed this
+  round**; G-01 and G-201 are one lineage rather than two successes, the two foundation crates are one
+  module and not two pilots, and Wave 2's formal Step F verdict is still `<pending>` because it was never
+  filled in.
+- The design package proposes freezing `migrations/001..019` plus `_sqlx_migrations` as an immutable host
+  baseline, putting new module revisions in `migrations/modules/<namespace>/` with a per-namespace
+  `MANIFEST.sha256`, and recording execution in one platform-owned append-only ledger
+  `platform_module_migrations` written by a single runner with advisory locking and fail-closed checksum,
+  orphan and revision-gap rejection. It separates three different meanings of "namespace": the catalog
+  directory, the ledger key, and a real PostgreSQL schema — the last one is explicitly out of scope.
+- It also states plainly what the smaller scheme cannot do: `identity` still cannot be cold-installed alone on
+  PostgreSQL, because all 13 existing IAM tables come from the shared `019`, which also renames tables that
+  `001` created. The proposal is therefore to split G-203 into G-203a (namespace isolation plus independent
+  future install/upgrade, closable in Wave 5B) and G-203b (physical schema separation and true single-module
+  cold install, irreversible and separately authorized). G-203 stays open and no closure is claimed here.
+- Recorded, not fixed: `apps/business-api/src/composition.rs` and `apps/governance-worker/src/main.rs` apply
+  migrations at process start, which contradicts the persistence baseline rule that the formal API process
+  does not migrate, and the repository sets no `search_path` anywhere.
+- Not run this round: the Rust workspace gates (no product code changed) and every real PostgreSQL acceptance
+  item in the design package, all `BLOCKED` without database authorization.
+- Status: WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED; WAVE 5B-0 DESIGN READY FOR REVIEW; R2 BLOCKED.

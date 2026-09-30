@@ -1086,3 +1086,57 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭；
   `identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
   ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；独立审阅栏留空。
+
+## 2026-09-30 Wave 5A Repair 2 独立审阅结论收口 + Wave 5B-0 迁移隔离设计
+
+本轮按 `docs/reviews/2026-09-30-wave5a-repair2-independent-review.md` §4 执行，是**纯文档轮**：
+不改迁移代码、不连库、不执行数据库操作（含只读 SQL）、不关闭 R2 相关缺口、不 push / merge / tag。
+
+- **独立审阅结论落账**：Repair 2 结论 **PASS（Wave 5A Repair 2 有界修复） / NOT INTEGRATED**
+  （`docs/reviews/2026-09-30-wave5a-repair2-independent-review.md:7`，审阅范围 `7180eec7..c73955e`）。
+  该 PASS 只覆盖这次有界修复本身，不改写 G-01 / G-02 / G-201 / G-202 / G-203 的原边界，
+  也不构成 PLAN-0014 总验收或 R2 admission（同文件 `:9`、`:80`）。
+  `docs/reviews/2026-09-30-wave5a-repair2-gates/README.md` 只把"审阅结论"从 `<pending>` 改为指向该
+  结论的指针，NOT RUN / BLOCKED 行与全部数字未动。
+- **准入矩阵**：新建 `docs/reviews/2026-09-30-wave5b-r2-admission-matrix.md`，以**原编号**建立
+  G-01（→ G-201 承接）、G-02、G-202、G-203、A-01..A-12、两模块各自 C0/C1 与 Wave 4 开放项
+  （D-W4-02/06/08/09/11、OBS-W4-05/06/07、N-G05）的逐行台账：原关闭条件（逐字）、当前源码 / 固定 SHA、
+  证据路径、证据年代、实际执行范围、状态、剩余动作与 owner。计数口径保持既有校准：
+  **10 PASS + 1 PARTIAL + 1 NOT RUN，本轮关闭数 0/12**。G-01 / G-201 按承接关系记一条 lineage，
+  不按两个成功模块计数；foundation 两个纯 crate 不凑两个 pilot。
+  Wave 2 的 formal Step F verdict 仍为 `<pending>`，矩阵如实登记为"从未填写"。
+- **Wave 5B-0 迁移隔离设计包**：新建
+  `docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md`（Proposed / DESIGN READY FOR REVIEW），
+  覆盖审阅 §4.4 的十项必答：`019` 逐对象归属表（13 表 / 11 索引 / 3 段种子 / 4 条 rename，
+  跨 context 裸 UUID 依赖单列，**organization 的 3 表 2 索引显式记账**）、迁移历史兼容策略
+  （`001..019` 与 checksum 一字不动，空库与既有宿主两条时间线，不补写成功记录）、
+  **三类 namespace 的区分**（目录 namespace / ledger namespace / 真实 SQL schema）、
+  目标 catalog 与 ledger 形态、runner 与 ledger 职责（单一 writer、依赖排序、advisory lock、
+  checksum / 孤儿 / 缺口三类 fail-closed、无 dirty 的事务化恢复）、最小方案与物理 schema 隔离对比、
+  兼容与权限（repository SQL 零改动、全仓零 `search_path`、角色矩阵列为待决）、
+  发布绑定（`MigrationRevision` 两字段不变、`package_digest` 语义不变、评估维度拆双）、
+  失败与回滚（无默认数据删除；不可逆动作单列为将来授权门禁）、逐文件实施清单（S1..S6）、
+  真实 PostgreSQL 验收矩阵（V1..V14 精确命令与诚实依赖）。
+- **G-203 判据核对结论**：设计包 §7 逐子句核对后判定——推荐的方案 A 满足
+  `docs/reviews/2026-09-24-saas-align-module-packaging.md:316-320` 的五个字面子句，
+  但**不**满足"单模块在 PostgreSQL 上冷安装"的强读法：identity / organization / policy 的既有 13 张表
+  由同一个 `019` 创建，且 `019:21-24` 重命名了 `001` 建的 v0 demo 表，故单独执行任一段落在结构上不安全。
+  据此提出（**不自采纳，判定权在独立审阅**）把 G-203 拆为 **G-203a**（namespace catalog / manifest /
+  ledger / runner 隔离 + 模块未来 revision 独立安装升级，Wave 5B 可关闭）与
+  **G-203b**（既有共享表物理隔离与真正单模块冷安装，不可逆搬迁，需独立 ADR + 运维授权）。
+  在此之前 **R2 继续 BLOCKED**，不允许把方案 A 写成"G-203 已关闭"。
+- **新登记文档**：`ADR-0029`（Proposed，未自填 Accepted）+ `docs/adr/README.md` 索引行。
+  范围仅覆盖 catalog 布局、平台 `platform_module_migrations` ledger（owner 显式为 Platform Runtime）、
+  单一 writer 与 fail-closed 校验；**不**授权 schema 搬迁或任何 `DROP`。
+- 盘点暴露的真实 Baseline 偏差（登记为待决，不在本轮修）：`apps/business-api/src/composition.rs:126` 与
+  `apps/governance-worker/src/main.rs:50` 在进程启动时执行 `MIGRATOR.run`，与
+  `docs/architecture/PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md:96-98`
+  「正式 API 进程不自动迁移」及 `SECURITY_ARCHITECTURE.md:251-260` 冲突（设计包 P-1 / D-2）。
+- 本轮门禁：`git diff --check` 见交付说明；Rust workspace 门禁 **本轮未运行，产品代码无改动**
+  （沿用 `c73955e` 的记录，不冒充本轮执行）；设计包 §9.2 的真实数据库项全部
+  **BLOCKED（无数据库授权）**，V5 / V10 / V13 / V14 本轮 **NOT RUN**。
+- 状态：**WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；WAVE 5B-0 DESIGN READY FOR REVIEW；R2 BLOCKED**。
+  未 push / merge / tag / 部署 / 改 main；未启动 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203
+  与 Wave 4 的 D-W4-02/06/08/09/11、OBS-W4-05/06/07、N-G05 一律未关闭；
+  `identity` / `policy` 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；Wave 5B-1 的实施与真实 PostgreSQL 验收
+  需独立审阅放行 G-203a 判据与数据库授权后才能开始。

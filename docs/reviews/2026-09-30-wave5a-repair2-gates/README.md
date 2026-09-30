@@ -87,7 +87,7 @@ Repair 1 让 `source_revision` 成为一个**可解析的提交**，但候选的
 
 | 项 | 值 |
 |---|---|
-| 审阅结论 | `<pending>` |
+| 审阅结论 | **PASS（Wave 5A Repair 2 有界修复） / NOT INTEGRATED**——独立审阅文档 `docs/reviews/2026-09-30-wave5a-repair2-independent-review.md`（审阅范围 `7180eec7…c73955e`；F1-A / F1-B 判 CLOSED；不是 PLAN-0014 总验收，也不是 R2 通过；§4 给出下一步指令）。本行只是指针，审阅判定、执行范围与证据以该文档为准。 |
 | 文档 closeout HEAD | `6c63ba1598d38e71913ad633eb8a46002b35c7d3` |
 | closeout 后复验 | 在同一 closeout 提交之后（HEAD 即上一行），对钉住 `c22939f0…` 的同一份候选重新 `verify`：两模块各 `exit 0`，12 项检查全 PASS。日志 `closeout/40-verify-after-closeout-identity.log`、`closeout/40-verify-after-closeout-policy.log`（含两份头部记录 HEAD、候选钉住的 SHA，以及该提交只含 `docs/` 路径这一点）。 |
 
@@ -96,3 +96,8 @@ Repair 1 让 `source_revision` 成为一个**可解析的提交**，但候选的
 `n15` / `n16` 与单元回归证明的方向。
 
 实现者不自行填写 PASS / accepted。状态：**WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED**。
+
+> 2026-09-30 之后追加（只加指针，原文一字未改）：该等待的独立审阅已到位，结论
+> **PASS（Wave 5A Repair 2 有界修复） / NOT INTEGRATED**，见
+> `docs/reviews/2026-09-30-wave5a-repair2-independent-review.md`。本轮 §7 的 NOT RUN / BLOCKED 项
+> 未因该结论改变，审阅的下一步指令是其 §4（Wave 5A 收口 + Wave 5B-0 迁移隔离设计包）。
