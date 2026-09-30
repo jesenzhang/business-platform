@@ -1,0 +1,7 @@
+title      : artifact-manifest.json names an integrity algorithm nobody implements
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n03-unknown-algorithm\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033223Z
+module-release: refused by the [artifact-record-format] check: artifact-manifest.json declares artifact_integrity_algorithm 'unknown-algorithm.v9' which this tool does not implement; the digest it records cannot be reproduced
+
+exit code : 1 (expected 1)

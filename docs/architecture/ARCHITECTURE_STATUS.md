@@ -863,3 +863,39 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署，
   未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 观察项继续有效；
   ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；独立审阅栏留空。
+
+> 2026-09-30 Wave 5A Repair 2（候选的来源绑定补实，未发布）在同一分支完成，代码候选
+> `c22939f0a51e3c7fa2ec424f3819c6e7113a9b66`。承前结论原文照录且未扩大：「Round 3 修复通过；Wave 4
+> 有界收口；既有 C1、R2 阻塞与未执行项继续有效」；Repair 1 的独立审阅结论为 **NEEDS REPAIR**
+> （F1-A / F1-B），本轮是其 §5 指令的实现。
+
+- 上一轮把 `source_revision` 变成「真提交」，但**候选的字节仍来自磁盘工作树**：packed `Cargo.toml`
+  从未按该提交重算（改写依赖版本 pin 并重算完整性摘要后 `verify` 仍通过），成员集合来自磁盘目录扫描
+  （checkout 少一个已提交源文件时仍能生成 20 成员工件，解包后 `cargo check` 报 E0583）。
+- 本轮把候选的**唯一来源**改成固定提交：成员列举用 `git ls-tree -r -z --full-name`，逐字成员用
+  `git cat-file blob`，派生成员（packed `Cargo.toml`、`module.manifest.json`、契约面、迁移映射）由
+  该提交重算后**整份**比较；`generate` 在创建输出目录之前先要求 checkout 与提交一致，符号链接
+  （`120000`）与 submodule gitlink（`160000`）一律拒绝。工具内唯一子进程出口仍是 `src/git.rs`，
+  架构门禁新增「成员列举必须是 `ls-tree -r -z`、禁止 `git show`、`src/commit.rs` 含 120000/160000」。
+- 验证侧把一句话拆成三类可核对事实（成员集合 ↔ Git 树 / 逐字成员 ↔ Git blob / 派生成员 ↔ 重算），
+  各自独立检查 ID：`source-member-set-matches-revision`、`source-inputs-match-revision`、
+  `derived-members-match-revision`；物理完整性摘要保持独立标识，二者不得互相顶替（共 12 项检查，
+  顺序固定并由测试断言）。
+- 工件与四类摘要**未变**（`identity` `3fed976b…` / `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，21 成员；
+  `policy` `52e788ff…` / `37e95a19…` / `f8add9e0…` / `1a5a43f8…`，23 成员）；`digest_form` 的匹配顺序
+  改为先试规范 LF 折叠摘要，使其不再取决于检查者如何 checkout 文件；协议本身
+  （`plan-0014.artifact-integrity.v1`、`plan-0014.migration-set.v1`、`normalize_text_bytes`）一字未改。
+- 门禁（本候选）：fmt / check / clippy `-D warnings` / 架构 fitness PASS / `git diff --check` 0；
+  定向 `module-release-tool` **61 passed**；脚本回归 **14 条 PASS**（新增自实现摘要口径对齐 `R7a`、
+  重算后仍被拒 `R7b`、隔离 checkout 三例 `R8a-c`）；pilot **exit 0**、19 负例全部按被断言的检查被拒。
+  `cargo test --workspace --all-features` 在默认构建目录因两个 bin 被会话外进程占用而**环境阻塞**，
+  同一代码在独立 `--target-dir` 下重跑，两份日志均归档。
+- 未执行 / NOT RUN（逐项，见证据 §7）：仓库外消费者 lane（本轮按审阅指令跳过）、PostgreSQL 迁移执行
+  与单模块安装 / 升级 / 回滚、70 个 `#[ignore]`（PostgreSQL 38 / PostgreSQL 且对象存储 3 / 仅对象存储
+  28 / 内网模型 provider 1）、publish / 注册 / install / deploy、漏洞 / 许可证 / Secret / 镜像扫描、CI。
+- 证据：`docs/reviews/2026-09-30-wave5a-repair2-gates/`（`F1-closure.md` 逐项闭环表、`red/` 与
+  `green/` 同命令对照、`gates/` 逐条门禁、`pilot/negatives/` 逐例注入说明）。Repair 1 归档原样保留。
+- 状态：**WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED**；`identity` / `policy` / 两个纯 crate
+  维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署 / 改 main，未启动 Wave 5B 或
+  PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 继续有效；ADR-0027 / ADR-0028 仍 Proposed /
+  NOT ACCEPTED；独立审阅栏留空。

@@ -1,0 +1,24 @@
+{
+  "Total": 70,
+  "ByCategory": [
+    {
+      "Category": "PostgreSQL",
+      "Count": 38
+    },
+    {
+      "Category": "object storage (S3 / MinIO)",
+      "Count": 28
+    },
+    {
+      "Category": "PostgreSQL + object storage",
+      "Count": 3
+    },
+    {
+      "Category": "external model provider",
+      "Count": 1
+    }
+  ],
+  "Drift": [],
+  "Unmatched": [],
+  "Removed": []
+}

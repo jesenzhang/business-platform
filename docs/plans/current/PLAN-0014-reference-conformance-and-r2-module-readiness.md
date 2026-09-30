@@ -1031,3 +1031,58 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
 - 状态：**WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED**。未 push / merge /
   tag / 部署；未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭；
   成熟度未改 ⇒ **R2 继续 BLOCKED**；独立审阅栏留空。
+
+## 2026-09-30 Wave 5A Repair 2 执行记录 — 候选的字节必须来自那个提交，而不是来自工作树
+
+- 起点：文档与代码同为 `77a4fbd2ae89b5cec8ac2e6f482eba8722295387`（Repair 1 候选 + 其 closeout）。
+  Wave 5A Repair 1 独立审阅（`docs/reviews/2026-09-30-wave5a-repair1-independent-review.md`，
+  审阅起点提交 `7180eec7fc813b33a748784ac806d5c95b4e359b`）给出 **NEEDS REPAIR**，findings
+  **F1-A / F1-B** 与 §5 指令。承前结论继续原文照录、不扩大：**「Round 3 修复通过；Wave 4 有界收口；
+  既有 C1、R2 阻塞与未执行项继续有效。」**
+- 范围纪律：只改 `tools/module-release-tool`、`scripts/`、本轮证据与文档。两个纯 crate 源码零改动；
+  未改迁移 / SQL / 标准 / ADR 文本；未新增依赖（成员列举走系统 `git` CLI 的 `ls-tree -r -z`，参数数组）。
+- **先失败回归**：新增 `tools/module-release-tool/tests/source_derivation.rs`（9 例）在修复前基线上
+  **`0 passed; 9 failed`（exit 101）**，每条都先证明候选可 `verify`、再注入损坏、并用工具自己的
+  `plan-0014.artifact-integrity.v1` 重算 inventory 与 integrity digest 使损坏在物理层面自洽
+  （`docs/reviews/2026-09-30-wave5a-repair2-gates/red/`）。修复后同一命令 `9 passed`（`green/`）。
+- **F1-A（packed `Cargo.toml` 从未按提交重算）** 由 `src/commit.rs` + `packaging.rs::project()` 关闭：
+  候选的唯一来源是一个固定提交，packed `Cargo.toml` 由提交里的 crate manifest + workspace manifest +
+  `Cargo.lock` + spec 重新打包，`verify` 把每个派生成员（packed `Cargo.toml`、`module.manifest.json`、
+  契约面、迁移映射）与重算结果**整份**比较（新检查 `derived-members-match-revision`）。审阅注入
+  `async-trait = "=99.0.0"` 并重算摘要后 `verify` 仍 exit 0 的现象不再可能：编排负例
+  `n13-packed-manifest-not-from-the-commit` 与脚本回归 `R7b` 都以该检查被拒。
+- **F1-B（源集合来自磁盘 glob）** 由 `Inputs::paths_under()`（提交侧 `git ls-tree -r -z --full-name`，
+  符号链接 `120000` 与 gitlink `160000` 一律拒绝）与 `assert_member_set_matches()` /
+  `assert_checkout_matches_commit()` 关闭：成员集合双向比较，`generate` 在 `create_dir_all` **之前**
+  就要求 checkout 与提交一致，被拒时不留下任何工件目录（新检查 `source-member-set-matches-revision`）。
+  证据：单元例 6–9、脚本回归 `R8a-c`（26 文件的隔离 checkout 为控制例）、编排 `n14/n15/n16`。
+- **三类比较分开记账（§5.4.4 / §5.4.5）**：成员集合 ↔ Git 树、逐字成员 ↔ Git blob、派生成员 ↔
+  重算内容，三项各自一个检查 ID 与各自的明细文本；物理完整性（`artifact-integrity-digest` 等）仍是
+  独立标识，明细只描述它真正跑过的比较。`verify` 共 12 项检查、顺序固定，
+  `tests/pilot_candidates.rs` 断言 ID 齐全。
+- **协议与摘要未变（§5.4.6）**：`plan-0014.artifact-integrity.v1` / `plan-0014.migration-set.v1` /
+  `normalize_text_bytes` 一字未改；两候选四类摘要与 Repair 1 及 Wave 5A 首轮逐字相同
+  （`identity` `3fed976b…` / `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，21 成员；
+  `policy` `52e788ff…` / `37e95a19…` / `f8add9e0…` / `1a5a43f8…`，23 成员），随提交变化的仍只有
+  `source_revision`。唯一口径修正：`migration-mapping.json` 的 `digest_form` 改为**先**匹配规范 LF
+  折叠摘要，使该字段成为提交的属性而非 checkout 方式（`core.autocrlf` 主机上曾判为 `raw` 并连带
+  漂移映射摘要）；本轮两份映射均为 `lf-normalized`。
+- 门禁（代码候选 `c22939f0a51e3c7fa2ec424f3819c6e7113a9b66`）：fmt / check / clippy `-D warnings` /
+  架构门禁 / `git diff --check` / 脚本回归 **14 条**（新增 `R7a/R7b/R8a-c`）全部 0；定向
+  `module-release-tool` **61 passed**。`cargo test --workspace --all-features` 在默认构建目录被
+  **环境阻塞**：`target/debug/business-api.exe` 与 `business-worker.exe` 被本会话之外的进程占用
+  （`os error 5`），cargo 无法重链接；同一代码改用独立 `--target-dir` 重跑，两份日志都归档。
+  pilot 在该 SHA 上 **exit 0**，19 个负例（含新增 4 例）全部因被断言的检查被拒。
+- 未运行逐项列在 `docs/reviews/2026-09-30-wave5a-repair2-gates/F1-closure.md` §7：仓库外消费者 lane
+  （按审阅指令 `-SkipOutsideConsumer`）、PostgreSQL 迁移执行与单模块安装/升级、70 个 `#[ignore]`
+  （分母沿用 Repair 1 的 PostgreSQL 38 / PostgreSQL+对象存储 3 / 仅对象存储 28 / 内网模型 1）、
+  publish / install / deploy、漏洞 / 许可证 / Secret / 镜像扫描、CI。
+- 提交链：`77a4fbd2` →（审阅）`7180eec7` → 代码 `f7e2af9c` → 代码 `f0c80f72` → 代码 `c22939f0`
+  （**本轮代码候选**，pilot 的 `source_revision`）→ 本 closeout 文档提交。证据：
+  `docs/reviews/2026-09-30-wave5a-repair2-gates/`；Repair 1 归档 `2026-09-29-wave5a-repair1-gates/`
+  一字未动。文档提交之后再对钉住 `c22939f0…` 的同一候选复验（`closeout/40-verify-after-closeout-*.log`），
+  以证明验证不绑定最新工作树输入。
+- 状态：**WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED**。未 push / merge / tag / 部署 / 改 main；
+  未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭；
+  `identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
+  ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；独立审阅栏留空。

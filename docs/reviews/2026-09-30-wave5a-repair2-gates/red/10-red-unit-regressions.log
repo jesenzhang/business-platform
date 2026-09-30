@@ -1,0 +1,149 @@
+# Wave 5A Repair 2 — RED: F1-A / F1-B regressions against the unchanged Repair 1 code
+
+command      : rtk proxy cargo test -p module-release-tool --test source_derivation --all-features -- --test-threads=1
+workdir      : F:\Workspace\business-platform
+utc          : recorded in 00-anchors.txt (Repair 1 code, HEAD 77a4fbd2ae89b5cec8ac2e6f482eba8722295387)
+file         : tools/module-release-tool/tests/source_derivation.rs (new in Repair 2)
+
+No source file under tools/module-release-tool/src had been changed when this ran.
+The one excluded case (`a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback`)
+failed here only because of a `git add --quiet` flag bug in the test itself; it is re-run
+in 11-red-missing-commit-guard.log after the test was corrected, before any source change.
+
+--- captured output ---
+# Wave 5A Repair 2 — RED: the F1-A / F1-B regressions before any source change
+
+command      : rtk proxy cargo test -p module-release-tool --test source_derivation --all-features -- --test-threads=1
+workdir      : F:\Workspace\business-platform
+utc          : Z
+branch       : codex/plan-0014-wave5a-local-release-pilot
+HEAD         : 77a4fbd2ae89b5cec8ac2e6f482eba8722295387
+tool sources : unchanged since the Repair 1 candidate (see 00-anchors.txt)
+
+`n`n--- captured output ---
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmqk8akj6w-1pz879e-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmqm1ad9e5-0prxwh0-working`
+
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running tests\source_derivation.rs (target\debug\deps\source_derivation-1366d6016d00281e.exe)
+
+running 9 tests
+test a_candidate_missing_a_committed_source_member_is_refused_after_rehashing ... FAILED
+test a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback ... FAILED
+test a_candidate_with_an_extra_source_member_is_refused_after_rehashing ... FAILED
+test a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent ... FAILED
+test a_packed_dependency_bump_is_refused_for_every_pilot_module ... FAILED
+test a_packed_manifest_the_pinned_commit_cannot_produce_is_refused ... FAILED
+test a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move ... FAILED
+test generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused ... FAILED
+test generating_from_a_checkout_with_an_uncommitted_source_file_is_refused ... FAILED
+
+failures:
+
+---- a_candidate_missing_a_committed_source_member_is_refused_after_rehashing stdout ----
+
+thread 'a_candidate_missing_a_committed_source_member_is_refused_after_rehashing' (33588) panicked at tools\module-release-tool\tests\source_derivation.rs:486:5:
+assertion `left == right` failed: got: artifact verification failed [source-inputs-match-revision]: 'contract/packages/identity/src/testing.rs' is a source file of the packed crate but the payload has no such member, so this candidate was not built from the tree the pinned commit describes
+  left: "source-inputs-match-revision"
+ right: "source-member-set-matches-revision"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback stdout ----
+
+thread 'a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback' (43196) panicked at tools\module-release-tool\tests\source_derivation.rs:571:9:
+git ["add", "--quiet", "."]: error: unknown option `quiet'
+usage: git add [<options>] [--] <pathspec>...
+
+    -n, --[no-]dry-run    dry run
+    -v, --[no-]verbose    be verbose
+
+    -i, --[no-]interactive
+                          interactive picking
+    -p, --[no-]patch      select hunks interactively
+    -e, --[no-]edit       edit current diff and apply
+    -f, --[no-]force      allow adding otherwise ignored files
+    -u, --[no-]update     update tracked files
+    --[no-]renormalize    renormalize EOL of tracked files (implies -u)
+    -N, --[no-]intent-to-add
+                          record only the fact that the path will be added later
+    -A, --[no-]all        add changes from all tracked and untracked files
+    --[no-]ignore-removal ignore paths removed in the working tree (same as --no-all)
+    --[no-]refresh        don't add, only refresh the index
+    --[no-]ignore-errors  just skip files which cannot be added because of errors
+    --[no-]ignore-missing check if - even missing - files are ignored in dry run
+    --[no-]sparse         allow updating entries outside of the sparse-checkout cone
+    --[no-]chmod (+|-)x   override the executable bit of the listed files
+    --[no-]pathspec-from-file <file>
+                          read pathspec from file
+    --[no-]pathspec-file-nul
+                          with --pathspec-from-file, pathspec elements are separated with NUL character
+
+
+
+---- a_candidate_with_an_extra_source_member_is_refused_after_rehashing stdout ----
+
+thread 'a_candidate_with_an_extra_source_member_is_refused_after_rehashing' (4056) panicked at tools\module-release-tool\tests\source_derivation.rs:507:5:
+assertion `left == right` failed: got: artifact verification failed [source-inputs-match-revision]: the packed crate sources are not the crate sources of the pinned commit: not in the commit [contract/packages/identity/src/review_invented.rs]; 
+  left: "source-inputs-match-revision"
+ right: "source-member-set-matches-revision"
+
+---- a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent stdout ----
+
+thread 'a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent' (46620) panicked at tools\module-release-tool\tests\source_derivation.rs:416:46:
+a candidate whose declaration is not the pinned commit's must not verify just because it is self-consistent: VerificationIndex { schema_version: "plan-0014.wave5a.verification.v1", module_id: "identity", module_version: "0.1.0-rc.1", artifact_integrity_digest: "f1ee4ce2a3e396de91c991fc639584dce74ceab6398281e88909838f9064c816", checks: [VerificationCheck { id: "artifact-record-format", description: "artifact-manifest.json is in a schema this tool implements, names an integrity algorithm it can reproduce, lists only valid member paths and SHA-256 digests, and declares every descriptive record it leaves outside the digest together with a reason", outcome: "PASS", detail: "schema=plan-0014.wave5a.artifact-manifest.v1 algorithm=plan-0014.artifact-integrity.v1 members=21 excluded=4" }, VerificationCheck { id: "artifact-integrity-digest", description: "SHA-256 over the canonicalised members of package/ recomputed from disk", outcome: "PASS", detail: "21 members, plan-0014.artifact-integrity.v1 = f1ee4ce2a3e396de91c991fc639584dce74ceab6398281e88909838f9064c816" }, VerificationCheck { id: "contract-surface-file-digest", description: "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest", outcome: "PASS", detail: "fa663a02b804a9453896c6615ea18a144f8e94f4be5d790d637190aa9fb90d76" }, VerificationCheck { id: "release-identity-consistency", description: "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)", outcome: "PASS", detail: "contract_digest=fa663a02b804a9453896c6615ea18a144f8e94f4be5d790d637190aa9fb90d76 package_digest=a4d3f7892f62fdc3880b6e9daf0cce1bc88b7d9e0c480ee49d17385101523f4a namespace=identity-management" }, VerificationCheck { id: "record-consistency", description: "artifact-manifest.json, release.json, the shipped module.manifest.json and the shipped migration mapping agree on module_id, module_version, manifest schema, contract digest, package digest and migration namespace", outcome: "PASS", detail: "module_id=identity module_version=0.1.0-rc.1 contract_digest=fa663a02b804a9453896c6615ea18a144f8e94f4be5d790d637190aa9fb90d76 package_digest=a4d3f7892f62fdc3880b6e9daf0cce1bc88b7d9e0c480ee49d17385101523f4a" }, VerificationCheck { id: "packed-crate-bindings", description: "release-bundle.json's crate_versions matches the [package] name and version of every Cargo.toml in the payload: a missing, extra, duplicated or renamed crate, or a version that differs from the packed manifest, is refused", outcome: "PASS", detail: "identity=0.1.0-rc.1" }, VerificationCheck { id: "migration-mapping-matches-formal-catalog", description: "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk", outcome: "PASS", detail: "namespace=identity-management set_digest=ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_identity_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED" }, VerificationCheck { id: "source-revision-exists", description: "release.json's source_revision names a commit object in this repository, resolved by git rather than by reading .git/HEAD, refs and packed-refs by hand, so a detached HEAD, a linked worktree and a shallow clone all mean the same commit here that git means", outcome: "PASS", detail: "source_revision=77a4fbd2ae89b5cec8ac2e6f482eba8722295387 resolves; HEAD currently resolves to 77a4fbd2ae89b5cec8ac2e6f482eba8722295387" }, VerificationCheck { id: "source-inputs-match-revision", description: "every payload member that copies a repository file verbatim, and every file that only feeds a derived record (the crate manifests before packing, the workspace manifest, Cargo.lock, rust-toolchain.toml, the release spec and the migration catalog files), equals the blob stored at that path in the pinned commit; a modified-but-uncommitted input therefore cannot produce a candidate, and cannot leave an older candidate verifying", outcome: "PASS", detail: "17 payload member(s) and 9 feeding file(s) compared with commit '77a4fbd2ae89b5cec8ac2e6f482eba8722295387'; the derived members (module.manifest.json, contract-surface.json, migration-mapping.json and the packed Cargo.toml files) are re-derived by the compile, digest and catalog checks above from exactly these inputs" }, VerificationCheck { id: "toolchain-declaration", description: "DECLARATION CHECK ONLY — release.json's build_toolchain states the channel that rust-toolchain.toml declares at the pinned commit. It does not, and cannot, prove which compiler build produced these bytes; that evidence is the rustc -vV line recorded in the run log outside the artifact", outcome: "PASS", detail: "declared channel '1.94.1'; identity toolchain_id=rust-toolchain-1.94.1 derives from [workspace.package] rust-version, whose file is covered by the input comparison" }] }
+
+---- a_packed_dependency_bump_is_refused_for_every_pilot_module stdout ----
+
+thread 'a_packed_dependency_bump_is_refused_for_every_pilot_module' (43360) panicked at tools\module-release-tool\tests\source_derivation.rs:347:26:
+identity: rewriting '0.4.45' as 99.0.0 must be refused, got VerificationIndex { schema_version: "plan-0014.wave5a.verification.v1", module_id: "identity", module_version: "0.1.0-rc.1", artifact_integrity_digest: "88f5c3bcf1e2f034d2e932caea4ec31c01ba18e7acb2b2ff1d4ea5fc97bff1fc", checks: [VerificationCheck { id: "artifact-record-format", description: "artifact-manifest.json is in a schema this tool implements, names an integrity algorithm it can reproduce, lists only valid member paths and SHA-256 digests, and declares every descriptive record it leaves outside the digest together with a reason", outcome: "PASS", detail: "schema=plan-0014.wave5a.artifact-manifest.v1 algorithm=plan-0014.artifact-integrity.v1 members=21 excluded=4" }, VerificationCheck { id: "artifact-integrity-digest", description: "SHA-256 over the canonicalised members of package/ recomputed from disk", outcome: "PASS", detail: "21 members, plan-0014.artifact-integrity.v1 = 88f5c3bcf1e2f034d2e932caea4ec31c01ba18e7acb2b2ff1d4ea5fc97bff1fc" }, VerificationCheck { id: "contract-surface-file-digest", description: "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest", outcome: "PASS", detail: "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107" }, VerificationCheck { id: "release-identity-consistency", description: "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)", outcome: "PASS", detail: "contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70 namespace=identity-management" }, VerificationCheck { id: "record-consistency", description: "artifact-manifest.json, release.json, the shipped module.manifest.json and the shipped migration mapping agree on module_id, module_version, manifest schema, contract digest, package digest and migration namespace", outcome: "PASS", detail: "module_id=identity module_version=0.1.0-rc.1 contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70" }, VerificationCheck { id: "packed-crate-bindings", description: "release-bundle.json's crate_versions matches the [package] name and version of every Cargo.toml in the payload: a missing, extra, duplicated or renamed crate, or a version that differs from the packed manifest, is refused", outcome: "PASS", detail: "identity=0.1.0-rc.1" }, VerificationCheck { id: "migration-mapping-matches-formal-catalog", description: "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk", outcome: "PASS", detail: "namespace=identity-management set_digest=ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_identity_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED" }, VerificationCheck { id: "source-revision-exists", description: "release.json's source_revision names a commit object in this repository, resolved by git rather than by reading .git/HEAD, refs and packed-refs by hand, so a detached HEAD, a linked worktree and a shallow clone all mean the same commit here that git means", outcome: "PASS", detail: "source_revision=77a4fbd2ae89b5cec8ac2e6f482eba8722295387 resolves; HEAD currently resolves to 77a4fbd2ae89b5cec8ac2e6f482eba8722295387" }, VerificationCheck { id: "source-inputs-match-revision", description: "every payload member that copies a repository file verbatim, and every file that only feeds a derived record (the crate manifests before packing, the workspace manifest, Cargo.lock, rust-toolchain.toml, the release spec and the migration catalog files), equals the blob stored at that path in the pinned commit; a modified-but-uncommitted input therefore cannot produce a candidate, and cannot leave an older candidate verifying", outcome: "PASS", detail: "17 payload member(s) and 9 feeding file(s) compared with commit '77a4fbd2ae89b5cec8ac2e6f482eba8722295387'; the derived members (module.manifest.json, contract-surface.json, migration-mapping.json and the packed Cargo.toml files) are re-derived by the compile, digest and catalog checks above from exactly these inputs" }, VerificationCheck { id: "toolchain-declaration", description: "DECLARATION CHECK ONLY — release.json's build_toolchain states the channel that rust-toolchain.toml declares at the pinned commit. It does not, and cannot, prove which compiler build produced these bytes; that evidence is the rustc -vV line recorded in the run log outside the artifact", outcome: "PASS", detail: "declared channel '1.94.1'; identity toolchain_id=rust-toolchain-1.94.1 derives from [workspace.package] rust-version, whose file is covered by the input comparison" }] }
+
+---- a_packed_manifest_the_pinned_commit_cannot_produce_is_refused stdout ----
+
+thread 'a_packed_manifest_the_pinned_commit_cannot_produce_is_refused' (45448) panicked at tools\module-release-tool\tests\source_derivation.rs:323:50:
+a dependency version the commit does not pin: a packed manifest the pinned commit cannot produce must not verify: VerificationIndex { schema_version: "plan-0014.wave5a.verification.v1", module_id: "identity", module_version: "0.1.0-rc.1", artifact_integrity_digest: "03cae52234b9df82016d787feafbdfaee187f70905b85612f7a7dae5a2f9217f", checks: [VerificationCheck { id: "artifact-record-format", description: "artifact-manifest.json is in a schema this tool implements, names an integrity algorithm it can reproduce, lists only valid member paths and SHA-256 digests, and declares every descriptive record it leaves outside the digest together with a reason", outcome: "PASS", detail: "schema=plan-0014.wave5a.artifact-manifest.v1 algorithm=plan-0014.artifact-integrity.v1 members=21 excluded=4" }, VerificationCheck { id: "artifact-integrity-digest", description: "SHA-256 over the canonicalised members of package/ recomputed from disk", outcome: "PASS", detail: "21 members, plan-0014.artifact-integrity.v1 = 03cae52234b9df82016d787feafbdfaee187f70905b85612f7a7dae5a2f9217f" }, VerificationCheck { id: "contract-surface-file-digest", description: "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest", outcome: "PASS", detail: "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107" }, VerificationCheck { id: "release-identity-consistency", description: "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)", outcome: "PASS", detail: "contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70 namespace=identity-management" }, VerificationCheck { id: "record-consistency", description: "artifact-manifest.json, release.json, the shipped module.manifest.json and the shipped migration mapping agree on module_id, module_version, manifest schema, contract digest, package digest and migration namespace", outcome: "PASS", detail: "module_id=identity module_version=0.1.0-rc.1 contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70" }, VerificationCheck { id: "packed-crate-bindings", description: "release-bundle.json's crate_versions matches the [package] name and version of every Cargo.toml in the payload: a missing, extra, duplicated or renamed crate, or a version that differs from the packed manifest, is refused", outcome: "PASS", detail: "identity=0.1.0-rc.1" }, VerificationCheck { id: "migration-mapping-matches-formal-catalog", description: "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk", outcome: "PASS", detail: "namespace=identity-management set_digest=ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_identity_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED" }, VerificationCheck { id: "source-revision-exists", description: "release.json's source_revision names a commit object in this repository, resolved by git rather than by reading .git/HEAD, refs and packed-refs by hand, so a detached HEAD, a linked worktree and a shallow clone all mean the same commit here that git means", outcome: "PASS", detail: "source_revision=77a4fbd2ae89b5cec8ac2e6f482eba8722295387 resolves; HEAD currently resolves to 77a4fbd2ae89b5cec8ac2e6f482eba8722295387" }, VerificationCheck { id: "source-inputs-match-revision", description: "every payload member that copies a repository file verbatim, and every file that only feeds a derived record (the crate manifests before packing, the workspace manifest, Cargo.lock, rust-toolchain.toml, the release spec and the migration catalog files), equals the blob stored at that path in the pinned commit; a modified-but-uncommitted input therefore cannot produce a candidate, and cannot leave an older candidate verifying", outcome: "PASS", detail: "17 payload member(s) and 9 feeding file(s) compared with commit '77a4fbd2ae89b5cec8ac2e6f482eba8722295387'; the derived members (module.manifest.json, contract-surface.json, migration-mapping.json and the packed Cargo.toml files) are re-derived by the compile, digest and catalog checks above from exactly these inputs" }, VerificationCheck { id: "toolchain-declaration", description: "DECLARATION CHECK ONLY — release.json's build_toolchain states the channel that rust-toolchain.toml declares at the pinned commit. It does not, and cannot, prove which compiler build produced these bytes; that evidence is the rustc -vV line recorded in the run log outside the artifact", outcome: "PASS", detail: "declared channel '1.94.1'; identity toolchain_id=rust-toolchain-1.94.1 derives from [workspace.package] rust-version, whose file is covered by the input comparison" }] }
+
+---- a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move stdout ----
+
+thread 'a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move' (34768) panicked at tools\module-release-tool\tests\source_derivation.rs:536:10:
+the pinned candidate must verify against the pinned commit, not the checkout: Verification { check: "source-inputs-match-revision", reason: "'contract/packages/identity/src/review_untracked.rs' is a source file of the packed crate but the payload has no such member, so this candidate was not built from the tree the pinned commit describes" }
+
+---- generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused stdout ----
+
+thread 'generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused' (28552) panicked at tools\module-release-tool\tests\source_derivation.rs:438:10:
+a committed source file missing from the checkout must not generate: GeneratedArtifact { directory: "F:\\Workspace\\business-platform\\tools\\module-release-tool\\../../target/tmp/module-release-tool\\48340-f1b-missing-out-15\\identity-0.1.0-rc.1", module_id: "identity", module_version: "0.1.0-rc.1", artifact_integrity_digest: "350da720a25c56f3e294a58da3d9046a91bae5143493df24936bff0d78c92dc9", contract_digest: "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107", package_digest: "b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70", member_count: 20 }
+
+---- generating_from_a_checkout_with_an_uncommitted_source_file_is_refused stdout ----
+
+thread 'generating_from_a_checkout_with_an_uncommitted_source_file_is_refused' (43952) panicked at tools\module-release-tool\tests\source_derivation.rs:463:5:
+assertion `left == right` failed: got: artifact verification failed [source-inputs-match-revision]: payload member 'package/contract/packages/identity/src/review_untracked.rs' comes from 'crates/identity/src/review_untracked.rs', which commit '77a4fbd2ae89b5cec8ac2e6f482eba8722295387' does not contain; the artifact cannot claim that revision
+  left: "source-inputs-match-revision"
+ right: "source-member-set-matches-revision"
+
+
+failures:
+    a_candidate_missing_a_committed_source_member_is_refused_after_rehashing
+    a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback
+    a_candidate_with_an_extra_source_member_is_refused_after_rehashing
+    a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent
+    a_packed_dependency_bump_is_refused_for_every_pilot_module
+    a_packed_manifest_the_pinned_commit_cannot_produce_is_refused
+    a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move
+    generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused
+    generating_from_a_checkout_with_an_uncommitted_source_file_is_refused
+
+test result: FAILED. 0 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 80.46s
+
+error: test failed, to rerun pass `-p module-release-tool --test source_derivation`
+
+exit code    : 101
+

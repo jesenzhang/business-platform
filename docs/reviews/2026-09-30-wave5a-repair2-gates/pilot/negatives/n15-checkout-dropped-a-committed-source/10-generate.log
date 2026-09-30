@@ -1,0 +1,7 @@
+title      : a checkout missing a committed source file must be refused, with no artifact created
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe generate --module identity --out F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\checkout-generate\dropped --repo F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\isolated-checkout
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033346Z
+module-release: refused by the [source-member-set-matches-revision] check: 'crates/identity/src' is not the source tree of commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66': committed file(s) absent from the checkout [crates/identity/src/application/access.rs]; a candidate packs the sources of the commit it pins, so the checkout may neither drop one nor add one
+
+exit code : 1 (expected 1)

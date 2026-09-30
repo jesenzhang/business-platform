@@ -1,0 +1,7 @@
+title      : release-bundle.json binds a crate version the packed Cargo.toml does not declare
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n07-bundle-crate-version\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033254Z
+module-release: refused by the [packed-crate-bindings] check: release-bundle.json binds crate 'identity' at version '9.9.9' but 'contract/packages/identity/Cargo.toml' declares '0.1.0-rc.1'
+
+exit code : 1 (expected 1)

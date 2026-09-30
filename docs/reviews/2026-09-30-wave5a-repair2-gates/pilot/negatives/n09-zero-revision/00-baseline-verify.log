@@ -1,0 +1,22 @@
+title      : n09-zero-revision : the untouched copy must verify before it is damaged
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n09-zero-revision\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033305Z
+status=verified
+module_id=identity
+module_version=0.1.0-rc.1
+artifact_integrity_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+check[artifact-record-format] artifact-manifest.json is in a schema this tool implements, names an integrity algorithm it can reproduce, lists only valid member paths and SHA-256 digests, and declares every descriptive record it leaves outside the digest together with a reason: PASS
+check[artifact-integrity-digest] SHA-256 over the canonicalised members of package/ recomputed from disk: PASS
+check[contract-surface-file-digest] sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest: PASS
+check[release-identity-consistency] compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace): PASS
+check[record-consistency] artifact-manifest.json, release.json, the shipped module.manifest.json and the shipped migration mapping agree on module_id, module_version, manifest schema, contract digest, package digest and migration namespace: PASS
+check[packed-crate-bindings] release-bundle.json's crate_versions matches the [package] name and version of every Cargo.toml in the payload: a missing, extra, duplicated or renamed crate, or a version that differs from the packed manifest, is refused: PASS
+check[migration-mapping-matches-formal-catalog] every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk: PASS
+check[source-revision-exists] release.json's source_revision names a commit object in this repository, resolved by git rather than by reading .git/HEAD, refs and packed-refs by hand, so a detached HEAD, a linked worktree and a shallow clone all mean the same commit here that git means. Every input below is read out of that commit, never out of the current checkout: PASS
+check[source-member-set-matches-revision] the payload contains exactly the members the pinned commit produces: the fixed records, one packed Cargo.toml per crate named in the commit's release spec, and every `.rs` file under each packed crate's `src` as `git ls-tree -r -z` lists them. A member the commit has and the artifact lacks, or one the artifact has and the commit does not, is refused even when the payload matches its own integrity record perfectly: PASS
+check[source-inputs-match-revision] every payload member that copies a repository file verbatim — the changelog and every source file of every packed crate — equals the blob stored at that path in the pinned commit, so neither a modified nor an invented source file can survive into a candidate: PASS
+check[derived-members-match-revision] each derived member — the packed Cargo.toml of every crate, the shipped module.manifest.json, the contract surface and the migration mapping — is rebuilt from the pinned commit (its release spec, workspace manifest, Cargo.lock, crate manifests, rust-toolchain.toml and formal migration catalogs) and compared in full, together with the recorded packaging transforms. Re-compiling the declaration the artifact ships is not proof of where it came from, so this compares against the commit instead: PASS
+check[toolchain-declaration] DECLARATION CHECK ONLY — release.json's build_toolchain states the channel that rust-toolchain.toml declares at the pinned commit. It does not, and cannot, prove which compiler build produced these bytes; that evidence is the rustc -vV line recorded in the run log outside the artifact: PASS
+
+exit code : 0 (expected 0)

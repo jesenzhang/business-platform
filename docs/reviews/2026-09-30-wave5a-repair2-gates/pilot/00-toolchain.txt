@@ -1,0 +1,33 @@
+generated-at (utc) : 20260930T032943Z
+repository          : F:\Workspace\business-platform
+run directory       : F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z
+source-revision     : c22939f0a51e3c7fa2ec424f3819c6e7113a9b66
+branch              : codex/plan-0014-wave5a-local-release-pilot
+working-tree-dirty  : 1 entries
+
+cargo --version
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+
+rustc -vV
+rustc 1.94.1 (e408947bf 2026-03-25)
+binary: rustc
+commit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1
+commit-date: 2026-03-25
+host: x86_64-pc-windows-msvc
+release: 1.94.1
+LLVM version: 21.1.8
+
+git --version
+git version 2.50.1.windows.1
+
+rust-toolchain.toml
+[toolchain]
+channel = "1.94.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+
+ProductName        : Windows 10 Home China
+DisplayVersion     : 22H2
+CurrentBuildNumber : 19045
+
+

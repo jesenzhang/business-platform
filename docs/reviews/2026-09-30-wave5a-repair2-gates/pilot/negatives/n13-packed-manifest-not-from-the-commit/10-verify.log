@@ -1,0 +1,7 @@
+title      : a packed Cargo.toml the pinned commit cannot produce, with a self-consistent record, must be refused
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n13-packed-manifest-not-from-the-commit\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033331Z
+module-release: refused by the [derived-members-match-revision] check: package/contract/packages/identity/Cargo.toml is not what commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66' produces (re-derived 65c01c4a2a3ef6ea638cabc820c6bf11e0e3b9ddb5a8b8f4423242892f7c4878, found 4b14cd85ce6736ad25ef3afa12ce8cae6fd54645e9da9ef219e981bc12cb5e57); a derived member has to be re-derived from the pinned inputs rather than trusted from the artifact it describes
+
+exit code : 1 (expected 1)

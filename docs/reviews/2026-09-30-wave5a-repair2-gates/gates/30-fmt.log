@@ -1,0 +1,8 @@
+title      : cargo fmt --all -- --check
+command    : rtk proxy cargo fmt --all -- --check
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-30 02:55:34Z
+--- output ------------------------------------------------------------------------
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+
+exit code  : 0

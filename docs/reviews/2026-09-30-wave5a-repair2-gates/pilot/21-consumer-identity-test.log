@@ -1,0 +1,30 @@
+title      : run the out-of-workspace identity test that calls a published contract
+command    : cargo test --manifest-path F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\identity\Cargo.toml --all-features
+workdir    : F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\identity
+utc        : 20260930T033138Z
+   Compiling pin-project-lite v0.2.17
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling wave5a-consumer-identity v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\identity)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.81s
+     Running unittests src\lib.rs (target\debug\deps\wave5a_consumer_identity-d91a0b7689cbb9a7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\public_contract.rs (target\debug\deps\public_contract-439e0a948a320375.exe)
+
+running 1 test
+test tenant_access_fails_closed_and_then_grants_a_seeded_membership ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wave5a_consumer_identity
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit code : 0 (expected 0)

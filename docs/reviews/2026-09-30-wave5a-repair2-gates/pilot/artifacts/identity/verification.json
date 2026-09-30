@@ -1,0 +1,80 @@
+{
+  "schema_version": "plan-0014.wave5a.verification.v1",
+  "module_id": "identity",
+  "module_version": "0.1.0-rc.1",
+  "artifact_integrity_digest": "68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700",
+  "checks": [
+    {
+      "id": "artifact-record-format",
+      "description": "artifact-manifest.json is in a schema this tool implements, names an integrity algorithm it can reproduce, lists only valid member paths and SHA-256 digests, and declares every descriptive record it leaves outside the digest together with a reason",
+      "outcome": "PASS",
+      "detail": "schema=plan-0014.wave5a.artifact-manifest.v1 algorithm=plan-0014.artifact-integrity.v1 members=21 excluded=4"
+    },
+    {
+      "id": "artifact-integrity-digest",
+      "description": "SHA-256 over the canonicalised members of package/ recomputed from disk",
+      "outcome": "PASS",
+      "detail": "21 members, plan-0014.artifact-integrity.v1 = 68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700"
+    },
+    {
+      "id": "contract-surface-file-digest",
+      "description": "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest",
+      "outcome": "PASS",
+      "detail": "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107"
+    },
+    {
+      "id": "release-identity-consistency",
+      "description": "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)",
+      "outcome": "PASS",
+      "detail": "contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70 namespace=identity-management"
+    },
+    {
+      "id": "record-consistency",
+      "description": "artifact-manifest.json, release.json, the shipped module.manifest.json and the shipped migration mapping agree on module_id, module_version, manifest schema, contract digest, package digest and migration namespace",
+      "outcome": "PASS",
+      "detail": "module_id=identity module_version=0.1.0-rc.1 contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70"
+    },
+    {
+      "id": "packed-crate-bindings",
+      "description": "release-bundle.json's crate_versions matches the [package] name and version of every Cargo.toml in the payload: a missing, extra, duplicated or renamed crate, or a version that differs from the packed manifest, is refused",
+      "outcome": "PASS",
+      "detail": "identity=0.1.0-rc.1"
+    },
+    {
+      "id": "migration-mapping-matches-formal-catalog",
+      "description": "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk",
+      "outcome": "PASS",
+      "detail": "namespace=identity-management set_digest=ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_identity_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED"
+    },
+    {
+      "id": "source-revision-exists",
+      "description": "release.json's source_revision names a commit object in this repository, resolved by git rather than by reading .git/HEAD, refs and packed-refs by hand, so a detached HEAD, a linked worktree and a shallow clone all mean the same commit here that git means. Every input below is read out of that commit, never out of the current checkout",
+      "outcome": "PASS",
+      "detail": "source_revision=c22939f0a51e3c7fa2ec424f3819c6e7113a9b66 resolves; HEAD currently resolves to c22939f0a51e3c7fa2ec424f3819c6e7113a9b66"
+    },
+    {
+      "id": "source-member-set-matches-revision",
+      "description": "the payload contains exactly the members the pinned commit produces: the fixed records, one packed Cargo.toml per crate named in the commit's release spec, and every `.rs` file under each packed crate's `src` as `git ls-tree -r -z` lists them. A member the commit has and the artifact lacks, or one the artifact has and the commit does not, is refused even when the payload matches its own integrity record perfectly",
+      "outcome": "PASS",
+      "detail": "21 payload member(s) are exactly the member set of commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66' (4 re-derived, 17 compared against their repository file)"
+    },
+    {
+      "id": "source-inputs-match-revision",
+      "description": "every payload member that copies a repository file verbatim — the changelog and every source file of every packed crate — equals the blob stored at that path in the pinned commit, so neither a modified nor an invented source file can survive into a candidate",
+      "outcome": "PASS",
+      "detail": "17 payload member(s) compared blob-for-blob with commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66'; the 4 derived member(s) are compared by the 'derived-members-match-revision' check below, because they are computed rather than copied"
+    },
+    {
+      "id": "derived-members-match-revision",
+      "description": "each derived member — the packed Cargo.toml of every crate, the shipped module.manifest.json, the contract surface and the migration mapping — is rebuilt from the pinned commit (its release spec, workspace manifest, Cargo.lock, crate manifests, rust-toolchain.toml and formal migration catalogs) and compared in full, together with the recorded packaging transforms. Re-compiling the declaration the artifact ships is not proof of where it came from, so this compares against the commit instead",
+      "outcome": "PASS",
+      "detail": "4 derived member(s) re-derived from commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66' and compared in full, together with 11 packaging transform(s); derivation inputs: tools/module-release-tool/specs/identity.json, 1 crate manifest(s), 2 migration catalog file(s), workspace manifest, Cargo.lock and rust-toolchain.toml at that commit"
+    },
+    {
+      "id": "toolchain-declaration",
+      "description": "DECLARATION CHECK ONLY — release.json's build_toolchain states the channel that rust-toolchain.toml declares at the pinned commit. It does not, and cannot, prove which compiler build produced these bytes; that evidence is the rustc -vV line recorded in the run log outside the artifact",
+      "outcome": "PASS",
+      "detail": "declared channel '1.94.1'; identity toolchain_id=rust-toolchain-1.94.1 derives from [workspace.package] rust-version, whose file is covered by the input comparison"
+    }
+  ]
+}

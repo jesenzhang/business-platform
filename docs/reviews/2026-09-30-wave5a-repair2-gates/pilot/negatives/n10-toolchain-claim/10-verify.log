@@ -1,0 +1,7 @@
+title      : the identity declares a toolchain rust-toolchain.toml at that commit does not
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n10-toolchain-claim\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033321Z
+module-release: refused by the [toolchain-declaration] check: release.json declares build toolchain '9.9.9' while 'rust-toolchain.toml' at commit 'c22939f0a51e3c7fa2ec424f3819c6e7113a9b66' declares '1.94.1'; the identity must state the declared pin
+
+exit code : 1 (expected 1)

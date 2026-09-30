@@ -1,0 +1,25 @@
+# Wave 5A Repair 2 — run anchors
+
+- recorded (UTC): 2026-09-30 01:55:20
+- branch: codex/plan-0014-wave5a-local-release-pilot
+- HEAD before this repair: 77a4fbd2ae89b5cec8ac2e6f482eba8722295387
+- git status --porcelain before this repair:
+```
+  ?? docs/reviews/2026-09-30-wave5a-repair1-independent-review.md
+  ?? docs/reviews/2026-09-30-wave5a-repair2-gates/
+  ?? tools/module-release-tool/tests/source_derivation.rs
+```
+
+The only uncommitted file at the start of Repair 2 is the independent review itself
+(`docs/reviews/2026-09-30-wave5a-repair1-independent-review.md`), which this repair archives as
+a tracked document. No source file was modified before the RED evidence below was taken.
+
+## Toolchain
+
+```
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+clippy 0.1.94 (e408947bfd 2026-03-25)
+rustc 1.94.1 (e408947bf 2026-03-25)
+git version: git version 2.50.1.windows.1
+```
+

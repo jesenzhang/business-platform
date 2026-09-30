@@ -290,3 +290,23 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - Status: WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED. Still nothing pushed, merged,
   tagged, published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED;
   G-01 / G-02 / G-201..G-203 stay open; PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.
+
+## PLAN-0014 Wave 5A Repair 2 — candidates come from the pinned commit, not from the checkout (2026-09-30)
+
+- [Wave 5A Repair 1 independent review — NEEDS REPAIR, findings F1-A / F1-B and the repair instruction](reviews/2026-09-30-wave5a-repair1-independent-review.md).
+- [Repair 2 evidence — RED/GREEN pair, gates, script regressions, pilot at the candidate SHA, 19 negative cases, code candidate c22939f](reviews/2026-09-30-wave5a-repair2-gates/README.md).
+- [F1-A / F1-B closure table, the three provenance comparisons, the gate table and the item-by-item NOT RUN list](reviews/2026-09-30-wave5a-repair2-gates/F1-closure.md).
+- What was wrong: Repair 1 made `source_revision` a real commit, but the candidate's bytes still came off
+  the working tree. A packed `Cargo.toml` with its dependency pin rewritten to a version that does not
+  exist verified once the integrity record was recomputed around it, and a checkout missing one committed
+  source file generated a 20-member artifact that no commit contains.
+- What fixes it: one commit is the only source of a candidate. Members are listed with `git ls-tree -r -z`,
+  copied members compared blob for blob, derived members (packed `Cargo.toml`, shipped manifest, contract
+  surface, migration mapping) recomputed from that commit and compared in whole, and generation refuses a
+  checkout that disagrees with the commit before it creates any output directory. Symlinks and submodule
+  gitlinks are refused rather than packed. Four digests and both member counts are unchanged.
+- Status: WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED. Nothing pushed, merged, tagged, published or
+  deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED; G-01 / G-02 / G-201..G-203 stay
+  open; the outside-repository consumer lane, PostgreSQL execution, publish/install and scans stay NOT RUN,
+  and `cargo test --workspace` in the default build directory is blocked by two binaries another process
+  holds (the same code was run in an isolated build directory instead, both logs archived).
