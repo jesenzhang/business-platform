@@ -23,3 +23,15 @@ rustc 1.94.1 (e408947bf 2026-03-25)
 git version: git version 2.50.1.windows.1
 ```
 
+## Final state of this repair (recorded after the documentation closeout)
+
+- review anchor (the commit that carries the review document): 7180eec7fc813b33a748784ac806d5c95b4e359b
+- code candidate, i.e. the `source_revision` of every artifact in this directory:
+  c22939f0a51e3c7fa2ec424f3819c6e7113a9b66
+- documentation closeout commit: 6c63ba1598d38e71913ad633eb8a46002b35c7d3 (123 paths, all under docs/)
+- branch codex/plan-0014-wave5a-local-release-pilot; not pushed, not merged, `main` untouched
+- from that closeout HEAD the pinned candidate re-verifies unchanged:
+  `closeout/40-verify-after-closeout-identity.log`, `closeout/40-verify-after-closeout-policy.log`
+  (both exit 0, all 12 checks each)
+- status: WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED; the reviewer column stays `<pending>`
+

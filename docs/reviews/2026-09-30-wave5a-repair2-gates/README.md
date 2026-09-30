@@ -15,7 +15,7 @@ NOT PUBLISHED，等待的正是这份审阅。
 | 主修复提交（来源派生） | `f7e2af9ce4914ff686e23b66d674a66da3e6a2c7` |
 | pilot 证据子目录选项 | `f0c80f727553395d7854135342e5dd0a29d5a852` |
 | **代码候选（pilot 与全部 RED/GREEN 的 `source_revision`）** | `c22939f0a51e3c7fa2ec424f3819c6e7113a9b66` |
-| 文档 closeout HEAD | 见 §8（本 README 所在提交；closeout 之后再验同一候选的日志在 `closeout/`） |
+| 文档 closeout HEAD（本 README 所在提交） | `6c63ba1598d38e71913ad633eb8a46002b35c7d3`（123 个路径全部在 `docs/` 下） |
 
 分支 `codex/plan-0014-wave5a-local-release-pilot`；未 push / merge / tag / 改 main。
 
@@ -88,7 +88,11 @@ Repair 1 让 `source_revision` 成为一个**可解析的提交**，但候选的
 | 项 | 值 |
 |---|---|
 | 审阅结论 | `<pending>` |
-| 文档 closeout HEAD | `<在 closeout 提交后回填>` |
-| closeout 后复验 | `closeout/40-verify-after-closeout-identity.log`、`closeout/40-verify-after-closeout-policy.log` |
+| 文档 closeout HEAD | `6c63ba1598d38e71913ad633eb8a46002b35c7d3` |
+| closeout 后复验 | 在同一 closeout 提交之后（HEAD 即上一行），对钉住 `c22939f0…` 的同一份候选重新 `verify`：两模块各 `exit 0`，12 项检查全 PASS。日志 `closeout/40-verify-after-closeout-identity.log`、`closeout/40-verify-after-closeout-policy.log`（含两份头部记录 HEAD、候选钉住的 SHA，以及该提交只含 `docs/` 路径这一点）。 |
+
+工具不要求 `source_revision` 等于当前 HEAD：它要求那个提交存在、且工件的每个输入都等于**那个提交**里的
+内容。因此「closeout 只加文档」不会让旧候选失效，而「改了来源却不提交」会立刻失效——后者正是本轮
+`n15` / `n16` 与单元回归证明的方向。
 
 实现者不自行填写 PASS / accepted。状态：**WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED**。

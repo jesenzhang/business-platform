@@ -5,6 +5,8 @@
   `7180eec7fc813b33a748784ac806d5c95b4e359b`。
 - 修复前基线：`77a4fbd2ae89b5cec8ac2e6f482eba8722295387`（Repair 1 候选）。
 - 代码候选：`c22939f0a51e3c7fa2ec424f3819c6e7113a9b66`（提交链见 `README.md` §1）。
+- 文档 closeout HEAD：`6c63ba1598d38e71913ad633eb8a46002b35c7d3`；该提交之后对同一候选的复验见
+  `closeout/`（两模块各 exit 0），其头部同时记录 HEAD、候选钉住的 SHA，以及该提交 123 个路径全在 `docs/` 下。
 - 命令约定：下表命令即审阅 §5.5 的确切命令行，RTK 前缀 `rtk proxy` 略去不影响语义；
   `日志` 列是本目录内相对路径。
 
