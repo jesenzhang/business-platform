@@ -44,6 +44,12 @@ param(
     [string]$OutRoot = '',
     [Parameter(Mandatory = $true)]
     [string]$EvidenceDir,
+    # Where this run's files go *inside* -EvidenceDir. A wave archives several runs
+    # beside each other (gates, red, green, script regressions, this pilot), and each
+    # of them owns one directory and nothing else — so the pilot owns a named
+    # subdirectory of the archive instead of writing loose beside the others. Empty
+    # means the run writes directly into -EvidenceDir, as it did before.
+    [string]$EvidenceSubdir = '',
     [string[]]$Modules = @('identity', 'policy'),
     [string]$ModuleVersion = '0.1.0-rc.1',
     # Where the "outside the repository" consumer rebuild happens. It must be on
@@ -68,6 +74,9 @@ if (-not (Split-Path -IsAbsolute $OutRoot)) {
 }
 if (-not (Split-Path -IsAbsolute $EvidenceDir)) {
     $EvidenceDir = Join-Path $repo $EvidenceDir
+}
+if (-not [string]::IsNullOrWhiteSpace($EvidenceSubdir)) {
+    $EvidenceDir = Join-Path $EvidenceDir $EvidenceSubdir
 }
 
 # A run owns one directory and nothing else, so cleanup can never reach outside
