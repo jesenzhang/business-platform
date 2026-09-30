@@ -550,7 +550,7 @@ function Invoke-CheckoutGenerateCase {
         [Parameter(Mandatory = $true)][hashtable]$State,
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Title,
-        [Parameter(Mandatory = $true)][string]$Checkout,
+        [Parameter(Mandatory = $true)][string]$CheckoutRoot,
         [Parameter(Mandatory = $true)][string]$Out,
         [Parameter(Mandatory = $true)][scriptblock]$Prepare,
         [string]$ExpectCheck = ''
@@ -566,7 +566,7 @@ function Invoke-CheckoutGenerateCase {
     # the run says in its own command line that a *second* checkout of the same commit
     # is what is being judged.
     $run = Invoke-Step -Name $Name -Title $Title `
-        -Arguments @('generate', '--module', $negModule, '--out', $Out, '--repo', $Checkout) `
+        -Arguments @('generate', '--module', $negModule, '--out', $Out, '--repo', $CheckoutRoot) `
         -LogFile (Join-Path $caseRoot '10-generate.log') -ExpectExit $expect -State $State
     $observed = if ($run.Log -match '\[([a-z0-9-]+)\]') { $Matches[1] } else { 'no check identifier' }
     $created = Test-Path -LiteralPath (Join-Path $Out "$negModule-$ModuleVersion")
@@ -610,7 +610,7 @@ function Invoke-CheckoutGenerateCase {
         "observed   : exit $($run.Exit), check ``$observed``, artifact directory created: $created",
         "verdict    : $verdict",
         '',
-        "the checkout is ``$Checkout`` — a directory whose ``.git`` file names this repository's",
+        "the checkout is ``$CheckoutRoot`` — a directory whose ``.git`` file names this repository's",
         'object store, holding only the files a candidate is built from.',
         '',
         "what this case did to it : $prepared",
