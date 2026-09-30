@@ -323,6 +323,30 @@ if ($gitSource -notmatch 'args\(' -or $gitSource -notmatch '--no-optional-locks'
 if ($gitSource -notmatch 'fn blob' -or $gitSource -notmatch 'cat-file') {
     throw "provenance must read committed content through git (`cat-file blob`), not through the working tree"
 }
+# Repair 2 (review §5.3.1/§5.4.4): the member set has to come from the commit tree,
+# so the listing is a Git call too — `ls-tree -r -z`, where `-z` is what keeps a path
+# containing whitespace from being re-parsed into two members. `git show` is refused
+# on purpose: it fuses "which path" with "what bytes" into a human-readable dump and
+# has no way to say which of the two it is answering.
+if ($gitSource -notmatch 'ls-tree' -or $gitSource -notmatch '"-r"' -or $gitSource -notmatch '"-z"') {
+    throw "the committed member set must be listed by git (`ls-tree -r -z`), not by walking a directory"
+}
+if ($gitSource -match '"show"' -or $gitSource -match "'show'") {
+    throw "git show mixes the member listing and the blob into one dump; use ls-tree for members and cat-file for bytes"
+}
+# Repair 2: a candidate's inputs are read through one type, and a tree entry that is
+# not a plain file — a symlink (120000) or a submodule gitlink (160000) — has to be
+# refused there rather than packed.
+$commitSourcePath = Join-Path $root "tools/module-release-tool/src/commit.rs"
+if (-not (Test-Path -LiteralPath $commitSourcePath)) {
+    throw 'tools/module-release-tool/src/commit.rs must own the fixed-commit input view'
+}
+$commitSource = Get-Content -Raw $commitSourcePath
+foreach ($mode in @('120000', '160000')) {
+    if ($commitSource -notmatch $mode) {
+        throw "the commit input view must refuse mode $mode entries (symbolic link or submodule) instead of packing them"
+    }
+}
 # The wave must not have made the pure crates impure in the direction of this
 # repository: they may not learn the tool's name, spawn processes or read time.
 foreach ($pureCrate in @("crates/business-module-contracts/src", "crates/business-application-compiler/src")) {

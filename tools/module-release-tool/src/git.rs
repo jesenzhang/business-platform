@@ -9,8 +9,16 @@
 //! Every call goes through [`Git::run`], which builds an argument array
 //! (`Command::args`, never a shell string), pins the working directory with
 //! `-C <root>` and passes `--no-optional-locks` so verification never writes
-//! repository locks. Only read-only subcommands are used: `rev-parse` and
-//! `cat-file`.
+//! repository locks. Only read-only subcommands are used: `rev-parse`, `cat-file`
+//! and `ls-tree`.
+//!
+//! The listing and the bytes are read separately and deliberately: `ls-tree -r -z`
+//! answers *which* members a commit contains (the `-z` form cannot be confused by
+//! a path containing a space, a tab or a newline, and it names the entry type, so a
+//! symlink or a submodule cannot pass as a file), and `cat-file blob` answers what
+//! one of those members *holds*. Neither `git show` nor a working-tree listing can
+//! stand in for either question: the former mixes the two answers into a
+//! human-readable dump, the latter answers a different question entirely.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -21,6 +29,20 @@ use crate::{ToolError, ToolResult};
 #[derive(Debug, Clone)]
 pub struct Git {
     root: PathBuf,
+}
+
+/// One entry of a commit tree, exactly as `git ls-tree` reports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeEntry {
+    /// The mode string, e.g. `100644`, `100755`, `120000` (symlink), `160000`
+    /// (gitlink).
+    pub mode: String,
+    /// The object type: `blob`, `tree` or `commit`.
+    pub kind: String,
+    /// The object id.
+    pub object: String,
+    /// Repository-relative POSIX path.
+    pub path: String,
 }
 
 impl Git {
@@ -130,4 +152,89 @@ impl Git {
         }
         Ok(Some(blob.stdout))
     }
+
+    /// Whether `revision` stores a tree (directory) at `repo_path`.
+    ///
+    /// A missing path and a path that is not a directory are distinguished from an
+    /// empty directory, which is a legal tree with no entries: `ls-tree` alone
+    /// cannot tell those three apart, and the difference decides whether a
+    /// candidate's member set is *empty* or *unknown*.
+    pub fn tree_object(&self, revision: &str, repo_path: &str) -> ToolResult<Option<String>> {
+        let spec = format!("{revision}:{}", repo_path.replace('\\', "/"));
+        let located = self.run(&["rev-parse", "--quiet", "--verify", &spec])?;
+        if !located.status.success() {
+            return Ok(None);
+        }
+        let oid = String::from_utf8_lossy(&located.stdout).trim().to_owned();
+        if oid.is_empty() {
+            return Ok(None);
+        }
+        let kind = self.run(&["cat-file", "-t", &oid])?;
+        if !kind.status.success() {
+            return Err(ToolError::Git {
+                command: format!("cat-file -t {oid}"),
+                reason: String::from_utf8_lossy(&kind.stderr).trim().to_owned(),
+            });
+        }
+        let kind = String::from_utf8_lossy(&kind.stdout).trim().to_owned();
+        Ok((kind == "tree").then_some(oid))
+    }
+
+    /// Every entry under `repo_path` in `revision`, recursively.
+    ///
+    /// `-z` is what makes this parseable without guessing: entries are separated
+    /// by NUL, so a path containing whitespace survives intact, and each entry
+    /// still carries its mode and object type for the caller to judge.
+    /// `--full-name` keeps the paths repository-relative no matter where the
+    /// process happens to be running.
+    pub fn tree(&self, revision: &str, repo_path: &str) -> ToolResult<Vec<TreeEntry>> {
+        let prefix = repo_path.replace('\\', "/");
+        let listing = self.run(&[
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-name",
+            revision,
+            "--",
+            &prefix,
+        ])?;
+        if !listing.status.success() {
+            return Err(ToolError::Git {
+                command: format!("ls-tree -r -z --full-name {revision} -- {prefix}"),
+                reason: String::from_utf8_lossy(&listing.stderr).trim().to_owned(),
+            });
+        }
+        let mut entries = Vec::new();
+        for record in listing.stdout.split(|byte| *byte == 0) {
+            if record.is_empty() {
+                continue;
+            }
+            entries.push(parse_entry(record, &prefix)?);
+        }
+        entries.sort_by(|left, right| left.path.as_bytes().cmp(right.path.as_bytes()));
+        Ok(entries)
+    }
+}
+
+/// Splits one `ls-tree` record, `<mode> <type> <object>\t<path>`.
+fn parse_entry(record: &[u8], prefix: &str) -> ToolResult<TreeEntry> {
+    let shown = String::from_utf8_lossy(record).into_owned();
+    let bad = || ToolError::Git {
+        command: format!("ls-tree -r -z … -- {prefix}"),
+        reason: format!("unparsable tree entry '{shown}'"),
+    };
+    let (header, path) = shown.split_once('\t').ok_or_else(bad)?;
+    let mut fields = header.split(' ');
+    let mode = fields.next().ok_or_else(bad)?.to_owned();
+    let kind = fields.next().ok_or_else(bad)?.to_owned();
+    let object = fields.next().ok_or_else(bad)?.to_owned();
+    if path.is_empty() || mode.is_empty() || kind.is_empty() || object.is_empty() {
+        return Err(bad());
+    }
+    Ok(TreeEntry {
+        mode,
+        kind,
+        object,
+        path: path.to_owned(),
+    })
 }

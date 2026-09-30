@@ -14,7 +14,8 @@
 //!
 //! The only outside process used here is `git` itself, and only to ask what `HEAD`
 //! resolves to (see [`read_git_revision`]); no other external command is run and
-//! nothing outside the repository is read.
+//! nothing outside the repository is read. [`RepoContext::assemble`] takes the same
+//! facts as bytes so they can come out of a commit instead of a checkout.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -63,12 +64,34 @@ impl RepoContext {
     pub fn with_root(root: PathBuf) -> ToolResult<Self> {
         let root_text = root.display().to_string();
         let workspace = read_file(&root.join("Cargo.toml"))?;
-        let package_table = parse_section(&workspace, "workspace.package")?;
         let toolchain_file = read_file(&root.join("rust-toolchain.toml"))?;
         let lock = read_file(&root.join("Cargo.lock"))?;
-        let workspace_dependencies = parse_section(&workspace, "workspace.dependencies")?;
-
         let revision = read_git_revision(&root)?;
+        let context = Self::assemble(root, revision, &workspace, &lock, &toolchain_file)?;
+        if context.revision.is_empty() {
+            return Err(ToolError::Usage(format!(
+                "repository root '{root_text}' has no readable git revision"
+            )));
+        }
+        Ok(context)
+    }
+
+    /// Builds the same facts from the three root files as *given*, plus the
+    /// revision they were read from.
+    ///
+    /// This is what lets a candidate be re-derived from a commit: the workspace
+    /// manifest, the lock file and the toolchain declaration are parsed from the
+    /// bytes the commit stores, so verifying an old candidate does not depend on
+    /// what the current checkout happens to contain.
+    pub(crate) fn assemble(
+        root: PathBuf,
+        revision: String,
+        workspace: &str,
+        lock: &str,
+        toolchain_file: &str,
+    ) -> ToolResult<Self> {
+        let package_table = parse_section(workspace, "workspace.package")?;
+        let workspace_dependencies = parse_section(workspace, "workspace.dependencies")?;
         let context = Self {
             root,
             revision,
@@ -77,19 +100,14 @@ impl RepoContext {
             rust_version: required(&package_table, "rust-version", "root [workspace.package]")?,
             license: required(&package_table, "license", "root [workspace.package]")?,
             toolchain_channel: required(
-                &parse_section(&toolchain_file, "toolchain")?,
+                &parse_section(toolchain_file, "toolchain")?,
                 "channel",
                 "rust-toolchain.toml [toolchain]",
             )?,
-            lock_versions: parse_lock_versions(&lock)?,
+            lock_versions: parse_lock_versions(lock)?,
             workspace_requirements: extract_versions(&workspace_dependencies),
             workspace_dependency_entries: workspace_dependencies,
         };
-        if context.revision.is_empty() {
-            return Err(ToolError::Usage(format!(
-                "repository root '{root_text}' has no readable git revision"
-            )));
-        }
         Ok(context)
     }
 
@@ -351,6 +369,6 @@ fn parse_lock_versions(content: &str) -> ToolResult<BTreeMap<String, Vec<String>
 /// relative, and for any ref layout it did not know. `git rev-parse HEAD` answers
 /// the same question for a normal checkout, a detached `HEAD` and a linked
 /// worktree, and it fails loudly instead of guessing.
-fn read_git_revision(root: &Path) -> ToolResult<String> {
+pub(crate) fn read_git_revision(root: &Path) -> ToolResult<String> {
     crate::git::Git::open(root)?.head()
 }

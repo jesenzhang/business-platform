@@ -44,6 +44,7 @@
 //! `module_version`, `source_revision` and the digests above.
 
 pub mod canonical;
+pub mod commit;
 pub mod git;
 pub mod isolation;
 pub mod migrations;
@@ -152,7 +153,12 @@ pub enum ToolError {
         reason: String,
     },
     /// A verification check did not hold.
-    #[error("artifact verification failed [{check}]: {reason}")]
+    ///
+    /// Wording is deliberately neutral about the command: the same check refuses a
+    /// candidate that has already been written and, at generation time, a checkout
+    /// whose bytes are not the ones the pinned commit contains — where there is no
+    /// artifact yet for the message to point at.
+    #[error("refused by the [{check}] check: {reason}")]
     Verification {
         /// Failed check identifier.
         check: String,

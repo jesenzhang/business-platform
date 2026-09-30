@@ -13,6 +13,14 @@
 //!    blob ([`Provenance::compare_sources`]), so a derived record cannot be
 //!    produced from modified-then-uncommitted input and still claim the commit.
 //!
+//! Reading the commit is [`crate::commit::Inputs`]'s job; this module owns the two
+//! *comparisons* a candidate is bound by, and the identifiers that name them, so
+//! there is exactly one place that decides what "these bytes are that commit's
+//! bytes" means. Repair 2 added the two identifiers that name what the first two
+//! comparisons do **not** cover: which members exist ([`CHECK_MEMBERS`]) and what
+//! the members that are *derived* rather than copied actually are
+//! ([`CHECK_DERIVED`]).
+//!
 //! Normalisation is the payload's own ([`normalize_text_bytes`]), which is what
 //! lets a `core.autocrlf` checkout be compared with committed bytes at all.
 //!
@@ -23,9 +31,7 @@
 
 use std::path::Path;
 
-use crate::canonical::{normalize_text_bytes, sha256_hex};
-use crate::git::Git;
-use crate::repo::parse_section;
+use crate::commit::Inputs;
 use crate::ToolResult;
 
 /// Check identifier used when the pinned revision is not a commit.
@@ -34,6 +40,21 @@ pub const CHECK_REVISION_EXISTS: &str = "source-revision-exists";
 pub const CHECK_INPUTS: &str = "source-inputs-match-revision";
 /// Check identifier used for the toolchain *declaration* comparison.
 pub const CHECK_TOOLCHAIN: &str = "toolchain-declaration";
+/// Check identifier used when the payload's members are not the members the
+/// pinned commit's tree produces — a dropped, missing or extra member.
+///
+/// Separate from [`CHECK_INPUTS`] on purpose: that one compares bytes that are
+/// present, this one compares *which* members exist. A candidate can pass one and
+/// fail the other, and a report that conflates them cannot say what was wrong.
+pub const CHECK_MEMBERS: &str = "source-member-set-matches-revision";
+/// Check identifier used when a member that is *derived* rather than copied —
+/// a packed crate manifest, the shipped module manifest, the contract surface or
+/// the migration mapping — is not what the pinned commit produces.
+///
+/// Separate from `artifact-integrity-digest`, which only proves the payload still
+/// matches its own record. Repair 1's finding F1-A was exactly a candidate that
+/// passed the physical check and had never been derived from the commit it pinned.
+pub const CHECK_DERIVED: &str = "derived-members-match-revision";
 
 /// One repository file compared against its committed blob.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,26 +93,16 @@ impl ProvenanceInput {
 /// The pinned commit, resolved by Git.
 #[derive(Debug, Clone)]
 pub struct Provenance {
-    git: Git,
+    inputs: Inputs,
     revision: String,
 }
 
 impl Provenance {
     /// Resolves `revision` in `root`, refusing a revision Git does not have.
     pub fn open(root: &Path, revision: &str) -> ToolResult<Self> {
-        let git = Git::open(root)?;
-        if !git.has_commit(revision)? {
-            return Err(crate::ToolError::Verification {
-                check: CHECK_REVISION_EXISTS.to_owned(),
-                reason: format!(
-                    "the artifact pins source_revision '{revision}' but Git has no such commit \
-                     object in this repository, so no claim about where these bytes came from \
-                     can be verified"
-                ),
-            });
-        }
+        let inputs = Inputs::open_commit(root, revision)?;
         Ok(Self {
-            git,
+            inputs,
             revision: revision.to_owned(),
         })
     }
@@ -104,71 +115,17 @@ impl Provenance {
 
     /// Compares every verbatim payload member with its blob at the pinned commit.
     pub fn compare_payload(&self, inputs: &[ProvenanceInput]) -> ToolResult<usize> {
-        self.compare(inputs, "payload member")
+        self.inputs.compare("payload member", inputs)
     }
 
     /// Compares every feeding file with its blob at the pinned commit.
     pub fn compare_sources(&self, inputs: &[ProvenanceInput]) -> ToolResult<usize> {
-        self.compare(inputs, "input file")
-    }
-
-    fn compare(&self, inputs: &[ProvenanceInput], kind: &str) -> ToolResult<usize> {
-        for input in inputs {
-            let blob = self.git.blob(&self.revision, &input.repo_path)?;
-            let Some(blob) = blob else {
-                return Err(crate::ToolError::Verification {
-                    check: CHECK_INPUTS.to_owned(),
-                    reason: format!(
-                        "{kind} '{origin}' comes from '{path}', which commit '{}' does not \
-                         contain; the artifact cannot claim that revision",
-                        self.revision,
-                        origin = input.origin,
-                        path = input.repo_path,
-                    ),
-                });
-            };
-            let expected = normalize_text_bytes(&blob, &input.repo_path)?;
-            let observed = normalize_text_bytes(&input.bytes, &input.origin)?;
-            if expected != observed {
-                return Err(crate::ToolError::Verification {
-                    check: CHECK_INPUTS.to_owned(),
-                    reason: format!(
-                        "{kind} '{origin}' does not match '{path}' as committed in '{}': \
-                         committed {want}, packed {got}; the packed inputs must be the ones the \
-                         pinned revision contains",
-                        self.revision,
-                        origin = input.origin,
-                        path = input.repo_path,
-                        want = sha256_hex(&expected),
-                        got = sha256_hex(&observed),
-                    ),
-                });
-            }
-        }
-        Ok(inputs.len())
+        self.inputs.compare("input file", inputs)
     }
 
     /// The toolchain channel declared by `rust-toolchain.toml` at the pinned
     /// commit — a declaration comparison, never a claim about this process.
     pub fn declared_toolchain_channel(&self) -> ToolResult<String> {
-        let blob = self.git.blob(&self.revision, "rust-toolchain.toml")?;
-        let Some(blob) = blob else {
-            return Err(crate::ToolError::Verification {
-                check: CHECK_TOOLCHAIN.to_owned(),
-                reason: format!(
-                    "'rust-toolchain.toml' is absent from commit '{}', so the toolchain the \
-                     artifact declares cannot be traced to a declaration",
-                    self.revision
-                ),
-            });
-        };
-        let text = String::from_utf8_lossy(&blob).into_owned();
-        let section = parse_section(&text, "toolchain")?;
-        crate::repo::required(
-            &section,
-            "channel",
-            "rust-toolchain.toml [toolchain] at the pinned \
-                                                     revision",
-        )
+        self.inputs.declared_toolchain_channel()
     }
 }

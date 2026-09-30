@@ -81,7 +81,12 @@ fn every_pilot_candidate_verifies_against_the_repository_and_traces_its_revision
             "packed-crate-bindings",
             "migration-mapping-matches-formal-catalog",
             "source-revision-exists",
+            // Repair 2 split provenance into the three claims it actually makes:
+            // which members exist, whether the copied ones are the commit's bytes,
+            // and whether the derived ones are what the commit derives.
+            "source-member-set-matches-revision",
             "source-inputs-match-revision",
+            "derived-members-match-revision",
             "toolchain-declaration",
         ] {
             assert!(
@@ -91,7 +96,7 @@ fn every_pilot_candidate_verifies_against_the_repository_and_traces_its_revision
         }
         assert_eq!(
             ids.len(),
-            10,
+            12,
             "the verification index grew or shrank without this test being updated: {ids:?}"
         );
         let provenance = index

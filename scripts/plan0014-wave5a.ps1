@@ -16,9 +16,14 @@
 #      `module-release guard`;
 #   6. rebuild one consumer from a directory outside the repository on the same
 #      volume, recording the cargo configuration that applied;
-#   7. run the negative cases. Every case gets its own pristine copy of a
+#   7. run the negative cases. Every artifact case gets its own pristine copy of a
 #      candidate that just verified, injects exactly one fault, and has to be
-#      refused for the asserted reason (exit code and check identifier).
+#      refused for the asserted reason (exit code and check identifier). Two of
+#      them are about provenance rather than damage: one rewrites a packed
+#      `Cargo.toml` and recomputes the integrity record around it (a payload that
+#      agrees with itself and with nothing else), and three run `generate` in an
+#      isolated checkout of the same commit — intact, missing a committed source,
+#      carrying one that was never committed.
 #
 # Deliberate limits, recorded rather than hidden:
 #   * no PostgreSQL lane and no migration execution (G-02 / G-203 stay open);
@@ -497,6 +502,167 @@ $State.Cases += [pscustomobject]@{
     'Raw logs: `00-compare-clean.log`, `10-compare-damaged.log` (archived beside this file).',
     ''
 ) | Set-Content -LiteralPath (Join-Path $compareCase 'case.md') -Encoding utf8
+
+# Repair 2, finding F1-A at the pilot layer: a payload whose record agrees with a
+# member the pinned commit cannot produce. The packed `Cargo.toml` is rewritten to a
+# dependency version no committed manifest states, and the integrity record is then
+# recomputed around it, so the physical check has nothing left to complain about. The
+# claim that fails is the one Repair 1 never tested: that the member is what that
+# commit derives.
+$null = Invoke-NegativeCase -State $State -Name 'n13-packed-manifest-not-from-the-commit' `
+    -Title 'a packed Cargo.toml the pinned commit cannot produce, with a self-consistent record, must be refused' `
+    -SourceArtifact $pristine -ExpectCheck 'derived-members-match-revision' -ExpectPattern $negModule -Inject {
+        param($copy)
+        $manifest = Join-Path $copy "package\contract\packages\$negModule\Cargo.toml"
+        $text = Get-Content -Raw -LiteralPath $manifest
+        $rewritten = $text -replace 'version = "=[0-9][^"]*"', 'version = "=99.0.0"'
+        if ($rewritten -eq $text) {
+            throw "the packed manifest of '$negModule' pins no dependency version; the case would assert nothing"
+        }
+        Set-Content -LiteralPath $manifest -Value $rewritten -NoNewline -Encoding utf8
+        $recomputed = Set-IntegrityRecord -Artifact $copy
+        if (-not $recomputed.Changed) {
+            throw 'recomputing the integrity record changed nothing, so the damaged payload was never self-consistent'
+        }
+    }
+
+# Repair 2, finding F1-B at the pilot layer: generation reads the commit, so a
+# checkout that dropped a committed source — or added one that was never committed —
+# has to be refused, and refused while no artifact directory exists yet.
+#
+# The three cases share one *isolated checkout*: a directory whose `.git` is a file
+# naming this repository's object store, which resolves the same HEAD and the same
+# commit objects while its own files are entirely its own. It contains only the files a
+# candidate is built from, which is the point — the tool has to know from the commit
+# what it expects to find. `n14` is the control and has to succeed: without it, the two
+# refusals below would only show that a damaged checkout is damaged.
+function Invoke-CheckoutGenerateCase {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$State,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Title,
+        [Parameter(Mandatory = $true)][string]$Checkout,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [Parameter(Mandatory = $true)][scriptblock]$Prepare,
+        [string]$ExpectCheck = ''
+    )
+    $caseRoot = Join-Path $State.NegativeRoot $Name
+    if (Test-Path -LiteralPath $caseRoot) {
+        Remove-OwnScratch -Path $caseRoot -OwnRoot $OutRoot
+    }
+    Ensure-Directory $caseRoot
+    $prepared = & $Prepare
+    $expect = if ($ExpectCheck) { 1 } else { 0 }
+    # `--repo` is the point of these cases: the tool is told which checkout to read, so
+    # the run says in its own command line that a *second* checkout of the same commit
+    # is what is being judged.
+    $run = Invoke-Step -Name $Name -Title $Title `
+        -Arguments @('generate', '--module', $negModule, '--out', $Out, '--repo', $Checkout) `
+        -LogFile (Join-Path $caseRoot '10-generate.log') -ExpectExit $expect -State $State
+    $observed = if ($run.Log -match '\[([a-z0-9-]+)\]') { $Matches[1] } else { 'no check identifier' }
+    $created = Test-Path -LiteralPath (Join-Path $Out "$negModule-$ModuleVersion")
+    $target = if ($ExpectCheck) { $ExpectCheck } else { 'generation succeeds' }
+    $verdict = 'FAILED'
+    if (-not $ExpectCheck) {
+        if ($run.Exit -eq 0 -and $created) {
+            $verdict = 'OK'
+        }
+        else {
+            $verdict = 'BROKEN'
+            $State.Failures += "$Name : the control checkout did not generate (exit $($run.Exit), artifact directory present: $created)"
+        }
+    }
+    elseif ($run.Exit -eq 0) {
+        $verdict = 'NOT REFUSED'
+        $State.Failures += "$Name : generation accepted a checkout it has to refuse"
+    }
+    elseif ($observed -ne $ExpectCheck) {
+        $verdict = 'WRONG REASON'
+        $State.Failures += "$Name : refused for '$observed', expected '$ExpectCheck'"
+    }
+    elseif ($created) {
+        $verdict = 'ARTIFACT CREATED'
+        $State.Failures += "$Name : refused, but an artifact directory was created anyway"
+    }
+    else {
+        $verdict = 'OK'
+    }
+    $State.Cases += [pscustomobject]@{
+        Case     = $Name
+        Target   = $target
+        Observed = $(if ($ExpectCheck) { $observed } else { "exit $($run.Exit), artifact directory created: $created" })
+        Verdict  = $verdict
+    }
+    @(
+        "# $($Name)",
+        '',
+        "case       : $Title",
+        "expect     : exit $expect" + $(if ($ExpectCheck) { ", refused by ``$ExpectCheck``, and no artifact directory" } else { ' and an artifact directory' }),
+        "observed   : exit $($run.Exit), check ``$observed``, artifact directory created: $created",
+        "verdict    : $verdict",
+        '',
+        "the checkout is ``$Checkout`` — a directory whose ``.git`` file names this repository's",
+        'object store, holding only the files a candidate is built from.',
+        '',
+        "what this case did to it : $prepared",
+        '',
+        'Raw log: `10-generate.log` (archived beside this file).',
+        ''
+    ) | Set-Content -LiteralPath (Join-Path $caseRoot 'case.md') -Encoding utf8
+    return ($verdict -eq 'OK')
+}
+
+$checkoutDirectory = Join-Path $OutRoot 'isolated-checkout'
+if (Test-Path -LiteralPath $checkoutDirectory) {
+    Remove-OwnScratch -Path $checkoutDirectory -OwnRoot $OutRoot
+}
+$checkout = New-IsolatedCheckout -Repo $repo -Destination $checkoutDirectory -Module $negModule
+$specDocument = Get-Content -Raw -LiteralPath (Join-Path $repo "tools/module-release-tool/specs/$negModule.json") | ConvertFrom-Json
+$crateSource = Join-Path $checkout.Root (($specDocument.packed_crates[0].source_dir -replace '/', '\') + '\src')
+# Any committed file but the crate root: generation never compiles Rust, so the file
+# only has to be one the pinned commit lists.
+$dropped = @(Get-ChildItem -LiteralPath $crateSource -Recurse -File |
+        Where-Object { $_.Name -ne 'lib.rs' } | Sort-Object -Property FullName)[0]
+if (-not $dropped) {
+    throw "the isolated checkout of '$negModule' has no source file besides lib.rs; the F1-B cases cannot be built"
+}
+$droppedRelative = $dropped.FullName.Substring($checkout.Root.Length).TrimStart('\')
+$droppedInRepository = Join-Path $repo $droppedRelative
+$extra = Join-Path $crateSource 'plan0014_repair_case_extra.rs'
+
+$null = Invoke-CheckoutGenerateCase -State $State -Name 'n14-isolated-checkout-control' `
+    -Title 'a complete isolated checkout of the pinned commit generates a candidate (control for n15 and n16)' `
+    -Checkout $checkout.Root -Out (Join-Path $OutRoot 'checkout-generate\control') -Prepare {
+        "nothing — the checkout is exactly the release inputs of commit as it stands ($($checkout.Files) files)"
+    }
+
+$null = Invoke-CheckoutGenerateCase -State $State -Name 'n15-checkout-dropped-a-committed-source' `
+    -Title 'a checkout missing a committed source file must be refused, with no artifact created' `
+    -Checkout $checkout.Root -Out (Join-Path $OutRoot 'checkout-generate\dropped') `
+    -ExpectCheck 'source-member-set-matches-revision' -Prepare {
+        if (-not (Test-Path -LiteralPath $dropped.FullName)) {
+            throw 'the control already removed the file; n15 has nothing to drop'
+        }
+        Remove-Item -LiteralPath $dropped.FullName -Force
+        $relative = $dropped.FullName.Substring($checkout.Root.Length).TrimStart('\') -replace '\\', '/'
+        "removed '$relative', which the pinned commit contains"
+    }
+
+$null = Invoke-CheckoutGenerateCase -State $State -Name 'n16-checkout-added-an-uncommitted-source' `
+    -Title 'a checkout with a source file the commit does not contain must be refused, with no artifact created' `
+    -Checkout $checkout.Root -Out (Join-Path $OutRoot 'checkout-generate\added') `
+    -ExpectCheck 'source-member-set-matches-revision' -Prepare {
+        if (-not (Test-Path -LiteralPath $dropped.FullName)) {
+            # n15 removed it; put it back so this case refuses for the file it added
+            # and not for the one the previous case dropped.
+            Copy-Item -LiteralPath $droppedInRepository -Destination $dropped.FullName -Force
+        }
+        if (Test-Path -LiteralPath $extra) {
+            Remove-Item -LiteralPath $extra -Force
+        }
+        Set-Content -LiteralPath $extra -Value "// written by the pilot script, committed nowhere`n" -Encoding utf8
+        "restored '$($droppedRelative -replace '\\', '/')' from the repository and added the never-committed '$(($extra -replace '\\', '/').Split('/')[-1])'"
+    }
 # ------------------------------------------------- isolation negative cases ----
 # Three leak shapes the Wave 5A string scan could not see, injected into a real
 # `cargo metadata` document and handed to the same guard the passing case used.

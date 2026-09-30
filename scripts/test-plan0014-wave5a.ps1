@@ -223,6 +223,129 @@ $escape = (Split-Path -Parent $runRoot)
 Test-Throws -Name 'R6-cleanup-scoped' -Expectation 'cleanup outside the run directory is refused' `
     -ExpectPattern 'not inside' -Body { Remove-OwnScratch -Path $escape -OwnRoot $runRoot }
 
+# R7 — the orchestrator re-implements the payload digest rule only so that a negative
+# case can build a payload that is *self-consistent* with a damaged member (review
+# F1-A). A re-implementation that quietly disagrees with the tool would turn every
+# such case into a test of the wrong thing, so the re-implementation is pinned here
+# first: on a freshly generated candidate it has to reproduce the recorded member
+# digests, in the recorded order, and the recorded integrity digest.
+$integrityCopy = Join-Path $runRoot 'integrity-copy'
+Copy-Tree -From $pristine -To $integrityCopy
+$recorded = Get-Content -Raw -LiteralPath (Join-Path $integrityCopy 'artifact-manifest.json') | ConvertFrom-Json
+$recomputed = Set-IntegrityRecord -Artifact $integrityCopy -DryRun
+$differences = @()
+$recordedFiles = @($recorded.files)
+if ($recordedFiles.Count -ne $recomputed.Files.Count) {
+    $differences += "member count: recorded $($recordedFiles.Count), recomputed $($recomputed.Files.Count)"
+}
+$compareTo = $recordedFiles.Count
+if ($recomputed.Files.Count -lt $compareTo) { $compareTo = $recomputed.Files.Count }
+for ($index = 0; $index -lt $compareTo; $index++) {
+    $want = $recordedFiles[$index]
+    $got = $recomputed.Files[$index]
+    if ($want.path -ne $got.path) {
+        $differences += "order at $index : recorded '$($want.path)', recomputed '$($got.path)'"
+    }
+    if ($want.sha256 -ne $got.sha256) {
+        $differences += "digest of '$($want.path)' : recorded $($want.sha256), recomputed $($got.sha256)"
+    }
+    if ([string] $want.bytes -ne [string] $got.bytes) {
+        $differences += "size of '$($want.path)' : recorded $($want.bytes), recomputed $($got.bytes)"
+    }
+}
+if ($recorded.artifact_integrity_digest -ne $recomputed.Digest) {
+    $differences += "integrity digest: recorded $($recorded.artifact_integrity_digest), recomputed $($recomputed.Digest)"
+}
+Add-Result -Name 'R7a-integrity-recompute-matches-the-tool' `
+    -Expectation 'the script re-implementation reproduces every recorded member digest and the integrity digest' `
+    -Passed ($differences.Count -eq 0 -and -not $recomputed.Changed) `
+    -Detail $(if ($differences.Count -eq 0) { "$($recomputed.Files.Count) member(s), digest $($recomputed.Digest.Substring(0, 12))…" } else { $differences -join '; ' })
+
+# R7b — and the re-implementation is strong enough to defeat the physical check: a
+# packed `Cargo.toml` whose dependency version no committed manifest can state, with
+# the record recomputed around it, must now be refused by the derivation check rather
+# than by the integrity digest. This is Repair 1 finding F1-A, run through the same
+# injection the pilot uses.
+$f1aCopy = Join-Path $runRoot 'f1a-copy'
+Copy-Tree -From $pristine -To $f1aCopy
+$packedManifest = Join-Path $f1aCopy "package\contract\packages\$Module\Cargo.toml"
+$manifestText = Get-Content -Raw -LiteralPath $packedManifest
+$tamperedManifest = $manifestText -replace 'async-trait = \{ version = "=0\.1\.92"' , 'async-trait = { version = "=99.0.0"'
+if ($tamperedManifest -eq $manifestText) {
+    throw 'the F1-A injection did not change the packed manifest; the case would assert nothing'
+}
+Set-Content -LiteralPath $packedManifest -Value $tamperedManifest -NoNewline -Encoding utf8
+$rehashed = Set-IntegrityRecord -Artifact $f1aCopy
+$f1aRun = Invoke-Step -Name 'R7b-rehashed-packed-manifest' `
+    -Title 'a packed manifest the pinned commit cannot produce, with a consistent record, must be refused' `
+    -Arguments @('verify', '--artifact', $f1aCopy) `
+    -LogFile (Join-Path $runRoot 'r7b-verify.log') -ExpectExit 1 -State $State
+$f1aCheck = if ($f1aRun.Log -match '\[([a-z0-9-]+)\]') { $Matches[1] } else { 'no check identifier' }
+Add-Result -Name 'R7b-rehashed-packed-manifest' `
+    -Expectation 'exit 1 refused by derived-members-match-revision, not by artifact-integrity-digest' `
+    -Passed ($f1aRun.Exit -eq 1 -and $f1aCheck -eq 'derived-members-match-revision' -and $rehashed.Changed) `
+    -Detail "exit=$($f1aRun.Exit) check=$f1aCheck record-rewritten=$($rehashed.Changed)"
+$State.Failures = @()
+
+# R8 — a second checkout of the same commit, damaged without touching this one.
+# Repair 1 enumerated the checkout, so a deleted tracked source disappeared from both
+# sides of the comparison at once (finding F1-B); the control below is what makes the
+# two refusals mean anything: with the inputs intact the same checkout generates.
+$checkout = New-IsolatedCheckout -Repo $repo -Destination (Join-Path $runRoot 'isolated-checkout') -Module $Module
+# Any committed file of the packed crate but its root: generation never compiles Rust,
+# so the file only has to be one the pinned commit lists.
+$crateSource = Join-Path $checkout.Root (((Get-Content -Raw -LiteralPath (Join-Path $repo "tools/module-release-tool/specs/$Module.json") | ConvertFrom-Json).packed_crates[0].source_dir -replace '/', '\') + '\src')
+$checkoutSource = @(Get-ChildItem -LiteralPath $crateSource -Recurse -File | Where-Object { $_.Name -ne 'lib.rs' } | Sort-Object -Property FullName)[0]
+if (-not $checkoutSource) {
+    throw "the isolated checkout of '$Module' has no source file besides lib.rs; R8 cannot be built"
+}
+$checkoutSourceRelative = $checkoutSource.FullName.Substring($checkout.Root.Length).TrimStart('\')
+$controlOut = Join-Path $runRoot 'isolated-control'
+$control = Invoke-Step -Name 'R8a-isolated-checkout-control' `
+    -Title 'a complete isolated checkout of the pinned commit generates a candidate' `
+    -Arguments @('generate', '--module', $Module, '--out', $controlOut, '--repo', $checkout.Root) `
+    -WorkDir $checkout.Root `
+    -LogFile (Join-Path $runRoot 'r8a-generate-control.log') -State $State
+Add-Result -Name 'R8a-isolated-checkout-control' `
+    -Expectation "exit 0 from a checkout that only contains the release inputs ($($checkout.Files) files)" `
+    -Passed ($control.Exit -eq 0 -and (Test-Path -LiteralPath (Join-Path $controlOut "$Module-$ModuleVersion"))) `
+    -Detail "exit=$($control.Exit) files=$($checkout.Files)"
+
+foreach ($shape in @(
+        @{ Name = 'R8b-dropped-committed-source'; File = $checkoutSource; Remove = $true },
+        @{ Name = 'R8c-uncommitted-extra-source'
+            File = Join-Path $crateSource 'plan0014_repair_case_extra.rs'; Remove = $false })) {
+    if ($shape.Remove) {
+        if (-not (Test-Path -LiteralPath $shape.File)) {
+            throw 'the isolated checkout is missing the source file the case removes; the control is not comparable'
+        }
+        Remove-Item -LiteralPath $shape.File -Force
+    }
+    else {
+        Set-Content -LiteralPath $shape.File -Value "// not committed anywhere`n" -Encoding utf8
+    }
+    $refusedOut = Join-Path $runRoot ($shape.Name + '-out')
+    $run = Invoke-Step -Name $shape.Name `
+        -Title "$($shape.Name): generation must refuse, and refuse before creating an artifact" `
+        -Arguments @('generate', '--module', $Module, '--out', $refusedOut, '--repo', $checkout.Root) `
+        -WorkDir $checkout.Root `
+        -LogFile (Join-Path $runRoot ($shape.Name.ToLower() + '.log')) -ExpectExit 1 -State $State
+    $check = if ($run.Log -match '\[([a-z0-9-]+)\]') { $Matches[1] } else { 'no check identifier' }
+    $artifactDirectory = Join-Path $refusedOut "$Module-$ModuleVersion"
+    $created = Test-Path -LiteralPath $artifactDirectory
+    Add-Result -Name $shape.Name `
+        -Expectation 'exit 1 by source-member-set-matches-revision and no artifact directory created' `
+        -Passed ($run.Exit -eq 1 -and $check -eq 'source-member-set-matches-revision' -and -not $created) `
+        -Detail "exit=$($run.Exit) check=$check artifact-directory-created=$created"
+    $State.Failures = @()
+    if ($shape.Remove) {
+        Copy-Item -LiteralPath (Join-Path $repo $checkoutSourceRelative) -Destination $shape.File -Force
+    }
+    else {
+        Remove-Item -LiteralPath $shape.File -Force
+    }
+}
+
 # ---------------------------------------------------------------- report ------
 $report = @(
     '# PLAN-0014 Wave 5A — orchestration helper regressions',

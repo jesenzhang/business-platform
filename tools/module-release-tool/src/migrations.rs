@@ -4,8 +4,8 @@
 //! candidate artifact may describe migrations, it may never invent them.
 //!
 //! * every claimed file must exist in the referenced catalog and must match the
-//!   checksum recorded in that catalog's own `MANIFEST.sha256`, re-verified
-//!   against the bytes on disk;
+//!   checksum recorded in that catalog's own `MANIFEST.sha256`, re-verified against
+//!   the bytes the pinned commit stores for it;
 //! * a module-owned catalog must be claimed in full, so a module cannot quietly
 //!   stop accounting for a migration it owns;
 //! * a shared catalog is claimed file by file and every shared entry is pinned
@@ -17,7 +17,7 @@
 //!   artifact instead of being implied by the presence of a digest.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use business_module_contracts::{MigrationRevision, MigrationSetDigest};
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::canonical::{
     fold_line_endings, migration_set_digest, sha256_hex, validate_sha256_hex, MigrationSetEntry,
 };
+use crate::commit::Inputs;
 use crate::repo::RepoContext;
 use crate::spec::{MigrationSetSpec, ReleaseSpec};
 use crate::{ToolError, ToolResult};
@@ -105,8 +106,18 @@ impl MigrationMapping {
     }
 }
 
-/// Builds the mapping from the spec and the repository's formal catalogs.
+/// Builds the mapping from the checkout under `context.root()`.
+///
+/// Kept for callers that genuinely mean the working tree; building or verifying a
+/// candidate uses [`build_mapping_at`], which reads the catalogs from the commit the
+/// candidate pins.
 pub fn build_mapping(context: &RepoContext, spec: &ReleaseSpec) -> ToolResult<MigrationMapping> {
+    build_mapping_at(&Inputs::working_tree(context.root()), spec)
+}
+
+/// Builds the mapping from the spec and the formal catalogs as one set of inputs
+/// holds them.
+pub fn build_mapping_at(inputs: &Inputs, spec: &ReleaseSpec) -> ToolResult<MigrationMapping> {
     let mut files = Vec::new();
     let mut assessments = Vec::new();
     let mut authority = vec![
@@ -122,7 +133,7 @@ pub fn build_mapping(context: &RepoContext, spec: &ReleaseSpec) -> ToolResult<Mi
     );
 
     for set in &spec.migration_sets {
-        files.extend(verify_catalog(context.root(), set)?);
+        files.extend(verify_catalog_at(inputs, set)?);
         assessments.push(assess(set));
     }
 
@@ -150,19 +161,28 @@ pub fn build_mapping(context: &RepoContext, spec: &ReleaseSpec) -> ToolResult<Mi
     })
 }
 
-/// Checks one declared migration set against the formal catalog found under
-/// `root` and returns the records to pin.
+/// Checks one declared migration set against the catalog found under `root`.
+///
+/// A working-tree entry point for callers that mean the checkout; a candidate is
+/// built and verified through [`verify_catalog_at`].
+pub fn verify_catalog(root: &Path, set: &MigrationSetSpec) -> ToolResult<Vec<MigrationFileRecord>> {
+    verify_catalog_at(&Inputs::working_tree(root), set)
+}
+
+/// Checks one declared migration set as one set of inputs holds it, and returns the
+/// records to pin.
 ///
 /// Every claimed file must appear in that catalog's own `MANIFEST.sha256` **and**
-/// hash to the value it records — raw bytes, or the same bytes with LF line
-/// endings, because the repository's two catalog checkouts differ only there.
-/// A catalog declared `module_owned` must be claimed in full, so a module can
+/// hash to the value it records — the canonical LF form first, then the raw bytes,
+/// because a `core.autocrlf` checkout and the committed blob differ only there (see
+/// the ordering note below). A catalog declared `module_owned` must be claimed in full, so a module can
 /// never quietly release a subset of its own schema; a catalog it does not own
 /// may only be referenced, never claimed as the module's own.
-pub fn verify_catalog(root: &Path, set: &MigrationSetSpec) -> ToolResult<Vec<MigrationFileRecord>> {
-    let catalog_manifest = root.join(&set.catalog_manifest);
-    let recorded = read_catalog_manifest(&catalog_manifest)?;
-    let catalog_dir = root.join(&set.catalog);
+pub fn verify_catalog_at(
+    inputs: &Inputs,
+    set: &MigrationSetSpec,
+) -> ToolResult<Vec<MigrationFileRecord>> {
+    let recorded = read_catalog_manifest_at(inputs, &set.catalog_manifest)?;
     let mut files: Vec<MigrationFileRecord> = Vec::new();
     for file_name in &set.files {
         let expected = recorded
@@ -175,18 +195,24 @@ pub fn verify_catalog(root: &Path, set: &MigrationSetSpec) -> ToolResult<Vec<Mig
                 ),
             })?;
         validate_sha256_hex(expected, "migration catalog checksum")?;
-        let path: PathBuf = catalog_dir.join(file_name);
-        let shown = path.display().to_string();
-        let raw = std::fs::read(&path).map_err(|source| ToolError::Io {
-            path: shown,
-            source,
-        })?;
+        let path = format!("{}/{}", set.catalog.trim_end_matches('/'), file_name);
+        let raw = inputs.bytes(&path)?;
         let raw_digest = sha256_hex(&raw);
-        let folded_digest = sha256_hex(&fold_line_endings(&raw));
-        let digest_form = if raw_digest == *expected {
-            "raw"
-        } else if folded_digest == *expected {
+        let folded = fold_line_endings(&raw);
+        let folded_digest = sha256_hex(&folded);
+        // The canonical form is tried first, and that order is load-bearing rather
+        // than cosmetic. Committed blobs are LF, so a file read from a commit matches
+        // *both* forms and the reported form used to depend on how the checker
+        // happened to check the repository out: `core.autocrlf=true` produced
+        // "lf-normalized" and a plain checkout would have produced "raw", changing the
+        // shipped mapping — and therefore the payload digest — per host. Reporting the
+        // canonical form whenever it matches makes the mapping a property of the
+        // commit, and leaves "raw" for the one case that is still information: a
+        // catalog whose own MANIFEST records the raw bytes of a CRLF file.
+        let digest_form = if folded_digest == *expected {
             "lf-normalized"
+        } else if raw_digest == *expected {
+            "raw"
         } else {
             return Err(ToolError::MigrationCatalog {
                 catalog: set.catalog.clone(),
@@ -232,14 +258,23 @@ pub fn verify_catalog(root: &Path, set: &MigrationSetSpec) -> ToolResult<Vec<Mig
     Ok(files)
 }
 
-/// Re-reads the catalogs and fails if anything moved since the artifact was
-/// written.
+/// Re-reads the catalogs from the checkout and fails if anything moved.
 pub fn reverify(
     context: &RepoContext,
     spec: &ReleaseSpec,
     recorded: &MigrationMapping,
 ) -> ToolResult<()> {
-    let rebuilt = build_mapping(context, spec)?;
+    reverify_at(&Inputs::working_tree(context.root()), spec, recorded)
+}
+
+/// Re-reads the catalogs from one set of inputs and fails if the recorded mapping
+/// is not what those inputs produce.
+pub fn reverify_at(
+    inputs: &Inputs,
+    spec: &ReleaseSpec,
+    recorded: &MigrationMapping,
+) -> ToolResult<()> {
+    let rebuilt = build_mapping_at(inputs, spec)?;
     if &rebuilt == recorded {
         return Ok(());
     }
@@ -302,12 +337,15 @@ fn assess(set: &MigrationSetSpec) -> BackendAssessment {
     }
 }
 
-fn read_catalog_manifest(path: &Path) -> ToolResult<BTreeMap<String, String>> {
-    let shown = path.display().to_string();
-    let text = std::fs::read_to_string(path).map_err(|source| ToolError::Io {
-        path: shown.clone(),
-        source,
-    })?;
+fn read_catalog_manifest_at(
+    inputs: &Inputs,
+    repo_path: &str,
+) -> ToolResult<BTreeMap<String, String>> {
+    let shown = match inputs.revision() {
+        Some(revision) => format!("{revision}:{repo_path}"),
+        None => repo_path.to_owned(),
+    };
+    let text = inputs.text(repo_path)?;
     let mut entries = BTreeMap::new();
     for line in text.lines() {
         let line = line.trim_end_matches('\r');

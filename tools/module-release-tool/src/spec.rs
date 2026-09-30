@@ -339,6 +339,12 @@ impl ReleaseSpec {
             reason: source.to_string(),
         })
     }
+
+    /// The changelog as one set of inputs declares it, so a candidate cut from a
+    /// commit ships that commit's changelog and not the current checkout's.
+    pub fn changelog_at(&self, inputs: &crate::commit::Inputs) -> ToolResult<String> {
+        inputs.text(&self.changelog_file)
+    }
 }
 
 fn descriptors(contracts: &[ContractSpec]) -> Vec<ContractDescriptor> {

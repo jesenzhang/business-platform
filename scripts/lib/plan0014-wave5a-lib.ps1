@@ -484,3 +484,180 @@ function Save-NegativeRecords {
     }
     return $saved
 }
+# ------------------------------------------------------- the digest rule again --
+#
+# `module-release` owns the payload digest rule and refuses a payload whose record
+# disagrees with its bytes. That is the check Repair 1 had; what Repair 1 could not
+# express is a payload whose record *does* agree with a member the pinned commit
+# cannot produce — a packed `Cargo.toml` whose dependency version was rewritten and
+# every hash beside it recomputed (review F1-A). Building such a counterexample needs
+# the orchestrator to recompute the record itself, so this is a deliberate duplicate
+# of `canonical.rs`, and the regression suite (R6) is what keeps the duplicate honest:
+# on a freshly generated candidate the recomputation has to reproduce the recorded
+# member digests and the recorded integrity digest without changing a single byte.
+function Get-OrdinalPathKey {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    # `inventory()` sorts members by path *bytes*, and the sort feeds the digest. A
+    # culture-sensitive sort would order `contract-x` and `contract/…` differently and
+    # produce a different digest for the same payload, so the key is the hex of each
+    # code unit; every member path is ASCII, where code units are bytes.
+    $key = ''
+    foreach ($character in $Path.ToCharArray()) {
+        $key += '{0:x4}' -f [int]$character
+    }
+    return $key
+}
+
+function Get-CanonicalFileDigest {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    # The canonical hashed form of one member: UTF-8 text, byte order mark removed,
+    # CRLF and lone CR folded to LF, exactly one trailing LF. `Get-Content -Raw`
+    # decodes UTF-8 and drops a leading BOM; the folding is spelled out, and the
+    # digest is taken over bytes — a scratch file — rather than over a string.
+    $text = Get-Content -Raw -LiteralPath $Path
+    if ($null -eq $text) {
+        $text = ''
+    }
+    $text = ($text -replace "`r`n", "`n") -replace "`r", "`n"
+    if (-not $text.EndsWith("`n")) {
+        $text += "`n"
+    }
+    $scratch = Join-Path $env:TEMP ("plan0014-canonical-" + (New-Guid).Guid + ".txt")
+    Set-Content -LiteralPath $scratch -Value $text -NoNewline -Encoding utf8
+    try {
+        return [pscustomobject]@{
+            Sha256 = (Get-FileHash -LiteralPath $scratch -Algorithm SHA256).Hash.ToLowerInvariant()
+            Bytes  = [int64] (Get-Item -LiteralPath $scratch).Length
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $scratch -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-IntegrityDigest {
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][array]$Files)
+    # The pre-image `plan-0014.artifact-integrity.v1` hashes: the algorithm name, then
+    # one `<sha256> <path>` line per member in path-byte order.
+    $preimage = "plan-0014.artifact-integrity.v1`n"
+    foreach ($file in $Files) {
+        $preimage += "$($file.sha256) $($file.path)`n"
+    }
+    if ($preimage -match '[^\x00-\x7F]') {
+        throw 'the integrity pre-image must be ASCII; a member path outside ASCII is not supported here'
+    }
+    $scratch = Join-Path $env:TEMP ("plan0014-preimage-" + (New-Guid).Guid + ".txt")
+    Set-Content -LiteralPath $scratch -Value $preimage -NoNewline -Encoding ascii
+    try {
+        return (Get-FileHash -LiteralPath $scratch -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    finally {
+        Remove-Item -LiteralPath $scratch -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Recomputes `files` and `artifact_integrity_digest` in an artifact copy from the
+# bytes that are actually in `package/`. With -DryRun nothing is written, which is how
+# the self-test compares this re-implementation with the tool's own record.
+function Set-IntegrityRecord {
+    param(
+        [Parameter(Mandatory = $true)][string]$Artifact,
+        [switch]$DryRun
+    )
+    $payload = Join-Path $Artifact 'package'
+    if (-not (Test-Path -LiteralPath $payload)) {
+        throw "'$payload' is not a release payload; there is no inventory to recompute"
+    }
+    $recordPath = Join-Path $Artifact 'artifact-manifest.json'
+    $record = Get-Content -Raw -LiteralPath $recordPath | ConvertFrom-Json
+    $before = $record.artifact_integrity_digest
+    $prefix = (Resolve-Path -LiteralPath $payload).Path.TrimEnd('\', '/')
+    $files = @(
+        foreach ($file in @(Get-ChildItem -LiteralPath $payload -Recurse -File -Force)) {
+            $relative = $file.FullName.Substring($prefix.Length).TrimStart('\', '/') -replace '\\', '/'
+            $digest = Get-CanonicalFileDigest -Path $file.FullName
+            [pscustomobject]@{ path = $relative; sha256 = $digest.Sha256; bytes = $digest.Bytes }
+        }
+    ) | Sort-Object -Property { Get-OrdinalPathKey $_.path }
+    $digest = Get-IntegrityDigest -Files $files
+    if (-not $DryRun) {
+        $record.files = @($files | ForEach-Object {
+                [ordered]@{ path = $_.path; sha256 = $_.sha256; bytes = $_.bytes }
+            })
+        $record.artifact_integrity_digest = $digest
+        (ConvertTo-Json -Depth 40 -InputObject $record) | Set-Content -LiteralPath $recordPath -Encoding utf8
+    }
+    return [pscustomobject]@{
+        Files   = @($files)
+        Digest  = $digest
+        Before  = $before
+        Changed = ($before -ne $digest)
+    }
+}
+
+# ------------------------------------------------- a second checkout of the commit --
+#
+# Review F1-B is a claim about the *checkout*, so a script-level case needs a checkout
+# that can be damaged without touching the developer's. A directory whose `.git` is a
+# **file** naming this repository's object store resolves the same HEAD and the same
+# commit objects while its working files are entirely its own — the same trick a linked
+# worktree uses, without asking Git to register anything in this repository. Only the
+# files a candidate is built from are copied, which is also the point: the tool has to
+# be able to say, from the commit alone, what it expects to find, and it must refuse a
+# checkout that dropped one of those files or added a file the commit does not have.
+function Get-ReleaseInputPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][string]$Module
+    )
+    $rootLength = (Resolve-Path -LiteralPath $Repo).Path.Length
+    $spec = Get-Content -Raw -LiteralPath (Join-Path $Repo "tools/module-release-tool/specs/$Module.json") | ConvertFrom-Json
+    $paths = @(
+        'Cargo.toml',
+        'Cargo.lock',
+        'rust-toolchain.toml',
+        "tools/module-release-tool/specs/$Module.json",
+        $spec.changelog_file
+    )
+    foreach ($crate in @($spec.packed_crates)) {
+        $directory = $crate.source_dir.TrimEnd('/')
+        $paths += "$directory/Cargo.toml"
+        $sourceRoot = Join-Path $Repo ($directory -replace '/', '\')
+        foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'src') -Recurse -File -Force)) {
+            $paths += $file.FullName.Substring($rootLength + 1) -replace '\\', '/'
+        }
+    }
+    foreach ($set in @($spec.migration_sets)) {
+        foreach ($file in @($set.files)) {
+            $paths += "$($set.catalog)/$file"
+        }
+        $paths += $set.catalog_manifest
+    }
+    return @($paths | Where-Object { $_ } | Select-Object -Unique)
+}
+
+function New-IsolatedCheckout {
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [Parameter(Mandatory = $true)][string]$Module
+    )
+    if (-not $env:TEMP) {
+        throw 'no temporary directory to build an isolated checkout in'
+    }
+    $root = New-FreshDirectory -Path $Destination -What 'isolated checkout'
+    $gitDirectory = (Resolve-Path -LiteralPath (Join-Path $Repo '.git')).Path
+    Set-Content -LiteralPath (Join-Path $root '.git') -Value ('gitdir: ' + ($gitDirectory -replace '\\', '/')) -NoNewline -Encoding ascii
+    $copied = 0
+    foreach ($relative in @(Get-ReleaseInputPath -Repo $Repo -Module $Module)) {
+        $source = Join-Path $Repo ($relative -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $source)) {
+            throw "'$relative' is a release input for '$Module' but is absent from the repository; the isolated checkout cannot be built"
+        }
+        $target = Join-Path $root ($relative -replace '/', '\')
+        Ensure-Directory (Split-Path -Parent $target)
+        Copy-Item -LiteralPath $source -Destination $target -Force
+        $copied++
+    }
+    return [pscustomobject]@{ Root = $root; Files = $copied }
+}
