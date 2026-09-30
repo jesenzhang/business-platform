@@ -774,5 +774,77 @@ Assert-SourceScan -Label "Policy DSL scan" `
     -Directories @("crates/policy/src") `
     -Patterns @("parse_expression", "evaluate_expression", "Expression\s*\{")
 
+# PLAN-0014 Wave 5B-S1 (review §3.8): the offline catalog gate is an
+# architecture assertion, not a release step. `catalog-check` with its default
+# checks (module catalog, pinned baseline history, single baseline embed point)
+# reads nothing but this checkout and never opens a database. The candidate
+# freeze is deliberately excluded until ADR-0029 is accepted.
+Push-Location $root
+try {
+    cargo run -q -p module-release-tool -- catalog-check --repo $root
+    if ($LASTEXITCODE -ne 0) {
+        throw "Wave 5B-S1 offline catalog gate failed (exit $LASTEXITCODE)"
+    }
+} finally {
+    Pop-Location
+}
+
+# A new namespace manifest records exactly one digest: SHA-256 over the file
+# with CRLF folded to LF. The historical baseline keeps its three-form
+# compatibility through the migration-manifest assertion above; that tolerance
+# must not leak into a module catalog (review §2 C1). This is a separate
+# assertion on purpose — the historical rule is never reused for new catalogs.
+function Assert-ModuleManifestCanonicalLf([string]$RelativeDirectory) {
+    $directory = Join-Path $root $RelativeDirectory
+    if (-not (Test-Path -LiteralPath $directory)) {
+        throw "Wave 5B manifest scan: $RelativeDirectory is missing"
+    }
+    Get-ChildItem -LiteralPath $directory -Directory | ForEach-Object {
+        $namespace = $_.Name
+        $manifestPath = Join-Path $_.FullName 'MANIFEST.sha256'
+        if (-not (Test-Path -LiteralPath $manifestPath)) {
+            Write-Output "  namespace ${namespace}: 0 migrations (RESERVED)"
+            return
+        }
+        $manifestBytes = [System.IO.File]::ReadAllBytes($manifestPath)
+        if ($manifestBytes -contains 0x0D) {
+            throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/MANIFEST.sha256 holds a CR byte; a namespace manifest is LF-only"
+        }
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            foreach ($line in [System.Text.Encoding]::UTF8.GetString($manifestBytes) -split "`n") {
+                if ([string]::IsNullOrWhiteSpace($line)) {
+                    continue
+                }
+                $fields = -split $line
+                if ($fields.Count -ne 2) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/MANIFEST.sha256 line '$line' is not '<digest>  <file>'"
+                }
+                $sqlPath = Join-Path $_.FullName $fields[1]
+                if (-not (Test-Path -LiteralPath $sqlPath)) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/$($fields[1]) is listed but missing"
+                }
+                $sqlBytes = [System.IO.File]::ReadAllBytes($sqlPath)
+                $lfBytes = [System.Collections.Generic.List[byte]]::new()
+                for ($index = 0; $index -lt $sqlBytes.Length; $index++) {
+                    if ($sqlBytes[$index] -eq 0x0D -and $index + 1 -lt $sqlBytes.Length -and $sqlBytes[$index + 1] -eq 0x0A) {
+                        continue
+                    }
+                    $lfBytes.Add($sqlBytes[$index])
+                }
+                $actual = ([System.BitConverter]::ToString($sha.ComputeHash([byte[]]$lfBytes.ToArray())) -replace '-', '').ToLowerInvariant()
+                if ($actual -ne $fields[0]) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/$($fields[1]) digest mismatch; a namespace manifest records the canonical LF digest only (no CRLF fallback)"
+                }
+            }
+        } finally {
+            $sha.Dispose()
+        }
+        Write-Output "  namespace ${namespace}: manifest verified against the canonical LF digests"
+    }
+}
+
+Assert-ModuleManifestCanonicalLf 'migrations/modules'
+
 Write-Output "Architecture fitness: PASS"
 exit 0

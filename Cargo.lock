@@ -282,6 +282,7 @@ dependencies = [
  "async-trait",
  "audit",
  "chrono",
+ "runtime-migration",
  "serde_json",
  "sqlx",
  "tokio",

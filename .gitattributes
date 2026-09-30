@@ -1,0 +1,13 @@
+# PLAN-0014 Wave 5B-S1: the offline catalog gate hashes file bytes, so the
+# files it judges must not depend on the checkout's core.autocrlf setting.
+# Two path scopes only:
+#  * the shared S1 fixture tree (a digest fixture whose bytes move with the
+#    host configuration proves nothing);
+#  * migrations/modules/ (a namespace MANIFEST.sha256 is LF-only by design
+#    section 11.1, and its digests are canonical-LF).
+# The historical baseline is deliberately NOT listed: its existing CRLF
+# tolerance is pinned by blob digest instead (review 2026-09-30 section 2 C1),
+# and renormalising historical files would rewrite the history S1 must not touch.
+tools/module-release-tool/tests/fixtures/wave5b/** text eol=lf
+migrations/modules/** text eol=lf
+

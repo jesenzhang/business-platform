@@ -1,0 +1,1 @@
+CREATE TABLE wave5b_fixture_policy_t4 (t4_id BIGINT);

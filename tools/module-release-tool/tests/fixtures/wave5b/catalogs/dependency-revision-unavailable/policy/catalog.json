@@ -1,0 +1,8 @@
+{
+  "schema_version": "plan-0014.wave5b.catalog.v1",
+  "namespace": "policy",
+  "owner": "policy",
+  "ledger": "platform_module_migrations",
+  "sql_schema": "public",
+  "depends_on": ["platform-baseline@19", "identity-management@1"]
+}

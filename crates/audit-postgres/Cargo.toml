@@ -21,6 +21,9 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+# The PostgreSQL conformance test applies the shared baseline through the single
+# embed point instead of a second `sqlx::migrate!` (PLAN-0014 Wave 5B-S1, P-4).
+runtime-migration = { workspace = true }
 
 [lints]
 workspace = true

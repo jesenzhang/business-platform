@@ -1,0 +1,7 @@
+{
+  "schema_version": "plan-0014.wave5b.catalog.v1",
+  "namespace": "policy",
+  "owner": "policy",
+  "sql_schema": "public",
+  "depends_on": ["platform-baseline@19"]
+}

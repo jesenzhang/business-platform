@@ -1,0 +1,1 @@
+DROP TABLE wave5b_fixture_identity_t9;

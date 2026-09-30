@@ -1,11 +1,12 @@
 //! `module-release` — local release-candidate CLI (PLAN-0014 Wave 5A).
 //!
 //! ```text
-//! module-release generate --module <id> --out <dir>            [--repo <dir>]
-//! module-release verify   --artifact <dir>                     [--repo <dir>]
-//! module-release compare  --left <dir> --right <dir>           [--repo <dir>]
-//! module-release guard    --metadata <file> --consumer <dir> --repo <dir>
-//!                       [--artifact <dir>]… [--forbid <dir>]…
+//! module-release generate      --module <id> --out <dir>            [--repo <dir>]
+//! module-release verify        --artifact <dir>                     [--repo <dir>]
+//! module-release compare       --left <dir> --right <dir>           [--repo <dir>]
+//! module-release guard         --metadata <file> --consumer <dir> --repo <dir>
+//!                            [--artifact <dir>]… [--forbid <dir>]…
+//! module-release catalog-check --repo <dir>                    [--only <check>]…
 //! ```
 //!
 //! `guard` decides whether a consumer really resolved outside the source
@@ -14,6 +15,12 @@
 //! by grepping a manifest for a path — is what catches a forward-slash path, a
 //! relative path and a transitive path dependency.
 //!
+//! `catalog-check` is the offline Wave 5B entry point (design §11, review §3.2):
+//! it reads files and read-only Git objects and prints what it verified. It is
+//! deliberately *not* part of the generate/verify artifact flow and it is not
+//! the S3 migration CLI `--namespace` / `verify` — it validates catalogs, it does
+//! not install anything.
+//!
 //! Any failure exits non-zero. There is no path in this binary that reports a
 //! failed check as success, and no command publishes, registers or installs
 //! anything.
@@ -21,6 +28,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use module_release_tool::catalog::{self, Check};
 use module_release_tool::isolation::{self, IsolationPolicy};
 use module_release_tool::packaging;
 use module_release_tool::repo::RepoContext;
@@ -47,11 +55,42 @@ fn run(arguments: &[String]) -> Result<(), ToolError> {
         "verify" => verify(&options),
         "compare" => compare(&options),
         "guard" => guard(&options),
+        "catalog-check" => catalog_check(&options),
         other => Err(ToolError::Usage(format!(
-            "unknown command '{other}'; expected generate, verify, compare or guard\n\n{}",
+            "unknown command '{other}'; expected generate, verify, compare, guard or \
+             catalog-check\n\n{}",
             usage()
         ))),
     }
+}
+
+/// The offline Wave 5B catalog gate: metadata, manifest, SQL ownership, the
+/// pinned baseline history and, only when asked for, the candidate freeze.
+fn catalog_check(options: &Options) -> Result<(), ToolError> {
+    let root = options.repo.clone().ok_or_else(|| {
+        ToolError::Usage(format!(
+            "'--repo' is required
+
+{}",
+            usage()
+        ))
+    })?;
+    let requested = options.texts("only");
+    let checks: Vec<Check> = if requested.is_empty() {
+        catalog::default_checks()
+    } else {
+        requested
+            .iter()
+            .map(|name| Check::parse(name))
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    let report = catalog::validate(&root, &checks)?;
+    for line in report.log_lines() {
+        println!("{line}");
+    }
+    println!("status=ok");
+    println!("root={}", root.display());
+    Ok(())
 }
 
 /// The repository the command operates on: `--repo`, or the one containing the
@@ -188,18 +227,22 @@ fn guard(options: &Options) -> Result<(), ToolError> {
 }
 fn usage() -> &'static str {
     "usage:\n  \
-     module-release generate --module <id> --out <dir>            [--repo <dir>]\n  \
-     module-release verify   --artifact <dir>                     [--repo <dir>]\n  \
-     module-release compare  --left <dir> --right <dir>           [--repo <dir>]\n  \
-     module-release guard    --metadata <file> --consumer <dir> --repo <dir>\n    \
-                       [--artifact <dir>]… [--forbid <dir>]…"
+     module-release generate      --module <id> --out <dir>            [--repo <dir>]\n  \
+     module-release verify        --artifact <dir>                     [--repo <dir>]\n  \
+     module-release compare       --left <dir> --right <dir>           [--repo <dir>]\n  \
+     module-release guard         --metadata <file> --consumer <dir> --repo <dir>\n    \
+                       [--artifact <dir>]… [--forbid <dir>]…\n  \
+     module-release catalog-check --repo <dir>                    [--only <check>]…\n    \
+                       check = module-catalog | pinned-baseline-history | baseline-embed | baseline-candidate-freeze"
 }
 
-/// Flat `--key value` options; `--out`, `--artifact` and `--forbid` may repeat.
+/// Flat `--key value` options; `--out`, `--artifact`, `--forbid` and `--only` may
+/// repeat.
 struct Options {
     repo: Option<PathBuf>,
     values: std::collections::BTreeMap<String, String>,
     paths: std::collections::BTreeMap<String, Vec<PathBuf>>,
+    words: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 impl Options {
@@ -207,6 +250,8 @@ impl Options {
         let mut repo = None;
         let mut values = std::collections::BTreeMap::new();
         let mut paths: std::collections::BTreeMap<String, Vec<PathBuf>> =
+            std::collections::BTreeMap::new();
+        let mut words: std::collections::BTreeMap<String, Vec<String>> =
             std::collections::BTreeMap::new();
         let mut index = 0;
         while index < arguments.len() {
@@ -225,6 +270,10 @@ impl Options {
                 repo = Some(PathBuf::from(value));
                 continue;
             }
+            words
+                .entry(key.to_owned())
+                .or_default()
+                .push(value.to_owned());
             paths
                 .entry(key.to_owned())
                 .or_default()
@@ -237,7 +286,13 @@ impl Options {
             repo,
             values,
             paths,
+            words,
         })
+    }
+
+    /// Every value of a repeatable text option, such as `--only`.
+    fn texts(&self, key: &str) -> Vec<String> {
+        self.words.get(key).cloned().unwrap_or_default()
     }
 
     /// A text option value, such as `--module`.

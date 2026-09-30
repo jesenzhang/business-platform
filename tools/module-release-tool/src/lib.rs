@@ -44,6 +44,7 @@
 //! `module_version`, `source_revision` and the digests above.
 
 pub mod canonical;
+pub mod catalog;
 pub mod commit;
 pub mod git;
 pub mod isolation;
