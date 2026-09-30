@@ -2,10 +2,11 @@
 
 > Review ID: REVIEW-PLAN-0014-WAVE5B-ADMISSION-2026-09-30
 > Status: 事实盘点（inventory / admission matrix），不是验收，不改规范
-> Date: 2026-09-30
+> Date: 2026-09-30（Revision 1：按 `docs/reviews/2026-09-30-wave5b-design-independent-review.md` 修正"独立安装"判据与真实执行范围；§2–§6 的历史证据、固定 SHA 与计数一律照录未改）
+> 起点：Revision 0 = `c73955e`；Revision 1 = `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`
 > Related plan: PLAN-0014（Active / Review-first）
 > 来源指令：`docs/reviews/2026-09-30-wave5a-repair2-independent-review.md` §4.3
-> 配套设计：`docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md`
+> 配套设计：`docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md`（Revision 1）
 
 ## 1. 判定纪律（本矩阵遵循的计数规则）
 
@@ -73,9 +74,33 @@
 | **G-01 → G-201**（canonical module release identity 缺失，C1） | Wave 1 G-01 由 Wave 2 G-201 重编号承接，**同一件事，只记一次** | 值契约 / 声明一致性：**CLOSED（局部）**；真实工件组装：**有证据 / 残项收窄**；整体 **未关闭** | ① `cargo test -p business-module-contracts -p business-application-compiler --all-features` → 113 passed（`69d9a6b0`）；② `cargo test --workspace --all-features` 在独立 `--target-dir` 下 exit 0，**864 passed / 0 failed / 70 ignored，191 suites**（`c22939f0`；默认构建目录被两个被占用 bin 阻塞，`os error 5`，两份日志都归档）；③ `module-release verify` 两模块各 12 项检查 exit 0（候选钉 `c22939f0`，HEAD `c73955e` 上复验仍 PASS）；④ 独立审阅重跑两个保留反例各 exit 1，命中具名检查 | `1e3a25b3`（值契约与 `verify_release_identity`）→ `c22939f0`（工具组装 + 钉入工件） | `2026-09-24-saas-align-module-packaging.md` §8 / §10；`2026-09-30-wave5a-repair2-gates/F1-closure.md` §6；`…/pilot/artifacts/{identity,policy}/`；审阅 §2 / §3 | 2026-09-24 / 09-29 / 09-30 | ① 「由 release tool 实际组装并钉入 pilot 工件」在 `c22939f0` 上已有证据 → 待独立审阅记为残项关闭；② G-01 原文的 “compatibility fixture”：spec 自述 compat 窗口「未经评审」、无上界 → 未满足；③ 迁移映射在 PostgreSQL 上 `module_owned = false`（见 G-203） | 平台架构 + 模块 owner（`identity` / `policy`）；判定：独立审阅者 |
 | **G-02**（本候选的真实 PostgreSQL 证据缺失，C1 evidence blocker） | 独立项，不被任何工件 / SQLite 证据替代 | **NOT RUN / BLOCKED** | 未连库。Repair 2 归档逐行记录：`PostgreSQL 迁移执行、单模块独立安装/升级/rollback` = **BLOCKED（无数据库授权）**；70 个 `#[ignore]` 一条未执行 | 无（无数据库执行 ⇒ 无候选可钉） | `2026-09-30-wave5a-repair2-gates/F1-closure.md` §7 第 3–4 行；`…/pilot/assembly-log.md` 末行 `BLOCKED (G-02 / G-203, no database authorisation in this environment)` | 2026-09-30 | 需一次**授权**的 PostgreSQL lane：专用空测试库 + 显式 TEST URL + 已授权角色；命令与判据见设计包 §9.1 / §9.2。原条件还要求 CI / staging lane，本地一次通过不等于关闭 | 平台架构 + Wave 5B 实施者；数据库授权：用户 / 运维 |
 | **G-202**（无独立发布工件与 workspace 外消费者证据，C1，R2 BLOCKER） | 独立项 | **有证据 / 残项收窄**；整体 **OPEN** | (a) pilot 工件带 release identity：`release.json` / `release-bundle.json` / `verification.json` 在 `c22939f0` 上 verify exit 0（12 项检查）；(b) **workspace 外消费者工程**：`tools/module-release-tool/consumers/{identity,policy}` 自带空 `[workspace]` 表、path 指向 packed artifact，实际 `build` + `test`（identity 1 例、policy 2 例，均为默认拒绝方向）+ 缓存预热后 `--locked --offline` 复建 + `module-release guard` 读完整 `cargo metadata` 图判定落点；(c) **仓库目录之外复建**：Repair 1 做过一次（`3*-outside-*`），Repair 2 按审阅指令 `-SkipOutsideConsumer` ⇒ **NOT RUN** | (a)(b) `c22939f0`；(c) 仅 `69d9a6b0` | `…/pilot/assembly-log.md`、`…/pilot/25-consumer-*-cargo-metadata.json`、`…/pilot/negatives/*/case.md`（19 例全 OK）；(c) `2026-09-29-wave5a-repair1-gates/3*-outside-*` | (a)(b) 2026-09-30；(c) 2026-09-29 | ① (c) 需在当前候选上重做一次才算当前证据；② 2026-09-27 校准要求的「授权库上单模块安装 / 升级 + 运维回滚」→ 设计包 §9.2 / §6.3；③ 不新增 publish / 注册中心要求（原文无此项） | 平台架构 + Wave 5B 实施者；判定：独立审阅者 |
-| **G-203**（migration 所有权仍是 workspace 平面序列，C1） | 独立项；本设计包的目标 | 声明层：**CLOSED（局部）**；物理 catalog：**OPEN**；执行 ledger：**OPEN**；安装 / 升级隔离：**BLOCKED** | 已执行且可复核的是**离线只读映射**：`migration-mapping.json` 逐文件比对 catalog `MANIFEST.sha256` 与提交内字节（先 LF 折叠、后 raw），module-owned catalog 必须全量声明，`set_digest` 由 `plan-0014.migration-set.v1` 计算并被 `MigrationRevision` 钉住；虚构文件与「把共享 catalog 声称为模块独有」均被拒。**SQLite 侧已有真 ledger 事实**：`identity_migrations` / `organization_migrations` / `policy_migrations` / `document_processing_migrations` 逐目录记账。**PostgreSQL 侧未做任何事**：`_sqlx_migrations` 单账本、`migrations/MANIFEST.sha256` 单目录、`runtime-migration` 全量 embed | `c22939f0`（映射与 `set_digest`）；SQL / catalog 自 `6c63ba15` 起未变，本轮零改动 | `…/pilot/artifacts/{identity,policy}/migration-mapping.json`；`tools/module-release-tool/src/migrations.rs`；`scripts/check-architecture.ps1:610-683`（六个 catalog 的 sha 门禁）；审阅 §4 前言（“声明 namespace 和 mapping/checksum 已有证据；物理 catalog、执行 ledger、安装升级隔离继续 OPEN”） | 2026-09-30 | 按 `PLAN-0014-wave5b-migration-isolation-design.md` 实施：per-namespace 目录 / manifest、per-namespace ledger、单 runner 归属、并发与失败恢复、真实 PG 验收。**本轮零代码改动** | 平台架构（设计）→ Wave 5B 实施者 → 独立审阅者 |
+| **G-203**（migration 所有权仍是 workspace 平面序列，C1） | 独立项；本设计包的目标 | 声明层：**CLOSED（局部）**；物理 catalog：**OPEN**；执行 ledger：**OPEN**；安装 / 升级隔离：**BLOCKED** | 已执行且可复核的是**离线只读映射**：`migration-mapping.json` 逐文件比对 catalog `MANIFEST.sha256` 与提交内字节（先 LF 折叠、后 raw），module-owned catalog 必须全量声明，`set_digest` 由 `plan-0014.migration-set.v1` 计算并被 `MigrationRevision` 钉住；虚构文件与「把共享 catalog 声称为模块独有」均被拒。**SQLite 侧已有真 ledger 事实**：`identity_migrations` / `organization_migrations` / `policy_migrations` / `document_processing_migrations` 逐目录记账。**PostgreSQL 侧未做任何事**：`_sqlx_migrations` 单账本、`migrations/MANIFEST.sha256` 单目录、`runtime-migration` 全量 embed | `c22939f0`（映射与 `set_digest`）；SQL / catalog 自 `6c63ba15` 起未变，本轮零改动 | `…/pilot/artifacts/{identity,policy}/migration-mapping.json`；`tools/module-release-tool/src/migrations.rs`；`scripts/check-architecture.ps1:610-683`（六个 catalog 的 sha 门禁）；审阅 §4 前言（“声明 namespace 和 mapping/checksum 已有证据；物理 catalog、执行 ledger、安装升级隔离继续 OPEN”） | 2026-09-30 | 按 `PLAN-0014-wave5b-migration-isolation-design.md` **Revision 1** 实施：per-namespace 目录 / manifest、per-namespace ledger、单 runner 归属、**公共 bootstrap 锁 + namespace 锁与持锁连接生命周期**、真实 PG 验收。**Revision 0 与 1 两轮都是零代码改动**；且必须区分两个不同验收目标——既有库物理隔离与空库单模块冷安装（设计包 §6.6），当前**两者证据均为零** | 平台架构（设计）→ Wave 5B 实施者 → 独立审阅者 |
 
-### 4.1 两试点的 C0 / C1 现状
+### 4.1 G-203 的四个记账子项（Revision 1 新增；**Proposed，全部 OPEN，零证据**）
+
+拆分的动机是**记账粒度**，不是降低门槛：**G-203 原条目仍是一条、仍 OPEN，分母不变**；G-202 与 A-12 的判定面同样不因拆分而改变（设计包 §7.1 分母规则）。子项状态由独立审阅裁决，本矩阵不标 Accepted。
+
+| 子项（Proposed） | 内容 | 本矩阵状态 | 实际执行范围（只写真正跑过的） | 关闭还需要什么 |
+|---|---|---|---|---|
+| G-203a-i 目录隔离 | `migrations/modules/<ns>/` + per-namespace `MANIFEST.sha256` + `catalog.json` + 工件钉定 + 静态门禁 | **OPEN** | 无：目录与门禁尚未创建（S1 未实施） | S1 落地 + 独立审阅对固定 SHA 判定 |
+| G-203a-ii ledger 隔离 | 平台 ledger + 单一 writer + 公共 bootstrap 锁 / namespace 锁 + fail-closed 判据 | **OPEN** | 无：无任何 runner 代码、无任何库操作 | S2/S3 + 授权库上 V1–V4、V6–V9 全绿 |
+| G-203b-i 既有库物理隔离（升级） | 13 张表从 `public` 迁到各 schema | **OPEN，且设计未完成**（设计包 §6.3–§6.5 列 7 项 OPEN；原 expand 顺序已撤回） | 无：未执行任何 DDL | 关闭全部 OPEN + 独立 ADR + 运维授权 + 备份验证 |
+| G-203b-ii 单模块冷安装 | 空库上只装一个模块，不建他人表 | **OPEN，且未设计** | 无 | 独立的模块自有 init catalog 设计与依赖对象最小清单（设计包 §6.6），**不以 G-203b-i 为前提**，也不得以复制旧迁移的方式冒充模块历史 |
+
+**判据更正记录（B2）**：Revision 0 的设计曾把"单模块冷安装"记为方案 B 已满足（"是"）。该断言已撤销——方案 B 移动的是**既有表的位置**，空库上没有既有表可搬，搬迁后冷安装仍需先跑 host baseline `1..19`。方案 A 与方案 B 在此判据上的当前状态都是**未满足、无证据**。
+
+### 4.2 真实执行范围的边界（Revision 1 新增，B3）
+
+本矩阵引用的 PostgreSQL 证据面必须与 `docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md` §9.1.2 的**逐 suite 数据库范围盘点**一起读，不得只看命令行 URL：
+
+- `#[ignore]` 的 PostgreSQL 套件**并非**都只操作给定库：`apps/migration/tests/migration_test.rs` 会丢弃给定库名并新建 `plan2_<uuid>` sibling 库（只建不保证清理），另有两条直接在给定库上跑迁移且不清理。
+- 多条套件在 `DATABASE_URL` 缺失时**静默回落**到硬编码开发库，且回落名互不一致（`business_platform` / `business_platform_test` / `enterprise_platform`）。
+- `MIGRATION__DATABASE__URL` 与 `DATABASE_URL` 互斥（同时设置即配置错误），因此"一条命令同时满足 CLI 与测试"的写法不成立；两条 lane 必须分开设置环境并各自恢复。
+- 结论：任何未来轮次声称"真实执行"时，必须写明**本轮实际新建 / 改动 / 删除了哪些数据库**；只写命令与 URL 不构成执行范围证明。
+
+
+
+### 4.3 两试点的 C0 / C1 现状
 
 | 模块 | C0 | 未清零 C1（⇒ R2 BLOCKED） | 当前可主张的事实 | 不可主张 |
 |---|---|---|---|---|
@@ -104,7 +129,7 @@
 | A-09 | **release 一致性验证**：`verify_release_identity` 对 `compile()` 输出重算双摘要并核对字段；6 类单字段错配负向；release 层 SemVer | `release_surface_digest.rs` 9 例 + `package_fingerprint_matches_the_planner_per_module_digest` + `release.rs` 2 例 | PASS（范围 = **声明一致性**；Round 1 高估已由 Round 2 纠正） | 同上；工具侧另有 `release-identity-consistency` 检查在候选上 exit 0 | 09-24 / 09-30 | PASS（限定词必须保留） | 不得再扩大为「工件字节一致性」——那是工具侧 `artifact_integrity_digest`（SP-1 未执行） |
 | A-10 | 独立消费者无 concrete adapter 编译 / 测试 | 内部：依赖白名单 fitness + 113 测试只用纯 contract 类型；外部：Wave 5 fixture | **PARTIAL**（内部 PASS / 外部 NOT RUN） | **外部消费者已执行**：两消费者独立 `[workspace]` + path 指向 packed artifact，build / test / `--locked --offline` / guard（`c22939f0`）。**仓库目录之外复建 NOT RUN**（Repair 2 `-SkipOutsideConsumer`） | 09-24 / 09-29（目录外历史） / 09-30 | PARTIAL → **接近 MET**（外部消费者有当前证据；目录外复建 NOT RUN） | Wave 5B 首轮在当前候选上补做一次目录外复建即可提请关闭；owner：Wave 5B 实施者 |
 | A-11 | live consumer 移除阻断、uninstall ≠ purge | planning tests（`BlockedRemoval`、`RemoveModule data_retained`） | PASS | 经归档 workspace 测试覆盖 | 09-24 / 09-30 | PASS | 迁移侧「回滚不得默认 drop 业务数据」由设计包 §5.8 承接，不属于本条证据 |
-| A-12 | 真实模块 release 工件 + PG 迁移 lane | 工件：Wave 5 pilot；PG：未执行 | **NOT RUN** | 工件部分已有候选（21 / 23 成员，verify 12 项 PASS）；**PG lane NOT RUN / BLOCKED**：无授权；70 个 `#[ignore]` 未执行，四类分母保留（PostgreSQL 38 / PostgreSQL 且对象存储 3 / 仅 S3-MinIO 对象存储 28 / 内网模型 provider 1） | 09-30 | **NOT RUN（真实 PostgreSQL 部分继续）** | 设计包 §9.2 验收矩阵 + 一次授权 lane；owner：Wave 5B 实施者 + 数据库授权方 |
+| A-12 | 真实模块 release 工件 + PG 迁移 lane | 工件：Wave 5 pilot；PG：未执行 | **NOT RUN** | 工件部分已有候选（21 / 23 成员，verify 12 项 PASS）；**PG lane NOT RUN / BLOCKED**：无授权；70 个 `#[ignore]` 未执行，四类分母保留（PostgreSQL 38 / PostgreSQL 且对象存储 3 / 仅 S3-MinIO 对象存储 28 / 内网模型 provider 1） | 09-30 | **NOT RUN（真实 PostgreSQL 部分继续）** | 设计包 §9.3 验收矩阵 + 一次授权 lane；ignored 分母按设计包 §9.4 的**增量对账**规则处理（新增 PostgreSQL ignored 会让分母增大，须如实逐条解释，**禁止**机械要求"必须仍为 70"，也禁止要求 passed/suites 恒等于 864/191）；owner：Wave 5B 实施者 + 数据库授权方 |
 
 **计数一致性核对**：A-01..A-12 = 12 条。Wave 2 原始口径 = 10 PASS（A-01..A-09、A-11）
 + 1 PARTIAL（A-10）+ 1 NOT RUN（A-12）。本轮**不把总数改写为「更多 PASS」**：A-10 的外部子项虽有
@@ -138,11 +163,23 @@
 6. 不得把 Wave 4 的 OBS-W4-* / N-G05 与迁移面混为一谈，也不得因为它们未修而宣称本设计无效。
 7. 不得宣称 Rust workspace 门禁在「当前 HEAD」通过：本轮为文档包，未运行产品门禁；Repair 2 归档
    的门禁属于 `c22939f0` / `a98e45c`，与本设计包提交不是同一输入。
+8. （Revision 1）**不得把方案 A 或方案 B 说成"单模块冷安装已具备"**：两者在此判据上都是未满足、
+   零证据；物理 schema 搬迁改变的是既有表的位置，不会让空库少跑一步 host baseline（§4.1）。
+9. （Revision 1）**不得把 G-203 拆成子项当作门槛降低**：G-203 原条目仍是一条、仍 OPEN，
+   G-202 / A-12 的判定面与分母不变；四个子项只是记账粒度，且全部 Proposed / OPEN，未标 Accepted。
+10. （Revision 1）**不得把"目录已建 / `MANIFEST.sha256` 为空 / 门禁脚本通过"记为安装或隔离成功**：
+    空 catalog 只表示预留；离线门禁通过也不等于 ADR-0029 被接受。
+11. （Revision 1）**不得用命令行 URL 推断测试的实际数据库范围**：见 §4.2 的逐 suite 盘点
+    （sibling 库 `plan2_<uuid>`、缺失变量时回落到硬编码开发库）。
 
 ## 8. 状态
 
-**WAVE 5A REPAIR 2 REVIEWED（PASS） / NOT INTEGRATED；WAVE 5B-0 DESIGN READY FOR REVIEW；R2 BLOCKED。**
+**WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED（PASS）/ NOT INTEGRATED；R2 BLOCKED。**
 `identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
-G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭；Wave 4 的 C1 与观察项继续有效；
-ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；本包新增的 ADR-0029 为 **Proposed / NOT ACCEPTED**。
+G-01 / G-02 / G-201 / G-202 / G-203 一律未关闭（G-203 的四个记账子项全部 Proposed / OPEN，见 §4.1）；
+Wave 4 的 C1 与观察项继续有效；
+ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；本包新增的 ADR-0029 为 **Proposed / NOT ACCEPTED**（Revision 1
+已按设计审阅 B1/B2 同步锁模型与范围边界，但**未**自行改变状态）。
+Revision 1 起点 `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`，纯文档轮：未连接数据库、未实施 S1/S2/S3、
+未 push / merge / tag / deploy、未改 main。
 

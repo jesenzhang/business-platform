@@ -945,3 +945,54 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
 - 状态：**WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；WAVE 5B-0 DESIGN READY FOR REVIEW；R2 BLOCKED**；
   `identity` / `policy` 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署 / 改 main，
   未启动 PLAN-0006；Wave 5B-1 实施需独立审阅放行 G-203a 判据并取得数据库授权后才能开始。
+
+> 2026-09-30 Wave 5B-0 设计包 **Revision 1**（按 `docs/reviews/2026-09-30-wave5b-design-independent-review.md`
+> §3 执行；**纯文档轮**，未连库、未改代码、未发布）在同一分支完成，起点
+> `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`。该审阅对 Revision 0 设计包的判定是
+> **NEEDS REPAIR（设计包）**（B1 共享 ledger 首次创建的锁保护、B2 搬迁时间线不可执行且混淆两类判据、
+> B3 验收命令与 fixture 范围）；上一段的历史结论与数字照录未改。
+
+- **锁模型更正（B1）**：设计包新增 §5.9。共享 ledger 表 `platform_module_migrations` 的**首次创建**改由
+  **所有 namespace 共用的固定 bootstrap 锁**保护，与 namespace 锁职责分离；两把锁都是**事务级**
+  `pg_advisory_xact_lock`（与仓内既有 8 处实现同形），公共锁用单 bigint 固定键、namespace 锁用
+  `(classid, objid)` 二元组键，两种锁标签在 PostgreSQL 中键域不相交。统一锁序：host baseline →
+  bootstrap 单元（锁内"存在性检查 + 创建 + 结构校验 + 提交后回读"，COMMIT 即释放）→ 按 `depends_on` 拓扑序
+  **一次一把** namespace 锁；**禁止**持有 namespace 锁时再取公共锁，锁序倒置型死锁被结构排除。
+  `CREATE TABLE IF NOT EXISTS` 被去掉（`crates/messaging/tests/inbox_idempotency.rs:18-22` 已记录该写法在
+  PG 下并发不安全，且它会静默接受形状不同的既存对象）。持锁连接即事务连接本身，锁随 COMMIT / ROLLBACK /
+  断开自动释放；应用级取消不等于断开（须显式 ROLLBACK 并弃用该连接）；等锁用 `lock_timeout` fail closed，
+  不设 `statement_timeout`。`verify` / `status` **不执行 DDL**，表缺失只返回 `Empty`/`Pending`，
+  权限 / 形状 / checksum 漂移一律 fail closed。并发验收由单条 V8 拆为 **V8a / V8b / V8c**
+  （V8b 专门覆盖"不同 namespace 首次并发 bootstrap"，状态仍 NOT RUN）。
+- **判据更正（B2）**：**撤销** Revision 0 "方案 B 单模块冷安装 = 是"的断言。方案 B 改变的是**既有表的位置与
+  授权边界**；空库上没有既有表可搬，搬迁后冷安装仍须先跑 host baseline `1..19`。因此设计包 §6.6 把
+  **既有库物理隔离**与**空库单模块冷安装**列为两个独立验收目标，**当前证据均为零**。方案 B 因原 expand 时间线
+  不可执行（视图指向尚未创建的表、旧名仍被旧表占用）而**降为未完成的研究方案并从 Wave 5B 可执行步骤中移除**；
+  §6.4 只保留修正后的候选事务顺序（同一事务内先移动表、后建旧名视图）与中间态对象存在性表，§6.5 记录 7 项
+  OPEN（兼容视图上的 `ON CONFLICT` 写语义未证明、`search_path` 基线缺失、角色矩阵未设计、锁窗口未测量等）。
+  G-203 的四个**记账子项**（目录隔离 / ledger 隔离 / 既有库升级 / 独立冷安装）全部 Proposed / OPEN，
+  且**不改变 G-203 / G-202 / A-12 的原分母**。
+- **验收命令与 fixture（B3）**：`apps/migration/src/config.rs:17-21` 在两个 URL 环境变量同时存在时直接
+  `ConfigLoadError`（值相同也拒绝），故 Revision 0 的同时设置写法在连接前即失败；设计包 §9.2 改为两条**互斥**
+  环境作用域（CLI lane 只设 `MIGRATION__DATABASE__URL`、测试 lane 只设 `DATABASE_URL`），try/finally 恢复
+  变量原有的"存在/不存在及值"，日志脱敏。§9.1.2 逐 suite 盘点实际数据库范围：`migration_test.rs:11-19`
+  丢弃给定库名并新建 `plan2_<uuid>` sibling 库（清理仅在成功路径），另有套件直接改动给定库不清理，
+  以及多条套件在变量缺失时静默回落到互不一致的硬编码库；因此"same target"不作为范围证明。
+  V14 改为**增量对账**（`864 + N` / `191 + M` / `70 + K` 逐条对到测试名），禁止机械固定 70 或 864/191。
+  `--namespace` / `verify` 明确标注尚未实现，V13 不再声称能验证新 mapping。
+- **S1 规格与 S4 历史兼容**：设计包 §11 收窄 S1 为"离线 catalog 验证 + 静态门禁"（显式 `schema_version` 且
+  未知字段/版本拒绝、路径逃逸与符号链接拒绝、manifest ↔ SQL 双向集合、重复/缺口/未知依赖/环/checksum、
+  空目录只表示 `RESERVED`、历史保护同时覆盖文件集合与**钉定 blob 内容摘要**并写明 Windows EOL 以 git blob
+  字节为准；owner 白名单只是静态 fitness 且给出同 owner 新表的授权扩展机制）；S1 不建平台表、不接 CLI、
+  不改启动迁移、不升 release spec。§5.7 HC-1..HC-5 要求 schema 版本**分派**而非替换常量
+  （`tools/module-release-tool/src/spec.rs:215`、`src/packaging.rs:1583` 现为单一常量比较），否则 `c22939f`
+  固定候选会失去 verify 能力；未知版本拒绝 + 固定候选重验回归。两项均只设计不实现。
+- **同步与门禁**：`ADR-0029` 保持 **Proposed / NOT ACCEPTED**（同步锁模型、范围边界与两条新增非目标）；
+  准入矩阵新增"记账子项"与"真实执行范围边界"两节；`PLAN-0014` 与 `docs/README.md` 追加状态与指针；
+  新增 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md`。Rust workspace 门禁 **本轮未运行，
+  产品代码无改动**（沿用 `c22939f0` / `c73955e` 记录，不冒充本轮执行，不借用 Wave 5A 数字）；
+  设计包 §9 全部数据库项 **NOT RUN / BLOCKED（无数据库授权）**。
+- 状态：**WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；
+  R2 BLOCKED**；`identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
+  G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 的 C1 一律未关闭；未自判 ADR-0029 Accepted；未实施 S1/S2/S3；
+  未连接数据库；未 push / merge / tag / 部署 / 改 main；未重开 Wave 5A Repair 2。

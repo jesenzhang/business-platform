@@ -342,3 +342,36 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 - Not run this round: the Rust workspace gates (no product code changed) and every real PostgreSQL acceptance
   item in the design package, all `BLOCKED` without database authorization.
 - Status: WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED; WAVE 5B-0 DESIGN READY FOR REVIEW; R2 BLOCKED.
+
+## PLAN-0014 Wave 5B-0 design package Revision 1 (2026-09-30)
+
+- [Wave 5B-0 design independent review — NEEDS REPAIR (design package), B1/B2/B3 and the single next implementation package](reviews/2026-09-30-wave5b-design-independent-review.md).
+- [Wave 5B-0 Revision 1 closeout — B1/B2/B3 original finding → repaired clause → static reasoning → future test mapping, with every unfinished item left OPEN](reviews/2026-09-30-wave5b-design-revision1-closeout.md).
+- [Wave 5B-0 migration isolation design package — Revision 1](plans/current/PLAN-0014-wave5b-migration-isolation-design.md),
+  [ADR-0029](adr/ADR-0029-module-namespaced-migration-catalogs-and-ledger.md) and the
+  [R2 admission matrix](reviews/2026-09-30-wave5b-r2-admission-matrix.md) were updated in the same round;
+  ADR-0029 stays **Proposed / NOT ACCEPTED**.
+- Lock model (B1): creating the shared `platform_module_migrations` ledger is now protected by one
+  **platform bootstrap lock keyed independently of any namespace**, separate from the per-namespace lock. Both
+  are transaction-scoped `pg_advisory_xact_lock` (matching the eight existing uses in the repo) with disjoint key
+  domains, one fixed acquisition order (baseline → bootstrap → one namespace at a time) and no path that takes the
+  bootstrap lock while holding a namespace lock. `CREATE TABLE IF NOT EXISTS` was dropped in favour of
+  check-and-create plus a structural validation and a post-commit read-back inside the lock; read-only
+  `verify` / `status` never run DDL. The single concurrency check became three: V8a same namespace, V8b two
+  different namespaces bootstrapping concurrently, V8c a killed lock holder followed by recovery. All still NOT RUN.
+- Criteria (B2): the Revision 0 claim that scheme B delivers single-module cold install is **withdrawn**. Scheme
+  B moves where existing tables live; an empty database still needs host baseline 1..19, so physical isolation and
+  independent cold install are now two separately-accounted goals and **neither has any evidence today**. Scheme B
+  is demoted to an unfinished research proposal and removed from the executable Wave 5B steps (its expand-2 step
+  pointed a compatibility view at a table that did not exist yet while the old name was still taken); §6.4 keeps a
+  corrected candidate ordering with an intermediate object-existence table and §6.5 lists seven OPEN items. G-203 is
+  accounted in four sub-items, all Proposed / OPEN, and the original G-203 / G-202 / A-12 denominators are unchanged.
+- Commands and fixtures (B3): `MIGRATION__DATABASE__URL` and `DATABASE_URL` are mutually exclusive
+  (`apps/migration/src/config.rs:17-21`), so the two lanes now have separate PowerShell scopes that restore each
+  variable's prior presence and value. A per-suite inventory records which database each ignored test really
+  touches — `apps/migration/tests/migration_test.rs` discards the supplied database name and creates
+  `plan2_<uuid>` siblings cleaned up only on success, and several suites silently fall back to inconsistent
+  hard-coded development databases. V14 is now incremental reconciliation rather than a fixed 864 / 191 / 70, and
+  `--namespace` / `verify` are labelled as not yet implemented.
+- No database was contacted, no product code changed, no S1/S2/S3 slice implemented, nothing pushed or merged.
+- Status: WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW; WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED; R2 BLOCKED.
