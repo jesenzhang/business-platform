@@ -5,8 +5,8 @@
 > Date: 2026-09-30
 > 起点（本轮所有事实与行号的取证基线）：`5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`
 > 起点分支 / 工作树：`codex/plan-0014-wave5a-local-release-pilot`，起点干净，唯一未跟踪文件是本轮所依据的
-> `docs/reviews/2026-09-30-wave5b-design-independent-review.md`（本轮随文档包一并入库，与 `7180eec7` /
-> `f1984544` 的"归档审阅文档"做法一致）
+> `docs/reviews/2026-09-30-wave5b-design-independent-review.md`（**已先随父提交 `e55a5a0` 单独入库，交付提交不含该文件**；
+> 与 `7180eec7` / `f1984544` 的"归档审阅文档"做法一致——Revision 1 复审更正）
 > 执行依据：`docs/reviews/2026-09-30-wave5b-design-independent-review.md` §3（唯一下一实施包）
 > 本轮性质：**纯文档轮**。未实施 S1/S2/S3，未连接任何数据库，未改 Rust / SQL / Cargo / 脚本 / 旧 MANIFEST，
 > 未自判 ADR-0029 Accepted，未 push / merge / tag / publish / deploy，未改 main，未重开 Wave 5A Repair 2。
@@ -29,7 +29,7 @@
 | 5 | `docs/architecture/ARCHITECTURE_STATUS.md` | 末尾追加一节状态（历史小节未改） | 许可项 4 |
 | 6 | `docs/README.md` | 末尾追加导航节 | 许可项 4 |
 | 7 | `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md` | 本文件 | 许可项 5 |
-| 8 | `docs/reviews/2026-09-30-wave5b-design-independent-review.md` | 归档（原未跟踪） | §3.6"检查本报告引用"所需；沿用既有归档惯例 |
+| 8 | `docs/reviews/2026-09-30-wave5b-design-independent-review.md` | 归档于**父提交 `e55a5a0`**（原未跟踪；交付提交不含该文件） | §3.6"检查本报告引用"所需；沿用既有归档惯例 |
 
 未改且刻意不改：`docs/adr/README.md`（ADR-0029 索引行的描述在本轮后仍然准确：Proposed、不含物理 schema
 搬迁）、`migrations/**`、任何 `MANIFEST.sha256`、`crates/**`、`apps/**`、`tools/**`、`scripts/**`、
@@ -52,7 +52,7 @@ Revision 0 让每个 namespace 各取**自己的** advisory lock，再去执行�
 | 键域不相交 | §5.9.1 | PostgreSQL advisory lock 的两种键形态是不同锁标签，L-B 与 L-N **结构上不可能**撞键；namespace 内部 `hashtext` 碰撞的后果只是**多**串行（安全方向），并额外要求 runner 启动时断言已 embed 的 namespace 键两两不同，否则 `LockKeyCollision` fail closed |
 | 统一锁序 | §5.9.2 | host baseline 到 bootstrap 单元（COMMIT 即释放）到按 `depends_on` 拓扑序一次一把 L-N；**禁止**持 L-N 时再取 L-B，禁止同时持两把 L-N，锁序倒置型死锁被结构排除，不依赖超时兜底 |
 | 去掉 `IF NOT EXISTS` | §5.3、§5.9.3 | 锁内"存在性检查 + 创建"是原子的；`IF NOT EXISTS` 会静默接受形状不同的既存对象，把 fail-closed 变成静默通过 |
-| 结构校验 + 提交回读 | §5.9.3 | `relkind='r'`、六列集合与类型/NOT NULL、主键列序、两个 CHECK、owner；不符 `LedgerSchemaMismatch`，不 `ALTER` 修复；COMMIT 后回读确认表可见可查且本连接不再持锁 |
+| 结构校验 + 提交回读 | §5.9.3 | `relkind='r'`、六列集合与类型/NOT NULL、主键列序、两个 CHECK、owner；不符 `LedgerSchemaMismatch`，不 `ALTER` 修复；COMMIT 后在**同一物理连接**上回读确认表可见可查，且**事务内记录的 backend pid**（`pg_backend_pid()`）不再持任何 advisory 锁——若回读被池派到另一连接则断言空洞为真，故钉定（Revision 1 复审更正，设计包 §5.9.3 第 7 步） |
 | 持锁连接生命周期 | §5.9.5 | 一个受保护单元就是一个 `Transaction`（sqlx 保证事务自始至终占同一条连接），全部语句经 `&mut *transaction`，禁止经 `&pool`；锁随 COMMIT/ROLLBACK/断开自动释放，因此"持锁连接回池"不可能发生；**应用级取消不等于断开**，须显式 ROLLBACK 并弃用连接 |
 | 超时 | §5.9.5 | `SET LOCAL lock_timeout`（新配置 `database.lock_timeout_secs`，默认 30s）超时即 `LockTimeout` fail closed；**不设** `statement_timeout`（合法慢 DDL 不应被会话默认值中途打断） |
 | 只读路径不建表 | §5.9.4 | `verify`/`status`/readiness 不执行 DDL、不取锁；表缺失返回 `Empty`/`Pending`（与 `apps/migration/src/main.rs:124` 及 AGENTS §15 PLAN-0003 的"只可忽略 migration table 缺失"一致）；权限、连接、形状、checksum、缺口、孤儿一律 fail closed |
@@ -164,7 +164,7 @@ host baseline 1..19"的事实，而对比表把"单模块冷安装"记为方案 
 | 修正 | 位置 | 内容 |
 |---|---|---|
 | 两条互斥 lane | §9.2 | LANE 1 只设 `MIGRATION__DATABASE__URL` 并 `Remove-Item Env:DATABASE_URL`；LANE 2 反之。两者都用 `Get-Item Env:…` 先快照、`finally` 精确恢复"存在或不存在加原值"；输出经 `://user:pass@` 到 `://***:***@` 过滤后 `Tee-Object` 归档；规定 `cargo run -p migration` 只出现在 LANE 1、`--include-ignored` 只出现在 LANE 2 |
-| 逐 suite 数据库范围盘点 | §9.1.2 | PostgreSQL 侧 18 个测试文件（含 1 个共享 helper 模块 `apps/business-api/tests/harness/mod.rs`）全部纳入盘点，设计包表格按行为分组登记：读哪个变量、缺变量时的行为（**HARD `.expect` 与 SOFT 硬编码回落**）、实际连接的库、清理是否在失败路径执行、能否算"只操作给定库" |
+| 逐 suite 数据库范围盘点 | §9.1.2 | PostgreSQL 相关 18 个测试文件（含复审补入的 `apps/business-api/tests/plan_0008_postgres_minio.rs`；原表遗漏该套件，其实测 `.expect` fail closed、只触给定库）+ 1 个共享 helper 模块 `apps/business-api/tests/harness/mod.rs` 纳入盘点，设计包表格按行为分组登记：读哪个变量、缺变量时的行为（**HARD `.expect` 与 SOFT 硬编码回落**）、实际连接的库、清理是否在失败路径执行、能否算"只操作给定库" |
 | fail-closed 前置 | §9.1.3 | 新套件禁止回落；带回落的既有套件不进 Wave 5B lane；清理必须覆盖失败路径（参照 `deploy/operations/drill-backup-restore.sh:210-234` 的 `trap cleanup EXIT`），并断言本轮结束后无 `plan0014_wave5b_%` 残留 |
 | V14 分母规则 | §9.4 | `passed = 864 + N` / `suites = 191 + M` / `ignored = 70 + K`，三个增量逐条对账到测试名与套件；未预期的减少即失败；**新增 PG ignored 增大分母是预期的、必须逐条解释，禁止机械固定 70**；附当前 70 条的逐文件分解表（38 / 3 / 28 / 1）作为对账分母 |
 | 命令真实性 | §9.3 | 每条命令标注是否当前存在；`--namespace` 与 `verify` 标注"未实现（`apps/migration/src/main.rs:63-73`）"；V13 取消"能验证新 mapping"的歧义（只证明 `c22939f` 固定候选自洽） |
@@ -218,12 +218,12 @@ S1 不建平台表、不接 CLI、不改启动迁移、不升 release spec。
 |---|---|
 | 起点 branch / HEAD / status | `codex/plan-0014-wave5a-local-release-pilot` / `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601` / 干净，仅未跟踪的独立审阅文档 |
 | `git diff --check`（本轮执行） | **exit 0**。首轮曾报 3 处 ADR 头部 trailing whitespace（Markdown 双空格硬换行），已改为段落后复跑为 0 |
-| 本轮 diff 规模 | 6 改 1 新，`+722 / -134`（`git diff --stat`，不含本 closeout 与归档审阅文档） |
+| 本轮 diff 规模 | 6 改 1 新，`+724 / -134`（`git diff --stat` 复算值——Revision 1 复审更正，原记 +722；不含本 closeout，审阅文档在父提交 `e55a5a0`） |
 | 行副作用告警（非失败） | `warning: in the working copy of '…wave5b-migration-isolation-design.md', LF will be replaced by CRLF`。本机 `core.autocrlf=true` 且无 `.gitattributes`；索引内仍为 LF，与仓库既有 blob 一致；已作为 §11.3 EOL 口径的实测依据记录 |
 | Rust workspace 门禁（fmt / check / clippy -D warnings / test） | **NOT RUN，本轮无产品代码改动**。不冒充本轮执行，也不借用 Wave 5A 在 `c22939f0` / `a98e45c` 的通过数字（864 / 70 / 191 只作为 §9.4 的**对账基线**引用，并注明其来源） |
 | 设计包 §9 全部数据库项（含 V5 / V10 / V13 / V14） | **BLOCKED 或 NOT RUN，无数据库授权**；本轮未执行任何 SQL（含只读），未猜测凭据 |
 | 架构门禁 `scripts/check-architecture.ps1` | **NOT RUN**（本轮未改 catalog 与门禁，跑了也不覆盖本轮内容；不冒充） |
-| 本地提交 | 本轮文档包以本地提交交付，父提交 `5c8355d`；本文件不内嵌自身提交 SHA（自引用不可能），SHA 以本轮交付回复与 `git log --oneline -1` 为准 |
+| 本地提交 | 本轮文档包以本地提交交付：审阅文档先随 `e55a5a0` 单独入库（其父为起点 `5c8355d`），交付提交的父提交为 `e55a5a0`——Revision 1 复审更正，原记"父提交 `5c8355d`"；本文件不内嵌自身提交 SHA（自引用不可能），SHA 以本轮交付回复与 `git log --oneline -1` 为准 |
 | 未做 | ADR Accepted 自判、S1/S2/S3 实施、数据库连接、`main` 改动、push / merge / tag / publish / deploy、重开 Wave 5A Repair 2 |
 
 ## 7. 送审项（判定权在独立审阅）
@@ -234,5 +234,20 @@ S1 不建平台表、不接 CLI、不改启动迁移、不升 release spec。
 3. §7.1 四子项记账是否满足"不降低原分母"的要求（G-203 / G-202 / A-12 保持原样）。
 4. §9.1.2 / §9.2 / §9.4 的命令与盘点是否足以作为未来 S5 的真实执行范围声明。
 5. §11 的 S1 是否可作为下一轮可编码包（其准入仍依赖本设计被接受与 ADR-0029 的正式处理结果）。
+
+## 8. 复审更正记录（2026-09-30，对交付提交 `7355c99` 的宿主复审）
+
+复审确认 B1/B2/B3 修正全部落地、无越权结论、无门禁冒充；另发现 6 项文档精度问题（2 Medium / 4 Low），已在更正提交中全部修复。**更正不改变控制流、判据方向、分母或状态结论。**
+
+| # | 级别 | 原问题 | 落点 |
+|---|---|---|---|
+| 1 | Medium | §7.1 G-203a-i 内容含"工件钉定"，判据却只写"§11 S1 全绿"，而 S1 明确不做工件钉定（§11.6），可能让 a-i 在无钉定证据时被记关闭；§9.5 整体判据（含 V12）与之不一致 | 设计包 §7.1 判据改为"S1 全绿 + S4 工件钉定半边（V12）"；§9.5 补 a-i = V11 + V12、a-ii = V1–V4/V6–V9 的子项映射；本矩阵 §4.1"关闭还需要什么"同步补 S4/V12 |
+| 2 | Medium | §5.9.3 第 7 步回读写"新事务/新语句"且断言"`pid = 本连接`"——若回读被池派到另一物理连接，断言恒真、失去证明力（与 §5.9.5 禁 `&pool` 同理） | 设计包 §5.9.3 第 7 步钉定为"同一物理连接 + 断言事务内 `pg_backend_pid()` 记录的 pid"，仍持锁行即 fail closed；本文件 §2.2 对应行同步改写 |
+| 3 | Low | §3.2 标题"索引（11）"，表内实列 10 项；`019` 实测 10 条 `CREATE INDEX`（8 普通 + 2 partial unique，`:61-:220`），且 §6.6"identity 3 索引"亦按 10 自洽 | 设计包 §3.2 改为 10 并列出行号 |
+| 4 | Low | §9.1.2 结论 3 写"6 个文件"回落，与 §9.1.3"上表 7 个文件"及 grep 硬编码回落 URL 实测（恰 7 文件）矛盾 | 设计包 §9.1.2 结论 3 改为 7 并注明与 §9.1.3 同一集合 |
+| 5 | Low | 本文件 §4.2 原称"18 个测试文件全部纳入盘点"，设计包 §9.1.2 表实际遗漏 `apps/business-api/tests/plan_0008_postgres_minio.rs`（2 条 ignored PG+MinIO 用例；实测 `:71-72` `.expect` fail closed、只触给定库、成功路径删对象 `:312`，不影响安全结论） | 设计包 §9.1.2 表补该一行；§4.2 措辞改为"18 个测试文件 + 1 个共享 helper" |
+| 6 | Low | §6 写"父提交 `5c8355d`"，实际交付提交的父为审阅归档提交 `e55a5a0`；§1 行 8 与设计包 §12 把审阅文档算入交付提交；"6 改 1 新 +722/-134" 按 commit stat 复算为 +724/-134 | 本文件头部注、§1 行 8、§6 两行与设计包 §12 第 6 条按真实提交结构与 stat 数字更正 |
+
+更正轮门禁：纯文档改动；`git diff --check` 复跑 exit 0；Rust workspace 与全部数据库门禁仍 **NOT RUN / BLOCKED**（无产品代码改动、无数据库授权），不借用 Wave 5A 数字。状态结论不变。
 
 **状态：WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；R2 BLOCKED。**

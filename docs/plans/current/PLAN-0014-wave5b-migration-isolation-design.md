@@ -37,6 +37,8 @@
 
 Revision 0 的历史结论按上述记录保留，未被改写；被 B1/B2 判定为错误的原文（ledger DDL 在 namespace 锁内创建、方案 B 冷安装"是"、expand-2 顺序、`V8` 单条并发用例、"V13 现在能验证新 mapping"）已在对应小节就地更正并标注 Revision 1。
 
+**Revision 1 复审更正记录（2026-09-30，对交付提交 `7355c99` 的宿主复审；纯文档精度更正，不改变控制流、判据方向、分母或状态结论）**：① §3.2 索引计数 11 → 10（与 `019` 实测 8 条 `CREATE INDEX` + 2 条 partial unique 一致，亦与 §6.6"identity 3 索引"自洽）；② §9.1.2 结论 3 回落文件数 6 → 7（与 §9.1.3 的"上表 7 个文件"和 grep 硬编码回落 URL 的实测一致）；③ §5.9.3 第 7 步提交回读钉定为"同一物理连接 + 事务内记录的 backend pid"，消除可能空洞为真的断言；④ §7.1 G-203a-i 判据补齐 S4/V12 工件钉定半边，并与 §9.5 与准入矩阵 §4.1 口径对齐（S1 不实施工件钉定）；⑤ §9.1.2 逐 suite 表补 `apps/business-api/tests/plan_0008_postgres_minio.rs` 一行；⑥ §12 交付记录更正为"审阅文档已随父提交 `e55a5a0` 入库"。逐项映射见 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md` §8。
+
 ---
 
 ## 1. 输入与本设计受约束的权威条文
@@ -116,7 +118,7 @@ Revision 0 的历史结论按上述记录保留，未被改写；被 B1/B2 判�
 
 **FK 闭合性（Revision 1 新增，B2 的关键前提）**：上表全部 FK 的引用方与被引用方**都在同一 owner 内**（`external_identities`/`tenant_memberships`→`platform_users`；`organization_members`→`organization_units`；`role_permissions`→`roles`+`permission_definitions`；`role_bindings`→`roles`）。因此按 owner 搬移时不会出现"半条 FK 跨 schema"的形态——这是 §6.4 候选顺序在结构上成立的原因，也是 §3.4 裸 UUID 跨上下文引用**不需要**FK 的原因。
 
-### 3.2 索引（11）
+### 3.2 索引（10，Revision 1 复审更正：原记 11；`019` 实测 8 条 `CREATE INDEX` + 2 条 `CREATE UNIQUE INDEX`，`019:61,63,93,112,129,170,172,216,218,220`）
 
 | 对象 | 行号 | owner |
 |---|---|---|
@@ -386,7 +388,7 @@ bootstrap 事务内，取得 L-B 之后：
    - 表 owner 等于当前迁移角色。
 5. 任一项不符 → `NamespaceError::LedgerSchemaMismatch{detail}`，ROLLBACK，exit 1，日志只打印期望/实际形状差异，不打印连接串。**不尝试 `ALTER` 修复**（修复旧库 ledger 形状属未来独立 ADR）。
 6. COMMIT。
-7. **提交结果回读**（新事务/新语句，只读）：确认表可见、可 `SELECT`，且 `SELECT count(*) FROM public.platform_module_migrations` 成功；同时回读 `pg_locks` 中断言本连接不再持有 advisory 锁（`locktype='advisory'` 且 `database = 当前库` 且 `pid = 本连接后端 pid` 为 0 行）。回读失败即 fail closed——"我创建成功了"必须由读回证明，不能由语句未报错推定。
+7. **提交结果回读**（只读，**必须在与 bootstrap 单元相同的物理连接上执行**）：确认表可见、可 `SELECT`，且 `SELECT count(*) FROM public.platform_module_migrations` 成功；同时回读 `pg_locks` 中断言不再存在该 bootstrap 的 advisory 锁（`locktype='advisory'` 且 `database = 当前库` 且 `pid = <记录值>` 为 0 行）。两处钉定（Revision 1 复审更正）：**其一**，断言的 pid 必须是 bootstrap 事务内在同一连接上执行 `pg_backend_pid()` 记录下来的值，而不是"执行回读的连接自己的 pid"——若回读被连接池派给另一条物理连接，"本连接不持锁"恒真，断言空洞失效，这正是 §5.9.5 禁止经 `&pool` 执行受保护语句的同一条理由；实现上 bootstrap 单元取单条 `Connection`，事务 COMMIT 后在同一连接上执行回读再归还。**其二**，回读整体纳入 fail-closed：记录的 pid 在回读时仍持有 advisory 锁行，或表不可见 / 不可查，即失败退出 1。"我创建成功了"必须由读回证明，不能由语句未报错推定。
 
 #### 5.9.4 只读路径不创建表
 
@@ -536,7 +538,7 @@ Revision 1 的处理（对应审阅 §3.3 第 3 条）：
 
 | 记账子项 | 内容 | 状态词汇 | 判据 |
 |---|---|---|---|
-| **G-203a-i 目录隔离** | namespace 目录 + per-namespace `MANIFEST.sha256` + `catalog.json` + 工件钉定 + 静态门禁 | Proposed 子项（**不标 Accepted**） | §11 S1 全绿 |
+| **G-203a-i 目录隔离** | namespace 目录 + per-namespace `MANIFEST.sha256` + `catalog.json` + 工件钉定 + 静态门禁 | Proposed 子项（**不标 Accepted**） | §11 S1 全绿 **＋ S4 工件钉定半边（V12：`namespace_isolation` 双维度评估、`host_baseline_dependency_is_pinned_in_set_digest` 与 HC-3 回归）**——工件钉定不在 S1 范围内（§11.6 明列 S1 不升 release spec），单靠 S1 不得关闭本子项（Revision 1 复审更正） |
 | **G-203a-ii ledger 隔离** | 平台 ledger + 单一 writer + 锁/恢复语义 + fail-closed 判据 + 真实 PG 行为证据 | Proposed 子项 | §8 S2/S3 + §9.3 V1–V3、V6–V9 |
 | **G-203b-i 既有库升级（物理 schema 搬迁）** | §6.4 序列在授权库上完成 + §6.5 全部 OPEN 关闭 | Proposed 子项，**未设计完成** | 独立 ADR + 运维授权后 |
 | **G-203b-ii 独立冷安装（空库单模块）** | §6.6 目标 I：模块自有 init catalog + 空库安装证据 | Proposed 子项，**未设计** | 独立后续设计 + 授权库证据 |
@@ -628,13 +630,14 @@ Revision 1 的处理（对应审阅 §3.3 第 3 条）：
 | `crates/policy-postgres/tests/contract.rs:21`、`organization-postgres/tests/contract.rs:20`、`document-postgres/tests/{query_contracts.rs:8,tenant_fence_pg.rs:45}`、`apps/business-api/tests/documents_postgres.rs:26`、`e2e_admin_bootstrap_postgres.rs:20,27`（经 `tests/harness/mod.rs:266`）、`governance-worker/tests/postgres_governance.rs:20`（不自跑迁移，假定库已 up） | `DATABASE_URL` | **`.expect(...)` fail closed** | 给定库 | 仅行级清理，且只在成功路径（`query_contracts.rs:41` 的 delete 位于 `:39` 的断言**之后**，失败即跳过） | 是，但会永久改动给定库的对象与行 |
 | `crates/messaging/tests/inbox_idempotency.rs:10-11`、`crates/document-processing-postgres/tests/{contracts.rs:37,230,323,cancel_factuality_pg.rs:181,211,258,306,353}`、`apps/business-worker/tests/postgres_minio_processing.rs:44-45` | `DATABASE_URL` | **回落到硬编码 `…/business_platform`**（`postgres_minio_processing` 还需 `MINIO_*`） | 给定库 | 行级清理，成功路径 | 是，但**回落不是 fail closed**（§9.1.3） |
 | `crates/messaging/tests/outbox_reliability.rs:14-15`、`crates/audit-postgres/tests/chain_pg.rs:23-24` | `DATABASE_URL` | **回落到 `…/business_platform_test`**（与 CI 的 `business_platform` 都不同名） | 给定库；`inbox_idempotency.rs:18-22` 记录 `CREATE TABLE IF NOT EXISTS` 并发不安全，故进程内只建一次 | 行级清理，成功路径 | 是，且这两条还各自私自 embed 第二份 catalog（P-4） |
+| `apps/business-api/tests/plan_0008_postgres_minio.rs:215,316`（Revision 1 复审补入） | `DATABASE_URL`（`:71-72` `.expect`，缺失即 fail）+ `MINIO_*`（`:87-90` 仅对象存储侧有硬编码默认，DB 侧无回落） | DB 侧 fail closed | 在**给定库上直接** `MIGRATOR.run`（`:78-81`）+ MinIO 桶对象读写 | 仅成功路径删上传对象（`:312`）；库内行与 `MIGRATOR.run` 的改动不清理 | 是（不新建库），但属 PG + 对象存储面，纯 PG 的 Wave 5B lane 不含它 |
 | `deploy/operations/drill-backup-restore.sh`（运维演练，**不是 cargo 测试**） | `DATABASE_URL`（`:167` 缺失即 fail） | fail closed，并拒绝指向 `postgres`（`:196`）或 `*_drill_*`（`:197`） | **创建 sibling 库 `<live_db>_drill_<UTC stamp>_<rand>`**（`:199-200`，DDL 走 `…/postgres` 维护库，`:187-191`、`:293-294`），另建 S3 桶 `<bucket>-restore-<stamp>-<rand>`（`:204`） | `trap cleanup EXIT`（`:234`）→ `DROP DATABASE IF EXISTS`（`:214`），**失败路径也执行**；drop 失败仅记日志（`:215`） | **否**：会新建/删除给定库之外的对象。这是仓内唯一"失败也清理"的 sibling 先例，可作为 §9.1.3 清理语义的参照 |
 
 盘点结论（必须如实写进未来 gate 记录）：
 
 1. **cargo 测试侧**只有一个地方创建给定 URL 之外的库：`apps/migration/tests/migration_test.rs`（sibling `plan2_<uuid-v7>`，两条测试各建一个）。其余 PG 套件都只操作**给定库本体**。另有两处**非测试**代码会创建 sibling 库：CLI 的 `main.rs:77-79`（创建的是 URL 自己指向的库，不算 sibling）与 `deploy/operations/drill-backup-restore.sh`（`<live_db>_drill_…`，属运维演练面，不在 Wave 5B lane）。其余 `create_database` / `drop_database` 命中（10 处）全是 SQLite 临时文件，不在本清单。
 2. 因此"两条命令都指向同一个目标库"**不能**当作"测试只操作给定库"的证明：`plan2_*` 的建/删落在 §9.1.1 授权范围之外；`migration_test.rs:11-19` 更是**丢弃给定库名**，即使 URL 指向授权库，实际新建的也是 `plan2_*`。
-3. 更普遍的问题是**回落**：6 个文件在 `DATABASE_URL` 缺失时静默连到硬编码库，且名字互不相同（`migration_test.rs` 内部就同时用 `business_platform`（`:13`）与 `enterprise_platform`（`:137`、`:162`）；`outbox_reliability.rs:15` 与 `chain_pg.rs:24` 用 `business_platform_test`）。这些套件在未设变量时"看起来通过"，实际改动的是另一个库。
+3. 更普遍的问题是**回落**：7 个文件在 `DATABASE_URL` 缺失时静默连到硬编码库（与 §9.1.3"上表 7 个文件"同一集合；Revision 1 复审更正，原记 6），且名字互不相同（`migration_test.rs` 内部就同时用 `business_platform`（`:13`）与 `enterprise_platform`（`:137`、`:162`）；`outbox_reliability.rs:15` 与 `chain_pg.rs:24` 用 `business_platform_test`）。这些套件在未设变量时"看起来通过"，实际改动的是另一个库。
 4. **清理普遍只在成功路径**：`migration_test.rs:221-224` / `:249-252` 的 `drop_database` 是函数最后两条语句，前面有十余处可 panic 的 `.expect`/`assert!`，任何一次失败都永久泄漏一个 `plan2_*` 库；行级清理同理（`query_contracts.rs:41` 在断言之后）。仓内**没有**任何枚举或回收 `plan2_%` 残留的步骤。唯一具备失败路径清理的是演练脚本的 `trap cleanup EXIT`。
 5. 结论性约束：**新的 namespace 测试（S2/S3）不得创建 sibling 库**，只允许在显式授权的 `plan0014_wave5b_%` 上运行；`migration_test.rs` 的两条 sibling 套件如确需运行，必须先在该轮授权清单里**逐条列出允许新建的库名模式与删除权限**，否则不运行。
 6. 未来清理策略：新套件采用 try/finally 语义（成功与 panic 路径都执行清理，参照 `drill-backup-restore.sh:210-234` 的 trap 模型），并在结束时断言 `pg_database` 中不再有本轮 `plan0014_wave5b_%` 残留；sibling 套件维持现状但被排除在 Wave 5B lane 之外。
@@ -748,7 +751,7 @@ V14 的期望写法（**不得写成"与基线一致"或"保持 864/191 不变"*
 
 ### 9.5 修订后的关闭判据提案（连同 §7 一起送审）
 
-`G-203a` 关闭 = V1、V2、V3、V4、V6、V7、V8a、V8b、V8c、V9、V11、V12 全绿（其中 V1–V4、V6–V9 需数据库授权）；`G-203b` 保持 OPEN 直至 §6.5 全部 OPEN 关闭且 §6.4 序列在授权库完成；`G-203b-ii`（独立冷安装）另需 §6.6 目标 I 的独立设计与证据；`G-02` 只有 V5/V10 在授权库上真实执行后才可能收窄（ignored 分母按 §9.4 规则，不机械固定 70）；A-12 的 PostgreSQL 部分继续 `NOT RUN`。**四个子项的记账不改变 G-203 / G-202 / A-12 的原分母（§7.1）。**
+`G-203a` 关闭 = V1、V2、V3、V4、V6、V7、V8a、V8b、V8c、V9、V11、V12 全绿（其中 V1–V4、V6–V9 需数据库授权；子项判据按 §7.1：**G-203a-i = V11 + V12 的工件钉定半边（S4）**，S1 单独不足以关闭，**G-203a-ii = V1–V4、V6–V9**，两者并集即本清单——Revision 1 复审更正，与 §7.1 对齐）；`G-203b` 保持 OPEN 直至 §6.5 全部 OPEN 关闭且 §6.4 序列在授权库完成；`G-203b-ii`（独立冷安装）另需 §6.6 目标 I 的独立设计与证据；`G-02` 只有 V5/V10 在授权库上真实执行后才可能收窄（ignored 分母按 §9.4 规则，不机械固定 70）；A-12 的 PostgreSQL 部分继续 `NOT RUN`。**四个子项的记账不改变 G-203 / G-202 / A-12 的原分母（§7.1）。**
 
 ---
 
@@ -847,7 +850,7 @@ S1 **不做**：创建 `platform_module_migrations`（属 S2 的 bootstrap）、
   3. `docs/reviews/2026-09-30-wave5b-r2-admission-matrix.md`（修正独立安装判据与真实执行范围）；
   4. `docs/plans/current/PLAN-0014-reference-conformance-and-r2-module-readiness.md`、`docs/architecture/ARCHITECTURE_STATUS.md`、`docs/README.md`（追加本轮审阅状态与修订指针，历史证据未改）；
   5. 新建 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md`；
-  6. 归档本轮所依据的 `docs/reviews/2026-09-30-wave5b-design-independent-review.md`（原为未跟踪文件，与 `7180eec7` / `f1984544` 的归档做法一致）。
+  6. 归档本轮所依据的 `docs/reviews/2026-09-30-wave5b-design-independent-review.md`（原为未跟踪文件；**已先随父提交 `e55a5a0` 单独入库，交付提交本身不含该文件**，归档做法与 `7180eec7` / `f1984544` 一致——Revision 1 复审更正）。
 - 未修改：`migrations/*.sql`、任何 `MANIFEST.sha256`、`crates/runtime-migration/src/lib.rs`、`apps/migration/**`、任何模块适配器、release spec、`scripts/check-architecture.ps1`、Wave 5A 证据目录、`docs/adr/README.md` 索引行（其描述在本轮后仍准确：Proposed、不含物理 schema 搬迁）。
 - 未连接、未执行任何数据库操作（含只读 SQL）；§9 的 LANE 1 / LANE 2 命令与 V1..V14 全部 **NOT RUN / BLOCKED**。
 - Rust workspace 门禁：**本轮未运行，产品代码无改动**（`cargo fmt --check` / `cargo check` / `clippy -D warnings` / `cargo test` 均沿用 `c22939f0` / `c73955e` 的既有记录，不冒充本轮执行，也不借用 Wave 5A 的通过数字）。

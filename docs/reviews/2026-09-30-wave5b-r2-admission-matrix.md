@@ -82,7 +82,7 @@
 
 | 子项（Proposed） | 内容 | 本矩阵状态 | 实际执行范围（只写真正跑过的） | 关闭还需要什么 |
 |---|---|---|---|---|
-| G-203a-i 目录隔离 | `migrations/modules/<ns>/` + per-namespace `MANIFEST.sha256` + `catalog.json` + 工件钉定 + 静态门禁 | **OPEN** | 无：目录与门禁尚未创建（S1 未实施） | S1 落地 + 独立审阅对固定 SHA 判定 |
+| G-203a-i 目录隔离 | `migrations/modules/<ns>/` + per-namespace `MANIFEST.sha256` + `catalog.json` + 工件钉定 + 静态门禁 | **OPEN** | 无：目录与门禁尚未创建（S1 未实施） | S1 落地 + S4 工件钉定（V12——工件钉定不在 S1 范围，判据见设计包 §7.1；Revision 1 复审补） + 独立审阅对固定 SHA 判定 |
 | G-203a-ii ledger 隔离 | 平台 ledger + 单一 writer + 公共 bootstrap 锁 / namespace 锁 + fail-closed 判据 | **OPEN** | 无：无任何 runner 代码、无任何库操作 | S2/S3 + 授权库上 V1–V4、V6–V9 全绿 |
 | G-203b-i 既有库物理隔离（升级） | 13 张表从 `public` 迁到各 schema | **OPEN，且设计未完成**（设计包 §6.3–§6.5 列 7 项 OPEN；原 expand 顺序已撤回） | 无：未执行任何 DDL | 关闭全部 OPEN + 独立 ADR + 运维授权 + 备份验证 |
 | G-203b-ii 单模块冷安装 | 空库上只装一个模块，不建他人表 | **OPEN，且未设计** | 无 | 独立的模块自有 init catalog 设计与依赖对象最小清单（设计包 §6.6），**不以 G-203b-i 为前提**，也不得以复制旧迁移的方式冒充模块历史 |
