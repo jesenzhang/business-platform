@@ -71,6 +71,22 @@
     { "case": "r6-index-unknown-method", "expect": "fail", "contains": "index access method 'mystery'" },
     { "case": "r6-join-using-columns", "expect": "fail", "contains": "outside the supported SQL subset" },
     { "case": "r6-inherits-parent", "expect": "fail", "contains": "'INHERITS (parent)'" },
-    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" }
+    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-alias-column-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-alias-column-list", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-join-on", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-join-on", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-delete-using-columns", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-delete-using-columns", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-cross-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-natural-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-alias-column-list-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-qualified-after-join-on", "expect": "fail", "contains": "schema-qualified" },
+    { "case": "n1-inheritance-star-with-foreign", "expect": "fail", "contains": "inheriting tables" },
+    { "case": "n1-inheritance-star-same-owner", "expect": "fail", "contains": "inheriting tables" },
+    { "case": "n1-table-function-call", "expect": "fail", "contains": "table function" },
+    { "case": "n1-sub-query-in-join-condition", "expect": "fail", "contains": "a sub-query inside a 'JOIN" },
+    { "case": "n1-sub-query-after-join-condition", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-sub-query-after-join", "expect": "pass", "status": "VALIDATED" }
   ]
 }

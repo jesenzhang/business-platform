@@ -76,6 +76,7 @@ $sb = [System.Text.StringBuilder]::new()
 [void]$sb.Append('  ' + $q + 'digest_rule' + $q + ': ' + $q + 'SHA-256 of the exact bytes returned by git cat-file blob for <pinned_revision>:<path>; never a Git object id and never working-tree bytes' + $q + ',' + $nl)
 [void]$sb.Append('  ' + $q + 'entries' + $q + ': [' + $nl)
 $items = [System.Collections.Generic.List[string]]::new()
+$formCounts = [System.Collections.Generic.SortedDictionary[string, int]]::new()
 foreach ($name in $names) {
     $bytes = Get-BlobBytes $pinned "migrations/$name"
     $raw = Get-Sha256Hex $bytes
@@ -83,6 +84,7 @@ foreach ($name in $names) {
     $crlf = Get-Sha256Hex (Get-ToCrlf $bytes)
     $rec = $recorded[$name]
     $form = if ($rec -eq $lf) { "lf" } elseif ($rec -eq $crlf) { "crlf" } elseif ($rec -eq $raw) { "raw" } else { throw "recorded digest for $name matches no line-ending form" }
+    if ($formCounts.ContainsKey($form)) { $formCounts[$form] += 1 } else { $formCounts[$form] = 1 }
     $rev = ($name -split '_')[0]
     $item = "    {`n" +
         "      `"path`": `"migrations/$name`",`n" +
@@ -104,4 +106,4 @@ $items.Add("    {`n" +
 [System.IO.File]::WriteAllText($out, $sb.ToString(), [System.Text.UTF8Encoding]::new($false))
 Write-Output "wrote $out"
 Write-Output ("entries=" + ($items.Count))
-Write-Output ("forms: lf=" + (@($names | Where-Object { $true }).Count))
+Write-Output ("forms: " + (($formCounts.Keys | ForEach-Object { "$_=$($formCounts[$_])" }) -join ' '))

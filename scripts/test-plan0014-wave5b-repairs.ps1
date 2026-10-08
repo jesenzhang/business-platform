@@ -52,17 +52,73 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $script:Failures = [System.Collections.Generic.List[string]]::new()
 $script:OnlyList = @($Only -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+# Every scenario name the sweep knows about, counted as the sweep runs.
+$script:ScenarioNames = [System.Collections.Generic.List[string]]::new()
+$script:Executed = 0
+$script:Skipped = 0
+$script:Blocked = [System.Collections.Generic.List[string]]::new()
 
 function Write-RepairLog([string]$Line) { Write-Host $Line }
+
+function Assert-Repair([bool]$Condition, [string]$Message) {
+    if (-not $Condition) {
+        throw $Message
+    }
+}
+
+# ---------------------------------------------------------------------------
+# scenario manifest - the filter is validated before anything runs (N5)
+# ---------------------------------------------------------------------------
+# The names this sweep can run are read out of this file's own syntax tree, so
+# the manifest cannot drift from the scenarios, and an unknown -Only name is a
+# refusal up front. It used to be discovered at the end, after every scenario
+# had printed SKIP: the run then reported success having executed nothing.
+$selfTokens = $null
+$selfParseErrors = $null
+$selfAst = [System.Management.Automation.Language.Parser]::ParseFile(
+    $PSCommandPath, [ref]$selfTokens, [ref]$selfParseErrors)
+Assert-Repair ($selfParseErrors.Count -eq 0) `
+    "repair-regressions: this script does not parse: $($selfParseErrors[0])"
+$script:ScenarioManifest = [System.Collections.Generic.List[string]]::new()
+foreach ($call in $selfAst.FindAll(
+        { param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+    if ($call.GetCommandName() -ne 'Invoke-RepairScenario') {
+        continue
+    }
+    $elements = @($call.CommandElements)
+    if ($elements.Count -lt 2) {
+        continue
+    }
+    $candidate = $elements[1]
+    if ($candidate -isnot [System.Management.Automation.Language.StringConstantExpressionAst]) {
+        continue
+    }
+    if ($script:ScenarioManifest -notcontains $candidate.Value) {
+        $script:ScenarioManifest.Add($candidate.Value) | Out-Null
+    }
+}
+Assert-Repair ($script:ScenarioManifest.Count -gt 0) `
+    'repair-regressions: this script declares no scenarios; the sweep would be an empty success'
+$unknownFilters = @($script:OnlyList | Where-Object { $script:ScenarioManifest -notcontains $_ })
+Assert-Repair ($unknownFilters.Count -eq 0) (
+    "-Only named no such scenario: '$($unknownFilters -join "', '")'; " +
+    "this run knows $($script:ScenarioManifest.Count) scenarios: $($script:ScenarioManifest -join ', ')")
 
 function Invoke-RepairScenario {
     <#  Runs one scenario body, tee-ing all streams into $OutDir\<Name>.log.
         A throwing body is a FAIL, never an interruption of the sweep. #>
     param([string]$Name, [scriptblock]$Body)
+    Assert-Repair ($script:ScenarioManifest -contains $Name) `
+        "repair-regressions: scenario '$Name' is not in the manifest read from this file"
+    Assert-Repair (-not $script:ScenarioNames.Contains($Name)) `
+        "repair-regressions: scenario '$Name' is declared twice; the second copy would never run"
+    $script:ScenarioNames.Add($Name) | Out-Null
     if ($script:OnlyList.Count -gt 0 -and $script:OnlyList -notcontains $Name) {
+        $script:Skipped += 1
         Write-RepairLog "SKIP $Name"
         return
     }
+    $script:Executed += 1
     $logPath = Join-Path $OutDir "$Name.log"
     if (Test-Path -LiteralPath $logPath) {
         throw "repair-regressions: scenario log '$logPath' already exists"
@@ -81,16 +137,18 @@ function Invoke-RepairScenario {
         }
     }
     if ($null -ne $thrown) {
-        $script:Failures.Add("$Name : $($thrown.Exception.Message)")
-        Write-RepairLog "FAIL $Name : $($thrown.Exception.Message)"
+        $message = $thrown.Exception.Message
+        if ($message.StartsWith('BLOCKED:')) {
+            # A named gap, never a pass: the scenario says what it could not
+            # exercise and why, and the summary counts it separately.
+            $script:Blocked.Add("$Name : $($message.Substring('BLOCKED:'.Length).Trim())") | Out-Null
+            Write-RepairLog "BLOCKED $Name : $($message.Substring('BLOCKED:'.Length).Trim())"
+        } else {
+            $script:Failures.Add("$Name : $message")
+            Write-RepairLog "FAIL $Name : $message"
+        }
     } else {
         Write-RepairLog "PASS $Name"
-    }
-}
-
-function Assert-Repair([bool]$Condition, [string]$Message) {
-    if (-not $Condition) {
-        throw $Message
     }
 }
 
@@ -98,6 +156,43 @@ function New-ScenarioScratch([string]$Name) {
     $root = Join-Path $OutDir ("scenario-" + $Name)
     New-Item -ItemType Directory -Force -Path $root | Out-Null
     return $root
+}
+
+function Get-ReparseCapableScratch([string]$Name) {
+    <#  A fresh scenario directory on a volume that can actually host a reparse
+        point, or a named BLOCKED refusal when no writable volume can. The
+        capability is proved by creating a junction, never assumed: exFAT
+        volumes and network shares accept the directory name and reject the
+        reparse point, and a fixture that silently degraded into a plain
+        directory would "pass" without testing anything (review N2). #>
+    foreach ($probe in @(
+            (Join-Path ([System.IO.Path]::GetTempPath()) 'wave5b-reparse-probe'),
+            (Join-Path $OutDir 'reparse-probe'))) {
+        $target = Join-Path $probe 'junction-target'
+        $link = Join-Path $probe 'junction-link'
+        try {
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            if (Test-Path -LiteralPath $link) {
+                (Get-Item -LiteralPath $link -Force).Delete()
+            }
+            New-Item -ItemType Junction -Path $link -Target $target -ErrorAction Stop | Out-Null
+            if (-not ((Get-Item -LiteralPath $link -Force).Attributes -band
+                    [System.IO.FileAttributes]::ReparsePoint)) {
+                throw 'the created item does not carry the reparse-point attribute'
+            }
+            (Get-Item -LiteralPath $link -Force).Delete()
+            $scratch = Join-Path $probe ('scenario-' + $Name)
+            if (Test-Path -LiteralPath $scratch) {
+                Remove-Item -LiteralPath $scratch -Recurse -Force
+            }
+            New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+            return $scratch
+        } catch {
+            continue
+        }
+    }
+    throw 'BLOCKED: no writable volume on this host can host a junction, so the ' +
+        'reparse-point cleanup rules cannot be exercised here; they are untested, not passing'
 }
 
 function Get-FileSha([string]$Path) {
@@ -120,7 +215,16 @@ $driverAst = [System.Management.Automation.Language.Parser]::ParseFile(
     $driver, [ref]$driverTokens, [ref]$driverParseErrors)
 Assert-Repair ($driverParseErrors.Count -eq 0) `
     "repair-regressions: production driver has parse errors: $($driverParseErrors[0])"
-$wanted = @('Get-CanonicalPath', 'Remove-Tree', 'Register-RunRoot', 'Remove-RunScratch', 'Write-Log')
+$wanted = @(
+    'Get-CanonicalPath',
+    'Test-ReparsePoint',
+    'Get-UnsafeLink',
+    'Assert-PathChainIsReal',
+    'Remove-Tree',
+    'Register-RunRoot',
+    'Remove-RunScratch',
+    'Write-Log'
+)
 $foundNames = [System.Collections.Generic.List[string]]::new()
 $functionText = ($driverAst.FindAll(
     { param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] },
@@ -327,6 +431,162 @@ Invoke-RepairScenario 'ast-register-refuses-root-equal-to-protected-parent' {
 }
 
 # ---------------------------------------------------------------------------
+# review N2 - a replaced root, a junction parent, a junction inside the tree
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'ast-cleanup-root-replaced-by-junction' {
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'linkroot'
+    $parent = Join-Path $scratch 'parent'
+    $outside = Join-Path $scratch 'outside'
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    New-Item -ItemType Directory -Force -Path $outside | Out-Null
+    $sentinel = Join-Path $outside 'sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'do-not-delete' -Encoding utf8
+    $nested = Join-Path $outside 'nested'
+    New-Item -ItemType Directory -Force -Path $nested | Out-Null
+    $deep = Join-Path $nested 'deep.txt'
+    Set-Content -LiteralPath $deep -Value 'deep-content' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+    $deepSha = Get-FileSha $deep
+
+    $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidlink') `
+        -Parent $parent -Kind 'work'
+    New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+    New-Item -ItemType File -Force -Path (Join-Path $runRoot 'work.txt') | Out-Null
+    $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+
+    # Something else replaces the registered root with a junction to content the
+    # run never created (review N2 probe).
+    Remove-Tree -Path $runRoot
+    New-Item -ItemType Junction -Path $runRoot -Target $outside | Out-Null
+    Assert-Repair ((Get-Item -LiteralPath $runRoot -Force).Attributes -band
+        [System.IO.FileAttributes]::ReparsePoint) `
+        'the fixture is not a reparse point; this scenario would prove nothing'
+
+    $notes = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+    $joined = (($script:RunLog + $notes) -join "`n")
+    Set-Content -LiteralPath (Join-Path $OutDir 'ast-cleanup-root-replaced-by-junction-notes.txt') `
+        -Value $joined -Encoding utf8
+
+    Assert-Repair (Test-Path -LiteralPath $sentinel) `
+        'cleanup deleted out-of-root content through the replaced root'
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the out-of-root sentinel changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $deep) 'nested out-of-root content was deleted'
+    Assert-Repair ((Get-FileSha $deep) -eq $deepSha) 'nested out-of-root content changed bytes'
+    Assert-Repair (-not (Test-Path -LiteralPath $runRoot)) `
+        'the link the run created was left behind instead of unlinked'
+    Assert-Repair ($joined -match 'replaced run root|reparse point') `
+        "cleanup never said what it found at the replaced root: $joined"
+}
+
+Invoke-RepairScenario 'ast-cleanup-parent-replaced-by-junction' {
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'linkparent'
+    $host_ = Join-Path $scratch 'host'
+    New-Item -ItemType Directory -Force -Path $host_ | Out-Null
+    $real = Join-Path $host_ 'real-parent'
+    New-Item -ItemType Directory -Force -Path $real | Out-Null
+    $link = Join-Path $host_ 'link-parent'
+    New-Item -ItemType Junction -Path $link -Target $real | Out-Null
+    $sentinel = Join-Path $real 'sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'keep-me' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+    $rootInside = Join-Path $link 'run-guidbehind'
+    New-Item -ItemType Directory -Force -Path $rootInside | Out-Null
+
+    $thrown = $null
+    try {
+        [void](Register-RunRoot -Root $rootInside -Parent $link -Kind 'main')
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point') `
+        "Register-RunRoot accepted a chain running through a junction: $thrown"
+
+    # The same tree reaching the delete stage anyway, through a hand-built
+    # registration: cleanup must refuse it and leave everything behind the link.
+    $script:RunRoots.Add([pscustomobject]@{
+        Root   = (Get-CanonicalPath $rootInside)
+        Parent = (Get-CanonicalPath $link)
+        Kind   = 'main'
+    }) | Out-Null
+    $warnings = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+    $joinedWarnings = $warnings -join "`n"
+    Set-Content -LiteralPath (Join-Path $OutDir 'ast-cleanup-parent-replaced-by-junction-notes.txt') `
+        -Value $joinedWarnings -Encoding utf8
+
+    Assert-Repair (Test-Path -LiteralPath $sentinel) `
+        'cleanup deleted content that lives behind a junction parent'
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the content behind the junction changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $rootInside) 'a root behind a junction parent was removed anyway'
+    Assert-Repair ($joinedWarnings -match 'reparse point') `
+        "cleanup did not name the link rule: $joinedWarnings"
+}
+
+Invoke-RepairScenario 'ast-cleanup-junction-inside-tree' {
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'linkchild'
+    $parent = Join-Path $scratch 'parent'
+    $outside = Join-Path $scratch 'outside'
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    New-Item -ItemType Directory -Force -Path $outside | Out-Null
+    $sentinel = Join-Path $outside 'sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'keep-me' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+
+    $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidchild') `
+        -Parent $parent -Kind 'work'
+    New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+    $inner = Join-Path $runRoot 'inner'
+    New-Item -ItemType Directory -Force -Path $inner | Out-Null
+    New-Item -ItemType File -Force -Path (Join-Path $inner 'mine.txt') | Out-Null
+    New-Item -ItemType Junction -Path (Join-Path $runRoot 'escape') -Target $outside | Out-Null
+    $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+
+    Remove-RunScratch
+
+    Assert-Repair (-not (Test-Path -LiteralPath $runRoot)) 'the run root survived its own cleanup'
+    Assert-Repair (Test-Path -LiteralPath $sentinel) `
+        'cleanup followed a junction out of the run and deleted what it points at'
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the junction target changed bytes'
+}
+
+# ---------------------------------------------------------------------------
+# review N5 - the scenario filter is a decision, not a silent all-SKIP pass
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'filter-unknown-only-refuses-before-executing' {
+    $out = Join-Path (New-ScenarioScratch 'filter-unknown') 'out'
+    $output = & pwsh -NoProfile -File $PSCommandPath -Repo $Repo -OutDir $out `
+        -Only 'no-such-scenario-name' 2>&1 | ForEach-Object { $_.ToString() }
+    $exit = $LASTEXITCODE
+    $joined = $output -join "`n"
+    Set-Content -LiteralPath (Join-Path $OutDir 'filter-unknown-only-child-output.txt') `
+        -Value $joined -Encoding utf8
+    Assert-Repair ($exit -ne 0) "an unknown -Only name still produced exit code $exit"
+    Assert-Repair ($joined -match 'no such scenario') `
+        "the refusal did not name the filter rule: $joined"
+    Assert-Repair ($joined -notmatch '(?m)^SKIP ') `
+        "the sweep walked scenarios and only complained afterwards: $joined"
+    Assert-Repair (@(Get-ChildItem -LiteralPath $out -Filter '*.log' -ErrorAction SilentlyContinue).Count -eq 0) `
+        'scenarios executed even though the filter named none of them'
+}
+
+Invoke-RepairScenario 'filter-counters-reported-for-a-valid-filter' {
+    $out = Join-Path (New-ScenarioScratch 'filter-counters') 'out'
+    $output = & pwsh -NoProfile -File $PSCommandPath -Repo $Repo -OutDir $out `
+        -Only 'static-r3-no-ambiguous-label' 2>&1 | ForEach-Object { $_.ToString() }
+    $exit = $LASTEXITCODE
+    $joined = $output -join "`n"
+    Set-Content -LiteralPath (Join-Path $OutDir 'filter-counters-child-output.txt') `
+        -Value $joined -Encoding utf8
+    Assert-Repair ($exit -eq 0) "a valid filter run failed with exit code $exit`: $joined"
+    Assert-Repair ($joined -match 'executed=1 skipped=\d+ failed=0 blocked=\d+ declared=\d+') `
+        "the sweep did not report executed/skipped/failed counts: $joined"
+    Assert-Repair (@(Get-ChildItem -LiteralPath $out -Filter '*.log').Count -eq 1) `
+        'exactly one scenario log was expected for a one-scenario filter run'
+}
+
+# ---------------------------------------------------------------------------
 # real-entry layer - the actual driver, preflight and lifecycle
 # ---------------------------------------------------------------------------
 Invoke-RepairScenario 'entry-r3-explicit-evidencedir-reaches-evidence-rule' {
@@ -516,12 +776,35 @@ Invoke-RepairScenario 'wrapper-b8-evidence-not-overwritten' {
 # ---------------------------------------------------------------------------
 # summary
 # ---------------------------------------------------------------------------
+$unrun = @($script:ScenarioManifest | Where-Object { $script:ScenarioNames -notcontains $_ })
 Write-RepairLog ''
-Write-RepairLog "repair-regressions: $($script:Failures.Count) scenario failure(s); logs in $OutDir"
+Write-RepairLog (
+    "repair-regressions: executed=$($script:Executed) skipped=$($script:Skipped) " +
+    "failed=$($script:Failures.Count) blocked=$($script:Blocked.Count) " +
+    "declared=$($script:ScenarioManifest.Count); logs in $OutDir")
 if ($script:Failures.Count -gt 0) {
     foreach ($failure in $script:Failures) {
         Write-RepairLog "  FAILED: $failure"
     }
     throw "$($script:Failures.Count) repair regression scenario(s) failed (raw logs in '$OutDir')"
 }
-Write-RepairLog 'Wave 5B-S1 repair regressions (R3/R4/R7): every scenario matched its expectation.'
+# A sweep that ran nothing has verified nothing, whatever it printed before.
+if ($script:Executed -eq 0) {
+    throw "repair-regressions: no scenario executed (-Only '$Only' matched nothing to run); " +
+        "refusing to report success for an empty sweep"
+}
+if ($unrun.Count -gt 0) {
+    throw "repair-regressions: $($unrun.Count) declared scenario(s) were never reached: $($unrun -join ', ')"
+}
+foreach ($blockage in $script:Blocked) {
+    Write-RepairLog "  NOT VERIFIED HERE: $blockage"
+}
+if ($script:Blocked.Count -gt 0) {
+    Write-RepairLog (
+        "Wave 5B-S1 repair regressions: $($script:Executed) executed scenarios matched " +
+        "their expectation; $($script:Blocked.Count) scenario(s) are BLOCKED and untested on this host.")
+} else {
+    Write-RepairLog (
+        "Wave 5B-S1 repair regressions: all $($script:Executed) executed scenarios " +
+        'matched their expectation.')
+}

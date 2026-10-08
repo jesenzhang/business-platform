@@ -506,6 +506,36 @@ SqlCase "r6-join-using-columns" "INSERT INTO wave5b_fixture_policy_t1 (id) SELEC
 SqlCase "r6-inherits-parent" "CREATE TABLE wave5b_fixture_policy_t10 (id BIGINT) INHERITS (roles);" "-- @bp-owned: wave5b_fixture_policy_t10"
 SqlCase "r6-attach-partition" "ALTER TABLE wave5b_fixture_policy_t1 ATTACH PARTITION platform_users DEFAULT;" $R2_HEAD
 
+# --- review N1: a table list is parsed to its end, or the statement is refused --
+# Each shape below stops a plain table list at a point where the next
+# comma-separated item is a foreign table. Every negative has a same-owner
+# control that differs only in the table named after the stopping point, so a
+# fix cannot pass by matching the foreign table's name.
+SqlCase "n1-foreign-after-alias-column-list" "INSERT INTO roles (role_id) SELECT r.id FROM roles AS r(id), platform_users p;" ""
+SqlCase "n1-same-owner-alias-column-list" "INSERT INTO roles (role_id) SELECT r.id FROM roles AS r(role_id), role_permissions rp;" ""
+SqlCase "n1-foreign-after-join-on" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id, platform_users p;" ""
+SqlCase "n1-same-owner-join-on" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id, permission_definitions pd;" ""
+SqlCase "n1-foreign-after-delete-using-columns" "DELETE FROM roles USING roles AS r(id), platform_users p;" ""
+SqlCase "n1-same-owner-delete-using-columns" "DELETE FROM roles USING roles AS r(role_id), role_permissions rp;" ""
+SqlCase "n1-foreign-after-cross-join" "INSERT INTO roles (role_id) SELECT r.id FROM roles r CROSS JOIN role_permissions rp, platform_users p;" ""
+SqlCase "n1-foreign-after-natural-join" "INSERT INTO roles (role_id) SELECT r.id FROM roles r NATURAL JOIN platform_users;" ""
+SqlCase "n1-foreign-after-alias-column-list-join" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r(id) JOIN role_permissions rp(role_id) ON rp.role_id = r.role_id, platform_users p;" ""
+SqlCase "n1-qualified-after-join-on" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id, public.platform_users p;" ""
+
+# A '*' behind a table name is the inheritance marker, not a projection: it
+# widens the table to its inheriting tables, which the scan cannot enumerate.
+# It is refused as a syntax rule, so the same-owner control is refused too.
+SqlCase "n1-inheritance-star-with-foreign" "INSERT INTO roles SELECT r.* FROM roles * r, platform_users p;" ""
+SqlCase "n1-inheritance-star-same-owner" "INSERT INTO roles SELECT r.* FROM roles * r, role_permissions rp;" ""
+
+# The shapes the list parser must keep deciding correctly: a table function is
+# not a table, a sub-query inside a JOIN condition is outside the subset, and a
+# sub-query after the condition is an ordinary clause reference.
+SqlCase "n1-table-function-call" "INSERT INTO roles (role_id) SELECT g.generate_series FROM generate_series(1, 3) g;" ""
+SqlCase "n1-sub-query-in-join-condition" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id IN (SELECT id FROM platform_users);" ""
+SqlCase "n1-sub-query-after-join-condition" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id WHERE EXISTS (SELECT 1 FROM platform_users);" ""
+SqlCase "n1-same-owner-sub-query-after-join" "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id WHERE EXISTS (SELECT 1 FROM role_permissions);" ""
+
 # --- expectations shared by both readers ------------------------------------
 Write-Text (Join-Path $fx "EXPECTATIONS.json") @'
 {
@@ -581,7 +611,23 @@ Write-Text (Join-Path $fx "EXPECTATIONS.json") @'
     { "case": "r6-index-unknown-method", "expect": "fail", "contains": "index access method 'mystery'" },
     { "case": "r6-join-using-columns", "expect": "fail", "contains": "outside the supported SQL subset" },
     { "case": "r6-inherits-parent", "expect": "fail", "contains": "'INHERITS (parent)'" },
-    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" }
+    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-alias-column-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-alias-column-list", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-join-on", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-join-on", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-delete-using-columns", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-delete-using-columns", "expect": "pass", "status": "VALIDATED" },
+    { "case": "n1-foreign-after-cross-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-natural-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-foreign-after-alias-column-list-join", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-qualified-after-join-on", "expect": "fail", "contains": "schema-qualified" },
+    { "case": "n1-inheritance-star-with-foreign", "expect": "fail", "contains": "inheriting tables" },
+    { "case": "n1-inheritance-star-same-owner", "expect": "fail", "contains": "inheriting tables" },
+    { "case": "n1-table-function-call", "expect": "fail", "contains": "table function" },
+    { "case": "n1-sub-query-in-join-condition", "expect": "fail", "contains": "a sub-query inside a 'JOIN" },
+    { "case": "n1-sub-query-after-join-condition", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "n1-same-owner-sub-query-after-join", "expect": "pass", "status": "VALIDATED" }
   ]
 }
 '@

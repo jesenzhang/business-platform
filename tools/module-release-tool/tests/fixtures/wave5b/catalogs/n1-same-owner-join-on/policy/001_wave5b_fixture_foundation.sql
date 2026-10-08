@@ -1,0 +1,1 @@
+INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id, permission_definitions pd;

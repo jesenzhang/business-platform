@@ -1912,45 +1912,288 @@ const CLAUSE_KEYWORDS: &[&str] = &[
     "window",
 ];
 
-/// Skips an optional alias after a table name: either `AS word` or a bare word
-/// that is not a clause keyword. Returns the index of the first token after the
-/// alias slot.
-fn skip_alias(tokens: &[Token], from: usize) -> usize {
-    let mut index = from;
-    match tokens.get(index) {
-        Some(Token::Word(word)) if word == "as" => {
-            if matches!(tokens.get(index + 1), Some(Token::Word(_))) {
-                index += 2;
-            }
-        }
-        Some(Token::Word(word)) if !CLAUSE_KEYWORDS.contains(&word.as_str()) => index += 1,
-        _ => {}
+/// Words that open a join clause inside a table reference list. The join and its
+/// condition belong to the list, so the list consumes them; stopping in front of
+/// one leaves the table behind it unchecked (review N1).
+const JOIN_START_WORDS: &[&str] = &["cross", "full", "inner", "join", "left", "natural", "right"];
+
+/// Words that may follow a table reference list and nothing else. A token that
+/// is neither a list continuation nor one of these is a named refusal: a list
+/// read only halfway is how an owner check goes missing (review N1, §3.5).
+const TABLE_LIST_END_WORDS: &[&str] = &[
+    "except",
+    "fetch",
+    "for",
+    "group",
+    "having",
+    "intersect",
+    "limit",
+    "offset",
+    "returning",
+    "union",
+    "using",
+    "where",
+    "window",
+];
+
+/// Words that keep a `JOIN … ON` expression open: after one of them an operand
+/// is still expected, so no clause keyword may follow yet.
+const CONDITION_OPERATOR_WORDS: &[&str] = &[
+    "all", "and", "any", "at", "between", "collate", "distinct", "escape", "exists", "ilike", "in",
+    "is", "like", "not", "or", "similar", "some", "to", "zone",
+];
+
+/// A word of these inside a join condition means a sub-query: its tables cannot
+/// be attributed, so the statement is refused by name (§3.5).
+const SUB_QUERY_WORDS: &[&str] = &["delete", "insert", "select", "update", "with"];
+
+/// How one token reads inside a refusal message.
+fn show_token(token: &Token) -> String {
+    match token {
+        Token::Word(word) => word.clone(),
+        Token::Symbol(symbol) => symbol.clone(),
     }
-    index
 }
 
-/// A comma separated `table [[AS] alias]` list, as used by `FROM` and by the
-/// table list of `DELETE … USING`. Every table name in the list is checked;
-/// aliases (bare or `AS`) are consumed, and a qualified name behind a comma is
-/// refused by [`object_after`]. The list ends at the first token that is not a
-/// comma continuation.
+/// Refuses the table-inheritance star (`FROM roles *`): it selects every
+/// descendant table, which the owner scan cannot enumerate, so the form is named
+/// instead of being skipped over (review N1, the same rule as `INHERITS`).
+fn refuse_inheritance_star(tokens: &[Token], index: usize, shown: &str) -> ToolResult<()> {
+    if matches!(tokens.get(index), Some(Token::Symbol(symbol)) if symbol == "*") {
+        return Err(refuse(
+            CHECK_CATALOG,
+            format!(
+                "{shown}: a '*' after a table name selects its inheriting tables, which the owner \
+                 scan cannot enumerate; it is outside the supported SQL subset"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// The end of an alias column list `( name , … )`, which belongs to the table
+/// item in front of it. Only plain names and commas live there.
+fn alias_column_list_end(tokens: &[Token], open: usize, shown: &str) -> ToolResult<usize> {
+    let mut index = open + 1;
+    let mut expect_name = true;
+    while index < tokens.len() {
+        match &tokens[index] {
+            Token::Word(name) if expect_name && !CLAUSE_KEYWORDS.contains(&name.as_str()) => {
+                expect_name = false;
+                index += 1;
+            }
+            Token::Symbol(symbol) if symbol == "," && !expect_name => {
+                expect_name = true;
+                index += 1;
+            }
+            Token::Symbol(symbol) if symbol == ")" && !expect_name => return Ok(index + 1),
+            _ => {
+                return Err(refuse(
+                    CHECK_CATALOG,
+                    format!(
+                        "{shown}: an alias column list holds only plain column names; the scan \
+                         refuses to guess what follows the table it is attached to"
+                    ),
+                ))
+            }
+        }
+    }
+    Err(refuse(
+        CHECK_CATALOG,
+        format!("{shown}: an alias column list never reaches its ')'"),
+    ))
+}
+
+/// Reads the optional `[AS] alias [ ( column , … ) ]` slot that follows a table
+/// name and returns the index after the whole table-reference item. The alias
+/// column list belongs to the item, so `FROM roles AS r (id), other` keeps its
+/// comma; an inheritance star and a parenthesis without an alias (a table
+/// function) are refused by name rather than left for the body scan to walk
+/// past (review N1).
+fn table_item_end(tokens: &[Token], from: usize, shown: &str) -> ToolResult<usize> {
+    let mut index = from;
+    refuse_inheritance_star(tokens, index, shown)?;
+    let mut aliased = false;
+    match tokens.get(index) {
+        Some(Token::Word(word)) if word == "as" => {
+            if !matches!(tokens.get(index + 1), Some(Token::Word(_))) {
+                return Err(refuse(
+                    CHECK_CATALOG,
+                    format!("{shown}: an 'AS' inside a table list names no alias"),
+                ));
+            }
+            index += 2;
+            aliased = true;
+        }
+        Some(Token::Word(word)) if !CLAUSE_KEYWORDS.contains(&word.as_str()) => {
+            index += 1;
+            aliased = true;
+        }
+        _ => {}
+    }
+    refuse_inheritance_star(tokens, index, shown)?;
+    if matches!(tokens.get(index), Some(Token::Symbol(symbol)) if symbol == "(") {
+        if !aliased {
+            return Err(refuse(
+                CHECK_CATALOG,
+                format!(
+                    "{shown}: a '(' behind a table name that has no alias is a table function or \
+                     an option list, which the owner scan cannot attribute"
+                ),
+            ));
+        }
+        index = alias_column_list_end(tokens, index, shown)?;
+        refuse_inheritance_star(tokens, index, shown)?;
+    }
+    Ok(index)
+}
+
+/// Consumes a join operator up to and including its `JOIN` keyword:
+/// `[NATURAL] [INNER | LEFT | RIGHT | FULL [OUTER] | CROSS] JOIN`. Join words
+/// that never reach `JOIN` are a named refusal.
+fn join_operator_end(tokens: &[Token], from: usize, shown: &str) -> ToolResult<usize> {
+    let mut index = from;
+    while let Some(Token::Word(word)) = tokens.get(index) {
+        if word == "join" {
+            return Ok(index + 1);
+        }
+        if !matches!(
+            word.as_str(),
+            "cross" | "full" | "inner" | "left" | "natural" | "outer" | "right"
+        ) {
+            break;
+        }
+        index += 1;
+    }
+    Err(refuse(
+        CHECK_CATALOG,
+        format!("{shown}: a join clause never reaches its 'JOIN' keyword"),
+    ))
+}
+
+/// The end of a `JOIN … ON` condition. A condition is an expression, so it ends
+/// where the list or the statement continues: at a top-level comma (the table
+/// list carries on after it, review N1), at the next join, or at a clause
+/// keyword that follows a finished operand. A sub-query inside the condition is
+/// refused by name, because the tables behind it cannot be attributed (§3.5).
+fn join_condition_end(tokens: &[Token], from: usize, shown: &str) -> ToolResult<usize> {
+    let mut index = from;
+    let mut depth = 0_i32;
+    let mut after_operand = false;
+    while index < tokens.len() {
+        match &tokens[index] {
+            Token::Word(word) if SUB_QUERY_WORDS.contains(&word.as_str()) => {
+                return Err(refuse(
+                    CHECK_CATALOG,
+                    format!(
+                        "{shown}: a sub-query inside a 'JOIN … ON' condition is outside the \
+                         supported SQL subset of the owner scan"
+                    ),
+                ));
+            }
+            Token::Word(word)
+                if after_operand
+                    && (TABLE_LIST_END_WORDS.contains(&word.as_str())
+                        || JOIN_START_WORDS.contains(&word.as_str())) =>
+            {
+                return Ok(index);
+            }
+            Token::Word(word) if CONDITION_OPERATOR_WORDS.contains(&word.as_str()) => {
+                after_operand = false;
+                index += 1;
+            }
+            Token::Word(_) => {
+                after_operand = true;
+                index += 1;
+            }
+            Token::Symbol(symbol) if symbol == "(" => {
+                depth += 1;
+                after_operand = false;
+                index += 1;
+            }
+            Token::Symbol(symbol) if symbol == ")" => {
+                if depth == 0 {
+                    return Ok(index);
+                }
+                depth -= 1;
+                after_operand = true;
+                index += 1;
+            }
+            // A comma at the top level of the condition is the table list
+            // carrying on after the join (review N1); any other punctuation
+            // keeps the expression open.
+            Token::Symbol(symbol) if symbol == "," && depth == 0 => return Ok(index),
+            Token::Symbol(_) => {
+                after_operand = false;
+                index += 1;
+            }
+        }
+    }
+    Ok(index)
+}
+
+/// A comma separated `table [[AS] alias [( column , … )]]` list with its join
+/// clauses, as used by `FROM` and by the table list of `DELETE … USING`. Every
+/// table name in the list is owner checked and the list is consumed to its end:
+/// a comma behind an alias column list or behind a `JOIN … ON` condition
+/// continues it, and any other token that follows an item is refused by name —
+/// a half-read list is exactly how a cross-owner table passed as VALIDATED
+/// (review N1).
+///
+/// `joined` says whether the item that starts here was introduced by a `JOIN`
+/// keyword, which is what makes a following `ON` a join condition rather than a
+/// token nobody can attribute.
 fn table_list_events(
     tokens: &[Token],
     from: usize,
     skip: &[&str],
+    joined: bool,
     shown: &str,
 ) -> ToolResult<(Vec<SqlEvent>, usize)> {
     let mut events = Vec::new();
     let mut index = from;
+    let mut joined = joined;
     loop {
         let (name, next) = object_after(tokens, index, skip, shown)?;
         events.push(SqlEvent::Reference(name));
-        index = skip_alias(tokens, next);
-        if matches!(tokens.get(index), Some(Token::Symbol(symbol)) if symbol == ",") {
-            index += 1;
-            continue;
+        index = table_item_end(tokens, next, shown)?;
+        // A join condition belongs to the item in front of it, so it is consumed
+        // here; `JOIN … USING (column)` is left to the body scan, which refuses
+        // a `USING` that names no table (review R6).
+        if joined
+            && tokens
+                .get(index)
+                .is_some_and(|token| token.keyword() == "on")
+        {
+            index = join_condition_end(tokens, index + 1, shown)?;
         }
-        break;
+        match tokens.get(index) {
+            Some(Token::Symbol(symbol)) if symbol == "," => {
+                index += 1;
+                joined = false;
+            }
+            Some(Token::Word(word)) if JOIN_START_WORDS.contains(&word.as_str()) => {
+                index = join_operator_end(tokens, index, shown)?;
+                joined = true;
+            }
+            // The list ends at the end of the statement or at a closing
+            // parenthesis; any other token must be a continuation, a join or a
+            // clause keyword, and is refused by name if it is none of those.
+            None => break,
+            Some(Token::Symbol(symbol)) if symbol == ")" => break,
+            Some(Token::Word(word)) if TABLE_LIST_END_WORDS.contains(&word.as_str()) => break,
+            Some(token) => {
+                return Err(refuse(
+                    CHECK_CATALOG,
+                    format!(
+                        "{shown}: the table list continues with '{}' the owner scan cannot \
+                         attribute; a table list is parsed to its end or refused, never read \
+                         halfway",
+                        show_token(token)
+                    ),
+                ))
+            }
+        }
     }
     Ok((events, index))
 }
@@ -2043,7 +2286,7 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
         // method as an unowned table, so a USING outside DELETE is refused.
         if keyword == "using" {
             if first_keyword(tokens) == Some("delete") {
-                let (list, next) = table_list_events(tokens, index + 1, &[], shown)?;
+                let (list, next) = table_list_events(tokens, index + 1, &[], false, shown)?;
                 events.extend(list);
                 index = next;
                 continue;
@@ -2051,9 +2294,8 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
             return Err(refuse(
                 CHECK_CATALOG,
                 format!(
-                    "{shown}: a 'USING' clause outside 'DELETE … USING' names an access method \
-                     or a join column list, which the owner scan cannot attribute; it is outside \
-                     the supported SQL subset"
+                    "{shown}: a 'USING' clause outside 'DELETE … USING' names no table the owner \
+                     scan can attribute; it is outside the supported SQL subset"
                 ),
             ));
         }
@@ -2085,10 +2327,17 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
                 index = next;
                 continue;
             }
-            // R2: FROM and JOIN take a table list with optional (bare or AS)
-            // aliases. Every reference in the list is owner checked; a
-            // qualified name anywhere in the list is refused by name.
-            let (list, next) = table_list_events(tokens, index + 1, &["only", "lateral"], shown)?;
+            // R2 / N1: FROM and JOIN take a table list with optional (bare or
+            // AS) aliases, alias column lists and join clauses. Every reference
+            // in the list is owner checked and the list is consumed to its end;
+            // a qualified name anywhere in the list is refused by name.
+            let (list, next) = table_list_events(
+                tokens,
+                index + 1,
+                &["only", "lateral"],
+                keyword == "join",
+                shown,
+            )?;
             events.extend(list);
             index = next;
             continue;
@@ -3109,9 +3358,11 @@ fn collect_rust_files(
 
 /// Finds every `sqlx::migrate!` call in one Rust file.
 ///
-/// Comments are removed first (they are where review P-4's explanatory text
-/// legitimately quotes the macro) and string literals are masked, so a quoted
-/// pseudo-call never counts as an embed point.
+/// The file goes through one lexical pass first (`lex_rust`), so comments,
+/// strings, raw strings, byte strings, char literals and lifetimes are all
+/// decided in the same place; a quoted pseudo-call never counts as an embed
+/// point and a `"` inside a char literal never hides the code behind it
+/// (review §3.7, repair N4).
 ///
 /// Review R5: the scan runs in two passes so declaration order stops mattering.
 /// Pass 1 (`collect_migrate_bindings`) parses `use` trees and collects every
@@ -3125,59 +3376,184 @@ fn collect_rust_files(
 /// name instead of being guessed around or treated as "no embed found"
 /// (review §3.7).
 fn migrate_macro_calls(shown: &str, text: &str) -> ToolResult<Vec<(usize, String)>> {
-    let code: Vec<char> = strip_rust_comments(text).chars().collect();
-    let mask = significant_mask(&code);
+    let (code, mask) = lex_rust(shown, text)?;
     let bindings = collect_migrate_bindings(shown, &code, &mask)?;
     find_migrate_calls(shown, &code, &mask, &bindings)
 }
 
-/// True for every character outside a string, byte string or raw literal.
-/// Char literals and lifetimes stay visible; neither can carry a macro call,
-/// and guessing at the difference is how a scan starts corrupting itself.
-fn significant_mask(code: &[char]) -> Vec<bool> {
+/// The one lexical pass of review N4: it returns the source with comments
+/// blanked (positions and line numbers preserved) and a mask that is false
+/// inside a comment or a string-like literal.
+///
+/// Every literal form Rust has is decided here — `"…"`, `r"…"`, `r#"…"#`,
+/// `b"…"`, `br#"…"#`, `c"…"`, `'c'`, `'\''`, `'\u{1F600}'`, `b'c'` and the
+/// lifetime `'a` — because a scanner that recognises only some of them lets the
+/// next one start wherever it likes: a `const Q: char = '"';` used to open a
+/// string that swallowed the import and the call behind it. A `'` that is
+/// neither a closed char literal nor a lifetime is refused by name rather than
+/// guessed at (§3.7).
+fn lex_rust(shown: &str, text: &str) -> ToolResult<(Vec<char>, Vec<bool>)> {
+    let mut code: Vec<char> = text.chars().collect();
     let mut mask = vec![true; code.len()];
     let mut index = 0_usize;
     while index < code.len() {
-        let rooted = index == 0 || !is_ident_char(code[index - 1]);
-        if rooted && (code[index] == 'r' || code[index] == 'b') {
-            if let Some(after) = mask_raw_literal(code, &mut mask, index) {
+        let character = code[index];
+        if character == '/' && code.get(index + 1) == Some(&'/') {
+            index = blank_line_comment(&mut code, &mut mask, index);
+            continue;
+        }
+        if character == '/' && code.get(index + 1) == Some(&'*') {
+            index = blank_block_comment(shown, &mut code, &mut mask, index)?;
+            continue;
+        }
+        if token_rooted(&code, index) {
+            if let Some(after) = mask_prefixed_literal(&code, &mut mask, index) {
                 index = after;
                 continue;
             }
-        }
-        if code[index] == '"' {
-            index = mask_quoted(code, &mut mask, index, index);
-            continue;
+            if character == '"' {
+                index = mask_quoted(&code, &mut mask, index, index);
+                continue;
+            }
+            if character == '\'' {
+                if let Some(after) = char_literal_end(&code, index) {
+                    for slot in &mut mask[index..after] {
+                        *slot = false;
+                    }
+                    index = after;
+                    continue;
+                }
+                if !code
+                    .get(index + 1)
+                    .is_some_and(|next| next.is_alphabetic() || *next == '_')
+                {
+                    let line = code[..index].iter().filter(|&&c| c == '\n').count() + 1;
+                    return Err(refuse(
+                        CHECK_EMBED,
+                        format!(
+                            "'{shown}:{line}': an apostrophe there is neither a closed char \
+                             literal nor a lifetime; the embed scan cannot read past it"
+                        ),
+                    ));
+                }
+                // A lifetime: only the apostrophe is insignificant, the name
+                // behind it stays readable to the scan.
+                mask[index] = false;
+                index += 1;
+                continue;
+            }
         }
         index += 1;
     }
-    mask
+    Ok((code, mask))
 }
 
-/// Masks one `r"…"`, `r#"…"#`, `b"…"` or `br#"…"#` literal starting at
-/// `index`. Returns the index after it, or `None` when no such literal starts
-/// here (a plain identifier that merely begins with `r` or `b`).
-fn mask_raw_literal(code: &[char], mask: &mut [bool], index: usize) -> Option<usize> {
+/// True at the first character of a token: a prefix such as `r`, `b` or `c`
+/// only means a literal when it does not continue an identifier, and the same
+/// rule decides a char literal and a lifetime.
+fn token_rooted(code: &[char], index: usize) -> bool {
+    index == 0 || !is_ident_char(code[index - 1])
+}
+
+/// Blanks a `//` comment to the end of its line, keeping the newline.
+fn blank_line_comment(code: &mut [char], mask: &mut [bool], mut index: usize) -> usize {
+    while index < code.len() && code[index] != '\n' {
+        code[index] = ' ';
+        mask[index] = false;
+        index += 1;
+    }
+    index
+}
+
+/// Blanks one (nestable) block comment, keeping newlines so line numbers stay
+/// truthful; a comment that never closes is a named refusal.
+fn blank_block_comment(
+    shown: &str,
+    code: &mut [char],
+    mask: &mut [bool],
+    mut index: usize,
+) -> ToolResult<usize> {
+    let mut depth = 0_usize;
+    while index < code.len() {
+        if code[index] == '/' && code.get(index + 1) == Some(&'*') {
+            depth += 1;
+            blank_pair(code, mask, index);
+            index += 2;
+            continue;
+        }
+        if code[index] == '*' && code.get(index + 1) == Some(&'/') {
+            depth -= 1;
+            blank_pair(code, mask, index);
+            index += 2;
+            if depth == 0 {
+                return Ok(index);
+            }
+            continue;
+        }
+        if code[index] != '\n' {
+            code[index] = ' ';
+        }
+        mask[index] = false;
+        index += 1;
+    }
+    Err(refuse(
+        CHECK_EMBED,
+        format!("'{shown}' has a block comment that never closes"),
+    ))
+}
+
+/// Blanks the two characters of a `/*` or `*/` pair.
+fn blank_pair(code: &mut [char], mask: &mut [bool], index: usize) {
+    for offset in 0..2 {
+        if index + offset < code.len() {
+            code[index + offset] = ' ';
+            mask[index + offset] = false;
+        }
+    }
+}
+
+/// Masks one prefixed literal starting at `index`: `r"…"`, `r#"…"#`, `b"…"`,
+/// `br#"…"#`, `c"…"`, `cr"…"` or the byte char `b'c'`. Returns the index after
+/// it, or `None` when no such literal starts here (a plain identifier that
+/// merely begins with `r`, `b` or `c`).
+fn mask_prefixed_literal(code: &[char], mask: &mut [bool], index: usize) -> Option<usize> {
     let mut cursor = index;
-    if code[index] == 'b' {
-        if code.get(cursor + 1) == Some(&'"') {
-            return Some(mask_quoted(code, mask, index, cursor + 1));
+    let byte_or_c = matches!(code[index], 'b' | 'c');
+    if byte_or_c {
+        // `b'a'` is a char literal with a prefix.
+        if code.get(cursor + 1) == Some(&'\'') {
+            let end = char_literal_end(code, cursor + 1)?;
+            for slot in &mut mask[index..end] {
+                *slot = false;
+            }
+            return Some(end);
         }
         cursor += 1;
-        if code.get(cursor) != Some(&'r') {
+    }
+    if code.get(cursor) == Some(&'r') {
+        cursor += 1;
+        let mut hashes = 0_usize;
+        while code.get(cursor) == Some(&'#') {
+            hashes += 1;
+            cursor += 1;
+        }
+        if code.get(cursor) != Some(&'"') {
             return None;
         }
+        return Some(mask_raw(code, mask, index, cursor, hashes));
     }
-    cursor += 1;
-    let mut hashes = 0_usize;
-    while code.get(cursor) == Some(&'#') {
-        hashes += 1;
-        cursor += 1;
+    if byte_or_c && code.get(cursor) == Some(&'"') {
+        return Some(mask_quoted(code, mask, index, cursor));
     }
-    if code.get(cursor) != Some(&'"') {
-        return None;
-    }
-    cursor += 1;
+    None
+}
+
+/// Masks one raw literal whose opening quote sits at `open` and whose closing
+/// delimiter needs `hashes` `#` characters. An unterminated raw literal masks
+/// to the end of the file: the compiler owns that error, the scan only must not
+/// read the region as code.
+fn mask_raw(code: &[char], mask: &mut [bool], from: usize, open: usize, hashes: usize) -> usize {
+    let mut cursor = open + 1;
     while cursor < code.len() {
         if code[cursor] == '"' {
             let mut closing = cursor + 1;
@@ -3187,18 +3563,69 @@ fn mask_raw_literal(code: &[char], mask: &mut [bool], index: usize) -> Option<us
                 closing += 1;
             }
             if matched == hashes {
-                for slot in &mut mask[index..closing] {
+                for slot in &mut mask[from..closing] {
                     *slot = false;
                 }
-                return Some(closing);
+                return closing;
             }
         }
         cursor += 1;
     }
-    for slot in &mut mask[index..] {
+    for slot in &mut mask[from..] {
         *slot = false;
     }
-    Some(code.len())
+    code.len()
+}
+
+/// The index after a char or byte-char literal whose opening `'` is at `open`,
+/// or `None` when no closed char literal starts there (which makes the `'` a
+/// lifetime, or an error the caller decides on).
+fn char_literal_end(code: &[char], open: usize) -> Option<usize> {
+    let mut cursor = open + 1;
+    if code.get(cursor) == Some(&'\'') || code.get(cursor) == Some(&'\n') {
+        return None;
+    }
+    if code.get(cursor) == Some(&'\\') {
+        cursor += 1;
+        match code.get(cursor) {
+            Some('u') => {
+                cursor += 1;
+                if code.get(cursor) != Some(&'{') {
+                    return None;
+                }
+                cursor += 1;
+                while code.get(cursor).is_some_and(|c| *c != '}') {
+                    cursor += 1;
+                }
+                if code.get(cursor) != Some(&'}') {
+                    return None;
+                }
+                cursor += 1;
+            }
+            Some('x') => {
+                cursor += 1;
+                for _ in 0..2 {
+                    if !code.get(cursor).is_some_and(char::is_ascii_hexdigit) {
+                        return None;
+                    }
+                    cursor += 1;
+                }
+            }
+            Some(_) => cursor += 1,
+            None => return None,
+        }
+    } else {
+        let character = *code.get(cursor)?;
+        if character == '\'' || character == '\\' {
+            return None;
+        }
+        cursor += 1;
+    }
+    if code.get(cursor) == Some(&'\'') {
+        Some(cursor + 1)
+    } else {
+        None
+    }
 }
 
 /// Masks an ordinary string literal whose opening quote is at `open`, starting
@@ -3227,12 +3654,60 @@ fn mask_quoted(code: &[char], mask: &mut [bool], from: usize, open: usize) -> us
 
 /// Reads the identifier run starting at `index`, which must be the first
 /// character of an identifier.
+///
+/// Review N3: a raw identifier (`r#embed`) is the identifier `embed` written
+/// with a prefix, so the prefix is consumed here and the name behind it is what
+/// the scan binds and matches. Without this, `use sqlx::migrate as r#embed;`
+/// looked like an alias `r` followed by noise, and the call `r#embed!(…)` was
+/// never recognised as the second embed point.
 fn word_at(code: &[char], index: usize) -> (String, usize) {
-    let mut end = index;
+    let start = if is_raw_prefix(code, index) {
+        index + 2
+    } else {
+        index
+    };
+    let mut end = start;
     while end < code.len() && is_ident_char(code[end]) {
         end += 1;
     }
-    (code[index..end].iter().collect(), end)
+    (code[start..end].iter().collect(), end)
+}
+
+/// True at the `r#` of a raw identifier (`r#type` names the identifier `type`).
+fn is_raw_prefix(code: &[char], index: usize) -> bool {
+    code.get(index) == Some(&'r')
+        && code.get(index + 1) == Some(&'#')
+        && code
+            .get(index + 2)
+            .is_some_and(|next| next.is_alphabetic() || *next == '_')
+}
+
+/// True when the token at `index` is the keyword `keyword`. A raw identifier is
+/// never a keyword: `r#as` is a name that wears the letters `as`.
+fn keyword_at(code: &[char], index: usize, keyword: &str) -> bool {
+    !is_raw_prefix(code, index) && word_at(code, index).0 == keyword
+}
+
+/// A `use` item ends after its path, its alias or its group. Any further token
+/// inside the same item is something the scan did not read, and an unread import
+/// is exactly how a second embed point hides (review N3, §3.7).
+fn refuse_use_tail(
+    shown: &str,
+    code: &[char],
+    mask: &[bool],
+    from: usize,
+    end: usize,
+) -> ToolResult<()> {
+    if next_significant(code, mask, from) < end {
+        return Err(refuse(
+            CHECK_EMBED,
+            format!(
+                "the 'use' tree in '{shown}' carries a token after the part the embed scan read; \
+                 a use item is parsed completely or refused, never half-read"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 /// Index of the next character that is neither whitespace nor masked.
@@ -3281,11 +3756,12 @@ fn collect_migrate_bindings(shown: &str, code: &[char], mask: &[bool]) -> ToolRe
             index += 1;
             continue;
         }
-        let (word, after) = word_at(code, index);
-        if word != "use" {
-            index = after;
+        // `r#use` is an identifier, not the `use` keyword (review N3).
+        if !keyword_at(code, index, "use") {
+            index = word_at(code, index).1;
             continue;
         }
+        let after = index + 3;
         let mut depth = 0_i32;
         let mut end = after;
         let terminated = loop {
@@ -3350,6 +3826,13 @@ fn parse_use_items(
 
 /// Parses one use item — a path with optional group continuation and optional
 /// `as` alias — and records or refuses the binding it produces.
+///
+/// Review N3: the item must be read to its end. A path that stops early (a raw
+/// `r#` segment, a token the parser has no rule for) used to `break` and leave
+/// the rest of the item unread, which let a second baseline embed hide behind
+/// `use sqlx::r#migrate as embed;`. Every exit that does not consume the whole
+/// item is now a named refusal.
+#[allow(clippy::too_many_lines)] // one rule per spelling of a use item: the branches are the grammar
 fn parse_use_item(
     shown: &str,
     code: &[char],
@@ -3381,11 +3864,14 @@ fn parse_use_item(
                      assume the macro is not imported (it cannot be attributed)",
                 ));
             }
+            refuse_use_tail(shown, code, mask, cursor + 1, end)?;
             return Ok(());
         }
         if code[cursor] == '{' {
             let group_end = matching_brace(shown, code, mask, cursor, end)?;
-            return parse_use_items(shown, code, mask, cursor + 1, group_end, &path, bindings);
+            parse_use_items(shown, code, mask, cursor + 1, group_end, &path, bindings)?;
+            refuse_use_tail(shown, code, mask, group_end + 1, end)?;
+            return Ok(());
         }
         if !is_ident_char(code[cursor]) {
             return Err(refuse(
@@ -3394,12 +3880,24 @@ fn parse_use_item(
             ));
         }
         let (ident, after) = word_at(code, cursor);
+        let raw = is_raw_prefix(code, cursor);
         cursor = next_significant(code, mask, after);
-        if ident == "self" {
+        if ident == "self" && !raw {
+            // `self` closes an item (`use sqlx::{self}`, `use sqlx::{self as …}`);
+            // as the first segment of a path (`use self::legacy::X`) it is only a
+            // root, and the path carries on behind it.
+            if cursor + 1 < end
+                && code.get(cursor) == Some(&':')
+                && code.get(cursor + 1) == Some(&':')
+            {
+                path.push(ident);
+                cursor = next_significant(code, mask, cursor + 2);
+                continue;
+            }
             if path.len() == 1
                 && path[0] == "sqlx"
                 && cursor < end
-                && word_at(code, cursor).0 == "as"
+                && keyword_at(code, cursor, "as")
             {
                 return Err(cannot_decide(
                     shown,
@@ -3409,6 +3907,7 @@ fn parse_use_item(
                      cannot follow migrate paths behind a crate alias (it cannot be attributed)",
                 ));
             }
+            refuse_use_tail(shown, code, mask, cursor, end)?;
             return Ok(());
         }
         path.push(ident);
@@ -3419,17 +3918,20 @@ fn parse_use_item(
             cursor = next_significant(code, mask, cursor + 2);
             continue;
         }
-        if word_at(code, cursor).0 == "as" {
-            cursor = next_significant(code, mask, cursor + 2);
+        if keyword_at(code, cursor, "as") {
+            let (_, after_as) = word_at(code, cursor);
+            cursor = next_significant(code, mask, after_as);
             if cursor >= end || !is_ident_char(code[cursor]) {
                 return Err(refuse(
                     CHECK_EMBED,
                     format!("the 'use' tree in '{shown}' has an 'as' without a name"),
                 ));
             }
-            let (alias, _) = word_at(code, cursor);
+            let (alias, after_alias) = word_at(code, cursor);
             if alias == "_" {
-                return Ok(()); // `as _` binds no callable name
+                // `as _` binds no callable name, but the item must still end here.
+                refuse_use_tail(shown, code, mask, after_alias, end)?;
+                return Ok(());
             }
             if path.len() == 1 && path[0] == "sqlx" {
                 return Err(cannot_decide(
@@ -3440,11 +3942,14 @@ fn parse_use_item(
                      hide behind the crate alias (it cannot be attributed)",
                 ));
             }
-            return note_migrate_binding(shown, code, cursor, &path, Some(alias), bindings);
+            note_migrate_binding(shown, code, cursor, &path, Some(alias), bindings)?;
+            refuse_use_tail(shown, code, mask, after_alias, end)?;
+            return Ok(());
         }
         break;
     }
-    note_migrate_binding(shown, code, end, &path, None, bindings)
+    note_migrate_binding(shown, code, end, &path, None, bindings)?;
+    refuse_use_tail(shown, code, mask, cursor, end)
 }
 
 /// Index of the `}` matching the `{` at `open`, inside a use tree.
@@ -3781,73 +4286,6 @@ fn cannot_decide(shown: &str, offset: usize, code: &[char], reason: &str) -> Too
     )
 }
 
-/// Removes `//` and block comments, keeping the byte positions of everything
-/// else so line numbers stay truthful.
-fn strip_rust_comments(text: &str) -> String {
-    let code: Vec<char> = text.chars().collect();
-    let mut out = String::with_capacity(text.len());
-    let mut index = 0_usize;
-    while index < code.len() {
-        let character = code[index];
-        if character == '/' && code.get(index + 1) == Some(&'/') {
-            while index < code.len() && code[index] != '\n' {
-                out.push(' ');
-                index += 1;
-            }
-            continue;
-        }
-        if character == '/' && code.get(index + 1) == Some(&'*') {
-            let mut depth = 0_usize;
-            while index < code.len() {
-                if code[index] == '/' && code.get(index + 1) == Some(&'*') {
-                    depth += 1;
-                    out.push(' ');
-                    out.push(' ');
-                    index += 2;
-                    continue;
-                }
-                if code[index] == '*' && code.get(index + 1) == Some(&'/') {
-                    depth -= 1;
-                    out.push(' ');
-                    out.push(' ');
-                    index += 2;
-                    if depth == 0 {
-                        break;
-                    }
-                    continue;
-                }
-                out.push(if code[index] == '\n' { '\n' } else { ' ' });
-                index += 1;
-            }
-            continue;
-        }
-        if character == '"' {
-            out.push(character);
-            index += 1;
-            while index < code.len() {
-                out.push(code[index]);
-                if code[index] == '\\' {
-                    index += 1;
-                    if index < code.len() {
-                        out.push(code[index]);
-                        index += 1;
-                        continue;
-                    }
-                }
-                if code[index] == '"' {
-                    index += 1;
-                    break;
-                }
-                index += 1;
-            }
-            continue;
-        }
-        out.push(character);
-        index += 1;
-    }
-    out
-}
-
 // ---------------------------------------------------------------------------
 // the report
 // ---------------------------------------------------------------------------
@@ -4174,6 +4612,125 @@ mod embed_scan_tests {
         );
     }
 
+    // --- review N3: raw identifiers are read, or the use tree is refused ------
+
+    #[test]
+    fn raw_identifier_alias_second_embed_is_counted() {
+        assert_one_call(
+            "use sqlx::migrate as r#embed;\n\
+             static M: sqlx::migrate::Migrator = r#embed!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn raw_identifier_in_the_imported_path_second_embed_is_counted() {
+        assert_one_call(
+            "use sqlx::r#migrate as embed;\n\
+             static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn raw_identifier_direct_call_is_counted() {
+        assert_one_call(
+            "static M: sqlx::migrate::Migrator = sqlx::r#migrate!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn a_raw_identifier_is_never_a_keyword() {
+        // `r#use` is a name wearing the letters `use`; it starts no use tree,
+        // and the direct call after it still counts.
+        assert_one_call(
+            "fn f() { let r#use = 1; \
+             static M: sqlx::migrate::Migrator = sqlx::migrate!(\"../../migrations\"); }\n",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn a_use_tree_that_is_not_fully_read_is_refused_by_name() {
+        for source in [
+            "use sqlx::migrate as embed tail;\nfn run() {}\n",
+            "use sqlx::migrate where;\nfn run() {}\n",
+            "use sqlx::{migrate} extra;\nfn run() {}\n",
+        ] {
+            let error = migrate_macro_calls("fixture.rs", source)
+                .expect_err("a use item that stops before its end must be refused");
+            assert!(
+                error.to_string().contains("parsed completely or refused"),
+                "{source}: {error}"
+            );
+        }
+        // The same shapes with nothing left over must still pass.
+        for source in [
+            "use sqlx::migrate as embed;\nfn run() {}\n",
+            "use sqlx::{migrate};\nfn run() {}\n",
+            "use sqlx::migrate;\nfn run() {}\n",
+        ] {
+            assert!(
+                migrate_macro_calls("fixture.rs", source).is_ok(),
+                "a complete use item must pass: {source}"
+            );
+        }
+    }
+
+    // --- review N4: one lexer for strings, chars, lifetimes and comments ------
+
+    #[test]
+    fn a_double_quote_char_literal_does_not_hide_a_second_embed() {
+        assert_one_call(
+            "const QUOTE: char = '\"';\n\
+             use sqlx::migrate as embed;\n\
+             static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn char_escapes_byte_chars_and_lifetimes_do_not_hide_a_second_embed() {
+        assert_one_call(
+            "const A: char = '\\'';\n\
+             const B: char = '\\\\';\n\
+             const C: char = '\\u{1F600}';\n\
+             const D: u8 = b'\\n';\n\
+             fn takes<'a, 'b>(x: &'a str, y: &'b str) -> &'a str {\n    \
+             static M: sqlx::migrate::Migrator = sqlx::migrate!(\"../../migrations\");\n    x\n}",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn an_apostrophe_in_a_comment_does_not_disturb_the_scan() {
+        assert_one_call(
+            "// don't let an apostrophe here end the literal — it can't.\n\
+             const S: &str = \"a // marker inside a string\";\n\
+             static M: sqlx::migrate::Migrator = sqlx::migrate!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn prefixed_literal_spellings_do_not_count_as_embeds() {
+        let source = "const A: &[u8] = b\"sqlx::migrate!(\\\"../../migrations\\\")\";\n\
+                      const B: &[u8] = br#\"sqlx::migrate!(\"../../migrations\")\"#;\n\
+                      const C: &[u8] = b's';\n";
+        assert!(calls(source).is_empty(), "{source}");
+    }
+
+    #[test]
+    fn an_apostrophe_that_is_neither_char_nor_lifetime_is_refused() {
+        let error = migrate_macro_calls(
+            "fixture.rs",
+            "const B: char = '\\;\nstatic M: sqlx::migrate::Migrator = sqlx::migrate!(\"x\");\n",
+        )
+        .expect_err("an unreadable literal must stop the scan, not skip the file");
+        assert!(error.to_string().contains("char literal"), "{error}");
+    }
+
     /// The end-to-end form of review R5: a second baseline embed in any of the
     /// four spellings must never be waved through as `baseline_embed_points=1`.
     #[test]
@@ -4194,6 +4751,32 @@ mod embed_scan_tests {
             (
                 "spaced",
                 "static M: sqlx::migrate::Migrator = sqlx :: migrate ! ( \"../../migrations\" );\n",
+            ),
+            // Review N3: the two raw-identifier spellings that used to be waved
+            // through with `baseline_embed_points=1`.
+            (
+                "raw-alias",
+                "use sqlx::migrate as r#embed;\n\
+                 static M: sqlx::migrate::Migrator = r#embed!(\"../../migrations\");\n",
+            ),
+            (
+                "raw-import",
+                "use sqlx::r#migrate as embed;\n\
+                 static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");\n",
+            ),
+            // Review N4: a char literal holding a double quote used to open a
+            // phantom string that swallowed the real call below it.
+            (
+                "quote-char",
+                "const QUOTE: char = '\"';\n\
+                 use sqlx::migrate as embed;\n\
+                 static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");\n",
+            ),
+            (
+                "escapes-and-lifetimes",
+                "const A: char = '\\'';\nconst B: char = '\\u{1F600}';\n\
+                 fn takes<'a>(x: &'a str) -> &'a str {\n    \
+                 static M: sqlx::migrate::Migrator = sqlx::migrate!(\"../../migrations\");\n    x\n}\n",
             ),
         ] {
             let work = TempDir::new(&format!("wave5b-embed-{name}")).expect("temp dir");
