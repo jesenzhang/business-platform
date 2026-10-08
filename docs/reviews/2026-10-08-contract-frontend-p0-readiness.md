@@ -3,7 +3,7 @@
 > 文档类型：Review（事实与缺口，不构成架构决策）
 > 状态：Completed / Documentation review only
 > 日期：2026-10-08
-> Review base：\`jesenzhang/business-platform\` \`main\` at \`505d2039f5ba46f0d3023e3eaa31fb7891fd6580\`
+> Review base：`jesenzhang/business-platform` `main` at `505d2039f5ba46f0d3023e3eaa31fb7891fd6580`
 > 关联参考：[FRONTEND_COMPONENT_CANDIDATES](../reference/FRONTEND_COMPONENT_CANDIDATES.md)、[WEB_OFFICE_TECHNOLOGY_EVALUATION](../reference/WEB_OFFICE_TECHNOLOGY_EVALUATION.md)
 > 后续候选计划：[PLAN-0016](../plans/current/PLAN-0016-contract-frontend-p0-validation.md)（Proposed / NOT ACTIVE）
 
@@ -11,28 +11,28 @@
 
 基于 GitHub 源码及文档静态审阅，未运行本地构建、真实数据库或浏览器 E2E。
 
-- \`apps/business-console/package.json\`：React 19、Vite、React Router 7、Radix Dialog、TanStack Query/Table、Zustand、ECharts、Tailwind、Vitest、Playwright 已存在。
-- \`apps/business-console/src/App.tsx\` / \`components.tsx\`：AppShell、导航、通用状态与基础布局；当前还没有独立的可复用合同业务组件库。
-- \`apps/business-console/src/pages.tsx\` / \`api.ts\` / \`contracts.ts\`：Document List/Detail、Upload、Processing、Candidate Review、Audit；Document Table 已使用 TanStack Table；上传为单文件；Candidate Review 使用 JSON + accept/reject，尚无 Contract Apply 流程。
-- \`apps/business-console/src/iam-pages.tsx\`：已有用户、角色、组织、授权管理表单，可作为统一表单/设计系统安全 PoC 样本。
-- \`apps/business-api/src/routes/documents.rs\`：已提供文档创建、列表、上传、详情与文档处理 Job 关联路由；**未找到公开的 GET 文档原始文件/预览内容接口**。
-- \`apps/business-api/src/routes/upload.rs\`：上传 10 MiB 上限，支持 PDF / TXT / DOC / DOCX，含 Idempotency-Key；**不代表**上述所有格式已经可用于 AI 抽取。
-- \`crates/contract/src/lib.rs\`：仅有领域定位说明与 TODO，尚无完整可供前端消费的 Contract Application/API。
-- \`docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md\`：目前固定 MVP 实际可处理 text/plain、text/markdown、application/json；Office/PDF 在该流水线仍为 unsupported；不得因上传成功误判 Processing 能力。
-- \`docs/plans/README.md\`：PLAN-0014 Active；Contract Business Vertical Slice 为下一项主要业务代码任务、计划尚未创建；PLAN-0006 Proposed/BLOCKED。
+- `apps/business-console/package.json`：React 19、Vite、React Router 7、Radix Dialog、TanStack Query/Table、Zustand、ECharts、Tailwind、Vitest、Playwright 已存在。
+- `apps/business-console/src/App.tsx` / `components.tsx`：AppShell、导航、通用状态与基础布局；当前还没有独立的可复用合同业务组件库。
+- `apps/business-console/src/pages.tsx` / `api.ts` / `contracts.ts`：Document List/Detail、Upload、Processing、Candidate Review、Audit；Document Table 已使用 TanStack Table；上传为单文件；Candidate Review 使用 JSON + accept/reject，尚无 Contract Apply 流程。
+- `apps/business-console/src/iam-pages.tsx`：已有用户、角色、组织、授权管理表单，可作为统一表单/设计系统安全 PoC 样本。
+- `apps/business-api/src/routes/documents.rs`：已提供文档创建、列表、上传、详情与文档处理 Job 关联路由；**未找到公开的 GET 文档原始文件/预览内容接口**。
+- `apps/business-api/src/routes/upload.rs`：上传 10 MiB 上限，支持 PDF / TXT / DOC / DOCX，含 Idempotency-Key；**不代表**上述所有格式已经可用于 AI 抽取。
+- `crates/contract/src/lib.rs`：仅有领域定位说明与 TODO，尚无完整可供前端消费的 Contract Application/API。
+- `docs/architecture/DURABLE_DOCUMENT_PROCESSING_ARCHITECTURE.md`：目前固定 MVP 实际可处理 text/plain、text/markdown、application/json；Office/PDF 在该流水线仍为 unsupported；不得因上传成功误判 Processing 能力。
+- `docs/plans/README.md`：PLAN-0014 Active；Contract Business Vertical Slice 为下一项主要业务代码任务、计划尚未创建；PLAN-0006 Proposed/BLOCKED。
 
 ## 2. 业务流程与 P0 组件对齐
 
 预期合同业务主链路仍为：
 
-\`\`\`text
+```text
 Contract List/Detail
   → Document Revision
   → AI Extraction + Evidence
   → Human Review
   → Apply Candidate (Contract owner Application Use Case)
   → Contract Version Update
-\`\`\`
+```
 
 | 业务步骤 | 已有可复用前端能力 | 优先组件/是否本阶段采用 | API/服务端真实门禁 |
 |---|---|---|---|
@@ -74,7 +74,7 @@ Contract List/Detail
 
 - Document Management 拥有文件、修订、访问授权；Document Intelligence 拥有候选/证据；Contract Management 拥有合同正式事实和合同版本；UI/Agent/Office 只是消费者或受控操作入口。
 - 每次读写依赖可信 Principal/Tenant/Policy + resource scope，不以组件隐藏按钮作为授权依据；错误与事件不得泄露正文、Key、签名 URL 或密钥。
-- 高风险写入按 \`Prepare → Preview → Confirm → Execute\`，并绑定用户、租户、资源版本、nonce/expiry 和命令 digest；禁止重复回调绕过幂等与确认。
+- 高风险写入按 `Prepare → Preview → Confirm → Execute`，并绑定用户、租户、资源版本、nonce/expiry 和命令 digest；禁止重复回调绕过幂等与确认。
 - UI Contributions 第一阶段限宿主受控类型 Navigation/ListView/DetailSection/DetailTab/Action/Command，不允许 npm 组件选择改变公开业务 Module Contract 或注入任意 executable code。
 
 ## 5. 与当前计划关系 / Gate
