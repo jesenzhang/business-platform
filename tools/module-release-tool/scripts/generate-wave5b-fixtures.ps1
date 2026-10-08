@@ -440,6 +440,72 @@ DROP TABLE wave5b_fixture_identity_t9;
 "@
 Set-Manifest $dir
 
+# --- review R1: the 019 rename targets are reserved legacy objects -----------
+# Every rename target of the pinned 019 migration must stay unclaimable: an
+# `IF NOT EXISTS` create over a legacy table would otherwise authorise writes
+# against an object the module does not own (the original B2 bypass).
+foreach ($renamed in @(
+        "v0_demo_role_permissions",
+        "v0_demo_user_roles",
+        "v0_demo_roles",
+        "v0_demo_permissions"
+    )) {
+    SqlCase ("r1-rename-target-" + $renamed) @"
+CREATE TABLE IF NOT EXISTS $renamed (id bigint);
+DELETE FROM $renamed;
+"@ ("-- @bp-owned: " + $renamed)
+}
+
+# Host baseline tables that belong to no module owner stay reserved too.
+SqlCase "r1-reserved-documents" "CREATE TABLE IF NOT EXISTS documents (id bigint);" "-- @bp-owned: documents"
+SqlCase "r1-reserved-sqlx-migrations" "CREATE TABLE IF NOT EXISTS _sqlx_migrations (version BIGINT);" "-- @bp-owned: _sqlx_migrations"
+
+# Reserved does not mean unusable by the existing owner: identity-management
+# still references its own baseline table platform_users (review R1, narrow IAM
+# exception kept).
+$dir = Join-Path $fx "r1-owned-host-table-reference/identity-management"
+Write-Text (Join-Path $dir "catalog.json") (Catalog "identity-management" "identity-management" @("platform-baseline@19"))
+Write-Text (Join-Path $dir "001_wave5b_fixture_identity.sql") @"
+-- @bp-owned: wave5b_fixture_iam_t2
+CREATE TABLE wave5b_fixture_iam_t2 (
+    t2_id BIGINT PRIMARY KEY REFERENCES platform_users (t2_id)
+);
+"@
+Set-Manifest $dir
+
+# --- review R2: comma table lists and aliases are all owner checked ----------
+# The two statements the repair review called out by name, kept verbatim.
+SqlCase "r2-foreign-in-from-alias" "INSERT INTO roles SELECT r.* FROM roles r, platform_users p;" ""
+SqlCase "r2-foreign-in-using" "DELETE FROM roles USING roles r, platform_users p;" ""
+
+# Foreign reference in the first / middle / last list position, and the AS alias
+# form, all refused; a qualified name behind a comma is refused by name.
+$R2_HEAD = "-- @bp-owned: wave5b_fixture_policy_t1" + "`n" + "CREATE TABLE wave5b_fixture_policy_t1 (id BIGINT);"
+SqlCase "r2-foreign-first-in-list" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT p.id FROM platform_users p, roles r;" $R2_HEAD
+SqlCase "r2-foreign-middle-in-list" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT a.id FROM roles a, platform_users p, role_permissions b;" $R2_HEAD
+SqlCase "r2-foreign-last-in-list" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT b.id FROM roles a, role_permissions b, platform_users p;" $R2_HEAD
+SqlCase "r2-foreign-in-as-alias" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT r.id FROM roles AS r, platform_users AS p;" $R2_HEAD
+SqlCase "r2-qualified-after-comma" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT x FROM roles r, public.platform_users p;" $R2_HEAD
+
+# Same-owner multi-table list with aliases (bare and AS) must pass unchanged.
+SqlCase "r2-same-owner-alias-list" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT r.id FROM roles r, role_permissions rp;" $R2_HEAD
+
+# FROM / USING / commas inside comments and string literals are not references.
+SqlCase "r2-comment-string-not-reference" @"
+CREATE TABLE wave5b_fixture_policy_t1 (payload TEXT);
+
+-- FROM platform_users, USING x
+INSERT INTO wave5b_fixture_policy_t1 (payload) VALUES ('FROM platform_users, roles USING y');
+"@ "-- @bp-owned: wave5b_fixture_policy_t1"
+
+# --- review R6: statement-aware USING, INHERITS and index methods ------------
+# The owned-table index with an access method is legal SQL and must pass.
+SqlCase "r6-index-using-btree" "CREATE INDEX wave5b_ix ON roles USING btree (role_id);" ""
+SqlCase "r6-index-unknown-method" "CREATE INDEX wave5b_ix ON roles USING mystery (role_id);" ""
+SqlCase "r6-join-using-columns" "INSERT INTO wave5b_fixture_policy_t1 (id) SELECT a.id FROM roles a JOIN role_permissions USING (role_id);" $R2_HEAD
+SqlCase "r6-inherits-parent" "CREATE TABLE wave5b_fixture_policy_t10 (id BIGINT) INHERITS (roles);" "-- @bp-owned: wave5b_fixture_policy_t10"
+SqlCase "r6-attach-partition" "ALTER TABLE wave5b_fixture_policy_t1 ATTACH PARTITION platform_users DEFAULT;" $R2_HEAD
+
 # --- expectations shared by both readers ------------------------------------
 Write-Text (Join-Path $fx "EXPECTATIONS.json") @'
 {
@@ -494,7 +560,28 @@ Write-Text (Join-Path $fx "EXPECTATIONS.json") @'
     { "case": "sql-dynamic-sql", "expect": "fail", "contains": "dollar-quoted" },
     { "case": "sql-qualified-reference", "expect": "fail", "contains": "schema-qualified" },
     { "case": "sql-unsupported-statement", "expect": "fail", "contains": "is outside the supported SQL subset" },
-    { "case": "table-name-conflict", "expect": "fail", "contains": "two namespaces may not create the same table" }
+    { "case": "table-name-conflict", "expect": "fail", "contains": "two namespaces may not create the same table" },
+    { "case": "r1-rename-target-v0_demo_role_permissions", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_user_roles", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_roles", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_permissions", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-reserved-documents", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-reserved-sqlx-migrations", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-owned-host-table-reference", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r2-foreign-in-from-alias", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-in-using", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-first-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-middle-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-last-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-in-as-alias", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-qualified-after-comma", "expect": "fail", "contains": "schema-qualified" },
+    { "case": "r2-same-owner-alias-list", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r2-comment-string-not-reference", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r6-index-using-btree", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r6-index-unknown-method", "expect": "fail", "contains": "index access method 'mystery'" },
+    { "case": "r6-join-using-columns", "expect": "fail", "contains": "outside the supported SQL subset" },
+    { "case": "r6-inherits-parent", "expect": "fail", "contains": "'INHERITS (parent)'" },
+    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" }
   ]
 }
 '@

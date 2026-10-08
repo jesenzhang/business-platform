@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Wave 5B-S1 offline catalog gate (design §11.1–§11.3, review §3.4–§3.7).
 //!
 //! This file is the second reader of the fixture tree under
@@ -760,4 +760,244 @@ fn dependency_grammar_is_fixed_and_does_not_guess() {
     ] {
         catalog::parse_dependency(entry).expect_err("the grammar is exact");
     }
+}
+
+// ---------------------------------------------------------------------------
+// S-6 — baseline reserved tables reconciled against the pinned SQL
+// ---------------------------------------------------------------------------
+//
+// Review R1: the reserved set must be derived from the *pinned commit's* SQL
+// (CREATE TABLE names, RENAME TO targets and the platform ledger), never from
+// the set itself. Every Git failure, unbalanced dollar block or unexplained
+// table-creating form fails the test loudly; nothing is skipped silently.
+// Review R1 additionally pins the four 019 rename targets individually.
+
+/// Runs one read-only Git command at the repository root; a non-zero Git exit
+/// (for example a missing pin) fails the test instead of producing empty input.
+fn git_read(repo: &Path, args: &[&str]) -> String {
+    let outcome = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .expect("git is available for the pinned reconciliation");
+    assert!(
+        outcome.status.success(),
+        "git {args:?} failed with {}: {}",
+        outcome.status,
+        String::from_utf8_lossy(&outcome.stderr)
+    );
+    String::from_utf8(outcome.stdout).expect("git prints UTF-8")
+}
+
+/// Keeps only executable SQL words, lower-cased: `--` and block comments,
+/// single-quoted literals and dollar-quoted bodies are blanked out, so a
+/// `CREATE TABLE` mention in a comment can never fake an expected name.
+fn executable_sql_words(text: &str, file: &str) -> Vec<String> {
+    let characters: Vec<char> = text.chars().collect();
+    let mut kept = String::new();
+    let mut index = 0_usize;
+    let mut dollars = 0_usize;
+    let mut in_dollar = false;
+    while index < characters.len() {
+        let character = characters[index];
+        if character == '$' && characters.get(index + 1) == Some(&'$') {
+            dollars += 1;
+            in_dollar = !in_dollar;
+            index += 2;
+            continue;
+        }
+        if in_dollar {
+            index += 1;
+            continue;
+        }
+        if character == '-' && characters.get(index + 1) == Some(&'-') {
+            while index < characters.len() && characters[index] != '\n' {
+                index += 1;
+            }
+            continue;
+        }
+        if character == '/' && characters.get(index + 1) == Some(&'*') {
+            let mut depth = 1_usize;
+            index += 2;
+            while index < characters.len() && depth > 0 {
+                if characters[index] == '/' && characters.get(index + 1) == Some(&'*') {
+                    depth += 1;
+                    index += 2;
+                } else if characters[index] == '*' && characters.get(index + 1) == Some(&'/') {
+                    depth -= 1;
+                    index += 2;
+                } else {
+                    index += 1;
+                }
+            }
+            assert_eq!(depth, 0, "{file}: a block comment is never closed");
+            continue;
+        }
+        if character == '\'' {
+            index += 1;
+            loop {
+                assert!(
+                    index < characters.len(),
+                    "{file}: a string literal never closes"
+                );
+                if characters[index] == '\'' {
+                    if characters.get(index + 1) == Some(&'\'') {
+                        index += 2;
+                        continue;
+                    }
+                    index += 1;
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        if character.is_ascii_alphanumeric() || character == '_' {
+            kept.push(character.to_ascii_lowercase());
+        } else {
+            kept.push(' ');
+        }
+        index += 1;
+    }
+    assert_eq!(dollars % 2, 0, "{file}: dollar quoting is unbalanced");
+    kept.split_whitespace().map(str::to_owned).collect()
+}
+
+/// Walks the executable word stream of one pinned migration and collects the
+/// table names the reserved-table reconciliation must know about: CREATE TABLE
+/// targets (with SELECT … INTO refused loudly) and RENAME TO targets.
+fn collect_reconciled_names(
+    words: &[String],
+    file: &str,
+    expected: &mut std::collections::BTreeSet<String>,
+    creates: &mut usize,
+    renames: &mut usize,
+) {
+    let mut position = 0_usize;
+    while position < words.len() {
+        if words[position] == "create" && words.get(position + 1) == Some(&"table".to_owned()) {
+            *creates += 1;
+            let mut name_at = position + 2;
+            if words.get(name_at) == Some(&"if".to_owned()) {
+                assert!(
+                    words.get(name_at + 1) == Some(&"not".to_owned())
+                        && words.get(name_at + 2) == Some(&"exists".to_owned()),
+                    "{file}: unexpected 'CREATE TABLE IF' form at word {name_at}"
+                );
+                name_at += 3;
+            }
+            let name = words
+                .get(name_at)
+                .unwrap_or_else(|| panic!("{file}: 'CREATE TABLE' has no name"))
+                .clone();
+            expected.insert(name);
+            position = name_at + 1;
+            continue;
+        }
+        if words[position] == "into" {
+            // `SELECT … INTO` also materialises a table; none may hide from
+            // this reconciliation (only INSERT INTO is legal here).
+            let mut walker = position;
+            while walker > 0 {
+                walker -= 1;
+                match words[walker].as_str() {
+                    "select" => panic!(
+                        "{file}: a 'SELECT … INTO' creates a table at word {position}; \
+                         extend this reconciliation by hand"
+                    ),
+                    "from" | "values" | "join" | "insert" => break,
+                    _ => {}
+                }
+            }
+        }
+        if words[position] == "rename" && words.get(position + 1) == Some(&"to".to_owned()) {
+            *renames += 1;
+            let name = words
+                .get(position + 2)
+                .unwrap_or_else(|| panic!("{file}: 'RENAME TO' has no target"))
+                .clone();
+            expected.insert(name);
+            position += 3;
+            continue;
+        }
+        position += 1;
+    }
+}
+
+#[test]
+fn baseline_reserved_tables_are_reconciled_with_pinned_sql() {
+    use std::collections::BTreeSet;
+
+    let repo = repository();
+    let pinned = catalog::PINNED_BASELINE_REVISION;
+    let listing = git_read(
+        &repo,
+        &["ls-tree", "--name-only", "-r", pinned, "--", "migrations/"],
+    );
+    let files: Vec<&str> = listing
+        .lines()
+        .filter(|line| {
+            std::path::Path::new(line)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("sql"))
+        })
+        .collect();
+    assert_eq!(
+        files.len(),
+        19,
+        "the pinned baseline provides exactly 19 SQL files; the pin moved or the tree is missing"
+    );
+
+    let mut expected: BTreeSet<String> = BTreeSet::new();
+    let mut creates = 0_usize;
+    let mut renames = 0_usize;
+    for file in &files {
+        let blob = format!("{pinned}:{file}");
+        let text = git_read(&repo, &["cat-file", "blob", blob.as_str()]);
+        let words = executable_sql_words(&text, file);
+        collect_reconciled_names(&words, file, &mut expected, &mut creates, &mut renames);
+    }
+
+    // The 019 rename is the only rename in the pinned baseline, and its four
+    // targets must be reserved (review R1).
+    assert_eq!(
+        renames, 4,
+        "the pinned baseline holds exactly four RENAME TO targets (all in 019)"
+    );
+    for target in [
+        "v0_demo_role_permissions",
+        "v0_demo_user_roles",
+        "v0_demo_roles",
+        "v0_demo_permissions",
+    ] {
+        assert!(
+            expected.contains(target),
+            "the pinned 019 rename target '{target}' is missing from the derived expectation"
+        );
+    }
+    assert!(
+        creates > 30,
+        "the pinned baseline creates dozens of tables, found {creates}"
+    );
+
+    // The two platform-managed tables never appear in SQL but are reserved.
+    expected.insert("_sqlx_migrations".to_owned());
+    expected.insert("platform_module_migrations".to_owned());
+
+    let actual: BTreeSet<String> = catalog::BASELINE_RESERVED_TABLE_NAMES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+    assert_eq!(
+        actual.len(),
+        catalog::BASELINE_RESERVED_TABLE_NAMES.len(),
+        "BASELINE_RESERVED_TABLE_NAMES repeats a name"
+    );
+    let missing: Vec<&String> = expected.difference(&actual).collect();
+    let extra: Vec<&String> = actual.difference(&expected).collect();
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "BASELINE_RESERVED_TABLE_NAMES does not reconcile with the pinned SQL: \
+         missing {missing:?}, extra {extra:?}"
+    );
 }

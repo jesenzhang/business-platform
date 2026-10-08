@@ -1,0 +1,1 @@
+INSERT INTO roles SELECT r.* FROM roles r, platform_users p;

@@ -120,6 +120,75 @@ pub const HOST_BASELINE_TABLE_OWNERSHIP: &[(&str, &str)] = &[
     ("policy_idempotency", "policy"),
 ];
 
+/// All table names that exist in the pinned host baseline (19 migrations) plus
+/// the two platform-managed tables (`_sqlx_migrations`, `platform_module_migrations`).
+///
+/// This set is *pinned and reconcilable*: the Rust test
+/// `baseline_reserved_tables_are_reconciled_with_pinned_sql` derives the expected
+/// set from the pinned commit blobs and asserts exact equality. A module revision
+/// may not create or declare any table in this set, even if it is not in the
+/// `HOST_BASELINE_TABLE_OWNERSHIP` attribution table (review B2).
+pub const BASELINE_RESERVED_TABLE_NAMES: &[&str] = &[
+    // From 001_initial.sql
+    "tenants",
+    "users",
+    "roles",
+    "permissions",
+    "role_permissions",
+    "user_roles",
+    "outbox_events",
+    "audit_events",
+    // From 002_document_metadata.sql
+    "documents",
+    // From 005_document_idempotency.sql
+    "document_idempotency",
+    // From 006_inbox_idempotency.sql
+    "inbox_events",
+    // From 010_document_processing_mvp.sql
+    "document_processing_jobs",
+    "document_processing_steps",
+    "document_ai_tasks",
+    "document_extraction_candidates",
+    "document_extraction_reviews",
+    // From 011_document_processing_execution_correctness.sql
+    "document_processing_audit_events",
+    // From 012_runtime_audit_integrity_repair.sql
+    "data_integrity_scan_runs",
+    "data_integrity_findings",
+    "data_repair_plans",
+    "data_repair_runs",
+    "data_repair_steps",
+    "data_repair_events",
+    // From 016_document_revision_evidence_foundation.sql
+    "document_revisions",
+    "document_links",
+    "document_purge_holds",
+    "document_processing_runs",
+    "document_processing_artifacts",
+    "document_processing_evidence",
+    // From 019_identity_authorization_foundation.sql
+    "platform_users",
+    "external_identities",
+    "tenant_memberships",
+    "identity_idempotency",
+    "platform_bootstrap_executions",
+    "organization_units",
+    "organization_members",
+    "organization_idempotency",
+    "permission_definitions",
+    "role_bindings",
+    "policy_idempotency",
+    // Legacy renamed tables from 019 (RENAME TO v0_demo_*): the rename targets
+    // keep holding demo-era rows, and no module may claim them (review R1).
+    "v0_demo_role_permissions",
+    "v0_demo_user_roles",
+    "v0_demo_roles",
+    "v0_demo_permissions",
+    // Platform-managed tables (not created by SQL, but reserved)
+    "_sqlx_migrations",
+    "platform_module_migrations",
+];
+
 /// One selectable check of [`validate`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Check {
@@ -1034,7 +1103,13 @@ fn read_manifest_and_files(path: &Path) -> ToolResult<(BTreeMap<String, String>,
         )
     })?;
     for line in split_lf(&text) {
-        let line = line.trim_end_matches('\r');
+        // B5 fix: reject manifest with CR bytes (new namespace manifest must be LF-only)
+        if line.contains('\r') {
+            return Err(refuse(
+                CHECK_CATALOG,
+                format!("catalog manifest '{shown}' contains a CR byte; a namespace manifest is LF-only"),
+            ));
+        }
         if line.is_empty() {
             return Err(refuse(
                 CHECK_CATALOG,
@@ -1738,7 +1813,12 @@ fn word_after(
     ))
 }
 
-/// `CREATE [UNIQUE] INDEX … ON <table> …`.
+/// The index access methods a module revision may name after
+/// `CREATE INDEX … ON <table> USING`. The list is closed: an unknown method is
+/// refused by name instead of being guessed at (review R6).
+const INDEX_ACCESS_METHODS: &[&str] = &["btree", "hash", "gist", "spgist", "gin", "brin"];
+
+/// `CREATE [UNIQUE] INDEX … ON <table> [USING method] …`.
 fn index_events(tokens: &[Token], shown: &str) -> ToolResult<Vec<SqlEvent>> {
     let on = index_of_keyword(tokens, "on").ok_or_else(|| {
         refuse(
@@ -1748,7 +1828,33 @@ fn index_events(tokens: &[Token], shown: &str) -> ToolResult<Vec<SqlEvent>> {
     })?;
     let (name, index) = object_after(tokens, on + 1, &["only"], shown)?;
     let mut events = vec![SqlEvent::Reference(name)];
-    events.extend(body_events(tokens, index, shown)?);
+    // R6: `USING` right behind the ON table introduces an access method, which
+    // is a token kind, never a table. It is consumed here; a `USING` anywhere
+    // else in an index statement is refused below in the body scan.
+    let mut body_from = index;
+    if matches!(tokens.get(index), Some(Token::Word(word)) if word == "using") {
+        let method = match tokens.get(index + 1) {
+            Some(Token::Word(word)) => word.clone(),
+            _ => {
+                return Err(refuse(
+                    CHECK_CATALOG,
+                    format!("{shown}: 'USING' in an index statement names no access method"),
+                ));
+            }
+        };
+        if !INDEX_ACCESS_METHODS.contains(&method.as_str()) {
+            return Err(refuse(
+                CHECK_CATALOG,
+                format!(
+                    "{shown}: index access method '{method}' is outside the supported subset \
+                     ({}); the owner scan refuses it rather than guessing",
+                    INDEX_ACCESS_METHODS.join(", ")
+                ),
+            ));
+        }
+        body_from = index + 2;
+    }
+    events.extend(body_events(tokens, body_from, shown)?);
     Ok(events)
 }
 
@@ -1766,6 +1872,87 @@ fn reference_list(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<
         }
     }
     Ok(events)
+}
+
+/// Words that can never be a bare table alias: seeing one ends the alias slot.
+const CLAUSE_KEYWORDS: &[&str] = &[
+    "all",
+    "and",
+    "as",
+    "by",
+    "cross",
+    "except",
+    "fetch",
+    "for",
+    "from",
+    "full",
+    "group",
+    "having",
+    "in",
+    "inner",
+    "intersect",
+    "join",
+    "left",
+    "like",
+    "limit",
+    "natural",
+    "not",
+    "offset",
+    "on",
+    "or",
+    "order",
+    "outer",
+    "right",
+    "select",
+    "set",
+    "union",
+    "using",
+    "values",
+    "where",
+    "window",
+];
+
+/// Skips an optional alias after a table name: either `AS word` or a bare word
+/// that is not a clause keyword. Returns the index of the first token after the
+/// alias slot.
+fn skip_alias(tokens: &[Token], from: usize) -> usize {
+    let mut index = from;
+    match tokens.get(index) {
+        Some(Token::Word(word)) if word == "as" => {
+            if matches!(tokens.get(index + 1), Some(Token::Word(_))) {
+                index += 2;
+            }
+        }
+        Some(Token::Word(word)) if !CLAUSE_KEYWORDS.contains(&word.as_str()) => index += 1,
+        _ => {}
+    }
+    index
+}
+
+/// A comma separated `table [[AS] alias]` list, as used by `FROM` and by the
+/// table list of `DELETE … USING`. Every table name in the list is checked;
+/// aliases (bare or `AS`) are consumed, and a qualified name behind a comma is
+/// refused by [`object_after`]. The list ends at the first token that is not a
+/// comma continuation.
+fn table_list_events(
+    tokens: &[Token],
+    from: usize,
+    skip: &[&str],
+    shown: &str,
+) -> ToolResult<(Vec<SqlEvent>, usize)> {
+    let mut events = Vec::new();
+    let mut index = from;
+    loop {
+        let (name, next) = object_after(tokens, index, skip, shown)?;
+        events.push(SqlEvent::Reference(name));
+        index = skip_alias(tokens, next);
+        if matches!(tokens.get(index), Some(Token::Symbol(symbol)) if symbol == ",") {
+            index += 1;
+            continue;
+        }
+        break;
+    }
+    Ok((events, index))
 }
 
 /// A module revision destroys nothing the host baseline owns.
@@ -1836,6 +2023,49 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
                 ),
             ));
         }
+        // R6: `INHERITS (parent)` copies a parent table's definition. The
+        // parent lives inside parentheses (a Symbol, never a Word keyword), so
+        // the scan refuses the whole statement by name instead of relying on
+        // an accidental parse failure (review §3 B3 / R6).
+        if keyword == "inherits" {
+            return Err(refuse(
+                CHECK_CATALOG,
+                format!(
+                    "{shown}: 'INHERITS (parent)' inherits another table's definition and is \
+                     outside the supported SQL subset of the owner scan"
+                ),
+            ));
+        }
+        // R2 / R6: `USING` is context dependent. Only `DELETE … USING` opens a
+        // table list; `CREATE INDEX … USING method` names an access method and
+        // is consumed in index_events, and `JOIN … USING (column)` names a
+        // column list. Treating every USING as a table would misread an access
+        // method as an unowned table, so a USING outside DELETE is refused.
+        if keyword == "using" {
+            if first_keyword(tokens) == Some("delete") {
+                let (list, next) = table_list_events(tokens, index + 1, &[], shown)?;
+                events.extend(list);
+                index = next;
+                continue;
+            }
+            return Err(refuse(
+                CHECK_CATALOG,
+                format!(
+                    "{shown}: a 'USING' clause outside 'DELETE … USING' names an access method \
+                     or a join column list, which the owner scan cannot attribute; it is outside \
+                     the supported SQL subset"
+                ),
+            ));
+        }
+        // B3 fix: detect ATTACH PARTITION / DETACH PARTITION
+        if (keyword == "attach" || keyword == "detach")
+            && matches!(tokens.get(index + 1), Some(Token::Word(w)) if w == "partition")
+        {
+            let (name, next) = object_after(tokens, index + 2, &[], shown)?;
+            events.push(SqlEvent::Reference(name));
+            index = next;
+            continue;
+        }
         if matches!(keyword, "references" | "from" | "join") {
             if matches!(tokens.get(index + 1), Some(Token::Word(word)) if word == "select") {
                 return Err(refuse(
@@ -1846,8 +2076,20 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
                     ),
                 ));
             }
-            let (name, next) = object_after(tokens, index + 1, &["only", "lateral"], shown)?;
-            events.push(SqlEvent::Reference(name));
+            if keyword == "references" {
+                // A REFERENCES target is always exactly one table: a column
+                // list may follow in parentheses, but never an alias or a
+                // comma list.
+                let (name, next) = object_after(tokens, index + 1, &["only"], shown)?;
+                events.push(SqlEvent::Reference(name));
+                index = next;
+                continue;
+            }
+            // R2: FROM and JOIN take a table list with optional (bare or AS)
+            // aliases. Every reference in the list is owner checked; a
+            // qualified name anywhere in the list is refused by name.
+            let (list, next) = table_list_events(tokens, index + 1, &["only", "lateral"], shown)?;
+            events.extend(list);
             index = next;
             continue;
         }
@@ -1858,6 +2100,24 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
 
 /// Applies the owner rules of design §11.2 #10 to every revision of a catalog.
 ///
+/// Reads one revision file, returning its display path and text; a revision
+/// that is not readable UTF-8 is refused with its path named.
+fn read_revision_sql(path: &Path, revision: &Revision) -> ToolResult<(String, String)> {
+    let shown = path.join(&revision.file_name).display().to_string();
+    let text = String::from_utf8(read_regular_file(
+        CHECK_CATALOG,
+        &path.join(&revision.file_name),
+        "SQL file",
+    )?)
+    .map_err(|_| {
+        refuse(
+            CHECK_CATALOG,
+            format!("{shown}: a migration file must be valid UTF-8"),
+        )
+    })?;
+    Ok((shown, text))
+}
+
 /// Returns the tables the namespace owns after its own catalog, and the
 /// revisions annotated with what each of them creates.
 fn scan_sql_ownership(
@@ -1872,18 +2132,7 @@ fn scan_sql_ownership(
         .collect();
     let mut annotated: Vec<Revision> = Vec::new();
     for revision in revisions {
-        let shown = path.join(&revision.file_name).display().to_string();
-        let text = String::from_utf8(read_regular_file(
-            CHECK_CATALOG,
-            &path.join(&revision.file_name),
-            "SQL file",
-        )?)
-        .map_err(|_| {
-            refuse(
-                CHECK_CATALOG,
-                format!("{shown}: a migration file must be valid UTF-8"),
-            )
-        })?;
+        let (shown, text) = read_revision_sql(path, revision)?;
         let (declarations, events) = analyse_sql(&text, &shown)?;
         let mut local: Vec<String> = Vec::new();
         for event in &events {
@@ -1898,12 +2147,24 @@ fn scan_sql_ownership(
                             ),
                         ));
                     }
+                    // Check host_table_owner first to provide the more specific error message
                     if let Some(other) = host_table_owner(table) {
                         return Err(refuse(
                             CHECK_CATALOG,
                             format!(
                                 "{shown}: '{table}' is a host baseline table owned by '{other}'; \
                                  a module revision may not create another owner's table",
+                            ),
+                        ));
+                    }
+                    // B2 fix: reject creation of any other table that exists in the pinned baseline.
+                    if BASELINE_RESERVED_TABLE_NAMES.contains(&table.as_str()) {
+                        return Err(refuse(
+                            CHECK_CATALOG,
+                            format!(
+                                "{shown}: creates '{table}', which already exists in the pinned \
+                                 host baseline; a module revision may not declare an existing \
+                                 platform object as its own new table"
                             ),
                         ));
                     }
@@ -2849,44 +3110,468 @@ fn collect_rust_files(
 /// Finds every `sqlx::migrate!` call in one Rust file.
 ///
 /// Comments are removed first (they are where review P-4's explanatory text
-/// legitimately quotes the macro), and every call must be spelled
-/// `sqlx::migrate!` with exactly one plain string literal argument.
+/// legitimately quotes the macro) and string literals are masked, so a quoted
+/// pseudo-call never counts as an embed point.
+///
+/// Review R5: the scan runs in two passes so declaration order stops mattering.
+/// Pass 1 (`collect_migrate_bindings`) parses `use` trees and collects every
+/// name bound to `sqlx::migrate` — `use sqlx::migrate;`, `use sqlx::migrate as
+/// embed;`, and the same spellings inside a group. Pass 2
+/// (`find_migrate_calls`) accepts the direct spelling `sqlx :: migrate ! ( … )`
+/// with any whitespace (comments included) between the tokens, plus a bare
+/// call of every bound name. Anything the scan cannot resolve — a
+/// `use sqlx::*` glob, a `use sqlx as …` crate alias, a `migrate` import from
+/// any other path, or a call behind a path other than `sqlx::` — is refused by
+/// name instead of being guessed around or treated as "no embed found"
+/// (review §3.7).
 fn migrate_macro_calls(shown: &str, text: &str) -> ToolResult<Vec<(usize, String)>> {
     let code: Vec<char> = strip_rust_comments(text).chars().collect();
-    let needle: Vec<char> = "migrate".chars().collect();
-    let mut found: Vec<(usize, String)> = Vec::new();
-    let mut start = 0_usize;
-    while let Some(offset) = find_subslice(&code[start..], &needle).map(|index| index + start) {
-        start = offset + needle.len();
-        let before_identifiable = offset > 0 && is_ident_char(code[offset - 1]);
-        let after_identifiable = code
-            .get(start)
-            .is_some_and(|&character| is_ident_char(character));
-        if before_identifiable || after_identifiable {
+    let mask = significant_mask(&code);
+    let bindings = collect_migrate_bindings(shown, &code, &mask)?;
+    find_migrate_calls(shown, &code, &mask, &bindings)
+}
+
+/// True for every character outside a string, byte string or raw literal.
+/// Char literals and lifetimes stay visible; neither can carry a macro call,
+/// and guessing at the difference is how a scan starts corrupting itself.
+fn significant_mask(code: &[char]) -> Vec<bool> {
+    let mut mask = vec![true; code.len()];
+    let mut index = 0_usize;
+    while index < code.len() {
+        let rooted = index == 0 || !is_ident_char(code[index - 1]);
+        if rooted && (code[index] == 'r' || code[index] == 'b') {
+            if let Some(after) = mask_raw_literal(code, &mut mask, index) {
+                index = after;
+                continue;
+            }
+        }
+        if code[index] == '"' {
+            index = mask_quoted(code, &mut mask, index, index);
             continue;
         }
-        if !ends_with_before_ws(&code, offset, &["sqlx", "::"]) {
+        index += 1;
+    }
+    mask
+}
+
+/// Masks one `r"…"`, `r#"…"#`, `b"…"` or `br#"…"#` literal starting at
+/// `index`. Returns the index after it, or `None` when no such literal starts
+/// here (a plain identifier that merely begins with `r` or `b`).
+fn mask_raw_literal(code: &[char], mask: &mut [bool], index: usize) -> Option<usize> {
+    let mut cursor = index;
+    if code[index] == 'b' {
+        if code.get(cursor + 1) == Some(&'"') {
+            return Some(mask_quoted(code, mask, index, cursor + 1));
+        }
+        cursor += 1;
+        if code.get(cursor) != Some(&'r') {
+            return None;
+        }
+    }
+    cursor += 1;
+    let mut hashes = 0_usize;
+    while code.get(cursor) == Some(&'#') {
+        hashes += 1;
+        cursor += 1;
+    }
+    if code.get(cursor) != Some(&'"') {
+        return None;
+    }
+    cursor += 1;
+    while cursor < code.len() {
+        if code[cursor] == '"' {
+            let mut closing = cursor + 1;
+            let mut matched = 0_usize;
+            while matched < hashes && code.get(closing) == Some(&'#') {
+                matched += 1;
+                closing += 1;
+            }
+            if matched == hashes {
+                for slot in &mut mask[index..closing] {
+                    *slot = false;
+                }
+                return Some(closing);
+            }
+        }
+        cursor += 1;
+    }
+    for slot in &mut mask[index..] {
+        *slot = false;
+    }
+    Some(code.len())
+}
+
+/// Masks an ordinary string literal whose opening quote is at `open`, starting
+/// the mask at `from` (so a `b"…"` prefix is masked with it). An unterminated
+/// literal masks to end of file; the compiler owns that error, the scan just
+/// must not read the region as code.
+fn mask_quoted(code: &[char], mask: &mut [bool], from: usize, open: usize) -> usize {
+    let mut cursor = open + 1;
+    while cursor < code.len() {
+        match code[cursor] {
+            '"' => {
+                for slot in &mut mask[from..=cursor] {
+                    *slot = false;
+                }
+                return cursor + 1;
+            }
+            '\\' => cursor += 2,
+            _ => cursor += 1,
+        }
+    }
+    for slot in &mut mask[from..] {
+        *slot = false;
+    }
+    code.len()
+}
+
+/// Reads the identifier run starting at `index`, which must be the first
+/// character of an identifier.
+fn word_at(code: &[char], index: usize) -> (String, usize) {
+    let mut end = index;
+    while end < code.len() && is_ident_char(code[end]) {
+        end += 1;
+    }
+    (code[index..end].iter().collect(), end)
+}
+
+/// Index of the next character that is neither whitespace nor masked.
+fn next_significant(code: &[char], mask: &[bool], mut index: usize) -> usize {
+    while index < code.len() && (code[index].is_whitespace() || !mask[index]) {
+        index += 1;
+    }
+    index
+}
+
+/// True when the two significant characters before `index` are the `::` of a
+/// path, so the word there is a path segment rather than a bare call name.
+fn previous_is_path_separator(code: &[char], mask: &[bool], index: usize) -> bool {
+    let mut seen = 0_usize;
+    let mut cursor = index;
+    while cursor > 0 {
+        cursor -= 1;
+        if code[cursor].is_whitespace() || !mask[cursor] {
             continue;
         }
-        let mut cursor = skip_ws(&code, start);
-        if code.get(cursor) != Some(&'!') {
+        if code[cursor] == ':' && seen < 2 {
+            seen += 1;
             continue;
         }
-        cursor = skip_ws(&code, cursor + 1);
-        if code.get(cursor) != Some(&'(') {
-            return Err(cannot_decide(
-                shown,
-                offset,
-                &code,
-                "is not followed by '('",
+        break;
+    }
+    seen == 2
+}
+
+/// Pass 1 of the R5 scan: every name in this file bound to `sqlx::migrate` by
+/// a `use` statement, collected before any call is looked at.
+///
+/// Bindings the scan cannot follow are refused at once — a `use sqlx::*` glob
+/// (which could bind the macro without naming it), a `use sqlx as …` crate
+/// alias (which renames every `sqlx::` path), and a `migrate` name imported
+/// from any other root (a re-export that could be the macro) — rather than
+/// being treated as "no embed found" (review §3.7, repair R5).
+fn collect_migrate_bindings(shown: &str, code: &[char], mask: &[bool]) -> ToolResult<Vec<String>> {
+    let mut bindings: Vec<String> = Vec::new();
+    let mut index = 0_usize;
+    while index < code.len() {
+        let starts_word = mask[index]
+            && is_ident_char(code[index])
+            && (index == 0 || !is_ident_char(code[index - 1]));
+        if !starts_word {
+            index += 1;
+            continue;
+        }
+        let (word, after) = word_at(code, index);
+        if word != "use" {
+            index = after;
+            continue;
+        }
+        let mut depth = 0_i32;
+        let mut end = after;
+        let terminated = loop {
+            if end >= code.len() {
+                break false;
+            }
+            if mask[end] {
+                match code[end] {
+                    '{' => depth += 1,
+                    '}' => depth -= 1,
+                    ';' if depth == 0 => break true,
+                    _ => {}
+                }
+            }
+            end += 1;
+        };
+        if !terminated {
+            return Err(refuse(
+                CHECK_EMBED,
+                format!(
+                    "a 'use' statement in '{shown}' never reaches its ';'; the embed scan \
+                     cannot follow it"
+                ),
             ));
         }
-        cursor = skip_ws(&code, cursor + 1);
+        parse_use_items(shown, code, mask, after, end, &[], &mut bindings)?;
+        index = end;
+    }
+    Ok(bindings)
+}
+
+/// Splits one use tree (or the inside of one `{…}` group) at top-level commas
+/// and parses every item with the inherited path prefix.
+fn parse_use_items(
+    shown: &str,
+    code: &[char],
+    mask: &[bool],
+    start: usize,
+    end: usize,
+    prefix: &[String],
+    bindings: &mut Vec<String>,
+) -> ToolResult<()> {
+    let mut cursor = start;
+    let mut item_start = start;
+    let mut depth = 0_i32;
+    while cursor < end {
+        if mask[cursor] {
+            match code[cursor] {
+                '{' => depth += 1,
+                '}' => depth -= 1,
+                ',' if depth == 0 => {
+                    parse_use_item(shown, code, mask, item_start, cursor, prefix, bindings)?;
+                    item_start = cursor + 1;
+                }
+                _ => {}
+            }
+        }
+        cursor += 1;
+    }
+    parse_use_item(shown, code, mask, item_start, end, prefix, bindings)
+}
+
+/// Parses one use item — a path with optional group continuation and optional
+/// `as` alias — and records or refuses the binding it produces.
+fn parse_use_item(
+    shown: &str,
+    code: &[char],
+    mask: &[bool],
+    start: usize,
+    end: usize,
+    prefix: &[String],
+    bindings: &mut Vec<String>,
+) -> ToolResult<()> {
+    let mut path: Vec<String> = prefix.to_vec();
+    let mut cursor = next_significant(code, mask, start);
+    if cursor >= end {
+        return Ok(()); // trailing comma inside a group
+    }
+    if path.is_empty() && code.get(cursor) == Some(&':') && code.get(cursor + 1) == Some(&':') {
+        cursor = next_significant(code, mask, cursor + 2); // absolute `::path`
+    }
+    loop {
+        if cursor >= end {
+            return Ok(());
+        }
+        if code[cursor] == '*' {
+            if path.len() == 1 && path[0] == "sqlx" {
+                return Err(cannot_decide(
+                    shown,
+                    cursor,
+                    code,
+                    "can be bound by the 'use sqlx::*' glob in this file; the scan refuses to \
+                     assume the macro is not imported (it cannot be attributed)",
+                ));
+            }
+            return Ok(());
+        }
+        if code[cursor] == '{' {
+            let group_end = matching_brace(shown, code, mask, cursor, end)?;
+            return parse_use_items(shown, code, mask, cursor + 1, group_end, &path, bindings);
+        }
+        if !is_ident_char(code[cursor]) {
+            return Err(refuse(
+                CHECK_EMBED,
+                format!("the 'use' tree in '{shown}' is not a path the embed scan can read"),
+            ));
+        }
+        let (ident, after) = word_at(code, cursor);
+        cursor = next_significant(code, mask, after);
+        if ident == "self" {
+            if path.len() == 1
+                && path[0] == "sqlx"
+                && cursor < end
+                && word_at(code, cursor).0 == "as"
+            {
+                return Err(cannot_decide(
+                    shown,
+                    cursor,
+                    code,
+                    "is reached through the crate alias 'use sqlx::{self as …}'; the scan \
+                     cannot follow migrate paths behind a crate alias (it cannot be attributed)",
+                ));
+            }
+            return Ok(());
+        }
+        path.push(ident);
+        if cursor >= end {
+            break;
+        }
+        if code[cursor] == ':' && code.get(cursor + 1) == Some(&':') {
+            cursor = next_significant(code, mask, cursor + 2);
+            continue;
+        }
+        if word_at(code, cursor).0 == "as" {
+            cursor = next_significant(code, mask, cursor + 2);
+            if cursor >= end || !is_ident_char(code[cursor]) {
+                return Err(refuse(
+                    CHECK_EMBED,
+                    format!("the 'use' tree in '{shown}' has an 'as' without a name"),
+                ));
+            }
+            let (alias, _) = word_at(code, cursor);
+            if alias == "_" {
+                return Ok(()); // `as _` binds no callable name
+            }
+            if path.len() == 1 && path[0] == "sqlx" {
+                return Err(cannot_decide(
+                    shown,
+                    cursor,
+                    code,
+                    "renames the whole 'sqlx' crate ('use sqlx as …'); every migrate path could \
+                     hide behind the crate alias (it cannot be attributed)",
+                ));
+            }
+            return note_migrate_binding(shown, code, cursor, &path, Some(alias), bindings);
+        }
+        break;
+    }
+    note_migrate_binding(shown, code, end, &path, None, bindings)
+}
+
+/// Index of the `}` matching the `{` at `open`, inside a use tree.
+fn matching_brace(
+    shown: &str,
+    code: &[char],
+    mask: &[bool],
+    open: usize,
+    end: usize,
+) -> ToolResult<usize> {
+    let mut depth = 0_i32;
+    let mut cursor = open;
+    while cursor < end {
+        if mask[cursor] {
+            match code[cursor] {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(cursor);
+                    }
+                }
+                _ => {}
+            }
+        }
+        cursor += 1;
+    }
+    Err(refuse(
+        CHECK_EMBED,
+        format!("the 'use' tree in '{shown}' has a brace that never closes"),
+    ))
+}
+
+/// Records one completed use binding. `sqlx::migrate` (bare or aliased) makes
+/// its spelling callable; a `migrate` name that comes from any other path, or
+/// that some other item is aliased *to*, is refused: a later bare call to that
+/// name could be the baseline macro through a re-export.
+fn note_migrate_binding(
+    shown: &str,
+    code: &[char],
+    offset: usize,
+    path: &[String],
+    alias: Option<String>,
+    bindings: &mut Vec<String>,
+) -> ToolResult<()> {
+    let ends_at_migrate = path.last().is_some_and(|last| last == "migrate");
+    let rooted_in_sqlx = path.first().is_some_and(|root| root == "sqlx");
+    let binds_macro = rooted_in_sqlx && path.len() == 2 && ends_at_migrate;
+    if binds_macro {
+        bindings.push(alias.unwrap_or_else(|| "migrate".to_owned()));
+        return Ok(());
+    }
+    if ends_at_migrate || alias.as_deref() == Some("migrate") {
+        return Err(cannot_decide(
+            shown,
+            offset,
+            code,
+            "binds the name 'migrate' to something other than 'sqlx::migrate'; the scan cannot \
+             be sure a later call is not the baseline macro (it cannot be attributed)",
+        ));
+    }
+    Ok(())
+}
+
+/// Pass 2 of the R5 scan: every `migrate` macro call site in the file.
+///
+/// A call is one of: the direct spelling `sqlx :: migrate ! ( … )` (any
+/// whitespace between tokens), or a bare call of a name bound by pass 1. A
+/// `migrate` call behind any other path, or bare without a resolvable
+/// binding, is refused by name — missing the second embed point is the exact
+/// failure review R5 documents, so an unattributable call is never waved
+/// through.
+fn find_migrate_calls(
+    shown: &str,
+    code: &[char],
+    mask: &[bool],
+    bindings: &[String],
+) -> ToolResult<Vec<(usize, String)>> {
+    let mut found: Vec<(usize, String)> = Vec::new();
+    let mut index = 0_usize;
+    while index < code.len() {
+        let starts_word = mask[index]
+            && is_ident_char(code[index])
+            && (index == 0 || !is_ident_char(code[index - 1]));
+        if !starts_word {
+            index += 1;
+            continue;
+        }
+        let (word, after) = word_at(code, index);
+        let bound = bindings.iter().any(|name| name == &word);
+        if word != "migrate" && !bound {
+            index = after;
+            continue;
+        }
+        let bang = next_significant(code, mask, after);
+        if code.get(bang) != Some(&'!') {
+            index = after;
+            continue;
+        }
+        let open = next_significant(code, mask, bang + 1);
+        if !matches!(code.get(open), Some('(' | '[' | '{')) {
+            // `bound != x` and friends: the `!` is an operator, not a macro.
+            index = after;
+            continue;
+        }
+        let direct = word == "migrate" && ends_with_before_ws(code, index, &["sqlx", "::"]);
+        if !direct {
+            let qualified = previous_is_path_separator(code, mask, index);
+            if qualified || !bound {
+                return Err(cannot_decide(
+                    shown,
+                    index,
+                    code,
+                    "is called behind a path or name that cannot be attributed to \
+                     'sqlx::migrate'",
+                ));
+            }
+        }
+        if code.get(open) != Some(&'(') {
+            return Err(cannot_decide(shown, index, code, "is not followed by '('"));
+        }
+        let mut cursor = skip_ws(code, open + 1);
         if code.get(cursor) != Some(&'"') {
             return Err(cannot_decide(
                 shown,
-                offset,
-                &code,
+                index,
+                code,
                 "does not have a plain string literal as its only argument",
             ));
         }
@@ -2912,22 +3597,23 @@ fn migrate_macro_calls(shown: &str, text: &str) -> ToolResult<Vec<(usize, String
         if !closed {
             return Err(cannot_decide(
                 shown,
-                offset,
-                &code,
+                index,
+                code,
                 "has an unterminated string literal argument",
             ));
         }
-        cursor = skip_ws(&code, cursor);
+        cursor = skip_ws(code, cursor);
         if code.get(cursor) != Some(&')') {
             return Err(cannot_decide(
                 shown,
-                offset,
-                &code,
+                index,
+                code,
                 "has more than one argument, which the scan cannot attribute",
             ));
         }
-        let line = code[..offset].iter().filter(|&&c| c == '\n').count() + 1;
+        let line = code[..index].iter().filter(|&&c| c == '\n').count() + 1;
         found.push((line, argument));
+        index = after;
     }
     Ok(found)
 }
@@ -3084,14 +3770,6 @@ fn ends_with_before_ws(code: &[char], index: usize, tokens: &[&str]) -> bool {
         cursor -= chars.len();
     }
     cursor == 0 || !is_ident_char(code[cursor - 1]) || code[cursor - 1] == ':'
-}
-
-fn find_subslice(haystack: &[char], needle: &[char]) -> Option<usize> {
-    if needle.is_empty() || haystack.len() < needle.len() {
-        return None;
-    }
-    (0..=haystack.len() - needle.len())
-        .find(|&start| &haystack[start..start + needle.len()] == needle)
 }
 
 /// The named "cannot decide" refusal of review §3.7.
@@ -3323,4 +4001,229 @@ pub fn validate(root: &Path, checks: &[Check]) -> ToolResult<Report> {
         embed,
         freeze,
     })
+}
+
+// ---------------------------------------------------------------------------
+// unit tests — the R5 embed scan (review §3.7, repair R5)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod embed_scan_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use super::{migrate_macro_calls, verify_embed_point};
+    use crate::tempdir::TempDir;
+    use std::fs;
+
+    const BASELINE: &str = "../../migrations";
+
+    fn calls(source: &str) -> Vec<(usize, String)> {
+        migrate_macro_calls("fixture.rs", source)
+            .unwrap_or_else(|error| panic!("the scan must decide this fixture, got {error}"))
+    }
+
+    fn assert_one_call(source: &str, argument: &str) {
+        let found = calls(source);
+        assert_eq!(
+            found.len(),
+            1,
+            "exactly one embed call expected for:\n{source}"
+        );
+        assert_eq!(found[0].1, argument);
+    }
+
+    #[test]
+    fn bare_import_second_embed_is_counted() {
+        assert_one_call(
+            "use sqlx::migrate;\n\
+             static M: sqlx::migrate::Migrator = migrate!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn aliased_import_second_embed_is_counted() {
+        assert_one_call(
+            "use sqlx::migrate as embed;\n\
+             static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn group_import_second_embed_is_counted() {
+        assert_one_call(
+            "use sqlx::{migrate};\n\
+             static M: sqlx::migrate::Migrator = migrate!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn spaced_direct_call_is_counted() {
+        assert_one_call(
+            "static M: sqlx::migrate::Migrator = \
+             sqlx :: migrate ! ( \"../../migrations\" );",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn group_alias_import_is_counted() {
+        assert_one_call(
+            "use sqlx::{migrate as embed, Row};\n\
+             static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn import_after_call_is_counted() {
+        assert_one_call(
+            "static M: sqlx::migrate::Migrator = migrate!(\"../../migrations\");\n\
+             use sqlx::migrate;",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn comments_between_macro_tokens_are_counted() {
+        assert_one_call(
+            "static M: sqlx::migrate::Migrator = \
+             sqlx /* p */ :: /* p */ migrate /* p */ ! /* p */ ( \"../../migrations\" );",
+            BASELINE,
+        );
+    }
+
+    #[test]
+    fn sqlite_own_relative_embed_still_counts() {
+        assert_one_call(
+            "pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!(\"./migrations\");",
+            "./migrations",
+        );
+    }
+
+    #[test]
+    fn quoted_and_commented_pseudo_calls_are_not_counted() {
+        let source = "// sqlx::migrate!(\"../../migrations\")\n\
+                      /* sqlx::migrate!(\"../../migrations\") */\n\
+                      fn note() -> &'static str { \"sqlx::migrate!(\\\"x\\\")\" }\n\
+                      fn raw() -> &'static str { r#\"sqlx::migrate!(\"x\")\"# }\n";
+        assert!(calls(source).is_empty(), "pseudo-calls must not count");
+    }
+
+    #[test]
+    fn quoted_pseudo_call_of_an_imported_alias_is_not_counted() {
+        let source =
+            "use sqlx::migrate as embed;\nfn note() -> String { \"embed!(\\\"x\\\")\".to_owned() }\n";
+        assert!(calls(source).is_empty());
+    }
+
+    #[test]
+    fn submodule_import_does_not_bind_the_macro() {
+        let source = "use sqlx::migrate::MigrateDatabase;\n\
+                      use sqlx::migrate::{Migrate, Migration};\n\
+                      fn run() {}\n";
+        assert!(calls(source).is_empty());
+    }
+
+    #[test]
+    fn bare_call_without_import_is_refused_by_name() {
+        let error = migrate_macro_calls("fixture.rs", "fn main() { migrate!(\"x\"); }")
+            .expect_err("a bare migrate call without an import cannot be attributed");
+        assert!(
+            error.to_string().contains("cannot be attributed"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn path_call_behind_another_path_is_refused_by_name() {
+        let error = migrate_macro_calls("fixture.rs", "fn main() { db::migrate!(\"x\"); }")
+            .expect_err("sqlx:: is the only attributed direct path");
+        assert!(
+            error.to_string().contains("cannot be attributed"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn glob_import_is_refused_by_name() {
+        let error = migrate_macro_calls("fixture.rs", "use sqlx::*;\nfn run() {}\n")
+            .expect_err("a sqlx glob can bind migrate without naming it");
+        assert!(error.to_string().contains("glob"), "{error}");
+    }
+
+    #[test]
+    fn crate_alias_import_is_refused_by_name() {
+        let error = migrate_macro_calls("fixture.rs", "use sqlx as db;\nfn run() {}\n")
+            .expect_err("a crate alias renames the migrate path");
+        assert!(error.to_string().contains("crate alias"), "{error}");
+    }
+
+    #[test]
+    fn reexported_migrate_import_is_refused_by_name() {
+        let error = migrate_macro_calls(
+            "fixture.rs",
+            "use crate::migrate;\nfn main() { migrate!(\"x\"); }\n",
+        )
+        .expect_err("a migrate binding that is not sqlx::migrate must not be trusted");
+        assert!(
+            error.to_string().contains("cannot be attributed"),
+            "{error}"
+        );
+    }
+
+    /// The end-to-end form of review R5: a second baseline embed in any of the
+    /// four spellings must never be waved through as `baseline_embed_points=1`.
+    #[test]
+    fn every_second_baseline_embed_form_is_refused_not_missed() {
+        for (name, source) in [
+            (
+                "bare",
+                "use sqlx::migrate;\nstatic M: sqlx::migrate::Migrator = migrate!(\"../../migrations\");\n",
+            ),
+            (
+                "alias",
+                "use sqlx::migrate as embed;\nstatic M: sqlx::migrate::Migrator = embed!(\"../../migrations\");\n",
+            ),
+            (
+                "group",
+                "use sqlx::{migrate};\nstatic M: sqlx::migrate::Migrator = migrate!(\"../../migrations\");\n",
+            ),
+            (
+                "spaced",
+                "static M: sqlx::migrate::Migrator = sqlx :: migrate ! ( \"../../migrations\" );\n",
+            ),
+        ] {
+            let work = TempDir::new(&format!("wave5b-embed-{name}")).expect("temp dir");
+            let baseline_crate = work.path().join("crates").join("runtime-migration");
+            let second_crate = work.path().join("crates").join("second-embed");
+            let baseline_src = baseline_crate.join("src");
+            let second_src = second_crate.join("src");
+            fs::create_dir_all(&baseline_src).expect("baseline crate dir");
+            fs::create_dir_all(&second_src).expect("second crate dir");
+            fs::create_dir_all(work.path().join("migrations")).expect("migrations dir");
+            // The scan resolves a relative embed against the crate directory,
+            // which it finds through the crate's Cargo.toml.
+            fs::write(baseline_crate.join("Cargo.toml"), "[package]\n")
+                .expect("baseline crate manifest");
+            fs::write(second_crate.join("Cargo.toml"), "[package]\n")
+                .expect("second crate manifest");
+            fs::write(
+                baseline_src.join("lib.rs"),
+                "pub static MIGRATOR: Migrator = sqlx::migrate!(\"../../migrations\");\n",
+            )
+            .expect("write baseline embed");
+            fs::write(second_src.join("lib.rs"), source).expect("write second embed");
+            let error = verify_embed_point(work.path())
+                .expect_err("a second baseline embed must be refused");
+            assert!(
+                error
+                    .to_string()
+                    .contains("2 call sites embed the host baseline"),
+                "{name}: expected a second-embed refusal, got: {error}"
+            );
+        }
+    }
 }

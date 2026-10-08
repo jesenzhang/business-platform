@@ -61,6 +61,45 @@ function Write-Log([string]$Line) {
     Write-Host $Line
 }
 
+function Get-CanonicalPath([string]$Path) {
+    <#  Returns the canonical absolute form of Path. For non-existent paths,
+        resolves the parent and appends the final component. #>
+    if (Test-Path -LiteralPath $Path) {
+        return (Resolve-Path -LiteralPath $Path).Path
+    }
+    $parent = Split-Path -Parent $Path
+    $child = Split-Path -Leaf $Path
+    $canonicalParent = Get-CanonicalPath $parent
+    return Join-Path $canonicalParent $child
+}
+
+function Assert-PathSafe([string]$Candidate, [string]$Ancestor, [string]$Label) {
+    <#  B1 fix: ensures Candidate is not the same as, or an ancestor of, Ancestor. #>
+    $candidateCanonical = Get-CanonicalPath $Candidate
+    $ancestorCanonical = Get-CanonicalPath $Ancestor
+    if ($candidateCanonical -eq $ancestorCanonical) {
+        throw "${Label}: candidate path '$Candidate' equals the protected path '$Ancestor'"
+    }
+    if ($ancestorCanonical.StartsWith($candidateCanonical + '\')) {
+        throw "${Label}: candidate path '$Candidate' is an ancestor of the protected path '$Ancestor'"
+    }
+}
+
+function Assert-PathsDoNotOverlap([string]$Path1, [string]$Path2, [string]$Label1, [string]$Label2) {
+    <#  B1 fix: ensures neither path is the same as or contains the other. #>
+    $canonical1 = Get-CanonicalPath $Path1
+    $canonical2 = Get-CanonicalPath $Path2
+    if ($canonical1 -eq $canonical2) {
+        throw "$Label1 and $Label2 overlap: both resolve to '$canonical1'"
+    }
+    if ($canonical1.StartsWith($canonical2 + '\')) {
+        throw "$Label1 and $Label2 overlap: '$Label1' ('$canonical1') is under '$Label2' ('$canonical2')"
+    }
+    if ($canonical2.StartsWith($canonical1 + '\')) {
+        throw "$Label1 and $Label2 overlap: '$Label2' ('$canonical2') is under '$Label1' ('$canonical1')"
+    }
+}
+
 function Remove-Tree {
     <#  Deletes a scratch file or tree, clearing attributes and unlinking
         junctions first: Windows refuses a recursive delete of a tree that still
@@ -119,9 +158,16 @@ function New-EvidenceDirectory([string]$Path) {
 }
 
 function New-FreshDirectory([string]$Path) {
-    Remove-Tree -Path $Path
-    New-Item -ItemType Directory -Force -Path $Path | Out-Null
-    return (Resolve-Path -LiteralPath $Path).Path
+    <#  B1 fix: do not delete the passed path at all. Create a unique per-run
+        subdirectory under it and return that. The caller is responsible for
+        validating that Path is safe before calling this function. #>
+    $runId = [guid]::NewGuid().ToString('N')
+    $runDir = Join-Path $Path ("run-" + $runId)
+    if (Test-Path -LiteralPath $runDir) {
+        throw "run directory '$runDir' already exists; this should never happen (GUID collision or stale state)"
+    }
+    New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+    return (Resolve-Path -LiteralPath $runDir).Path
 }
 
 function Invoke-Command2 {
@@ -170,7 +216,7 @@ function Invoke-Command2 {
 }
 
 function Get-GitBlobBytes {
-    <#  `git cat-file blob <rev>:<path>` as raw bytes, with process-level
+    <#  `git cat-file blob <rev> <path>` as raw bytes, with process-level
         redirection so no PowerShell text decoding can touch the content. #>
     param([string]$Repository, [string]$Spec)
     $tag = [guid]::NewGuid().ToString('N')
@@ -259,33 +305,155 @@ if (-not (Test-Path -LiteralPath $expectationPath)) {
     throw "missing shared expectations: $expectationPath"
 }
 $keepEvidenceOutsideScratch = -not [string]::IsNullOrWhiteSpace($EvidenceDir)
-$scratchRoot = New-FreshDirectory -Path $script:Scratch
+
+# B1 fix: validate all path relationships before any deletion or creation.
+$canonicalRepo = Get-CanonicalPath $script:Repo
+$scratchPath = if ([string]::IsNullOrWhiteSpace($Scratch)) {
+    Join-Path $script:Repo 'target/tmp/plan0014-wave5b'
+} else {
+    $Scratch
+}
+# For a non-existent scratch, resolve the parent first.
+if (-not (Test-Path -LiteralPath $scratchPath)) {
+    $scratchParent = Split-Path -Parent $scratchPath
+    if (-not (Test-Path -LiteralPath $scratchParent)) {
+        throw "scratch parent '$scratchParent' does not exist; cannot validate scratch path"
+    }
+    $scratchCanonicalParent = Get-CanonicalPath $scratchParent
+    $scratchLeaf = Split-Path -Leaf $scratchPath
+    $script:Scratch = Join-Path $scratchCanonicalParent $scratchLeaf
+} else {
+    $script:Scratch = (Resolve-Path -LiteralPath $scratchPath).Path
+}
+$canonicalScratch = Get-CanonicalPath $script:Scratch
+
+# Reject scratch that equals or is an ancestor of the repo.
+Assert-PathSafe -Candidate $canonicalScratch -Ancestor $canonicalRepo -Label "scratch validation"
+# Reject scratch that is a drive root or filesystem root.
+if ($canonicalScratch -match '^[A-Z]:\\$' -or $canonicalScratch -eq (Get-Location -PSProvider FileSystem).ProviderPath) {
+    throw "scratch path '$script:Scratch' is a filesystem root; refuse to operate on root directories"
+}
+
+# Prepare evidence directory path (but do not create it yet).
+if ($keepEvidenceOutsideScratch) {
+    if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
+        throw "-EvidenceDir must be specified when not keeping evidence inside scratch"
+    }
+    $evidencePath = if (Split-Path -IsAbsolute $EvidenceDir) {
+        $EvidenceDir
+    } else {
+        Join-Path $script:Repo $EvidenceDir
+    }
+    $canonicalEvidence = Get-CanonicalPath $evidencePath
+    # Ensure evidence doesn't overlap with scratch.
+    Assert-PathsDoNotOverlap -Path1 $canonicalScratch -Path2 $canonicalEvidence -Label1 "scratch" -Label2 "evidence"
+} else {
+    $canonicalEvidence = $null
+}
+
+# R4 fix: every run root this run creates is registered together with the
+# parent directory validated for it, and cleanup may delete exactly the
+# registered roots themselves — never the parent the caller handed in, and
+# never a path that was not registered. Protected paths (the repository, the
+# scratch parent, an external evidence directory) refuse deletion even when a
+# registration were wrong.
+$script:RunRoots = [System.Collections.Generic.List[object]]::new()
+$script:ProtectedPaths = [System.Collections.Generic.List[string]]::new()
+$script:ProtectedPaths.Add($canonicalRepo)
+$script:ProtectedPaths.Add($canonicalScratch)
+if ($keepEvidenceOutsideScratch) {
+    $script:ProtectedPaths.Add($canonicalEvidence)
+}
+
+function Register-RunRoot([string]$Root, [string]$Parent, [string]$Kind) {
+    <#  Registers one run-scoped directory tree for guaranteed cleanup. The
+        root must resolve inside the validated parent it is registered under. #>
+    $canonicalRootPath = Get-CanonicalPath $Root
+    $canonicalParentPath = (Get-CanonicalPath $Parent).TrimEnd('\')
+    if (-not $canonicalRootPath.ToLowerInvariant().StartsWith(
+            $canonicalParentPath.ToLowerInvariant() + '\')) {
+        throw "run root '$canonicalRootPath' is not inside its validated parent '$canonicalParentPath'"
+    }
+    $script:RunRoots.Add([pscustomobject]@{
+        Root   = $canonicalRootPath
+        Parent = $canonicalParentPath
+        Kind   = $Kind
+    }) | Out-Null
+    return $canonicalRootPath
+}
 
 function Remove-RunScratch {
-    if ($KeepScratch -or -not $keepEvidenceOutsideScratch) {
-        # Without -EvidenceDir the evidence itself lives inside the scratch tree.
+    <#  R4: deletes exactly the registered run roots. Each root is re-checked
+        against its registered parent, the protected paths and a case-
+        insensitive separator boundary before anything is removed; the internal
+        evidence subtree survives by design (review repair R4). #>
+    if ($KeepScratch) {
+        foreach ($entry in $script:RunRoots) {
+            Write-Log "kept scratch root ($($entry.Kind)): $($entry.Root)"
+        }
         return
     }
-    $path = $script:ScratchCleanupPath
-    try {
-        if (Test-Path -LiteralPath $path) {
-            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+    foreach ($entry in $script:RunRoots) {
+        $root = $entry.Root
+        try {
+            if (-not (Test-Path -LiteralPath $root)) {
+                continue
+            }
+            $canonicalPath = Get-CanonicalPath $root
+            $lowerRoot = $canonicalPath.ToLowerInvariant()
+            $parentPrefix = $entry.Parent.ToLowerInvariant().TrimEnd('\') + '\'
+            if ($lowerRoot -ne $root.ToLowerInvariant() -or
+                -not $lowerRoot.StartsWith($parentPrefix)) {
+                Write-Warning "refusing to delete '$root': it no longer resolves inside its registered parent '$($entry.Parent)'"
+                continue
+            }
+            $blocked = $false
+            foreach ($protected in $script:ProtectedPaths) {
+                $lowerProtected = (Get-CanonicalPath $protected).ToLowerInvariant().TrimEnd('\')
+                if ($lowerRoot -eq $lowerProtected -or
+                    $lowerProtected.StartsWith($lowerRoot + '\')) {
+                    Write-Warning "refusing to delete '$root': it is or contains the protected path '$protected'"
+                    $blocked = $true
+                    break
+                }
+            }
+            if ($blocked) {
+                continue
+            }
+            if ($entry.Kind -eq 'main' -and $script:InternalEvidence) {
+                # Default evidence lives inside the run: the evidence subtree
+                # is kept by explicit rule, everything else in the root goes.
+                $keep = (Get-CanonicalPath $script:EvidenceInsideRun).ToLowerInvariant()
+                Get-ChildItem -LiteralPath $root -Force | ForEach-Object {
+                    if ((Get-CanonicalPath $_.FullName).ToLowerInvariant() -ne $keep) {
+                        Remove-Tree -Path $_.FullName
+                    }
+                }
+                Write-Log "internal evidence retained at '$script:EvidenceInsideRun'; the rest of the run root was cleaned"
+            } else {
+                Remove-Tree -Path $root
+            }
+        } catch {
+            Write-Warning "scratch root '$root' could not be removed: $($_.Exception.Message)"
         }
-    } catch {
-        Write-Warning "scratch '$path' could not be removed: $($_.Exception.Message)"
     }
 }
 
-$script:ScratchCleanupPath = $scratchRoot
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent `
-    -Action { Remove-RunScratch } | Out-Null
+try {
+
+$scratchRoot = Register-RunRoot -Root (New-FreshDirectory -Path $script:Scratch) `
+    -Parent $script:Scratch -Kind 'main'
 
 if (-not $keepEvidenceOutsideScratch) {
     $evidence = New-EvidenceDirectory -Path (Join-Path $scratchRoot 'evidence')
+    $script:InternalEvidence = $true
+    $script:EvidenceInsideRun = Join-Path $scratchRoot 'evidence'
 } elseif (Split-Path -IsAbsolute $EvidenceDir) {
     $evidence = New-EvidenceDirectory -Path $EvidenceDir
+    $script:InternalEvidence = $false
 } else {
     $evidence = New-EvidenceDirectory -Path (Join-Path $script:Repo $EvidenceDir)
+    $script:InternalEvidence = $false
 }
 
 Write-Log "wave5b-s1 offline catalog gate"
@@ -706,7 +874,13 @@ function Test-ReparseCapable([string]$Directory) {
 
 $linkScratch = $scratchRoot
 if (-not (Test-ReparseCapable $scratchRoot)) {
-    $linkScratch = New-FreshDirectory -Path (Join-Path ([System.IO.Path]::GetTempPath()) 'plan0014-wave5b-links')
+    # B1 fix: use a unique GUID-based directory name instead of a fixed name
+    # that would wipe out other runs.
+    $linkScratchRunId = [guid]::NewGuid().ToString('N')
+    $linkScratch = Register-RunRoot -Root (
+        Join-Path ([System.IO.Path]::GetTempPath()) ("plan0014-wave5b-links-" + $linkScratchRunId)
+    ) -Parent ([System.IO.Path]::GetTempPath()) -Kind 'fallback'
+    New-Item -ItemType Directory -Force -Path $linkScratch | Out-Null
     Write-Log ("scratch volume cannot hold reparse points; link cases use $linkScratch")
 }
 Write-Log ("link-scratch=$linkScratch reparse-capable=" + (Test-ReparseCapable $linkScratch))
@@ -805,7 +979,11 @@ Write-Log "evidence written to $evidence"
 # so a run never leaves a repository clone behind in the build directory unless
 # `-KeepScratch` asked for it.
 Write-Log "scratch: $scratchRoot"
-Remove-RunScratch
+} finally {
+    Remove-RunScratch
+}
+
+Write-Log "scratch: $scratchRoot"
 
 if ($mismatched.Count -gt 0) {
     foreach ($row in $mismatched) {

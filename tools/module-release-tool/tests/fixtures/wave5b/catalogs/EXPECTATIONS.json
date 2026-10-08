@@ -50,6 +50,27 @@
     { "case": "sql-dynamic-sql", "expect": "fail", "contains": "dollar-quoted" },
     { "case": "sql-qualified-reference", "expect": "fail", "contains": "schema-qualified" },
     { "case": "sql-unsupported-statement", "expect": "fail", "contains": "is outside the supported SQL subset" },
-    { "case": "table-name-conflict", "expect": "fail", "contains": "two namespaces may not create the same table" }
+    { "case": "table-name-conflict", "expect": "fail", "contains": "two namespaces may not create the same table" },
+    { "case": "r1-rename-target-v0_demo_role_permissions", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_user_roles", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_roles", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-rename-target-v0_demo_permissions", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-reserved-documents", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-reserved-sqlx-migrations", "expect": "fail", "contains": "already exists in the pinned host baseline" },
+    { "case": "r1-owned-host-table-reference", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r2-foreign-in-from-alias", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-in-using", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-first-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-middle-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-last-in-list", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-foreign-in-as-alias", "expect": "fail", "contains": "gives to owner 'identity-management'" },
+    { "case": "r2-qualified-after-comma", "expect": "fail", "contains": "schema-qualified" },
+    { "case": "r2-same-owner-alias-list", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r2-comment-string-not-reference", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r6-index-using-btree", "expect": "pass", "status": "VALIDATED" },
+    { "case": "r6-index-unknown-method", "expect": "fail", "contains": "index access method 'mystery'" },
+    { "case": "r6-join-using-columns", "expect": "fail", "contains": "outside the supported SQL subset" },
+    { "case": "r6-inherits-parent", "expect": "fail", "contains": "'INHERITS (parent)'" },
+    { "case": "r6-attach-partition", "expect": "fail", "contains": "gives to owner 'identity-management'" }
   ]
 }

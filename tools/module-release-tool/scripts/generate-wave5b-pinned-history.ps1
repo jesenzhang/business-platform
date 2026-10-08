@@ -7,7 +7,7 @@
 param(
     [string]$Repo = (Join-Path (Get-Location) '.'),
     [string]$PinnedSha = '5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601',
-    [string]$Out = '
+    [string]$Out = ''
 )
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path $Repo).Path
