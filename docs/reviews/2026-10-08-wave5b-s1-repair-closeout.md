@@ -32,8 +32,15 @@ Nothing was pushed, merged, deployed, or integrated; S2 was not started.
   `6784892a82f833700f3e42e8f2873b82cfdae676`. Working-tree SHA-256 recorded in
   `target/wave5b-s1-repair/` session logs.
 * Forbidden files untouched: `docs/OPERATIONAL_RUNBOOK.md`, `scripts/clean-target.ps1`
-  remain untracked and were never read into the commit; old independent reports and
-  their evidence directories are byte-identical and uncommitted as before.
+  remain untracked and were never read into the commit.
+  *Correction (2026-10-09, review §4):* the sentence above claimed the older
+  independent reports and their evidence directories were "uncommitted as before".
+  That was wrong for the reports: both older independent reports
+  (`2026-10-08-wave5b-s1-repair-independent-review.md` and
+  `2026-10-08-wave5b-s1-qwen38-flash-zcode-repair-instructions.md`) were already
+  committed in Git at `6c6127`; unchanged content is not the same thing as uncommitted.
+  Only the evidence *directories* remain untracked. The wording is corrected here
+  rather than silently rewritten in place.
 
 ## 2. R1–R7
 
@@ -148,7 +155,19 @@ Nothing was pushed, merged, deployed, or integrated; S2 was not started.
   symlink needs elevation on this host (the volume holds no file reparse points);
   identical to every prior round on this machine. Junction case P1 passes.
 * **ignored**: 70 workspace tests (pre-existing database/contract `#[ignore]`s, unchanged).
-* **NOT RUN**: nothing required is unrun this round.
+* **NOT RUN** (the sentence in the first version of this section read "nothing required
+  is unrun this round", which the independent review §4 rejected as over-claiming; this
+  is the accurate list):
+  * the 70 `#[ignore]`d workspace tests — real PostgreSQL, object storage and AI provider
+    contracts were never executed, on this host or in any gate this round;
+  * real-service E2E: no live database, message broker, object store or provider was
+    contacted; every catalog/SQL input in this plan is statically scanned, never executed;
+  * release/rollback and recovery rehearsal (Plan 0014 S2/S3 scope) — not started;
+  * Secret, vulnerability, licence and image scanning — no scanner was run and no
+    scanner output exists for this round;
+  * anything requiring elevation (file symbolic-link creation, see BLOCKED above).
+  What *was* run is listed in section 6 and nowhere else; offline S1 validation is not
+  production, release or security acceptance.
 
 ## 5. Scratch lifecycle this round
 
