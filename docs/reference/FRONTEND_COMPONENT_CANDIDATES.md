@@ -104,4 +104,6 @@
 
 补充候选来源：[Radix](https://github.com/radix-ui/primitives)、[dnd-kit](https://github.com/clauderic/dnd-kit)、[FullCalendar](https://github.com/fullcalendar/fullcalendar)、[Monaco Editor](https://github.com/microsoft/monaco-editor)；Open File Viewer 的单独版本与许可见 [Web Office 参考材料](WEB_OFFICE_TECHNOLOGY_EVALUATION.md)。
 
+> **Contract Vertical Slice 的 P0 执行对齐：** 已完成 [2026-10-08 现状与 API 门禁审阅](../reviews/2026-10-08-contract-frontend-p0-readiness.md)，并形成 [PLAN-0016 P0 前端组件验证子计划](../plans/current/PLAN-0016-contract-frontend-p0-validation.md)（**Proposed / NOT ACTIVE**）。组件 PoC 与正式业务 API 阶段分开；未授权自动安装依赖或宣称合同切片已完成。
+
 > 当前仅形成可验证的参考组件候选清单。未安装组件、未重构前端、未新增 API 或部署、未执行 PoC、未激活实施计划或接受 ADR。
