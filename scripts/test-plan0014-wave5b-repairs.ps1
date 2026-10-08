@@ -104,6 +104,13 @@ function Get-FileSha([string]$Path) {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Get-NormalizedOutput([string]$Text) {
+    <#  A child pwsh renders one logical message across several lines and
+        prefixes the continuation with '|'; normalise the whitespace so an
+        assertion matches the message wherever the console chose to break it. #>
+    ($Text -replace '\|', ' ') -replace '\s+', ' '
+}
+
 # ---------------------------------------------------------------------------
 # production-AST function extraction (isolated layer)
 # ---------------------------------------------------------------------------
@@ -479,13 +486,14 @@ Invoke-RepairScenario 'wrapper-b7-stub-exit-7-propagates' {
     $evidence = Join-Path (New-ScenarioScratch 'b7fail-ev') 'gates-evidence'
     $result = Invoke-Wrapper -Phase 'fast' -EvidenceDir $evidence -StubDir $stubDir -Mode 'always-7'
     Assert-Repair ($result.Code -ne 0) 'wrapper reported success even though every stubbed command exited 7'
-    Assert-Repair ($result.Out -match 'FAILED GATES') 'wrapper did not summarize failed gates'
+    $normalized = Get-NormalizedOutput $result.Out
+    Assert-Repair ($normalized -match 'FAILED GATES') 'wrapper did not summarize failed gates'
     # 20-25 plus 30 are stubbed in the fast phase: seven gates expected a 0 or
     # a 1 and all got 7 - including the planned negative, which must NOT be
     # waved through just because the exit code was non-zero.
-    Assert-Repair ($result.Out -match '25-catalog-check-unknown-check: expected 1, got 7') `
+    Assert-Repair ($normalized -match '25-catalog-check-unknown-check: expected 1, got 7') `
         "the expected-1 gate was not recorded as a mismatch: $($result.Out)"
-    $failCount = [regex]::Matches($result.Out, 'expected \d+, got 7').Count
+    $failCount = [regex]::Matches($normalized, 'expected \d+, got 7').Count
     Assert-Repair ($failCount -eq 7) "expected seven mismatches, recorded $failCount"
 }
 
@@ -500,7 +508,7 @@ Invoke-RepairScenario 'wrapper-b8-evidence-not-overwritten' {
     $before = Get-FileSha $logFile
     $second = Invoke-Wrapper -Phase 'post' -EvidenceDir $evidence -StubDir $stubDir -Mode 'always-0'
     Assert-Repair ($second.Code -ne 0) 'wrapper accepted a second run into the same evidence directory'
-    Assert-Repair ($second.Out -match 'already exists[\s\S]{0,40}and is not empty') `
+    Assert-Repair ((Get-NormalizedOutput $second.Out) -match 'already exists and is not empty') `
         "refusal did not name the evidence rule: $($second.Out)"
     Assert-Repair ((Get-FileSha $logFile) -eq $before) 'an archived gate log changed between runs'
 }
