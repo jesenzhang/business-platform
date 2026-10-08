@@ -464,8 +464,12 @@ Restore-Clone $clone
 #       well-formed digest of something else, every SQL file stays untouched.
 #       Only the manifest blob can catch this.
 $manifestPath = Join-Path $clone 'migrations\MANIFEST.sha256'
-$manifestLines = [System.Text.Encoding]::UTF8.GetString(
-    [System.IO.File]::ReadAllBytes($manifestPath)) -split "`n"
+# A clone of this repository checks the historical manifest out with CRLF
+# (core.autocrlf), so the case edits the row it means to edit and puts the file
+# back in the same form it had: an EOL-only change is the tolerance of H3, not
+# the drift this case is about.
+$manifestLines = @([System.Text.Encoding]::UTF8.GetString(
+    [System.IO.File]::ReadAllBytes($manifestPath)) -split "`r?`n")
 for ($index = 0; $index -lt $manifestLines.Count; $index++) {
     if ($manifestLines[$index] -match '^([0-9a-f]{64})(  001_initial\.sql)$') {
         $manifestLines[$index] = ('{0}{1}' -f ('b' * 64), $Matches[2])
@@ -473,7 +477,7 @@ for ($index = 0; $index -lt $manifestLines.Count; $index++) {
     }
 }
 [System.IO.File]::WriteAllBytes($manifestPath,
-    [System.Text.Encoding]::UTF8.GetBytes(($manifestLines -join "`n")))
+    [System.Text.Encoding]::UTF8.GetBytes(($manifestLines -join "`r`n")))
 $run = Get-HistoryVerdict $clone
 $detail = (($run.OutLines | Where-Object { $_ -match 'module-release:' }) -join ' ')
 $actual = Get-VerdictOf $run
@@ -486,15 +490,15 @@ Restore-Clone $clone
 
 # H12 — a line is removed from the manifest: 19 baseline files, 18 rows.
 $manifestPath = Join-Path $clone 'migrations\MANIFEST.sha256'
-$manifestLines = [System.Text.Encoding]::UTF8.GetString(
-    [System.IO.File]::ReadAllBytes($manifestPath)) -split "`n"
+$manifestLines = @([System.Text.Encoding]::UTF8.GetString(
+    [System.IO.File]::ReadAllBytes($manifestPath)) -split "`r?`n")
 $kept = @($manifestLines | Where-Object { $_ -notmatch '  001_initial\.sql$' })
 if ($kept.Count -ge $manifestLines.Count) {
     Add-Case -Family 'history-cases' -Id 'H12-manifest-line-removed' -Expect 'fail' `
         -Actual 'mismatch-detail' -Detail 'the fixture did not find a 001_initial.sql row to remove'
 } else {
     [System.IO.File]::WriteAllBytes($manifestPath,
-        [System.Text.Encoding]::UTF8.GetBytes(($kept -join "`n")))
+        [System.Text.Encoding]::UTF8.GetBytes(($kept -join "`r`n")))
     $run = Get-HistoryVerdict $clone
     $detail = (($run.OutLines | Where-Object { $_ -match 'module-release:' }) -join ' ')
     $actual = Get-VerdictOf $run

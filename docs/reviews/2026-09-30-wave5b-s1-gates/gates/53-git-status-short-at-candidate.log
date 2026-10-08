@@ -1,0 +1,13 @@
+# gate: 53-git-status-short-at-candidate
+# command: git status --short
+# started: 2026-09-30 17:38:16 +08:00
+# finished: 2026-09-30 17:38:16 +08:00
+# duration-seconds: 0
+# exit-code: 0
+
+ M docs/README.md
+ M docs/architecture/ARCHITECTURE_STATUS.md
+ M docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md
+ M docs/reviews/2026-09-30-wave5b-r2-admission-matrix.md
+?? docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md
+?? docs/reviews/2026-09-30-wave5b-s1-gates/

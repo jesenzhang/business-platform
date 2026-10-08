@@ -1192,3 +1192,37 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   结果见 closeout。
 - 状态：**WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；
   R2 BLOCKED**。未自判 ADR-0029 Accepted；未实施 S1/S2/S3；未改 main；未 push / merge / tag；未重开 Wave 5A Repair 2。
+
+## 2026-09-30 Wave 5B-S1 实施轮（离线 catalog 门禁 + 静态 SQL fitness + 单一 baseline embed 修复）
+
+本轮执行 `docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md` §3（唯一下一实施包），
+并落实其 §2 的 C1 历史摘要兼容规则。起点 `6decf1ad9ea05233d66dd3539594ff210afd99f2`，实现候选
+`b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`；上文各节的历史证据与固定 SHA 一字未改，本节只追加状态与指针。
+逐项对账见 `docs/reviews/2026-09-30-wave5b-s1-closeout.md` 与 `docs/reviews/2026-09-30-wave5b-s1-gates/`。
+
+- **离线门禁实装**：`tools/module-release-tool/src/catalog.rs` 提供 `catalog-check` 四个 check，默认集合为
+  `module-catalog` + `pinned-baseline-history` + `baseline-embed`；`baseline-candidate-freeze` 只在显式 `--only` 时评估
+  （ADR-0029 仍 Proposed，冻结不得成为默认策略）。`scripts/check-architecture.ps1` 调默认 check 并新增 namespace
+  manifest 的 canonical-LF-only 断言（不复用历史 manifest 的三形容错）。
+- **两份正式 catalog 为 RESERVED**：`migrations/modules/{identity-management,policy}` 六字段 catalog + 空 manifest +
+  `depends_on=platform-baseline@19`。这是**预留**，不是安装能力，更不是"`migrations/modules` 是已安装 catalog"的断言。
+- **C1 落实**：历史 `migrations/MANIFEST.sha256` 的 19 条中恰 7 条只与 CRLF 形摘要一致，该容错保留且**可见可数**
+  （`legacy_manifest_form_entries=7`）；但每条同时被该文件的 **blob SHA-256** 钉住，并做钉住 commit / HEAD / 索引 /
+  工作树四方比对；`git rev-parse <sha>:<path>` 的对象 id 不是内容摘要，已由反例测试钉住。历史文件与历史 manifest 未改一字。
+- **单一 embed（P-4）**：`crates/messaging/tests/outbox_reliability.rs` 与 `crates/audit-postgres/tests/chain_pg.rs` 改走
+  `runtime_migration::MIGRATOR`；扫描确认 host baseline 只被 `crates/runtime-migration/src/lib.rs` 一处 embed，
+  两个 SQLite 适配器只 embed 自有 `./migrations`。
+- **正反例对账**：一份 `EXPECTATIONS.json` 由两个读取者共同消费（`scripts/test-plan0014-wave5b.ps1` 的 76 个 case 与
+  `tools/module-release-tool/tests/wave5b_catalog.rs` 的 19 个测试）；驱动实测 75 MATCH + 1 BLOCKED + 0 MISMATCH。
+- **门禁**：逐条日志（含命令行、起止时间、退出码）在 `docs/reviews/2026-09-30-wave5b-s1-gates/`；`fmt` / `check` /
+  `clippy -D warnings` / `-p runtime-migration` / `-p module-release-tool --all-features` / 两条 PG `--no-run` /
+  `check-architecture.ps1` 全部 exit 0；`cargo test --workspace --all-features` 用隔离 target 目录跑（V14 口径）。
+- **NOT RUN / BLOCKED**：PostgreSQL 套件（含 `--include-ignored`）全部 **NOT RUN**（无数据库授权，未连接任何库）；
+  `P2-catalog-symlink` **BLOCKED**（创建符号链接需管理员权限，仓库卷 exFAT 无 reparse point）；大小写重名目录负例
+  在大小写不敏感的宿主上不可表达。**864 / 191 / 70 是对账基线，不是目标**，差值逐条归因到测试名。
+- **下一步（本任务未完成，继续执行）**：① 确认隔离 target 下的 `cargo test --workspace --all-features` 日志到位；
+  ② `pwsh tools/module-release-tool/scripts/build-wave5b-closeout.ps1 -Repo . -DocsSha <文档提交>` 填完 closeout 证据段落；
+  ③ 交独立复审并**停止**等待判定。复跑与对账入口见 closeout §3–§4 与 `tools/module-release-tool/scripts/README.md`。
+- 状态：**WAVE 5B-S1 READY FOR INDEPENDENT REVIEW / NOT INTEGRATED；R2 BLOCKED**。未进入 S2；未连接数据库；
+  未自判 ADR-0029（仍 Proposed）；未改 `main`；未 merge / tag / publish / 部署；未重开 Wave 5A Repair 2，其归档证据未改；
+  G-01 / G-02 / G-201 / G-202 / G-203（含 G-203a-i / G-203a-ii / G-203b-i / G-203b-ii）与 Wave 4 的 C1 一律未关闭。

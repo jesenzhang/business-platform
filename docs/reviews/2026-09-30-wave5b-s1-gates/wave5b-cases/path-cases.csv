@@ -1,0 +1,3 @@
+"Case","Expect","Actual","Verdict","Detail"
+"P1-namespace-junction","fail","fail","MATCH","module-release: refused by the [module-catalog] check: namespace directory 'C:\Users\admin\AppData\Local\Temp\plan0014-wave5b-links\link-junction\migrations/modules\policy' is a symbolic link or reparse point"
+"P2-catalog-symlink","fail","not-run","BLOCKED","the host refused to create a file symbolic link: 此操作需要管理员权限。 (the repository volume is exFAT, which holds no reparse points)"

@@ -34,7 +34,9 @@
 |---|---|---|---|
 | 0 | 2026-09-30 | `c73955e` | 首版设计包。独立审阅结论 **NEEDS REPAIR（设计包）**（`docs/reviews/2026-09-30-wave5b-design-independent-review.md:3`），阻止项 B1（共享 ledger 首次创建的锁保护）、B2（方案 B 时间线不可执行 + 冷安装判据混淆）、B3（验收命令互斥配置 + fixture 范围） |
 | 1 | 2026-09-30 | `5c8355d` | 按该审阅 §3 修订：新增 §5.9（公共 bootstrap 锁 + namespace 锁 + 持锁连接生命周期，统一锁序与 fail-closed 读路径）；§6 方案 B 降为未完成研究方案并分离两个验收目标（§6.6）；§9.1/§9.2 拆分 CLI 与测试的环境作用域并逐 suite 盘点数据库范围；§7 增加四个子项记账与分母规则；§5.7/§8 补 S4 历史 v1 兼容要求；§11 给出收窄后的 S1 规格（文件清单、红绿反例、命令、停止条件）。逐项落点见 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md` |
+| — | 2026-09-30 | `6decf1a` | **S1 实施轮（不重启设计轮：Rev 仍为 1，本文判据与分母未改）**。按 docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md §3 落地离线门禁，并落实其 §2 C1 历史摘要兼容规则；对本文的更正集中在 §5.2、§11.2、§11.3（OID 不是摘要 + C1 + 四方比对 + checkout 端字节稳定）、§11.4（实际落点），实施状态见 §12.1 |
 
+本文判据的**唯一一次实施轮**（S1）状态记录在 §12.1；上表 Rev 列保持 1，实施不产生新的设计修订。
 Revision 0 的历史结论按上述记录保留，未被改写；被 B1/B2 判定为错误的原文（ledger DDL 在 namespace 锁内创建、方案 B 冷安装"是"、expand-2 顺序、`V8` 单条并发用例、"V13 现在能验证新 mapping"）已在对应小节就地更正并标注 Revision 1。
 
 **Revision 1 复审更正记录（2026-09-30，对交付提交 `7355c99` 的宿主复审；纯文档精度更正，不改变控制流、判据方向、分母或状态结论）**：① §3.2 索引计数 11 → 10（与 `019` 实测 8 条 `CREATE INDEX` + 2 条 partial unique 一致，亦与 §6.6"identity 3 索引"自洽）；② §9.1.2 结论 3 回落文件数 6 → 7（与 §9.1.3 的"上表 7 个文件"和 grep 硬编码回落 URL 的实测一致）；③ §5.9.3 第 7 步提交回读钉定为"同一物理连接 + 事务内记录的 backend pid"，消除可能空洞为真的断言；④ §7.1 G-203a-i 判据补齐 S4/V12 工件钉定半边，并与 §9.5 与准入矩阵 §4.1 口径对齐（S1 不实施工件钉定）；⑤ §9.1.2 逐 suite 表补 `apps/business-api/tests/plan_0008_postgres_minio.rs` 一行；⑥ §12 交付记录更正为"审阅文档已随父提交 `e55a5a0` 入库"。逐项映射见 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md` §8。
@@ -218,7 +220,7 @@ migrations/modules/
 | `owner` | `identity-management` | 与 `BOUNDED_CONTEXT_MAP.md` 的 context 名一致 |
 | `ledger` | `platform_module_migrations` | 固定常量，禁止 `_sqlx_migrations` |
 | `sql_schema` | `public` | 方案 A 恒为 `public`；出现其他值即门禁失败（防止悄悄做 L3） |
-| `depends_on` | `["platform-baseline@19"]` | runner 与门禁都检查：无环、baseline 版本 ≥ 声明值 |
+| `depends_on` | `["platform-baseline@19"]` | 语法固定为 `name@revision`：`platform-baseline@N` 或 `<namespace>@N`，`N` 为无前导零的正整数；裸名 `platform-baseline`、`@0`、`@019`、空名一律拒绝（S1 复审更正：不猜测、不做"看起来等价"的规范化）。门禁另检查：无环、同一目标不重复声明、被依赖 namespace 在本 checkout 确有该 revision、baseline 版本 ≥ 声明值 |
 
 不引入新格式标准：`catalog.json` 只被 `check-architecture.ps1`、`tools/module-release-tool`、`runtime-migration/build.rs` 三方读取，三方共用同一组 schema 校验测试。**未知字段策略、字段固定顺序与反例见 §11.1**（Revision 1 按审阅 §3.5 收窄为 S1 规格）。`catalog.json` 的 `schema_version` **不改变** `identity.v1` / `MigrationRevision` 的任何字段（§5.7）。
 
@@ -800,6 +802,15 @@ S1 只做**离线 catalog 验证 + 静态门禁**，零运行时行为变更。A
 
 **#10 的诚实边界（不得夸大）**：这是对 SQL **文本**的静态 fitness function，用于阻止"顺手把别人的表写进自己的迁移"。它**不证明**数据库层的权限隔离：真正的隔离来自角色与 grant 边界（D-5 / OPEN-B2-3）。任何文档与日志都不得把这条门禁描述成"跨模块写入已被阻止"。
 
+**S1 实施补充（2026-09-30 S1 复审更正；不新增判据方向，只把 §11.2 已列规则做到可判定）**：
+
+- **a. 依赖语法与可得性**：`depends_on` 按上表语法精确解析；namespace 依赖的 revision 必须在同一 checkout 的目标 catalog 中存在（不足 → `requires revision N of '<name>' but that catalog … here`），否则"声明了依赖"仍可能在 S2 运行时才发现无法满足。
+- **b. 重复依赖按目标名判重**：`policy@1` + `policy@2` 是两个不同 revision 号但同一目标；判重键是**目标名**，不是整串文本。
+- **c. 路径包含用文件系统解析后的真实路径**：`migrations/modules`、每个 namespace 目录、freeze 的每个条目都先 `canonicalize` 再断言仍在根内，因此**祖先目录**被替换为 junction/symlink 时同样拒绝（只做字符串前缀比较会在祖先被换走时放行）；每次读目录后二次校验该路径仍是普通目录，压缩 read 与 walk 之间的 TOCTOU 窗口。
+- **d. 无法归因的 SQL 结构点名拒绝**：整表 `RENAME TO`、`CREATE TABLE … (LIKE …)`、`CREATE TABLE … PARTITION OF …`、dollar-quoted 块、引号/注释不闭合，全部给出具名失败（"outside the supported SQL subset"），而不是悄悄跳过——跳过正是外来表引用溜过的方式。列改名 `RENAME COLUMN … TO …` 不受影响。
+- **e. host baseline 表禁止 schema 级销毁**：`DROP TABLE` / `TRUNCATE` 命中 §3.1 归属表中的 13 张 host 表即拒绝，**即使声明者就是其 owner**（否则 owner 可以删掉冻结 baseline 里的表）；数据语句（`INSERT`/`UPDATE`/`DELETE`）仍按 #10 的 owner 规则允许。
+- **f. 每条读取失败都带 check 名**：文件/目录读取、摘要比较、embed 扫描的错误消息一律形如 `refused by the [<check>] check: …`，使负例断言能钉住"是哪条规则拒绝的"，而不是只看到一句失败。
+
 ### 11.3 历史保护（文件集合 + 固定历史内容/摘要）
 
 Revision 0 只断言"恰好 19 个文件名"，这**不足以**阻止同时修改 SQL 与 `MANIFEST.sha256`（两者可一起改而门禁仍绿）。S1 必须同时覆盖：
@@ -808,6 +819,14 @@ Revision 0 只断言"恰好 19 个文件名"，这**不足以**阻止同时修�
 2. **固定历史内容**：逐个 `git rev-parse <PINNED_SHA>:migrations/<file>` 取 **git blob** 的 SHA-256，与门禁内固化的 19 项摘要表逐项比对；`migrations/MANIFEST.sha256` 自身同样按 blob 比对。`PINNED_SHA` 在 S1 中固定为本设计的 Revision 1 起点 `5c8355d…`（此后仅在 baseline 合法演进时经独立裁决更新），并在日志中打印所钉的 SHA。
 3. **交叉一致**：`MANIFEST.sha256` 声明的摘要必须与 git blob 重算一致（防"改 SQL 不改 MANIFEST"与"两者同改但 blob 变"两种情形）。
 4. **Windows EOL 口径（必须写明）**：对比基准是 **git blob 的字节**（仓库内规范形态），不是工作树字节——`core.autocrlf` / `.gitattributes` 可能让工作树呈现 CRLF，直接哈希工作树会因开发者配置不同而假红或假绿。因此门禁走 `git show <sha>:<path>` 取字节；需要哈希工作树（例如本地快速模式）时，必须先按 `canonical.rs:77 fold_line_endings` 做 LF 折叠，且日志必须标明用的是 blob 模式还是工作树模式。
+
+5. **S1 复审更正（C1：`git` 对象 id 不是内容摘要；历史容错不得外溢）**：
+
+   - 本条第 2 点原文写的 `git rev-parse <PINNED_SHA>:<path>` 返回的是 **40 位 git 对象 id**，它是 Git 的对象寻址键，**不是**内容摘要。S1 的比对对象是 `git cat-file blob <sha>:<path>` 的**字节**再做 SHA-256（64 位小写 hex）。反例可复现：`001_initial.sql` 在 `5c8355d` 的 blob OID 是 40 hex，`validate_sha256_hex` 直接拒绝——把 OID 记进摘要表会当场得到一个"看起来像 hash 但不是 SHA-256"的值。测试 `a_git_object_id_is_never_a_content_digest` 钉住这条。
+   - **历史 manifest 的三形容错保留**：`migrations/MANIFEST.sha256` 19 条中**恰有 7 条**只与 CRLF 形摘要相符（`002`、`003`、`004`、`005`、`006`、`007`、`008`；`001`/`018` 在盘上是 LF，其余 11 条与 LF 形一致）。S1 **不改写**任何历史文件与历史行；容错之所以安全，是因为每条同时被该文件的 **blob 摘要**钉住——改内容必然改 blob。
+   - **容错不得外溢**：新建 namespace catalog 的 `MANIFEST.sha256` 只接受**规范 LF 摘要**（`fold_line_endings` 后 SHA-256），且 manifest 文件本身不得含 CR；这条规则独立实现，不复用历史 manifest 的旧断言（旧断言继续只管 `migrations/MANIFEST.sha256`）。
+   - **四方比对**：钉住的 blob ↔ `HEAD` blob ↔ 索引 blob ↔ 工作树（LF 折叠后）。只比 HEAD 会漏掉"只改了索引"和"只改了工作树"两种漂移。
+   - **checkout 端字节稳定**：S1 新增 path 作用域的 `.gitattributes`（仅 `tools/module-release-tool/tests/fixtures/wave5b/**` 与 `migrations/modules/**`，`text eol=lf`），使摘要 fixture 不随 `core.autocrlf` 漂移；**历史 migrations 故意不列入**——历史文件不改写，其 CRLF 兼容由 blob 摘要承担。
 
 ### 11.4 准确文件清单与命令
 
@@ -826,6 +845,19 @@ pwsh scripts/check-architecture.ps1                     # 静态门禁（V11 的
 pwsh scripts/test-plan0014-wave5b.ps1                    # 门禁自身的正/负例回归
 cargo test -p messaging -p audit-postgres --all-features   # P-4 两处修复后仍全绿（两条 PG 用例仍是 ignored，离线）
 ```
+
+**S1 实施落地补充（2026-09-30；基线 `6decf1a`，候选 `b25e2d4`）**——只登记实际落点，不改动上表的计划文本：
+
+| 文件 | 实际变更 |
+|---|---|
+| `tools/module-release-tool/src/catalog.rs`（新）、`src/lib.rs`、`src/main.rs` | 四个 check：`module-catalog` / `pinned-baseline-history` / `baseline-embed`（§3.7 单一 embed 扫描，计划表原缺此行）/ `baseline-candidate-freeze`（**仅 `--only` 可选**，默认集合不含）；`migrations/modules` 两份 catalog 的 6 字段严格解析与全部 §11.2 规则 |
+| `tools/module-release-tool/tests/fixtures/wave5b/catalogs/**` + `EXPECTATIONS.json`（新） | 50 个 case 目录（期望表 50 行），**两个读取者共用同一张期望表**；`history/pinned-baseline-5c8355d….json`（新）是钉住的 20 条摘要表（`include_str!` 内嵌，测试断言内嵌值 == 磁盘文件） |
+| `tools/module-release-tool/tests/wave5b_catalog.rs`（新） | 第二个读取者（19 个用例）：fixture 全表、钉住历史、C1 七条、OID≠摘要反例、13 表归属 ↔ `019` 对账、默认 check 集合、仓库自身状态、embed 唯一点 |
+| `scripts/test-plan0014-wave5b.ps1`（新） | 第一个读取者：catalog / history / embed / freeze / path 五个家族；负例全部在 scratch 副本上跑，不动仓库真实 catalog |
+| `.gitattributes`（新，path 作用域） | 见 §11.3 第 5 点：只钉 fixture 与 `migrations/modules/**`，历史 migrations 不列入 |
+| `Cargo.lock`、`crates/audit-postgres/Cargo.toml` | 两处测试改用 `runtime_migration::MIGRATOR` 所需的 dev-dependency 及其锁定结果 |
+
+`cargo test -p messaging -p audit-postgres --all-features` 的实际口径修正：两条 PostgreSQL 用例保持 `#[ignore]`，本轮**未连接数据库**，因此上面第三条只证明**能编译**（`--no-run`），不证明 PG 行为；PG 行为仍为 NOT RUN。
 
 ### 11.5 fixture 规范：空 catalog ≠ 安装证明（Revision 1 新增）
 
@@ -857,3 +889,12 @@ S1 **不做**：创建 `platform_module_migrations`（属 S2 的 bootstrap）、
 - `git diff --check`：见 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md` 的交付记录。
 - 未自判 ADR-0029 Accepted；未实施 S1/S2/S3；未改 main；未 push / merge / tag / publish / deploy；未重开 Wave 5A Repair 2。
 - 状态：**WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；R2 BLOCKED**。
+
+### 12.1 S1 实施状态（2026-09-30；实施轮，不是设计修订）
+
+- 基线与候选：起点 `6decf1ad9ea05233d66dd3539594ff210afd99f2`，实现候选 `b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`（本地，未集成）；钉住的 baseline 提交仍是 `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`（revision 19）。
+- 已落地：`catalog-check` 四个 check（默认 `module-catalog` / `pinned-baseline-history` / `baseline-embed`，`baseline-candidate-freeze` 仅显式 `--only`）；`migrations/modules/{identity-management,policy}` 两份 catalog 打印 `RESERVED`；`scripts/check-architecture.ps1` 调默认 check + namespace manifest canonical-LF-only 断言；一份 `EXPECTATIONS.json` 由 PowerShell 驱动与 Rust 测试两个读取者共同消费；`tools/module-release-tool/scripts/` 收录 fixture 生成器、钉住历史生成器、门禁驱动与 closeout 对账器。
+- 对本文的更正落点：§5.2（`depends_on` 精确语法与两条附加规则）、§11.2 实施补充 a–f（含"owner 也不得销毁 host baseline 表"）、§11.3 第 5 点（C1 完整口径：`git` 对象 id 不是摘要 / 7 条 CRLF-only 容错保留但每条另被 blob 摘要钉住 / 新 catalog 只认 canonical LF / 四方比对 / `.gitattributes` 只作用两条新路径）、§11.4（实际文件清单，含本文原计划缺的 `baseline-embed` 与 `.gitattributes` 两行）。
+- 与本文计划的一处口径修正：§11.4 第三条命令 `cargo test -p messaging -p audit-postgres --all-features` 本轮**只做到 `--no-run`**（两条 PG 用例仍 `#[ignore]`，未连接数据库），因此它证明能编译，不证明 PG 行为。
+- 门禁与缺口：逐条日志 `docs/reviews/2026-09-30-wave5b-s1-gates/`；PG 全部 **NOT RUN**（无授权），`P2-catalog-symlink` **BLOCKED**（无特权 + exFAT）。S1 不做的事（§11.6）一件都没做：无 ledger 表、无 runner、无 CLI `--namespace` / `verify`、无启动迁移改动、无 release spec 升级。
+- 状态：**WAVE 5B-S1 READY FOR INDEPENDENT REVIEW / NOT INTEGRATED；R2 BLOCKED**。§12 的 Revision 1 记录保留原文；G-203 的四个记账子项与全部 C1 一律未关闭，ADR-0029 仍 Proposed——离线门禁通过不构成接受（§11.6）。

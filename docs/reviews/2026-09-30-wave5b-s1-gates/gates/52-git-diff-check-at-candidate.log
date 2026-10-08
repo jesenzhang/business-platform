@@ -1,0 +1,8 @@
+# gate: 52-git-diff-check-at-candidate
+# command: git diff --check
+# started: 2026-09-30 17:38:16 +08:00
+# finished: 2026-09-30 17:38:16 +08:00
+# duration-seconds: 0
+# exit-code: 0
+
+warning: in the working copy of 'docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md', LF will be replaced by CRLF the next time Git touches it

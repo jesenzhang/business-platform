@@ -1,0 +1,23 @@
+# gate: 23-catalog-check-only-embed
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform --only baseline-embed
+# started: 2026-09-30 17:20:03 +08:00
+# finished: 2026-09-30 17:20:04 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrrqhotii-0v9iaik-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrrqk9djc-0l20r6z-working`
+
+checks=baseline-embed
+embed scanned_rs_files=261 baseline_embed_points=1 crate_relative_embeds=2
+embed site=crates/document-processing-sqlite/src/lib.rs argument='./migrations' resolves_to=crates/document-processing-sqlite/migrations kind=crate
+embed site=crates/document-sqlite/src/migrations.rs argument='./migrations' resolves_to=crates/document-sqlite/migrations kind=crate
+embed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline
+status=ok
+root=F:\Workspace\business-platform

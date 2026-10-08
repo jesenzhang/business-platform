@@ -1,0 +1,45 @@
+# gate: 26-catalog-check-fresh-clone
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\wave5b-fresh-clone
+# exit-code: 0
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrrqhotii-0v9iaik-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrrqk9djc-0l20r6z-working`
+
+checks=module-catalog,pinned-baseline-history,baseline-embed
+namespace=identity-management owner=identity-management status=RESERVED revisions= depends_on=platform-baseline@19
+namespace=policy owner=policy status=RESERVED revisions= depends_on=platform-baseline@19
+order=identity-management>policy
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] mode=blob+index+working-tree
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] head=b25e2d4a9b455b776934495b8f3dfd2b71a13fe2
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] baseline_revision=19 blob_entries_verified=40 working_tree_entries_verified=20 legacy_manifest_form_entries=7
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/001_initial.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/002_document_metadata.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/003_outbox_reliability.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/004_outbox_state_reconciliation.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/005_document_idempotency.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/006_inbox_idempotency.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/007_document_integrity_constraints.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/008_document_query_indexes.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/009_document_content_revision.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/010_document_processing_mvp.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/011_document_processing_execution_correctness.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/012_runtime_audit_integrity_repair.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/013_runtime_governance_revision1.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/014_document_processing_review_idempotency.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/015_runtime_governance_revision2.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/016_document_revision_evidence_foundation.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/017_document_revision_evidence_integrity.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/018_processing_correlation_propagation.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/019_identity_authorization_foundation.sql
+history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] hit=migrations/MANIFEST.sha256
+embed scanned_rs_files=261 baseline_embed_points=1 crate_relative_embeds=2
+embed site=crates/document-processing-sqlite/src/lib.rs argument='./migrations' resolves_to=crates/document-processing-sqlite/migrations kind=crate
+embed site=crates/document-sqlite/src/migrations.rs argument='./migrations' resolves_to=crates/document-sqlite/migrations kind=crate
+embed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline
+status=ok
+root=F:\Workspace\business-platform\target\tmp\wave5b-fresh-clone

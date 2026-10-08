@@ -996,3 +996,12 @@ Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAI
   R2 BLOCKED**；`identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
   G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 的 C1 一律未关闭；未自判 ADR-0029 Accepted；未实施 S1/S2/S3；
   未连接数据库；未 push / merge / tag / 部署 / 改 main；未重开 Wave 5A Repair 2。
+
+## 2026-09-30 Wave 5B-S1 离线 catalog 门禁（实施轮）
+
+- 起点 `6decf1ad9ea05233d66dd3539594ff210afd99f2`，本地候选 `b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`（未集成）。执行包为 `docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md` §3，并落实其 §2 C1 历史摘要兼容规则。
+- 新增 `tools/module-release-tool/src/catalog.rs`：`catalog-check` 四个 check，默认集合为 `module-catalog` + `pinned-baseline-history` + `baseline-embed`，`baseline-candidate-freeze` **仅在显式 `--only` 时生效**（ADR-0029 未 Accepted 前不作为默认策略）。`scripts/check-architecture.ps1` 调用默认 check，并另加 namespace manifest 的 canonical-LF-only 断言（不复用历史 manifest 的三形容错）。`scripts/test-plan0014-wave5b.ps1` 与 `tools/module-release-tool/tests/wave5b_catalog.rs` 是同一张 `EXPECTATIONS.json` 的两个读取者。
+- 架构事实变化：`migrations/modules/{identity-management,policy}` 两份 catalog 存在且状态为 **RESERVED（0 revision）**——这是预留，不是"可独立安装"，更不构成"`migrations/modules` 是已安装 catalog"的声明。baseline embed 点收敛为唯一一处 `crates/runtime-migration/src/lib.rs`；两处 PostgreSQL 测试改用 `runtime_migration::MIGRATOR`（修 P-4）。历史 baseline 文件与历史 `MANIFEST.sha256` **一字未改**：C1 的 7 条 CRLF-only 摘要继续按原样被接受，但每个历史文件另被其 blob 摘要钉住。
+- 静态门禁不等于隔离证明：owner 扫描只是 SQL 文本 fitness function，不证明数据库层角色/grant 隔离（设计包 §11.2 #10 的诚实边界）。G-203 的四个记账子项与 G-01 / G-02 / G-201 / G-202 / G-203、Wave 4 的 C1 **一律未关闭**，准入矩阵分母未降。
+- 门禁：逐条命令与退出码见 `docs/reviews/2026-09-30-wave5b-s1-gates/`，对账见 `docs/reviews/2026-09-30-wave5b-s1-closeout.md`。PostgreSQL 相关 suite 因无数据库授权 **NOT RUN**；文件 symlink 路径用例 **BLOCKED**（创建符号链接需管理员权限，且仓库卷为 exFAT，不持有 reparse point）。
+- 状态：**WAVE 5B-S1 READY FOR INDEPENDENT REVIEW / NOT INTEGRATED；R2 BLOCKED**。未自判 ADR-0029 Accepted（仍 Proposed）；未实施 S2（runner / ledger / 运行时接线）；未连接数据库；未改 `main`；未 push / merge / tag / publish / 部署；未重开 Wave 5A Repair 2，其归档证据未改。

@@ -1,0 +1,13 @@
+# gate: 35-build-no-run-outbox-reliability
+# command: rtk proxy cargo test -p messaging --test outbox_reliability --no-run
+# started: 2026-09-30 17:27:46 +08:00
+# finished: 2026-09-30 17:27:47 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\outbox_reliability-3m2d99w7u5gzd\s-hmrrokixyi-0t06mik-working`
+
+warning: `messaging` (test "outbox_reliability") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.74s
+  Executable tests\outbox_reliability.rs (target\debug\deps\outbox_reliability-06f8f52e776617d4.exe)

@@ -183,3 +183,16 @@ ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；本包新增的 ADR-0029 为 *
 Revision 1 起点 `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`，纯文档轮：未连接数据库、未实施 S1/S2/S3、
 未 push / merge / tag / deploy、未改 main。
 
+#
+
+## 9. 追加记录（2026-09-30 Wave 5B-S1 实施轮）：静态门禁已落地，**本矩阵判定不变**
+
+起点 `6decf1ad9ea05233d66dd3539594ff210afd99f2`，本地候选 `b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`（未集成）。上文 §1–§8（含 §4.1 的"实际执行范围=无"与 §4.2）是 Revision 1 的原始记录，**一字未改**；本节只登记 S1 带来的新事实与其明确不能证明的东西。
+
+- 新增事实：`migrations/modules/{identity-management,policy}` 两份 `catalog.json` + 空 `MANIFEST.sha256` 已入库并打印 `RESERVED`；`tools/module-release-tool` 的 `catalog-check`（默认 `module-catalog` / `pinned-baseline-history` / `baseline-embed`）与 `scripts/check-architecture.ps1` 的 namespace manifest canonical-LF-only 断言已成为静态门禁；baseline embed 点收敛为唯一一处。
+- **G-203a-i 仍 OPEN**：S1 交付的是目录、manifest、静态门禁与钉住的历史摘要，**不含** S4 的工件钉定（V12），也不含独立审阅对固定 SHA 的判定；§4.1 中"实际执行范围"一栏对本轮的正确读法是"新增静态门禁，数据库执行范围仍为零"。
+- **G-203a-ii 仍 OPEN**：无 `platform_module_migrations`、无 runner、无 bootstrap 锁代码（S2 未实施）。
+- **G-203b-i / G-203b-ii 仍 OPEN**：未执行任何 DDL；单模块冷安装仍无证据，且两份 RESERVED catalog **不得**被读成冷安装能力。
+- G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 的 C1 **一律未关闭**；A-01..A-12 判定面不变；分母未降。
+- 数据库执行范围：本轮**未连接任何数据库**（含只读）；PG 相关 suite NOT RUN（无授权），文件 symlink 路径用例 BLOCKED（无特权 + 仓库卷 exFAT）。
+- ADR-0029 **仍 Proposed / NOT ACCEPTED**；离线门禁通过不构成接受，也不构成任何子项关闭。

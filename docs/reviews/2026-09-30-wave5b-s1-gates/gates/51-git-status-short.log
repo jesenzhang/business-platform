@@ -1,0 +1,22 @@
+# gate: 51-git-status-short
+# command: git status --short
+# started: 2026-09-30 17:20:07 +08:00
+# finished: 2026-09-30 17:20:07 +08:00
+# duration-seconds: 0
+# exit-code: 0
+
+ M Cargo.lock
+ M crates/audit-postgres/Cargo.toml
+ M crates/audit-postgres/tests/chain_pg.rs
+ M crates/messaging/tests/outbox_reliability.rs
+ M docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md
+ M scripts/check-architecture.ps1
+ M tools/module-release-tool/src/lib.rs
+ M tools/module-release-tool/src/main.rs
+?? docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md
+?? docs/reviews/2026-09-30-wave5b-s1-gates/
+?? migrations/modules/
+?? scripts/test-plan0014-wave5b.ps1
+?? tools/module-release-tool/src/catalog.rs
+?? tools/module-release-tool/tests/fixtures/
+?? tools/module-release-tool/tests/wave5b_catalog.rs
