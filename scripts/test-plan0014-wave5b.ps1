@@ -85,45 +85,68 @@ function Get-CanonicalPath([string]$Path) {
 
 function Test-ReparsePoint([string]$Path) {
     <#  True when the path itself is a reparse point — a junction, a symbolic
-        link or a mount point. Attribute based, because the link is invisible to
-        path arithmetic: Resolve-Path, StartsWith and equality all see the name,
-        never the fact that something else stands behind it (review N2). #>
-    if (-not (Test-Path -LiteralPath $Path)) {
+        link or a mount point. The attributes come from the platform call the
+        shell itself makes underneath Get-Item, which opens the reparse point
+        rather than what it points at: the attribute of the *name* is what a
+        delete acts on, and a link is invisible to path arithmetic, because
+        Resolve-Path, StartsWith and equality all see the name, never the fact
+        that something else stands behind it (review N2). The call is also cheap
+        enough that Remove-Tree can afford to repeat it around every directory
+        it enters, which is what Q2 needs. A name that cannot be read answers
+        false: nothing is proven about it, and whoever deletes it fails on it. #>
+    try {
+        $attributes = [System.IO.File]::GetAttributes($Path)
+    } catch {
         return $false
     }
-    $item = Get-Item -LiteralPath $Path -Force
-    return (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
+    return (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
 }
 
 function Get-UnsafeLink([string]$Path, [string]$Boundary) {
-    <#  The first component on the way from Path up to Boundary (both included)
-        that is a reparse point, or an empty string when the whole chain is a
-        real directory tree. Below such a component the names are no longer the
-        run's own: containment checks pass, and a recursive delete reaches a
-        tree the run never created (review N2, §3.8). A chain that never reaches
-        its boundary is a refusal of its own, not a safe answer. #>
+    <#  The first component on the way from Path up to the volume root (both
+        included) that is a reparse point, or an empty string when the whole
+        chain is a real directory tree.
+
+        Q1 (rereview): the walk does NOT stop at Boundary, because a boundary is
+        a *name* and a replaced directory keeps its name. Move `anchor` aside and
+        plant a junction on it, and `anchor\scratch\run-owned` still spells
+        itself, still answers every containment test, and now names somebody
+        else's tree - so a chain check that stops at the registered parent
+        certifies the spelling and not the directory. The boundary is still
+        required (a path that no longer sits under the name it was registered
+        under is a refusal of its own), it is only no longer trusted as the place
+        where proof may stop. Below an unsafe component the names are no longer
+        the run's own, and a delete reaches a tree the run never created
+        (review §3.8). #>
     $canonicalBoundary = (Get-CanonicalPath $Boundary).TrimEnd('\')
     $current = Get-CanonicalPath $Path
+    $reachedBoundary = $false
     while ($true) {
         if (Test-ReparsePoint $current) {
             return $current
         }
         if ($current -eq $canonicalBoundary) {
-            return ''
+            $reachedBoundary = $true
         }
         $parent = Split-Path -Parent $current
         if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $current) {
-            throw "'$Path' never reaches its boundary '$canonicalBoundary'"
+            break
         }
         $current = $parent
     }
+    if (-not $reachedBoundary) {
+        throw "'$Path' never reaches its boundary '$canonicalBoundary'"
+    }
+    return ''
 }
 
 function Assert-PathChainIsReal([string]$Path, [string]$Boundary, [string]$Label) {
-    <#  Named refusal when Path, or any ancestor of it up to Boundary, is a
-        reparse point. Registration calls this so a link cannot enter the run at
-        all; a caller that must handle the case differently (cleanup unlinks a
-        replaced root instead) asks Get-UnsafeLink directly. #>
+    <#  Named refusal when Path, or any of its ancestors up to the volume root,
+        is a reparse point. Registration calls this so a link cannot enter the run
+        at all; a caller that must handle the case differently (cleanup unlinks a
+        replaced root instead) asks Get-UnsafeLink directly. Boundary is the
+        registration's own claim about where the path lives, and it is checked,
+        but the proof of the chain does not stop there (review Q1). #>
     $unsafe = Get-UnsafeLink -Path $Path -Boundary $Boundary
     if ($unsafe -ne '') {
         $target = ''
@@ -168,10 +191,33 @@ function Remove-Tree {
     <#  Deletes a scratch file or tree, clearing attributes and unlinking
         reparse points first: Windows refuses a recursive delete of a tree that
         still holds a reparse point, and a scratch directory must never survive
-        a run. N2 (review §3.8): nothing is ever enumerated *through* a link.
-        The walk is done one directory at a time, a link is unlinked as the name
-        it is, and no directory is deleted with a recursive API, so content
-        behind a replaced directory stays where it is. #>
+        a run.
+
+        N2 (review §3.8): nothing is ever enumerated *through* a link. The walk
+        is done one directory at a time, a link is unlinked as the name it is,
+        and no directory is deleted with a recursive API, so content behind a
+        replaced directory stays where it is.
+
+        Q2 (rereview): being a real directory when its parent was enumerated is
+        not the same as being one when the walk gets to it, because only the
+        name was queued. So every directory is proved twice around its
+        enumeration - immediately before, and immediately after - by reading its
+        own reparse attribute and that of every component between it and the
+        root of this walk, and again immediately before it is deleted. Every one
+        of those reads is no-follow, and so is every delete: opening a reparse
+        point opens the link, not the target, which is why removing the name of
+        a junction cannot reach through it. A directory whose proof fails is
+        *retained*, nothing enumerated before the failure is deleted, and the
+        whole removal ends in a named refusal instead of a quiet success.
+
+        The limit of that, stated rather than glossed: one attribute read still
+        precedes one delete by a syscall, and no user-mode check can make the
+        pair atomic. What is therefore guaranteed is that the walk never follows
+        a link it could see and never deletes content reached through a name that
+        changed under it; what is handled by retention is the rest, and retention
+        leaves a scratch directory behind, which this gate treats as a failure
+        the caller has to report. Content outside a run root is never at risk in
+        either case. #>
     param([string]$Path, [int]$Attempts = 5)
     if (-not (Test-Path -LiteralPath $Path)) {
         return
@@ -186,15 +232,74 @@ function Remove-Tree {
         Remove-Item -LiteralPath $Path -Force
         return
     }
+    $treeRoot = $root.FullName
+    <#  One no-follow walk of the components from a directory up to the root of
+        this tree walk. It returns the component that is a reparse point, or an
+        empty string. Kept inside this function on purpose: the cleanup surface
+        is imported by name into independent probes, and a dependency outside it
+        would break them. #>
+    $unsafeWithin = {
+        param([string]$Directory, [string]$WalkRoot)
+        $cursor = $Directory
+        while ($true) {
+            if (Test-ReparsePoint $cursor) {
+                return $cursor
+            }
+            if ($cursor -eq $WalkRoot) {
+                return ''
+            }
+            $cursorParent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($cursorParent) -or $cursorParent -eq $cursor) {
+                return ''
+            }
+            $cursor = $cursorParent
+        }
+    }
+    $retainedNote = {
+        param([string]$Directory, [string]$Unsafe, [switch]$WhileEnumerated)
+        $what = if ($Unsafe -eq $Directory) { 'is itself a reparse point' }
+        else { "is reached through the reparse point '$Unsafe'" }
+        $when = if ($WhileEnumerated) { ' while it was being enumerated' } else { '' }
+        return "'$Directory' $what$when"
+    }
+    # The chain above this root is not the tree's own business, but it has to be
+    # proved once: Remove-Tree is also handed paths nobody registered, and Q1 was
+    # a link *above* everything the caller had checked.
+    $above = Split-Path -Parent $treeRoot
+    while (-not [string]::IsNullOrWhiteSpace($above)) {
+        if (Test-ReparsePoint $above) {
+            throw "Remove-Tree: '$treeRoot' is reached through '$above', which is a reparse point; the tree is retained and nothing under it was touched"
+        }
+        $nextAbove = Split-Path -Parent $above
+        if ($nextAbove -eq $above) {
+            break
+        }
+        $above = $nextAbove
+    }
+    $retained = [System.Collections.Generic.List[string]]::new()
+    $retainedRefusal = ''
     for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
         try {
             $seen = [System.Collections.Generic.List[string]]::new()
             $pending = [System.Collections.Generic.Stack[string]]::new()
-            $pending.Push($root.FullName)
+            $pending.Push($treeRoot)
             while ($pending.Count -gt 0) {
                 $directory = $pending.Pop()
+                $unsafe = & $unsafeWithin $directory $treeRoot
+                if ($unsafe -ne '') {
+                    $retained.Add((& $retainedNote $directory $unsafe)) | Out-Null
+                    continue
+                }
+                $children = @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction SilentlyContinue)
+                # The entries just read are only paths inside this directory while
+                # the directory still is this directory (review Q2).
+                $unsafe = & $unsafeWithin $directory $treeRoot
+                if ($unsafe -ne '') {
+                    $retained.Add((& $retainedNote $directory $unsafe -WhileEnumerated)) | Out-Null
+                    continue
+                }
                 $seen.Add($directory) | Out-Null
-                foreach ($child in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction SilentlyContinue)) {
+                foreach ($child in $children) {
                     try {
                         if ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
                             [void]$child.Delete()
@@ -211,14 +316,32 @@ function Remove-Tree {
                     }
                 }
             }
+            if ($retained.Count -gt 0) {
+                $retainedRefusal = ("Remove-Tree retained {0} object(s) instead of deleting them: {1}. " -f `
+                        $retained.Count, ($retained -join '; ')) +
+                    'A directory that stopped being the directory that was queued is not entered, the ' +
+                    'entries read from it are not deleted, and the tree is left where it stands.'
+                break
+            }
             # Directories last, deepest first, and each one only when empty: a
             # recursive API here would walk into anything the tree grew.
             foreach ($directory in ($seen | Sort-Object { $_.Length } -Descending)) {
                 try {
+                    $unsafe = & $unsafeWithin $directory $treeRoot
+                    if ($unsafe -ne '') {
+                        $retained.Add((& $retainedNote $directory $unsafe)) | Out-Null
+                        break
+                    }
                     [System.IO.Directory]::Delete($directory, $false)
                 } catch {
                     Write-Verbose "deferred removal of '$directory': $($_.Exception.Message)"
                 }
+            }
+            if ($retained.Count -gt 0) {
+                $retainedRefusal = ("Remove-Tree retained {0} object(s) instead of deleting them: {1}. " -f `
+                        $retained.Count, ($retained -join '; ')) +
+                    'A directory that stopped being the directory that was queued is not removed.'
+                break
             }
             if (-not (Test-Path -LiteralPath $Path)) {
                 return
@@ -233,6 +356,9 @@ function Remove-Tree {
             }
             Start-Sleep -Milliseconds (200 * $attempt)
         }
+    }
+    if ($retainedRefusal -ne '') {
+        throw $retainedRefusal
     }
 }
 
@@ -464,9 +590,16 @@ if ($keepEvidenceOutsideScratch) {
 function Register-RunRoot([string]$Root, [string]$Parent, [string]$Kind) {
     <#  Registers one run-scoped directory tree for guaranteed cleanup. The
         root must resolve inside the validated parent it is registered under,
-        and the chain from the root to that parent must be real directories:
-        a link registered as a run root would put someone else's tree on the
-        delete list (review N2). #>
+        and the chain from the root up to the volume root must be real
+        directories: a link anywhere on the way would put someone else's tree on
+        the delete list (review N2, and Q1 for the part above the parent).
+
+        The root also has to exist already, because the registration is anchored
+        *in* it: an unguessable witness file whose name and content only this run
+        knows is written into the directory, and cleanup deletes the root only
+        while that witness is still there saying the same thing. Without it, a
+        registration is a promise about a spelling - and Q1 is exactly a case
+        where the spelling stayed and the directory behind it did not. #>
     $canonicalRootPath = Get-CanonicalPath $Root
     $canonicalParentPath = (Get-CanonicalPath $Parent).TrimEnd('\')
     if (-not $canonicalRootPath.ToLowerInvariant().StartsWith(
@@ -475,11 +608,27 @@ function Register-RunRoot([string]$Root, [string]$Parent, [string]$Kind) {
     }
     Assert-PathChainIsReal -Path $canonicalRootPath -Boundary $canonicalParentPath `
         -Label "run root '$canonicalRootPath'"
+    if (-not (Test-Path -LiteralPath $canonicalRootPath)) {
+        throw "run root '$canonicalRootPath' does not exist; a root is created first and registered afterwards, so that its ownership can be anchored in it"
+    }
+    if (-not (Get-Item -LiteralPath $canonicalRootPath -Force).PSIsContainer) {
+        throw "run root '$canonicalRootPath' is not a directory"
+    }
+    $token = [guid]::NewGuid().ToString('N')
+    $witness = ".wave5b-run-owned-$token.owned"
+    $witnessPath = Join-Path $canonicalRootPath $witness
+    if (Test-Path -LiteralPath $witnessPath) {
+        throw "run root '$canonicalRootPath' already holds a file named '$witness'"
+    }
+    [System.IO.File]::WriteAllText($witnessPath, "wave5b-run-root-owner=$token`r`n",
+        [System.Text.UTF8Encoding]::new($false))
     $script:RunRoots.Add([pscustomobject]@{
-        Root   = $canonicalRootPath
-        Parent = $canonicalParentPath
-        Kind   = $Kind
-    }) | Out-Null
+            Root    = $canonicalRootPath
+            Parent  = $canonicalParentPath
+            Kind    = $Kind
+            Witness = $witness
+            Token   = $token
+        }) | Out-Null
     return $canonicalRootPath
 }
 
@@ -490,7 +639,12 @@ function Remove-RunScratch {
         evidence subtree survives by design (review repair R4). N2 (review
         §3.8): the check is repeated on the *attributes*, not just the spelling,
         because a root that was replaced by a link after registration names a
-        tree the run never created — the link is unlinked, its target is not. #>
+        tree the run never created - the link is unlinked, its target is not.
+        Q1 (rereview): that re-check no longer stops at the registered parent
+        (see Get-UnsafeLink), and it is completed by the ownership witness
+        Register-RunRoot wrote into the directory: a name that resolves, sits
+        inside its parent and holds no link can still be a different directory,
+        and a directory this run did not create is not this run's to delete. #>
     if ($KeepScratch) {
         foreach ($entry in $script:RunRoots) {
             Write-Log "kept scratch root ($($entry.Kind)): $($entry.Root)"
@@ -534,9 +688,35 @@ function Remove-RunScratch {
             if ($blocked) {
                 continue
             }
+            $witness = ''
+            $token = ''
+            if ($entry.PSObject.Properties.Name -contains 'Witness') {
+                $witness = [string]$entry.Witness
+            }
+            if ($entry.PSObject.Properties.Name -contains 'Token') {
+                $token = [string]$entry.Token
+            }
+            if ([string]::IsNullOrWhiteSpace($witness) -or [string]::IsNullOrWhiteSpace($token)) {
+                Write-Warning "refusing to delete '$root': it carries no run ownership witness, so nothing proves this tree is the one this run created"
+                continue
+            }
+            $witnessText = ''
+            try {
+                $witnessPath = Join-Path $canonicalPath $witness
+                if (Test-Path -LiteralPath $witnessPath) {
+                    $witnessText = [System.IO.File]::ReadAllText($witnessPath)
+                }
+            } catch {
+                $witnessText = ''
+            }
+            if (-not $witnessText.Contains($token)) {
+                Write-Warning "refusing to delete '$root': its ownership witness '$witness' is missing or names a different run, so this path no longer holds the tree the run created"
+                continue
+            }
             if ($entry.Kind -eq 'main' -and $script:InternalEvidence) {
                 # Default evidence lives inside the run: the evidence subtree
-                # is kept by explicit rule, everything else in the root goes.
+                # is kept by explicit rule, everything else in the root goes -
+                # including the witness, which has served its purpose by then.
                 $keep = (Get-CanonicalPath $script:EvidenceInsideRun).ToLowerInvariant()
                 Get-ChildItem -LiteralPath $root -Force | ForEach-Object {
                     if ((Get-CanonicalPath $_.FullName).ToLowerInvariant() -ne $keep) {
@@ -989,12 +1169,18 @@ function Test-ReparseCapable([string]$Directory) {
 $linkScratch = $scratchRoot
 if (-not (Test-ReparseCapable $scratchRoot)) {
     # B1 fix: use a unique GUID-based directory name instead of a fixed name
-    # that would wipe out other runs.
+    # that would wipe out other runs. The directory is created first and
+    # registered afterwards, because registering anchors the ownership witness
+    # inside it (review Q1).
     $linkScratchRunId = [guid]::NewGuid().ToString('N')
-    $linkScratch = Register-RunRoot -Root (
-        Join-Path ([System.IO.Path]::GetTempPath()) ("plan0014-wave5b-links-" + $linkScratchRunId)
-    ) -Parent ([System.IO.Path]::GetTempPath()) -Kind 'fallback'
-    New-Item -ItemType Directory -Force -Path $linkScratch | Out-Null
+    $linkScratchCandidate = Join-Path ([System.IO.Path]::GetTempPath()) (
+        'plan0014-wave5b-links-' + $linkScratchRunId)
+    if (Test-Path -LiteralPath $linkScratchCandidate) {
+        throw "link scratch '$linkScratchCandidate' already exists; this run did not create it and will not take it over"
+    }
+    New-Item -ItemType Directory -Path $linkScratchCandidate | Out-Null
+    $linkScratch = Register-RunRoot -Root $linkScratchCandidate `
+        -Parent ([System.IO.Path]::GetTempPath()) -Kind 'fallback'
     Write-Log ("scratch volume cannot hold reparse points; link cases use $linkScratch")
 }
 Write-Log ("link-scratch=$linkScratch reparse-capable=" + (Test-ReparseCapable $linkScratch))

@@ -57,6 +57,10 @@ $script:ScenarioNames = [System.Collections.Generic.List[string]]::new()
 $script:Executed = 0
 $script:Skipped = 0
 $script:Blocked = [System.Collections.Generic.List[string]]::new()
+# Q3 (rereview): one identity for this run, and the list of objects this run
+# created. Scratch that is not on this list is nobody's to delete.
+$script:RunId = [guid]::NewGuid().ToString('N')
+$script:RunOwned = [System.Collections.Generic.List[string]]::new()
 
 function Write-RepairLog([string]$Line) { Write-Host $Line }
 
@@ -135,6 +139,10 @@ function Invoke-RepairScenario {
         if ($transcript) {
             Stop-Transcript | Out-Null
         }
+        # Q3 (rereview): the scratch a scenario created is released by this
+        # scenario's finally, whether its body passed, failed or was blocked.
+        # Only recorded objects are released; OutDir evidence stays.
+        Remove-RunOwnedScratch
     }
     if ($null -ne $thrown) {
         $message = $thrown.Exception.Message
@@ -158,36 +166,93 @@ function New-ScenarioScratch([string]$Name) {
     return $root
 }
 
+function Remove-RunOwnedScratch {
+    <#  Q3 (rereview): this sweep deletes exactly the objects it created and
+        recorded - nothing else. OutDir is evidence and never enters the list, a
+        directory that already existed is never entered, and the removal itself
+        is the production Remove-Tree, which proves the path chain and retains
+        what it cannot prove. #>
+    while ($script:RunOwned.Count -gt 0) {
+        $path = $script:RunOwned[$script:RunOwned.Count - 1]
+        $script:RunOwned.RemoveAt($script:RunOwned.Count - 1)
+        try {
+            if (Test-Path -LiteralPath $path) {
+                Remove-Tree -Path $path
+            }
+        } catch {
+            Write-RepairLog "note: owned scratch '$path' was retained: $($_.Exception.Message)"
+        }
+    }
+}
+
 function Get-ReparseCapableScratch([string]$Name) {
     <#  A fresh scenario directory on a volume that can actually host a reparse
         point, or a named BLOCKED refusal when no writable volume can. The
         capability is proved by creating a junction, never assumed: exFAT
         volumes and network shares accept the directory name and reject the
         reparse point, and a fixture that silently degraded into a plain
-        directory would "pass" without testing anything (review N2). #>
-    foreach ($probe in @(
-            (Join-Path ([System.IO.Path]::GetTempPath()) 'wave5b-reparse-probe'),
-            (Join-Path $OutDir 'reparse-probe'))) {
-        $target = Join-Path $probe 'junction-target'
-        $link = Join-Path $probe 'junction-link'
-        try {
-            New-Item -ItemType Directory -Force -Path $target | Out-Null
-            if (Test-Path -LiteralPath $link) {
-                (Get-Item -LiteralPath $link -Force).Delete()
+        directory would "pass" without testing anything (review N2).
+
+        Q3 (rereview): the probe base, the junction target, the link and the
+        scenario directory all carry this run's id, and none of them is ever
+        deleted on the way in. A name that exists is refused or stepped around,
+        so two runs with the same scenario name - one after the other, or two at
+        the same time - cannot land in one directory and cannot clear each
+        other's fixtures.
+
+        This function is also imported on its own by independent probes, so it
+        provides its own run id and ownership list, and calls nothing but the
+        host's commands. #>
+    if ([string]::IsNullOrWhiteSpace($script:RunId)) {
+        $script:RunId = [guid]::NewGuid().ToString('N')
+    }
+    if ($null -eq $script:RunOwned) {
+        $script:RunOwned = [System.Collections.Generic.List[string]]::new()
+    }
+    <#  Creates one directory this run owns, and only one. A name that already
+        exists is somebody else's, so it is stepped around rather than emptied:
+        Q3 was a helper that deleted whatever a previous run had left at a fixed
+        name, and a name is not ownership. #>
+    $newOwnedDirectory = {
+        param([string]$Base, [string]$Prefix)
+        foreach ($try in 1..8) {
+            $candidate = Join-Path $Base ($Prefix + '-' + [guid]::NewGuid().ToString('N'))
+            if (Test-Path -LiteralPath $candidate) {
+                Write-Host "note: '$candidate' already exists; choosing another name instead of taking it over"
+                continue
             }
+            New-Item -ItemType Directory -Path $candidate | Out-Null
+            $canonical = (Resolve-Path -LiteralPath $candidate).Path
+            if (-not $script:RunOwned.Contains($canonical)) {
+                $script:RunOwned.Add($canonical) | Out-Null
+            }
+            return $canonical
+        }
+        throw "cannot create a unique directory under '$Base' with prefix '$Prefix'"
+    }
+    foreach ($probeBase in @(
+            (Join-Path ([System.IO.Path]::GetTempPath()) ('wave5b-reparse-probe-' + $script:RunId)),
+            (Join-Path $OutDir ('reparse-probe-' + $script:RunId)))) {
+        if (Test-Path -LiteralPath $probeBase) {
+            Write-Host "note: probe base '$probeBase' already exists; refusing to share a scratch this run did not create"
+            continue
+        }
+        try {
+            New-Item -ItemType Directory -Path $probeBase | Out-Null
+            $script:RunOwned.Add((Resolve-Path -LiteralPath $probeBase).Path) | Out-Null
+            $target = & $newOwnedDirectory $probeBase 'junction-target'
+            $link = Join-Path $probeBase ('junction-link-' + [guid]::NewGuid().ToString('N'))
             New-Item -ItemType Junction -Path $link -Target $target -ErrorAction Stop | Out-Null
             if (-not ((Get-Item -LiteralPath $link -Force).Attributes -band
                     [System.IO.FileAttributes]::ReparsePoint)) {
                 throw 'the created item does not carry the reparse-point attribute'
             }
+            # The link is a name this run just created; removing the name is all
+            # it takes, and the target stays for the scenario to use.
             (Get-Item -LiteralPath $link -Force).Delete()
-            $scratch = Join-Path $probe ('scenario-' + $Name)
-            if (Test-Path -LiteralPath $scratch) {
-                Remove-Item -LiteralPath $scratch -Recurse -Force
-            }
-            New-Item -ItemType Directory -Force -Path $scratch | Out-Null
-            return $scratch
+            return & $newOwnedDirectory $probeBase ('scenario-' + $Name)
         } catch {
+            Write-Host "note: probe base '$probeBase' is not usable: $($_.Exception.Message)"
             continue
         }
     }
@@ -197,6 +262,19 @@ function Get-ReparseCapableScratch([string]$Name) {
 
 function Get-FileSha([string]$Path) {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Get-TreeItemCount([string]$Path) {
+    <#  How much is really inside a tree, for a before/after comparison in a
+        failure message. The .NET enumeration is used rather than Get-ChildItem
+        because a Q2 scenario installs a scoped Get-ChildItem shim to schedule
+        its swap, and a dynamic-language shim would be visible here too: a
+        fixture must not be able to disturb the instrument that measures it. #>
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return 0
+    }
+    return @([System.IO.Directory]::GetFileSystemEntries(
+        $Path, '*', [System.IO.SearchOption]::AllDirectories)).Count
 }
 
 function Get-NormalizedOutput([string]$Text) {
@@ -257,6 +335,19 @@ function Reset-RunHarness {
     $KeepScratch = $false
 }
 
+# Anything that ends this run abnormally from here on still releases what this
+# run created. Each scenario also has its own finally; this is the net under a
+# terminating error raised outside a scenario body, and like that finally it
+# releases only the recorded objects. It sits below the helper definitions and
+# checks for them, because a trap that itself fails replaces the real error
+# with a missing-command message - which is what it did on its first try here.
+trap {
+    if (Get-Command -Name Remove-RunOwnedScratch -CommandType Function -ErrorAction SilentlyContinue) {
+        Remove-RunOwnedScratch
+    }
+    break
+}
+
 # ---------------------------------------------------------------------------
 # static layer - R3 and R7 guards against reintroduction
 # ---------------------------------------------------------------------------
@@ -300,6 +391,102 @@ Invoke-RepairScenario 'static-r7-no-array-append' {
         "wrapper still appends a bare EvidenceDir concatenation inside an argument array: $($bad -join ', ')"
 }
 
+Invoke-RepairScenario 'static-cleanup-surface-is-self-contained' {
+    <#  An independent probe imports the cleanup surface by name: it parses the
+        production driver, takes the extent text of the eight functions below and
+        runs that text on its own (that is exactly how review Q1 and Q2 were
+        reproduced). Anything one of them calls therefore has to live inside the
+        extracted set, otherwise a probe of a real fix dies on a missing command
+        and the finding reopens for the wrong reason. #>
+    # Only top-level definitions are part of a file's surface: a scenario may
+    # define a scoped shim over a real cmdlet (the Q2 probes do exactly that to
+    # schedule a swap at one enumeration boundary), and that shim is not a
+    # dependency of anything.
+    $topLevelNames = {
+        param($tree)
+        $names = [System.Collections.Generic.List[string]]::new()
+        foreach ($definition in $tree.FindAll(
+                { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] },
+                $true)) {
+            $blocks = 0
+            $cursor = $definition.Parent
+            while ($null -ne $cursor) {
+                if ($cursor -is [System.Management.Automation.Language.ScriptBlockAst]) { $blocks++ }
+                $cursor = $cursor.Parent
+            }
+            if ($blocks -le 1) { $names.Add($definition.Name) | Out-Null }
+        }
+        return , $names
+    }
+    $driverNames = & $topLevelNames $driverAst
+    $helperNames = & $topLevelNames $selfAst
+    $orphans = [System.Collections.Generic.List[string]]::new()
+    foreach ($fn in $driverAst.FindAll(
+            { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] },
+            $true)) {
+        if ($wanted -notcontains $fn.Name) { continue }
+        foreach ($call in $fn.FindAll(
+                { param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+            $called = $call.GetCommandName()
+            if ([string]::IsNullOrWhiteSpace($called)) { continue }
+            if (($driverNames -contains $called -or $helperNames -contains $called) -and
+                $wanted -notcontains $called) {
+                $orphans.Add("$($fn.Name) -> $called") | Out-Null
+            }
+        }
+    }
+    <#  The same rule holds the other way round: the Q3 probe imports
+        Get-ReparseCapableScratch by itself, so that one may call neither file's
+        helpers at all. #>
+    foreach ($fn in $selfAst.FindAll(
+            { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] },
+            $true)) {
+        if ($fn.Name -ne 'Get-ReparseCapableScratch') { continue }
+        foreach ($call in $fn.FindAll(
+                { param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+            $called = $call.GetCommandName()
+            if ([string]::IsNullOrWhiteSpace($called)) { continue }
+            if ($driverNames -contains $called -or $helperNames -contains $called) {
+                $orphans.Add("'$($fn.Name)' is imported alone and may not call: $called") | Out-Null
+            }
+        }
+    }
+    Assert-Repair ($orphans.Count -eq 0) (
+        'the probe-extractable cleanup surface calls functions outside itself, so a probe ' +
+        "that imports only that surface would break: $(($orphans | Sort-Object -Unique) -join ', ')")
+}
+
+Invoke-RepairScenario 'static-no-recursive-delete-in-either-harness' {
+    <#  Q3 (rereview): the repair helper cleared a previous run's scratch with
+        `Remove-Item -Recurse -Force` on a path nobody had proved this run owns.
+        That is a defect class, not a one-line slip, so neither harness may use a
+        recursive Remove-Item at all: the only tree removal either file performs
+        is Remove-Tree, which proves the path first and retains what it cannot
+        prove. #>
+    $offenders = [System.Collections.Generic.List[string]]::new()
+    foreach ($file in @($driver, $PSCommandPath)) {
+        $fileTokens = $null
+        $fileErrors = $null
+        $fileAst = [System.Management.Automation.Language.Parser]::ParseFile(
+            $file, [ref]$fileTokens, [ref]$fileErrors)
+        Assert-Repair ($fileErrors.Count -eq 0) "'$file' does not parse: $($fileErrors[0])"
+        foreach ($call in $fileAst.FindAll(
+                { param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+            if ($call.GetCommandName() -ne 'Remove-Item') { continue }
+            foreach ($element in $call.CommandElements) {
+                if ($element -is [System.Management.Automation.Language.CommandParameterAst] -and
+                    $element.ParameterName -match '^(Recurse|r)$') {
+                    $offenders.Add(("{0}:{1}" -f (Split-Path -Leaf $file),
+                        $element.Extent.StartLineNumber)) | Out-Null
+                }
+            }
+        }
+    }
+    Assert-Repair ($offenders.Count -eq 0) (
+        'a recursive Remove-Item is back; it deletes content the run does not own at: ' +
+        ($offenders -join ', '))
+}
+
 # ---------------------------------------------------------------------------
 # isolated layer - production cleanup functions against real directories
 # ---------------------------------------------------------------------------
@@ -317,13 +504,15 @@ Invoke-RepairScenario 'ast-cleanup-normal-external' {
     $sentinelSha = Get-FileSha $sentinel
     $oldSha = Get-FileSha $oldFile
 
+    New-Item -ItemType Directory -Force -Path (Join-Path $parent 'run-guidaaa') | Out-Null
     $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidaaa') `
         -Parent $parent -Kind 'main'
     New-Item -ItemType File -Force -Path (Join-Path $runRoot 'work.txt') | Out-Null
     $fallbackParent = [System.IO.Path]::GetTempPath()
-    $fallback = Register-RunRoot -Root (Join-Path $fallbackParent ('wave5b-repair-fixture-fallback-' + [guid]::NewGuid().ToString('N'))) `
-        -Parent $fallbackParent -Kind 'fallback'
-    New-Item -ItemType Directory -Force -Path $fallback | Out-Null
+    $fallbackCandidate = Join-Path $fallbackParent (
+        'wave5b-repair-fixture-fallback-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $fallbackCandidate | Out-Null
+    $fallback = Register-RunRoot -Root $fallbackCandidate -Parent $fallbackParent -Kind 'fallback'
     $script:ProtectedPaths.Add($repoStandIn)
     $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
 
@@ -340,6 +529,7 @@ Invoke-RepairScenario 'ast-cleanup-normal-external' {
 Invoke-RepairScenario 'ast-cleanup-internal-evidence-retained' {
     Reset-RunHarness
     $parent = New-ScenarioScratch 'internal'
+    New-Item -ItemType Directory -Force -Path (Join-Path $parent 'run-guidbbb') | Out-Null
     $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidbbb') `
         -Parent $parent -Kind 'main'
     $evidence = Join-Path $runRoot 'evidence'
@@ -366,6 +556,7 @@ Invoke-RepairScenario 'ast-cleanup-keepscratch' {
     Reset-RunHarness
     $KeepScratch = $true
     $parent = New-ScenarioScratch 'keep'
+    New-Item -ItemType Directory -Force -Path (Join-Path $parent 'run-guidccc') | Out-Null
     $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidccc') `
         -Parent $parent -Kind 'main'
     New-Item -ItemType File -Force -Path (Join-Path $runRoot 'work.txt') | Out-Null
@@ -449,9 +640,9 @@ Invoke-RepairScenario 'ast-cleanup-root-replaced-by-junction' {
     $sentinelSha = Get-FileSha $sentinel
     $deepSha = Get-FileSha $deep
 
+    New-Item -ItemType Directory -Force -Path (Join-Path $parent 'run-guidlink') | Out-Null
     $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidlink') `
         -Parent $parent -Kind 'work'
-    New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
     New-Item -ItemType File -Force -Path (Join-Path $runRoot 'work.txt') | Out-Null
     $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
 
@@ -534,9 +725,9 @@ Invoke-RepairScenario 'ast-cleanup-junction-inside-tree' {
     Set-Content -LiteralPath $sentinel -Value 'keep-me' -Encoding utf8
     $sentinelSha = Get-FileSha $sentinel
 
+    New-Item -ItemType Directory -Force -Path (Join-Path $parent 'run-guidchild') | Out-Null
     $runRoot = Register-RunRoot -Root (Join-Path $parent 'run-guidchild') `
         -Parent $parent -Kind 'work'
-    New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
     $inner = Join-Path $runRoot 'inner'
     New-Item -ItemType Directory -Force -Path $inner | Out-Null
     New-Item -ItemType File -Force -Path (Join-Path $inner 'mine.txt') | Out-Null
@@ -549,6 +740,354 @@ Invoke-RepairScenario 'ast-cleanup-junction-inside-tree' {
     Assert-Repair (Test-Path -LiteralPath $sentinel) `
         'cleanup followed a junction out of the run and deleted what it points at'
     Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the junction target changed bytes'
+}
+
+# ---------------------------------------------------------------------------
+# rereview Q1 - the chain ABOVE the registered parent, and the identity of the
+# directory the registration names
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'ast-cleanup-ancestor-above-parent-replaced-by-junction' {
+    <#  Review Q1: registration stopped its chain check at the parent it was
+        given, so a link planted *above* that parent was invisible and cleanup
+        deleted the tree the link points at. The registered parent may not be an
+        unproven start of trust, so this runs the review's own fixture at three
+        different depths above the parent. #>
+    $scratch = Get-ReparseCapableScratch 'ancestorlink'
+    foreach ($depth in @(1, 2, 3)) {
+        Reset-RunHarness
+        $unit = Join-Path $scratch ("depth$depth")
+        $anchor = Join-Path $unit 'anchor'
+        $below = @()
+        for ($level = 1; $level -lt $depth; $level++) { $below += ("level$level") }
+        $below += 'scratch'
+        $relative = ($below -join [System.IO.Path]::DirectorySeparatorChar)
+        $parent = Join-Path $anchor $relative
+        $runRoot = Join-Path $parent 'run-owned'
+        $outside = Join-Path $unit 'outside-owned'
+        $outsideRun = Join-Path (Join-Path $outside $relative) 'run-owned'
+        New-Item -ItemType Directory -Force -Path $runRoot, $outsideRun | Out-Null
+        $sentinel = Join-Path $outsideRun 'sentinel.txt'
+        Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $runRoot 'mine.txt') -Value 'run-owned' -Encoding utf8
+        $sentinelSha = Get-FileSha $sentinel
+        $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+        [void](Register-RunRoot -Root $runRoot -Parent $parent -Kind 'main')
+
+        # Park the level the run knows nothing about and plant a junction in it.
+        $parked = Join-Path $unit 'parked-anchor'
+        Move-Item -LiteralPath $anchor -Destination $parked
+        New-Item -ItemType Junction -Path $anchor -Target $outside -ErrorAction Stop | Out-Null
+        $parkedMine = Join-Path (Join-Path $parked $relative) 'run-owned/mine.txt'
+        $outsideBefore = Get-TreeItemCount $outside
+
+        $warnings = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+        $joined = (($script:RunLog + $warnings) -join "`n")
+        $outsideAfter = Get-TreeItemCount $outside
+        $reported = Get-UnsafeLink -Path $runRoot -Boundary $parent
+
+        Assert-Repair (Test-Path -LiteralPath $sentinel) (
+            "depth ${depth}Q1: cleanup deleted the external tree reached through an ancestor " +
+            "the run never registered ('$sentinel' is gone, the external tree went from " +
+            "$outsideBefore to $outsideAfter item(s))")
+        Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) "depth ${depth}Q1: the external sentinel changed bytes"
+        Assert-Repair ($reported.ToLowerInvariant() -eq $anchor.ToLowerInvariant()) (
+            "depth ${depth}Q1: Get-UnsafeLink still stops at the registered parent - it reported " +
+            "'$reported' while '$anchor' is a junction, so the chain above the parent is unchecked")
+        Assert-Repair (Test-Path -LiteralPath $parkedMine) (
+            "depth ${depth}Q1: the run's own tree was taken apart through the planted link")
+        Assert-Repair ($joined -match 'reparse point') (
+            "depth ${depth}Q1: the refusal did not name the link rule: $joined")
+    }
+}
+
+Invoke-RepairScenario 'ast-register-refuses-link-already-above-parent' {
+    <#  The other half of Q1: the link was there *before* registration, so
+        nothing about the run created it. Registration has to refuse, and the
+        delete stage has to refuse the same tree when the registration is
+        hand-built around that refusal. #>
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'registerlink'
+    $host_ = Join-Path $scratch 'host'
+    $outside = Join-Path $scratch 'outside'
+    New-Item -ItemType Directory -Force -Path (
+        Join-Path $host_ 'real/scratch/run-owned'), (Join-Path $outside 'scratch/run-owned') | Out-Null
+    $anchor = Join-Path $host_ 'anchor'
+    Move-Item -LiteralPath (Join-Path $host_ 'real') -Destination (Join-Path $host_ 'parked')
+    New-Item -ItemType Junction -Path $anchor -Target $outside -ErrorAction Stop | Out-Null
+    $parent = Join-Path $anchor 'scratch'
+    $root = Join-Path $parent 'run-owned'
+    $sentinel = Join-Path $outside 'scratch/run-owned/sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+
+    $outsideBefore = Get-TreeItemCount $outside
+    $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+    $script:RunRoots.Add([pscustomobject]@{
+            Root   = (Get-CanonicalPath $root)
+            Parent = (Get-CanonicalPath $parent)
+            Kind   = 'main'
+        }) | Out-Null
+    $warnings = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+    $joinedWarnings = $warnings -join "`n"
+    $outsideAfter = Get-TreeItemCount $outside
+    Assert-Repair (Test-Path -LiteralPath $sentinel) (
+        'cleanup deleted the tree a pre-existing junction above the parent points at ' +
+        "('$sentinel' is gone; the external tree went from $outsideBefore to $outsideAfter item(s))")
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the external sentinel changed bytes'
+    Assert-Repair ($joinedWarnings -match 'reparse point') "the refusal did not name the link rule: $joinedWarnings"
+
+    $thrown = $null
+    try {
+        [void](Register-RunRoot -Root $root -Parent $parent -Kind 'main')
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point') (
+        "Register-RunRoot accepted a run path reached through a pre-existing junction: $thrown")
+}
+
+Invoke-RepairScenario 'ast-remove-tree-linked-ancestor-retains-tree' {
+    <#  Q1 at the layer below the registry: Remove-Tree is also called on paths
+        nobody registered (scratch files, noise directories), so it has to prove
+        its own path chain too rather than trust its caller. #>
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'removetreelink'
+    $unit = Join-Path $scratch 'unit'
+    $outside = Join-Path $unit 'outside-owned'
+    New-Item -ItemType Directory -Force -Path (Join-Path $outside 'run-owned/nested') | Out-Null
+    $sentinel = Join-Path $outside 'run-owned/sentinel.txt'
+    $deep = Join-Path $outside 'run-owned/nested/deep.txt'
+    Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+    Set-Content -LiteralPath $deep -Value 'outside-owned nested' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+    $deepSha = Get-FileSha $deep
+    $anchor = Join-Path $unit 'anchor'
+    New-Item -ItemType Junction -Path $anchor -Target $outside -ErrorAction Stop | Out-Null
+    $through = Join-Path $anchor 'run-owned'
+
+    $outsideBefore = Get-TreeItemCount $outside
+    $thrown = $null
+    try {
+        Remove-Tree -Path $through
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    $outsideAfter = Get-TreeItemCount $outside
+    Assert-Repair (Test-Path -LiteralPath $sentinel) (
+        "Remove-Tree walked into a tree reached through a junction instead of refusing " +
+        "('$sentinel' is gone; the external tree went from $outsideBefore to $outsideAfter " +
+        "item(s)); it said: $thrown")
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'the external sentinel changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $deep) 'nested external content was deleted'
+    Assert-Repair ((Get-FileSha $deep) -eq $deepSha) 'nested external content changed bytes'
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point') (
+        "Remove-Tree left the junction target alone but never said why it stopped: $thrown")
+    Assert-Repair (Test-Path -LiteralPath $anchor) 'the junction itself was removed rather than retained'
+}
+
+Invoke-RepairScenario 'ast-cleanup-ownership-witness-is-required' {
+    <#  Q1 asks that registration and cleanup be bound to a physical anchor: the
+        name of a path says nothing about the directory standing behind it. The
+        run therefore anchors every registered root with an unguessable witness
+        file it wrote there itself, and refuses a root whose witness is gone or
+        no longer carries its token - which is what a wholesale replacement of
+        the tree looks like. The scenario also proves the opposite direction,
+        because a cleanup that refused everything would pass this too. #>
+    Reset-RunHarness
+    $parent = New-ScenarioScratch 'witness'
+    $rootPath = Join-Path $parent 'run-guidwit'
+    New-Item -ItemType Directory -Force -Path $rootPath | Out-Null
+    $runRoot = Register-RunRoot -Root $rootPath -Parent $parent -Kind 'main'
+    New-Item -ItemType File -Force -Path (Join-Path $runRoot 'work.txt') | Out-Null
+    $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+
+    $entry = $script:RunRoots[0]
+    Assert-Repair ($null -ne $entry.Witness -and $null -ne $entry.Token) `
+        'Q1: Register-RunRoot records no ownership witness, so cleanup cannot tell the run tree from a look-alike'
+    $witnessPath = Join-Path $runRoot $entry.Witness
+    Assert-Repair (Test-Path -LiteralPath $witnessPath) 'the ownership witness is not inside the registered root'
+
+    Set-Content -LiteralPath $witnessPath -Value 'someone-elses-content' -Encoding utf8
+    $warnings = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+    $joined = $warnings -join "`n"
+    Assert-Repair (Test-Path -LiteralPath $runRoot) (
+        'cleanup deleted a registered root whose ownership witness no longer matched the registration')
+    Assert-Repair ($joined -match 'witness') "the refusal did not name the witness rule: $joined"
+
+    Set-Content -LiteralPath $witnessPath -Value ("wave5b-run-root-owner={0}" -f $entry.Token) -Encoding utf8
+    Remove-RunScratch
+    Assert-Repair (-not (Test-Path -LiteralPath $runRoot)) (
+        'positive control failed: a witnessed, owned, unprotected root was not cleaned')
+}
+
+# ---------------------------------------------------------------------------
+# rereview Q2 - the identity of a directory between verifying it and using it
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'ast-remove-tree-queued-directory-swapped-before-pop' {
+    <#  Review Q2, window one: a child directory passes the attribute check while
+        its parent is enumerated, and only its name is queued. Something replaces
+        that name with a junction before the walk pops it, and the enumeration
+        then walks into someone else's tree. The swap below is a deterministic
+        scheduler injection at that exact boundary - the real cmdlet still
+        enumerates, and the real production Remove-Tree still deletes. #>
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'queueswap'
+    $unit = Join-Path $scratch 'unit'
+    $run = Join-Path $unit 'run-owned'
+    $child = Join-Path $run 'child'
+    $sibling = Join-Path $run 'sibling'
+    $outside = Join-Path $unit 'outside-owned'
+    New-Item -ItemType Directory -Force -Path $child, $sibling, (Join-Path $outside 'nested') | Out-Null
+    $sentinel = Join-Path $outside 'sentinel.txt'
+    $deep = Join-Path $outside 'nested/deep.txt'
+    Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+    Set-Content -LiteralPath $deep -Value 'outside-owned nested content' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $child 'child-file.txt') -Value 'run-owned' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $sibling 'mine.txt') -Value 'run-owned' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+    $deepSha = Get-FileSha $deep
+
+    # The swap is scheduled at the enumeration of the *parent*: the child is
+    # checked, queued by name, and only then replaced (review Q2, window one).
+    $script:SwapShim = [ordered]@{
+        Done   = $false
+        Watch  = $run
+        Swap   = $child
+        Parked = (Join-Path $unit 'parked-child')
+        Into   = $outside
+    }
+    $script:RealChildItem = Get-Command -CommandType Cmdlet Get-ChildItem
+    function Get-ChildItem {
+        [CmdletBinding()]
+        param([string]$LiteralPath, [switch]$Force)
+        $forward = @{ ErrorAction = 'SilentlyContinue' }
+        if ($PSBoundParameters.ContainsKey('LiteralPath')) { $forward['LiteralPath'] = $LiteralPath }
+        if ($Force) { $forward['Force'] = $true }
+        $items = @(& $script:RealChildItem @forward)
+        $shim = $script:SwapShim
+        if (-not $shim.Done -and $PSBoundParameters.ContainsKey('LiteralPath') -and
+            $LiteralPath -eq $shim.Watch) {
+            $root = [System.IO.Path]::GetFullPath($scratch) + [System.IO.Path]::DirectorySeparatorChar
+            foreach ($candidate in @($shim.Swap, $shim.Parked, $shim.Into)) {
+                if (-not [System.IO.Path]::GetFullPath($candidate).StartsWith($root,
+                        [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw 'the scheduled swap would escape the scenario scratch'
+                }
+            }
+            Move-Item -LiteralPath $shim.Swap -Destination $shim.Parked
+            New-Item -ItemType Junction -Path $shim.Swap -Target $shim.Into -ErrorAction Stop | Out-Null
+            $shim.Done = $true
+        }
+        return $items
+    }
+
+    $outsideBefore = Get-TreeItemCount $outside
+    $thrown = $null
+    try {
+        Remove-Tree -Path $run
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    $outsideAfter = Get-TreeItemCount $outside
+    Assert-Repair ($script:SwapShim.Done) 'the scheduled swap never ran; this scenario would prove nothing'
+    Assert-Repair (Test-Path -LiteralPath $sentinel) (
+        'Q2: Remove-Tree deleted through a directory that became a junction after it was ' +
+        "queued ('$sentinel' is gone; the external tree went from $outsideBefore to $outsideAfter " +
+        "item(s)); Remove-Tree said: $thrown")
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'Q2: the external sentinel changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $deep) 'Q2: nested external content was deleted'
+    Assert-Repair ((Get-FileSha $deep) -eq $deepSha) 'Q2: nested external content changed bytes'
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point|retain') (
+        "Q2: Remove-Tree left the external tree alone but never said why it stopped: $thrown")
+    Assert-Repair (Test-Path -LiteralPath (Join-Path $script:SwapShim.Parked 'child-file.txt')) `
+        'Q2: the run-owned content that was moved aside did not survive'
+    Assert-Repair (-not (Test-Path -LiteralPath (Join-Path $sibling 'mine.txt'))) `
+        'positive control failed: the run-owned sibling the walk could prove was not cleaned'
+    Assert-Repair (Test-Path -LiteralPath $run) 'the retained root vanished, so the refusal leaves nothing to inspect'
+}
+
+Invoke-RepairScenario 'ast-remove-tree-directory-swapped-after-enumeration' {
+    <#  Review Q2, window two: the swap lands after the directory has been
+        enumerated but before the entries of that enumeration are deleted, so the
+        entries are stale and every one of them is now a path *through* a link.
+        Both trees hold a file of the same name, and only the external one may
+        survive. #>
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'enumswap'
+    $unit = Join-Path $scratch 'unit'
+    $run = Join-Path $unit 'run-owned'
+    $child = Join-Path $run 'child'
+    $sibling = Join-Path $run 'sibling'
+    $outside = Join-Path $unit 'outside-owned'
+    New-Item -ItemType Directory -Force -Path $child, $sibling, $outside | Out-Null
+    Set-Content -LiteralPath (Join-Path $child 'shared.txt') -Value 'run-owned bytes' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $sibling 'mine.txt') -Value 'run-owned sibling bytes' -Encoding utf8
+    $outsideFile = Join-Path $outside 'shared.txt'
+    $sentinel = Join-Path $outside 'sentinel.txt'
+    Set-Content -LiteralPath $outsideFile -Value 'outside-owned bytes' -Encoding utf8
+    Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+    $outsideSha = Get-FileSha $outsideFile
+    $sentinelSha = Get-FileSha $sentinel
+
+    # The swap is scheduled at the enumeration of the directory itself: the
+    # listing cleanup is about to act on is taken first, and the entry that
+    # listing names is replaced under it before cleanup reaches it (review Q2,
+    # window two).
+    $script:SwapShim = [ordered]@{
+        Done   = $false
+        Watch  = $child
+        Swap   = $child
+        Parked = (Join-Path $unit 'parked-child')
+        Into   = $outside
+    }
+    $script:RealChildItem = Get-Command -CommandType Cmdlet Get-ChildItem
+    function Get-ChildItem {
+        [CmdletBinding()]
+        param([string]$LiteralPath, [switch]$Force)
+        $forward = @{ ErrorAction = 'SilentlyContinue' }
+        if ($PSBoundParameters.ContainsKey('LiteralPath')) { $forward['LiteralPath'] = $LiteralPath }
+        if ($Force) { $forward['Force'] = $true }
+        $items = @(& $script:RealChildItem @forward)
+        $shim = $script:SwapShim
+        if (-not $shim.Done -and $PSBoundParameters.ContainsKey('LiteralPath') -and
+            $LiteralPath -eq $shim.Watch) {
+            $root = [System.IO.Path]::GetFullPath($scratch) + [System.IO.Path]::DirectorySeparatorChar
+            foreach ($candidate in @($shim.Swap, $shim.Parked, $shim.Into)) {
+                if (-not [System.IO.Path]::GetFullPath($candidate).StartsWith($root,
+                        [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw 'the scheduled swap would escape the scenario scratch'
+                }
+            }
+            Move-Item -LiteralPath $shim.Swap -Destination $shim.Parked
+            New-Item -ItemType Junction -Path $shim.Swap -Target $shim.Into -ErrorAction Stop | Out-Null
+            $shim.Done = $true
+        }
+        return $items
+    }
+
+    $outsideBefore = Get-TreeItemCount $outside
+    $thrown = $null
+    try {
+        Remove-Tree -Path $run
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    $outsideAfter = Get-TreeItemCount $outside
+    Assert-Repair ($script:SwapShim.Done) 'the scheduled swap never ran; this scenario would prove nothing'
+    Assert-Repair (Test-Path -LiteralPath $outsideFile) (
+        'Q2: Remove-Tree deleted the external file that shares a name with an entry it ' +
+        "enumerated before the swap ('$outsideFile' is gone; the external tree went from " +
+        "$outsideBefore to $outsideAfter item(s)); Remove-Tree said: $thrown")
+    Assert-Repair ((Get-FileSha $outsideFile) -eq $outsideSha) 'Q2: the external file changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $sentinel) 'Q2: the external sentinel was deleted'
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'Q2: the external sentinel changed bytes'
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point|retain') (
+        "Q2: Remove-Tree left the external tree alone but never said why it stopped: $thrown")
+    Assert-Repair (Test-Path -LiteralPath (Join-Path $script:SwapShim.Parked 'shared.txt')) `
+        'Q2: the run-owned file that was moved aside did not survive'
+    Assert-Repair (-not (Test-Path -LiteralPath (Join-Path $sibling 'mine.txt'))) `
+        'positive control failed: the run-owned sibling the walk could prove was not cleaned'
+    Assert-Repair (Test-Path -LiteralPath $run) 'the retained root vanished, so the refusal leaves nothing to inspect'
 }
 
 # ---------------------------------------------------------------------------
@@ -584,6 +1123,202 @@ Invoke-RepairScenario 'filter-counters-reported-for-a-valid-filter' {
         "the sweep did not report executed/skipped/failed counts: $joined"
     Assert-Repair (@(Get-ChildItem -LiteralPath $out -Filter '*.log').Count -eq 1) `
         'exactly one scenario log was expected for a one-scenario filter run'
+}
+
+# ---------------------------------------------------------------------------
+# rereview Q3 - the capability probe scratch belongs to one run, not to the host
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'helper-scratch-never-reuses-previous-run-root' {
+    <#  Q3: the probe used a fixed global base and a fixed scenario name, and
+        deleted whatever it found there. A second run, or a run overlapping with
+        another one, therefore erased another run's fixtures and evidence. The
+        decoy below is a tree this scenario creates *first*, under the exact path
+        the old helper used, with a sentinel: the helper may neither hand it back
+        nor clean it. #>
+    $name = 'q3decoy-' + $script:RunId
+    $legacyBase = Join-Path ([System.IO.Path]::GetTempPath()) 'wave5b-reparse-probe'
+    $decoy = Join-Path $legacyBase ('scenario-' + $name)
+    if (Test-Path -LiteralPath $decoy) {
+        throw "the legacy probe path '$decoy' already exists from an earlier run; clean it by hand so this scenario owns its own decoy"
+    }
+    New-Item -ItemType Directory -Path $decoy | Out-Null
+    $script:RunOwned.Add((Get-CanonicalPath $decoy)) | Out-Null
+    $sentinel = Join-Path $decoy 'preexisting-sentinel.txt'
+    [System.IO.File]::WriteAllText($sentinel, 'belongs-to-the-earlier-run')
+    $sentinelSha = Get-FileSha $sentinel
+
+    $returned = Get-ReparseCapableScratch $name
+    Assert-Repair ($null -ne $returned -and -not [string]::IsNullOrWhiteSpace($returned)) `
+        'Get-ReparseCapableScratch returned no path'
+    $script:RunOwned.Add((Get-CanonicalPath $returned)) | Out-Null
+    Assert-Repair ((Get-CanonicalPath $returned).ToLowerInvariant() -ne (Get-CanonicalPath $decoy).ToLowerInvariant()) (
+        "Q3: the helper handed back the scratch of an earlier run ('$returned') instead of creating its own; " +
+        "the earlier run's sentinel '$sentinel' is now " +
+        $(if (Test-Path -LiteralPath $sentinel) { 'intact' } else { 'deleted' }))
+    Assert-Repair (Test-Path -LiteralPath $sentinel) `
+        'Q3: the helper deleted a scenario directory a previous run had left behind'
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'Q3: the earlier run sentinel changed bytes'
+    Assert-Repair (-not (Get-CanonicalPath $returned).ToLowerInvariant().StartsWith(
+            (Get-CanonicalPath $legacyBase).ToLowerInvariant() + '\')) `
+        "Q3: the helper still puts probe scratch under the shared fixed base '$legacyBase', so two runs can meet there"
+    Assert-Repair ((Get-CanonicalPath $returned).ToLowerInvariant().StartsWith(
+            (Get-CanonicalPath $OutDir).ToLowerInvariant() + '\') -or
+        (Get-CanonicalPath $returned).ToLowerInvariant().Contains($script:RunId)) (
+        "Q3: the probe scratch '$returned' is not namespaced to this run ($script:RunId)")
+    Assert-Repair (Test-Path -LiteralPath $returned) 'the helper returned a directory that does not exist'
+}
+
+Invoke-RepairScenario 'helper-scratch-repeat-and-concurrent-runs-are-disjoint' {
+    <#  Q3 asked for three things: a same-name directory left by an earlier run,
+        a repeated run, and two runs in parallel. The first is the decoy
+        scenario; this one runs the real helper in separate child processes -
+        twice in a row and then twice at the same time - each of which plants a
+        sentinel in the scratch it was given, holds it for a moment, and refuses
+        to exit if anything touched it. Two runs that shared a root could not
+        both report that. #>
+    $childScript = Join-Path $OutDir 'helper-scratch-child-probe.ps1'
+    $childLines = @(
+        'param(',
+        '    [Parameter(Mandatory)][string]$Repair,',
+        '    [Parameter(Mandatory)][string]$Driver,',
+        '    [Parameter(Mandatory)][string]$ChildOutDir,',
+        '    [Parameter(Mandatory)][string]$ScenarioName,',
+        '    [int]$HoldMilliseconds = 1200',
+        ')',
+        '$ErrorActionPreference = ''Stop''',
+        '$OutDir = $ChildOutDir',
+        'foreach ($sourceFile in @($Driver, $Repair)) {',
+        '    $tokens = $null',
+        '    $errors = $null',
+        '    $ast = [System.Management.Automation.Language.Parser]::ParseFile(',
+        '        $sourceFile, [ref]$tokens, [ref]$errors)',
+        '    if ($errors.Count -gt 0) { Write-Output "RESULT=PARSE-FAILED $sourceFile"; exit 8 }',
+        '    $definitions = @($ast.FindAll(',
+        '        { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] },',
+        '        $true))',
+        '    # Top level only: a scenario may define a scoped shim over a real cmdlet,',
+        '    # and importing that shim here would replace the cmdlet for the whole child.',
+        '    $text = ($definitions | Where-Object {',
+        '        $blocks = 0',
+        '        $cursor = $_.Parent',
+        '        while ($null -ne $cursor) {',
+        '            if ($cursor -is [System.Management.Automation.Language.ScriptBlockAst]) { $blocks++ }',
+        '            $cursor = $cursor.Parent',
+        '        }',
+        '        $blocks -le 1',
+        '    } | ForEach-Object { $_.Extent.Text }) -join "`r`n"',
+        '    Invoke-Expression $text',
+        '}',
+        '$root = Get-ReparseCapableScratch $ScenarioName',
+        '$root = (Resolve-Path -LiteralPath $root).Path',
+        'Write-Output "RUNID=$script:RunId"',
+        'Write-Output "ROOT=$root"',
+        'Write-Output "BASE=$((Split-Path -Parent $root))"',
+        '$sentinel = Join-Path $root ''child-own-sentinel.txt''',
+        '[System.IO.File]::WriteAllText($sentinel, ''child run owns this'')',
+        '$sha = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash',
+        'Start-Sleep -Milliseconds $HoldMilliseconds',
+        'if (-not (Test-Path -LiteralPath $sentinel)) { Write-Output ''SENTINEL_ALIVE=false''; Write-Output ''RESULT=SENTINEL-DELETED-BY-SOMEONE-ELSE''; exit 3 }',
+        'if ((Get-FileHash -LiteralPath $sentinel -Algorithm SHA256).Hash -ne $sha) { Write-Output ''RESULT=SENTINEL-BYTES-CHANGED''; exit 4 }',
+        'Write-Output ''SENTINEL_ALIVE=true''',
+        'if (Get-Command -Name Remove-RunOwnedScratch -CommandType Function -ErrorAction SilentlyContinue) {',
+        '    Remove-RunOwnedScratch',
+        '    if (Test-Path -LiteralPath $root) { Write-Output ''RESULT=OWNED-SCRATCH-SURVIVED''; exit 5 }',
+        '    Write-Output ''OWNED_CLEANUP=gone''',
+        '} else {',
+        '    Write-Output ''OWNED_CLEANUP=absent''',
+        '}',
+        'Write-Output ''RESULT=OK''',
+        'exit 0'
+    )
+    [System.IO.File]::WriteAllText($childScript, ($childLines -join "`r`n"),
+        [System.Text.UTF8Encoding]::new($false))
+
+    function Start-ScratchChild {
+        <#  Starts one child run of the real helper and does not wait, so two of
+           them can genuinely overlap. #>
+        param([string]$Tag, [string]$ScenarioName, [int]$HoldMilliseconds)
+        $childOut = Join-Path $OutDir "helper-scratch-$Tag-outdir"
+        New-Item -ItemType Directory -Force -Path $childOut | Out-Null
+        $stdout = Join-Path $OutDir "helper-scratch-$Tag.log"
+        $process = Start-Process -FilePath 'pwsh' -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdout `
+            -ArgumentList @('-NoProfile', '-File', $childScript,
+                '-Repair', $PSCommandPath, '-Driver', $driver,
+                '-ChildOutDir', $childOut, '-ScenarioName', $ScenarioName,
+                '-HoldMilliseconds', $HoldMilliseconds)
+        return [pscustomobject]@{ Tag = $Tag; Process = $process; Stdout = $stdout }
+    }
+
+    function Complete-ScratchChild {
+        <#  Waits for one started child and parses its key=value report. #>
+        param($Running)
+        $Running.Process.WaitForExit()
+        $text = ''
+        if (Test-Path -LiteralPath $Running.Stdout) {
+            $text = [System.IO.File]::ReadAllText($Running.Stdout)
+        }
+        $fields = @{}
+        foreach ($line in ($text -split "`r?`n")) {
+            if ($line -match '^([A-Z_]+)=(.*)$') { $fields[$Matches[1]] = $Matches[2] }
+        }
+        return [pscustomobject]@{
+            Tag    = $Running.Tag
+            Code   = $Running.Process.ExitCode
+            Fields = $fields
+            Out    = $text
+        }
+    }
+
+    $report = [System.Collections.Generic.List[string]]::new()
+    $sequential = @()
+    foreach ($tag in @('first', 'second')) {
+        $sequential += Complete-ScratchChild (Start-ScratchChild -Tag $tag `
+                -ScenarioName 'shared-name' -HoldMilliseconds 300)
+        $last = $sequential[-1]
+        $report.Add("sequential $($last.Tag): exit=$($last.Code) root=$($last.Fields['ROOT'])")
+    }
+    foreach ($child in $sequential) {
+        Assert-Repair ($child.Code -eq 0) (
+            "Q3: child run '$($child.Tag)' of the probe helper exited $($child.Code):`n$($child.Out)")
+        Assert-Repair ($child.Fields['RESULT'] -eq 'OK') "Q3: child '$($child.Tag)' reported $($child.Fields['RESULT'])"
+    }
+    Assert-Repair ($sequential[0].Fields['ROOT'] -ne $sequential[1].Fields['ROOT']) (
+        "Q3: two runs of the same scenario name share '$($sequential[0].Fields['ROOT'])'")
+    Assert-Repair ($sequential[0].Fields['BASE'] -ne $sequential[1].Fields['BASE']) (
+        "Q3: two runs share the probe base '$($sequential[0].Fields['BASE'])'")
+    foreach ($child in @($sequential)) {
+        # A child that inherited this run's identity would inherit its scratch too.
+        Assert-Repair ($child.Fields['RUNID'] -ne $script:RunId) `
+            'Q3: a child run reports this run id, so it is not a separate run'
+    }
+    Assert-Repair ($sequential[0].Fields['RUNID'] -ne $sequential[1].Fields['RUNID']) `
+        'Q3: two child runs report the same run id'
+
+    $pair = @(
+        (Start-ScratchChild -Tag 'parallel-left' -ScenarioName 'shared-name' -HoldMilliseconds 2500),
+        (Start-ScratchChild -Tag 'parallel-right' -ScenarioName 'shared-name' -HoldMilliseconds 2500)
+    )
+    $concurrent = @($pair | ForEach-Object { Complete-ScratchChild $_ })
+    foreach ($child in $concurrent) {
+        $report.Add("concurrent $($child.Tag): exit=$($child.Code) root=$($child.Fields['ROOT'])")
+        Assert-Repair ($child.Code -eq 0) "Q3: concurrent child '$($child.Tag)' exited $($child.Code):`n$($child.Out)"
+        Assert-Repair ($child.Fields['SENTINEL_ALIVE'] -eq 'true') `
+            'Q3: a concurrent run touched the other run sentinel'
+        Assert-Repair ($child.Fields['OWNED_CLEANUP'] -eq 'gone') (
+            "Q3: child '$($child.Tag)' left its own scratch behind or had nothing to clean " +
+            "($($child.Fields['OWNED_CLEANUP']))")
+        Assert-Repair (-not (Test-Path -LiteralPath $child.Fields['BASE'])) `
+            "Q3: the child probe base '$($child.Fields['BASE'])' outlived the child"
+    }
+    Assert-Repair ($concurrent[0].Fields['ROOT'] -ne $concurrent[1].Fields['ROOT']) (
+        "Q3: two concurrent runs were handed the same scratch '$($concurrent[0].Fields['ROOT'])'")
+    foreach ($child in $sequential) {
+        Assert-Repair (-not (Test-Path -LiteralPath $child.Fields['BASE'])) `
+            "Q3: the child probe base '$($child.Fields['BASE'])' outlived the child"
+    }
+    Set-Content -LiteralPath (Join-Path $OutDir 'helper-scratch-isolation-report.txt') `
+        -Value ($report -join "`r`n") -Encoding utf8
 }
 
 # ---------------------------------------------------------------------------
