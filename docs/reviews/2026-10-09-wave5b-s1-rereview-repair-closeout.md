@@ -356,6 +356,11 @@ reviewer's files with only their paths repointed, and the third differs from the
 original by a `try`/`catch` around `Remove-Tree` plus two output lines — necessary because a
 correct refusal is now a thrown, named refusal under `$ErrorActionPreference = 'Stop'`.
 
+> 2026-10-22 workspace-cleanup note: `target/` was deleted in full, so the
+> `target/wave5b-q123/` scratch copies no longer exist. The authoritative probe scripts
+> remain under `docs/reviews/2026-10-09-wave5b-s1-rereview-gates/` (see the table above);
+> re-reviews must use those copies.
+
 End state: **READY FOR REVIEW / NOT INTEGRATED. R2 BLOCKED / NOT CLAIMED.** No push, no merge,
 no deploy, no integration. Stopping here for the independent re-review.
 
