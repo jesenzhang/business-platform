@@ -356,10 +356,13 @@ reviewer's files with only their paths repointed, and the third differs from the
 original by a `try`/`catch` around `Remove-Tree` plus two output lines — necessary because a
 correct refusal is now a thrown, named refusal under `$ErrorActionPreference = 'Stop'`.
 
-> 2026-10-22 workspace-cleanup note: `target/` was deleted in full, so the
-> `target/wave5b-q123/` scratch copies no longer exist. The authoritative probe scripts
-> remain under `docs/reviews/2026-10-09-wave5b-s1-rereview-gates/` (see the table above);
-> re-reviews must use those copies.
+> 2026-10-22 workspace-cleanup note (corrected): `target/` was deleted in full, so the
+> `target/wave5b-q123/` scratch copies no longer exist. The `.ps1` files under
+> `docs/reviews/2026-10-09-wave5b-s1-rereview-gates/` are the **reviewer-round originals**
+> (they still point at the deleted `target/w5b-review-1009/…`); they are **not** the executed
+> copies, which carried a `try`/`catch` around `Remove-Tree` plus two extra output lines and
+> were not preserved. The §7 probe values therefore cannot be reproduced from the repository
+> alone; the 2026-10-22 independent re-review records this as an evidence gap.
 
 End state: **READY FOR REVIEW / NOT INTEGRATED. R2 BLOCKED / NOT CLAIMED.** No push, no merge,
 no deploy, no integration. Stopping here for the independent re-review.
