@@ -1,0 +1,7 @@
+# gate: 25-catalog-check-unknown-check
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform --only everything
+# started: 2026-10-09 10:01:56 +08:00
+# finished: 2026-10-09 10:01:56 +08:00
+# duration-seconds: 0
+# exit-code: 7
+# expected-exit-code: 1

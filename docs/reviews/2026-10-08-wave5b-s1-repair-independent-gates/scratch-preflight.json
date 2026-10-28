@@ -1,0 +1,5 @@
+{
+  "exit": 1,
+  "sentinel_survived": true,
+  "output": "test-plan0014-wave5b.ps1: 无法处理参数，因为参数名称 'Label' 存在歧义。可能的匹配项包括: -Label1 -Label2。\r\n"
+}

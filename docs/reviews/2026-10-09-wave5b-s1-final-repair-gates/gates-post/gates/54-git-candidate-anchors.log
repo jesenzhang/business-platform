@@ -1,0 +1,11 @@
+# gate: 54-git-candidate-anchors
+# command: git log --oneline -n 3 --format=%H %ad %s --date=iso-strict
+# started: 2026-10-09 01:20:52 +08:00
+# finished: 2026-10-09 01:20:52 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0
+
+a90cf3277356471511647fbee9b507716c8c81bb 2026-10-09T00:59:44+08:00 fix(plan-0014): parse wave 5b-s1 table lists and Rust lexing to their end
+840f5a0befcc6aaea815edc244e03835fdd28bf4 2026-10-08T17:10:38+08:00 docs(plan-0014): record the wave 5b-s1 R1-R7 repair closeout
+5fa0ff46ed29e7ed0dfdebf01f3542779b3e3a22 2026-10-08T17:08:54+08:00 test(plan-0014): stabilise the wave 5b-s1 repair driver assertions

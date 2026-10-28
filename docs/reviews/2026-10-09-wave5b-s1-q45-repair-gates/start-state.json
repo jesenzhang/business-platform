@@ -1,0 +1,10 @@
+{
+  "head": "53ef8b289f2a1bf11b108cb5504d90f21153ebc8",
+  "branch": "codex/plan-0014-wave5a-local-release-pilot",
+  "status": "?? docs/OPERATIONAL_RUNBOOK.md\n?? docs/reviews/2026-10-08-wave5b-s1-final-independent-gates/\n?? docs/reviews/2026-10-08-wave5b-s1-independent-gates/\n?? docs/reviews/2026-10-08-wave5b-s1-repair-independent-gates/\n?? docs/reviews/2026-10-09-wave5b-s1-final-repair-gates/\n?? docs/reviews/2026-10-09-wave5b-s1-q123-independent-gates/\n?? docs/reviews/2026-10-09-wave5b-s1-q123-independent-review.md\n?? docs/reviews/2026-10-09-wave5b-s1-rereview-gates/\n?? docs/reviews/2026-10-09-wave5b-s1-rereview-repair-gates/\n?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-fast/\n?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-heavy/\n?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-post/\n?? scripts/clean-target.ps1\n",
+  "sha256": {
+    "scripts/test-plan0014-wave5b.ps1": "7b7f209577324697c8bc89b364d23a80cef42a711451f1a05a825c7d1c842471",
+    "scripts/test-plan0014-wave5b-repairs.ps1": "f235f5f271cfb20efe6c8496f8a099ae77df1c01d78823ae297bbf9a97177665",
+    "docs/reviews/2026-10-09-wave5b-s1-q123-independent-review.md": "8a7782086136a6415d3b04ab8c645efbc542f0609a1daf8836f31158aaaaedc4"
+  }
+}

@@ -1,0 +1,8 @@
+NAMED_REFUSAL=Remove-Tree retained 1 object(s) instead of deleting them: 'C:\Users\admin\AppData\Local\Temp\wave5b-review1009-queue-6458d7ee9209467985a37f88819b19fb\run-owned\child' is itself a reparse point. A directory that stopped being the directory that was queued is not entered, the entries read from it are not deleted, and the tree is left where it stands.
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-queue-6458d7ee9209467985a37f88819b19fb",
+  "swapped_after_enumeration": true,
+  "sentinel_survives": true,
+  "original_parked_child_survives": true,
+  "sha_before": "3F962E42C8471C12F5E11DAB2391F98C70FC6DC4626AFFDEEDE72379F9CAF4CA"
+}

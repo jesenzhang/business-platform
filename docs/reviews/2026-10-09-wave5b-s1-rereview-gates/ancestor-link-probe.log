@@ -1,0 +1,13 @@
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3a11c04ea50e412fb768a29edd00795a",
+  "anchor_link": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3a11c04ea50e412fb768a29edd00795a\\anchor",
+  "parent": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3a11c04ea50e412fb768a29edd00795a\\anchor\\scratch",
+  "root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3a11c04ea50e412fb768a29edd00795a\\anchor\\scratch\\run-owned",
+  "outside_actual_root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3a11c04ea50e412fb768a29edd00795a\\outside-owned-test\\scratch\\run-owned",
+  "anchor_attributes": "Directory, ReparsePoint",
+  "reported_unsafe_link": "",
+  "sentinel_survives": false,
+  "sha_before": "860D0FE3E3CA46ACE6F5B47164EEBB84C31C358BFA34A121DC13C60864337C63",
+  "original_parked_root_survives": true,
+  "messages": []
+}

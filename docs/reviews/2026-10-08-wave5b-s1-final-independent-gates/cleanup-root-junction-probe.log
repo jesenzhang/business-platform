@@ -1,0 +1,11 @@
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-independent-cleanup-a6a516fa1031419ea0f64e026e6b32c3",
+  "registered_root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-independent-cleanup-a6a516fa1031419ea0f64e026e6b32c3\\registered-parent\\run-owned-test",
+  "actual_target": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-independent-cleanup-a6a516fa1031419ea0f64e026e6b32c3\\outside-owned-test-target",
+  "canonical": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-independent-cleanup-a6a516fa1031419ea0f64e026e6b32c3\\registered-parent\\run-owned-test",
+  "attributes": "Directory, ReparsePoint",
+  "before_sha": "A23E81AED73E8BFF561CD67948CEA3EFB27F9714185917817819283A719C99DF",
+  "sentinel_survives": false,
+  "root_survives": false,
+  "messages": []
+}

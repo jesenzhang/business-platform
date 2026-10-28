@@ -1,0 +1,67 @@
+{
+  "capturedUtc": "2026-10-09 02:29:23Z",
+  "branch": "codex/plan-0014-wave5a-local-release-pilot",
+  "head": "6bcdd89d14d188f62e99bbd068cf786b8207699b",
+  "candidateUnderRepair": "a90cf3277356471511647fbee9b507716c8c81bb",
+  "trackedTreeDirty": [],
+  "untrackedProtected": [
+    "docs/OPERATIONAL_RUNBOOK.md",
+    "docs/reviews/2026-10-08-wave5b-s1-final-independent-gates/",
+    "docs/reviews/2026-10-08-wave5b-s1-independent-gates/",
+    "docs/reviews/2026-10-08-wave5b-s1-repair-independent-gates/",
+    "docs/reviews/2026-10-09-wave5b-s1-final-repair-gates/",
+    "docs/reviews/2026-10-09-wave5b-s1-repair-rereview.md",
+    "docs/reviews/2026-10-09-wave5b-s1-rereview-gates/",
+    "docs/reviews/2026-10-09-wave5b-s1-rereview-repair-gates/",
+    "docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-fast/",
+    "docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-heavy/",
+    "docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-post/",
+    "scripts/clean-target.ps1"
+  ],
+  "files": {
+    "scripts/test-plan0014-wave5b.ps1": "7B7F209577324697C8BC89B364D23A80CEF42A711451F1A05A825C7D1C842471",
+    "scripts/test-plan0014-wave5b-repairs.ps1": "F235F5F271CFB20EFE6C8496F8A099AE77DF1C01D78823AE297BBF9A97177665"
+  },
+  "logHashes": {
+    "repair-scenarios.log": {
+      "sha256": "DA6D88E1EBB42F9B02EC8CBEC994916691226E0176A2D5B1DCA2A77F423F3861",
+      "bytes": 2981
+    },
+    "driver113.log": {
+      "sha256": "BA7FE141AAFD2267EDF19880AC49670BA1C51BF8CFAB094AA2F9AD91338852F8",
+      "bytes": 53287
+    },
+    "gates-fast.log": {
+      "sha256": "960E1B2278D6F9D07F602BE08BA88068AA51E1148A3A5632DF66DFBDA54FE15E",
+      "bytes": 496
+    },
+    "gates-heavy.log": {
+      "sha256": "275B5EF5B7E5CEEA9936CB0F76134650884AE49C33630805D9A84794F498C496",
+      "bytes": 501
+    },
+    "gates-post.log": {
+      "sha256": "EFEC22ACF5AA03BF100CD57C06919B6DF0DD8D1B06C802A2E6181A5B879BF086",
+      "bytes": 497
+    },
+    "probes/ancestor-link-probe.log": {
+      "sha256": "477C6ABFC8BE20E50C5052DD6B0B92C4EB89078B5E530A73A17A093FF5632A21",
+      "bytes": 1709
+    },
+    "probes/queued-directory-link-probe-postfix.log": {
+      "sha256": "A69CC89B99A9389433D08124B410A17F8B725942A69C752B6F53856E5CA0D956",
+      "bytes": 1105
+    },
+    "probes/global-scratch-probe.log": {
+      "sha256": "0D8D719EC34199A5FC0DE9CF9F3653D02ADE11C3848A8AEE0EAC4DA04CC0AAF1",
+      "bytes": 581
+    },
+    "failfirst/q1-q2-against-candidate-driver.log": {
+      "sha256": "46153E811A163AA121BE71EBB3B147F828B4DEE70C35FEAA7C32E460C0D12BE0",
+      "bytes": 6617
+    },
+    "failfirst/q3-against-candidate-helper.log": {
+      "sha256": "B5AEBD4DCC681419A8F8B652D1415234BB10BF0192E62DA7EBA2724E22FB6D81",
+      "bytes": 4098
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# gate: 40-check-architecture
+# command: rtk proxy pwsh -NoProfile -File scripts/check-architecture.ps1
+# started: 2026-10-09 13:43:11 +08:00
+# finished: 2026-10-09 13:43:11 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0

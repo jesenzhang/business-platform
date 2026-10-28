@@ -1,0 +1,535 @@
+{
+  "schema_version": "1",
+  "mode": "range",
+  "repository": "F:/Workspace/business-platform",
+  "from": "87e8a318fa32ff43d41ad45da8a0f83b3b19a2a4",
+  "to": "5fa0ff46ed29e7ed0dfdebf01f3542779b3e3a22",
+  "merge_base": "87e8a318fa32ff43d41ad45da8a0f83b3b19a2a4",
+  "total_files": 75,
+  "reviewable_count": 7,
+  "excluded_count": 68,
+  "total_insertions": 2899,
+  "total_deletions": 103,
+  "reviewable_files": [
+    {
+      "path": "scripts/test-plan0014-wave5b-repairs.ps1",
+      "status": "added",
+      "insertions": 527,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/test-plan0014-wave5b.ps1",
+      "status": "modified",
+      "insertions": 196,
+      "deletions": 18
+    },
+    {
+      "path": "tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1",
+      "status": "modified",
+      "insertions": 88,
+      "deletions": 1
+    },
+    {
+      "path": "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tools/module-release-tool/scripts/run-wave5b-gates.ps1",
+      "status": "modified",
+      "insertions": 65,
+      "deletions": 25
+    },
+    {
+      "path": "tools/module-release-tool/src/catalog.rs",
+      "status": "modified",
+      "insertions": 959,
+      "deletions": 56
+    },
+    {
+      "path": "tools/module-release-tool/tests/wave5b_catalog.rs",
+      "status": "modified",
+      "insertions": 241,
+      "deletions": 1
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-fixes.md",
+      "status": "added",
+      "insertions": 29,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-review.md",
+      "status": "added",
+      "insertions": 131,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-qwen38-flash-zcode-repair-instructions.md",
+      "status": "added",
+      "insertions": 271,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-repair-independent-review.md",
+      "status": "added",
+      "insertions": 125,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/EXPECTATIONS.json",
+      "status": "modified",
+      "insertions": 22,
+      "deletions": 1,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/001_wave5b_fixture_identity.sql",
+      "status": "added",
+      "insertions": 4,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 5,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 2,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/001_wave5b_fixture_foundation.sql",
+      "status": "added",
+      "insertions": 3,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/MANIFEST.sha256",
+      "status": "added",
+      "insertions": 1,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/catalog.json",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "default_path"
+    }
+  ]
+}

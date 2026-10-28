@@ -1,0 +1,167 @@
+[
+  {
+    "case": "control_foreign_alias",
+    "kind": "sql",
+    "input": "INSERT INTO roles SELECT r.* FROM roles r, platform_users p;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\control_foreign_alias",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\control_foreign_alias\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "foreign_after_alias_column_list",
+    "kind": "sql",
+    "input": "INSERT INTO roles (role_id) SELECT r.id FROM roles AS r(id), platform_users p;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_alias_column_list",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_alias_column_list\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "foreign_after_join_on",
+    "kind": "sql",
+    "input": "INSERT INTO roles (role_id) SELECT r.role_id FROM roles r JOIN role_permissions rp ON rp.role_id = r.role_id, platform_users p;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_join_on",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_join_on\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "delete_foreign_after_alias_column_list",
+    "kind": "sql",
+    "input": "DELETE FROM roles USING roles AS r(id), platform_users p;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\delete_foreign_after_alias_column_list",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\delete_foreign_after_alias_column_list\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "foreign_after_inheritance_star",
+    "kind": "sql",
+    "input": "INSERT INTO roles SELECT r.* FROM roles * r, platform_users p;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_inheritance_star",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\foreign_after_inheritance_star\\migrations/modules\\policy\\001_probe.sql: a '*' after a table name selects its inheriting tables, which the owner scan cannot enumerate; it is outside the supported SQL subset\n"
+  },
+  {
+    "case": "control_same_owner",
+    "kind": "sql",
+    "input": "INSERT INTO roles SELECT r.* FROM roles r, role_permissions rp;",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\control_same_owner",
+      "--only",
+      "module-catalog"
+    ],
+    "exit": 0,
+    "output": "checks=module-catalog\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\norder=policy\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\control_same_owner\n"
+  },
+  {
+    "case": "control_direct",
+    "kind": "embed",
+    "input": "static M: sqlx::migrate::Migrator = sqlx::migrate!(\"../../migrations\");",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\embed-control_direct",
+      "--only",
+      "baseline-embed"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/extra/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  },
+  {
+    "case": "control_alias",
+    "kind": "embed",
+    "input": "use sqlx::migrate as embed; static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\embed-control_alias",
+      "--only",
+      "baseline-embed"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/extra/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  },
+  {
+    "case": "raw_alias",
+    "kind": "embed",
+    "input": "use sqlx::migrate as r#embed; static M: sqlx::migrate::Migrator = r#embed!(\"../../migrations\");",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\embed-raw_alias",
+      "--only",
+      "baseline-embed"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/extra/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  },
+  {
+    "case": "raw_macro_import",
+    "kind": "embed",
+    "input": "use sqlx::r#migrate as embed; static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\embed-raw_macro_import",
+      "--only",
+      "baseline-embed"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/extra/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  },
+  {
+    "case": "double_quote_char",
+    "kind": "embed",
+    "input": "const QUOTE: char = '\"'; use sqlx::migrate as embed; static M: sqlx::migrate::Migrator = embed!(\"../../migrations\");",
+    "command": [
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-build\\debug\\module-release-tool.exe",
+      "catalog-check",
+      "--repo",
+      "F:\\Workspace\\business-platform\\target\\w5b-review-1009-probes\\embed-double_quote_char",
+      "--only",
+      "baseline-embed"
+    ],
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/extra/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  }
+]

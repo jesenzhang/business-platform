@@ -1,0 +1,49 @@
+# gate: 31-check-workspace
+# command: rtk proxy cargo check --workspace --all-targets --all-features
+# started: 2026-10-09 10:06:56 +08:00
+# finished: 2026-10-09 10:07:00 +08:00
+# duration-seconds: 4
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-3nsyobzd4yhqq\s-hn0xa45um8-195iznp-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\provenance-2t0vwjlbf1izi\s-hn0xa4ru87-1d1kuug-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\canonical-1tu0idvrv1cbs\s-hn0xa4rme3-19sh8ys-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-2sq6ri2pnol6e\s-hn0xa4shx8-1yeftgy-working`
+
+warning: `module-release-tool` (test "provenance") generated 1 warning
+warning: `module-release-tool` (test "canonical") generated 1 warning
+warning: `module-release-tool` (bin "module-release-tool" test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\wave5b_catalog-141uy0xhd3apt\s-hn0xa4shyq-0lm97ge-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-2c1m1bp40x6ni\s-hn0xa4shrb-10otnpb-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\compatibility-2jhnas19jvlyr\s-hn0xa4s2mz-02uslvd-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\verification_guards-0pzigo9bso9tr\s-hn0xa4s2n8-1ena7q6-working`
+
+warning: `module-release-tool` (test "wave5b_catalog") generated 1 warning
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+warning: `module-release-tool` (test "compatibility") generated 1 warning
+warning: `module-release-tool` (test "verification_guards") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\packaging-2u6rexszb12qx\s-hn0xa4shca-0tgpaxd-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\source_derivation-32x80v3gu54av\s-hn0xa4shx1-1u6jdap-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\pilot_candidates-114m3vu9vpjpe\s-hn0xa4shhq-0e7ofcb-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\isolation-19k86zis33zyi\s-hn0xa4shfg-0moutmy-working`
+
+warning: `module-release-tool` (test "packaging") generated 1 warning
+warning: `module-release-tool` (test "source_derivation") generated 1 warning
+warning: `module-release-tool` (test "pilot_candidates") generated 1 warning
+warning: `module-release-tool` (test "isolation") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-2cjz7v8flojii\s-hn0xa46sqv-1g5ly3v-working`
+
+warning: `module-release-tool` (lib test) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.60s

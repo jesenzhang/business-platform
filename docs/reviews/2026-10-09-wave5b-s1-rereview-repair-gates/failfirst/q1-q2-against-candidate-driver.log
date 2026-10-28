@@ -1,0 +1,50 @@
+# step: q1-q2-against-candidate-driver
+# scenarios: the FINAL ones, from commit 0169d85 of scripts/test-plan0014-wave5b-repairs.ps1
+# unit under test: git show 0f29573:scripts/test-plan0014-wave5b.ps1 (candidate a90cf32 content), sha256 FB56AE7E2E350B70C08FEAED9B7EDA692B225A3053DF9C459ADE1F740BB43A47
+# expected: every Q1/Q2 regression FAILS, showing an external sentinel being destroyed
+# exit-code: 1
+
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Test-ReparsePoint, Get-UnsafeLink, Assert-PathChainIsReal, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+SKIP static-r3-no-ambiguous-label
+SKIP static-r7-no-array-append
+PASS static-cleanup-surface-is-self-contained
+SKIP static-no-recursive-delete-in-either-harness
+SKIP ast-cleanup-normal-external
+SKIP ast-cleanup-internal-evidence-retained
+SKIP ast-cleanup-keepscratch
+SKIP ast-cleanup-protected-refusals
+SKIP ast-cleanup-outside-registered-parent
+SKIP ast-register-refuses-root-equal-to-protected-parent
+SKIP ast-cleanup-root-replaced-by-junction
+SKIP ast-cleanup-parent-replaced-by-junction
+SKIP ast-cleanup-junction-inside-tree
+FAIL ast-cleanup-ancestor-above-parent-replaced-by-junction : depth 1Q1: cleanup deleted the external tree reached through an ancestor the run never registered ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-ancestorlink-5c914f2153e54509bfcf9b39847dcae3\depth1\outside-owned\scratch\run-owned\sentinel.txt' is gone, the external tree went from 3 to 1 item(s))
+FAIL ast-register-refuses-link-already-above-parent : cleanup deleted the tree a pre-existing junction above the parent points at ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-registerlink-12221cfc74ec42f0af2eb9897ecbee00\outside\scratch\run-owned\sentinel.txt' is gone; the external tree went from 3 to 1 item(s))
+FAIL ast-remove-tree-linked-ancestor-retains-tree : Remove-Tree walked into a tree reached through a junction instead of refusing ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-removetreelink-7f63f70c72eb40329d2089042d3de239\unit\outside-owned\run-owned\sentinel.txt' is gone; the external tree went from 4 to 0 item(s)); it said: 
+FAIL ast-cleanup-ownership-witness-is-required : Q1: Register-RunRoot records no ownership witness, so cleanup cannot tell the run tree from a look-alike
+FAIL ast-remove-tree-queued-directory-swapped-before-pop : Q2: Remove-Tree deleted through a directory that became a junction after it was queued ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-queueswap-cbcc32de36dc4d098d59544b1aa8881a\unit\outside-owned\sentinel.txt' is gone; the external tree went from 3 to 0 item(s)); Remove-Tree said: 
+FAIL ast-remove-tree-directory-swapped-after-enumeration : Q2: Remove-Tree deleted the external file that shares a name with an entry it enumerated before the swap ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-enumswap-d863b03de61e4dc4a25bb15b74828b5a\unit\outside-owned\shared.txt' is gone; the external tree went from 2 to 1 item(s)); Remove-Tree said: 
+SKIP filter-unknown-only-refuses-before-executing
+SKIP filter-counters-reported-for-a-valid-filter
+SKIP helper-scratch-never-reuses-previous-run-root
+SKIP helper-scratch-repeat-and-concurrent-runs-are-disjoint
+SKIP entry-r3-explicit-evidencedir-reaches-evidence-rule
+SKIP entry-r4-internal-default-lifecycle
+SKIP wrapper-r7-capture-unique-evidencedir-argument
+SKIP wrapper-b7-known-negative-only-passes
+SKIP wrapper-b7-stub-exit-7-propagates
+SKIP wrapper-b8-evidence-not-overwritten
+
+repair-regressions: executed=7 skipped=22 failed=6 blocked=0 declared=29; logs in F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\failfirst\q1-q2-against-candidate-driver-outdir
+  FAILED: ast-cleanup-ancestor-above-parent-replaced-by-junction : depth 1Q1: cleanup deleted the external tree reached through an ancestor the run never registered ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-ancestorlink-5c914f2153e54509bfcf9b39847dcae3\depth1\outside-owned\scratch\run-owned\sentinel.txt' is gone, the external tree went from 3 to 1 item(s))
+  FAILED: ast-register-refuses-link-already-above-parent : cleanup deleted the tree a pre-existing junction above the parent points at ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-registerlink-12221cfc74ec42f0af2eb9897ecbee00\outside\scratch\run-owned\sentinel.txt' is gone; the external tree went from 3 to 1 item(s))
+  FAILED: ast-remove-tree-linked-ancestor-retains-tree : Remove-Tree walked into a tree reached through a junction instead of refusing ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-removetreelink-7f63f70c72eb40329d2089042d3de239\unit\outside-owned\run-owned\sentinel.txt' is gone; the external tree went from 4 to 0 item(s)); it said: 
+  FAILED: ast-cleanup-ownership-witness-is-required : Q1: Register-RunRoot records no ownership witness, so cleanup cannot tell the run tree from a look-alike
+  FAILED: ast-remove-tree-queued-directory-swapped-before-pop : Q2: Remove-Tree deleted through a directory that became a junction after it was queued ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-queueswap-cbcc32de36dc4d098d59544b1aa8881a\unit\outside-owned\sentinel.txt' is gone; the external tree went from 3 to 0 item(s)); Remove-Tree said: 
+  FAILED: ast-remove-tree-directory-swapped-after-enumeration : Q2: Remove-Tree deleted the external file that shares a name with an entry it enumerated before the swap ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-enumswap-d863b03de61e4dc4a25bb15b74828b5a\unit\outside-owned\shared.txt' is gone; the external tree went from 2 to 1 item(s)); Remove-Tree said: 
+Exception: F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1:1522
+Line |
+1522 |      throw "$($script:Failures.Count) repair regression scenario(s) fa …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | 6 repair regression scenario(s) failed (raw logs in
+     | 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\failfirst\q1-q2-against-candidate-driver-outdir')

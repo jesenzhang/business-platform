@@ -1,0 +1,33 @@
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Test-ReparsePoint, Get-UnsafeLink, Assert-PathChainIsReal, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+PASS static-r3-no-ambiguous-label
+SKIP static-r7-no-array-append
+SKIP static-cleanup-surface-is-self-contained
+SKIP static-no-recursive-delete-in-either-harness
+SKIP ast-cleanup-normal-external
+SKIP ast-cleanup-internal-evidence-retained
+SKIP ast-cleanup-keepscratch
+SKIP ast-cleanup-protected-refusals
+SKIP ast-cleanup-outside-registered-parent
+SKIP ast-register-refuses-root-equal-to-protected-parent
+SKIP ast-cleanup-root-replaced-by-junction
+SKIP ast-cleanup-parent-replaced-by-junction
+SKIP ast-cleanup-junction-inside-tree
+SKIP ast-cleanup-ancestor-above-parent-replaced-by-junction
+SKIP ast-register-refuses-link-already-above-parent
+SKIP ast-remove-tree-linked-ancestor-retains-tree
+SKIP ast-cleanup-ownership-witness-is-required
+SKIP ast-remove-tree-queued-directory-swapped-before-pop
+SKIP ast-remove-tree-directory-swapped-after-enumeration
+SKIP filter-unknown-only-refuses-before-executing
+SKIP filter-counters-reported-for-a-valid-filter
+SKIP helper-scratch-never-reuses-previous-run-root
+SKIP helper-scratch-repeat-and-concurrent-runs-are-disjoint
+SKIP entry-r3-explicit-evidencedir-reaches-evidence-rule
+SKIP entry-r4-internal-default-lifecycle
+SKIP wrapper-r7-capture-unique-evidencedir-argument
+SKIP wrapper-b7-known-negative-only-passes
+SKIP wrapper-b7-stub-exit-7-propagates
+SKIP wrapper-b8-evidence-not-overwritten
+
+repair-regressions: executed=1 skipped=28 failed=0 blocked=0 declared=29; logs in docs\reviews\2026-10-22-independent-rereview-gates\repair-scenarios-clean\scenario-filter-counters\out
+Wave 5B-S1 repair regressions: all 1 executed scenarios matched their expectation.

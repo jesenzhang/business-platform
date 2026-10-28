@@ -1,0 +1,11 @@
+# gate: 36-build-no-run-chain-pg
+# command: rtk proxy cargo test -p audit-postgres --test chain_pg --no-run
+# started: 2026-10-09 10:12:17 +08:00
+# finished: 2026-10-09 10:12:18 +08:00
+# duration-seconds: 1
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+  Executable tests\chain_pg.rs (target\debug\deps\chain_pg-d2a565c98adcbc87.exe)

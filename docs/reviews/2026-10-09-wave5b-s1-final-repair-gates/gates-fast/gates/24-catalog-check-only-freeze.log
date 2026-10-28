@@ -1,0 +1,17 @@
+# gate: 24-catalog-check-only-freeze
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform --only baseline-candidate-freeze
+# started: 2026-10-09 01:00:15 +08:00
+# finished: 2026-10-09 01:00:16 +08:00
+# duration-seconds: 1
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hn0wy1le5c-0dq8cni-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hn0xndhe8b-1n1t5nj-working`
+
+checks=baseline-candidate-freeze
+freeze baseline_sql_files=19 subdirectories=modules
+status=ok
+root=F:\Workspace\business-platform

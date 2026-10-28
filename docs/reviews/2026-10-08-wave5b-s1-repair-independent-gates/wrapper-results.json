@@ -1,0 +1,37 @@
+[
+  {
+    "mode": "fail",
+    "run": "fail",
+    "phase": "fast",
+    "exit": 1,
+    "stdout": "phase fast complete\nFAILED GATES:\n  20-catalog-check-default: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\20-catalog-check-default.log)\n  21-catalog-check-only-catalog: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\21-catalog-check-only-catalog.log)\n  22-catalog-check-only-history: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\22-catalog-check-only-history.log)\n  23-catalog-check-only-embed: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\23-catalog-check-only-embed.log)\n  24-catalog-check-only-freeze: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\24-catalog-check-only-freeze.log)\n  25-catalog-check-unknown-check: expected 1, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\25-catalog-check-unknown-check.log)\n  30-fmt-check: expected 0, got 7 (log: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-fail\\gates\\30-fmt-check.log)\n",
+    "stderr": "Exception: F:\\Workspace\\business-platform\\tools\\module-release-tool\\scripts\\run-wave5b-gates.ps1:159\nLine |\n 159 |      throw \"$($script:FailedGates.Count) gate(s) failed with unexpecte …\n     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | 7 gate(s) failed with unexpected exit codes\n"
+  },
+  {
+    "mode": "pass",
+    "run": "pass",
+    "phase": "fast",
+    "exit": 0,
+    "stdout": "phase fast complete\n",
+    "stderr": ""
+  },
+  {
+    "mode": "pass",
+    "run": "pass",
+    "phase": "fast",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Exception: F:\\Workspace\\business-platform\\tools\\module-release-tool\\scripts\\run-wave5b-gates.ps1:26\nLine |\n  26 |          throw \"Evidence directory '$EvidenceDir' already exists and i …\n     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Evidence directory\n     | 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\wrapper-evidence-pass' already exists\n     | and is not empty; choose a new directory or use a different RunId\n"
+  },
+  {
+    "mode": "pass",
+    "run": "post",
+    "phase": "post",
+    "exit": 0,
+    "stdout": "phase post complete\n",
+    "stderr": ""
+  },
+  {
+    "overwrite_refused": true
+  }
+]

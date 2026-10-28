@@ -1,0 +1,13 @@
+# step: global-scratch-probe
+# command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\global-scratch-probe.ps1'
+# head: 6bcdd89d14d188f62e99bbd068cf786b8207699b
+# started: 2026-10-09 10:28:52 +08:00
+# finished: 2026-10-09 10:28:54 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+{
+  "returned": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-reparse-probe-c99c094fe8744921b5c352233d771850\\scenario-independent-07ec45e7367e41bcbfba816666fd411c-1560e35fea3147c7830c9f0905ca2125",
+  "reused_preexisting_root": false,
+  "sentinel_survives": true
+}

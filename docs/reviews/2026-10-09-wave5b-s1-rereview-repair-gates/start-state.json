@@ -1,0 +1,26 @@
+{
+  "recorded_at_utc": "2026-10-09T01:22:06Z",
+  "branch": "codex/plan-0014-wave5a-local-release-pilot",
+  "head": "0f295731d4cfc5f57cd8638d5a1fd2ca234f0caa",
+  "code_candidate_under_repair": "a90cf3277356471511647fbee9b507716c8c81bb",
+  "rereview_report": "docs/reviews/2026-10-09-wave5b-s1-repair-rereview.md",
+  "tracked_changes_vs_head": [],
+  "untracked_top_level": [
+    "?? docs/OPERATIONAL_RUNBOOK.md",
+    "?? docs/reviews/2026-10-08-wave5b-s1-final-independent-gates/",
+    "?? docs/reviews/2026-10-08-wave5b-s1-independent-gates/",
+    "?? docs/reviews/2026-10-08-wave5b-s1-repair-independent-gates/",
+    "?? docs/reviews/2026-10-09-wave5b-s1-final-repair-gates/",
+    "?? docs/reviews/2026-10-09-wave5b-s1-repair-rereview.md",
+    "?? docs/reviews/2026-10-09-wave5b-s1-rereview-gates/",
+    "?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-fast/",
+    "?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-heavy/",
+    "?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-post/",
+    "?? scripts/clean-target.ps1"
+  ],
+  "sha256": {
+    "scripts/test-plan0014-wave5b.ps1": "606CCECE5E63CDEA106A8491E1F4959900E762492213290EFDE464FEAB127CD3",
+    "scripts/test-plan0014-wave5b-repairs.ps1": "E6717866F641B9A3FF2A1C1E88C0C95E6407BAA996A88CBCA887CA7BD5E9B674",
+    "docs/reviews/2026-10-09-wave5b-s1-repair-rereview.md": "FDAF35F22621ADA2DE5501C895158F8E9EB65DF57F9599D77A502F3B5B3E7BA0"
+  }
+}

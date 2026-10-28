@@ -1,0 +1,25 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261009085807
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\target\w5b-review-1009\scripts\test-plan0014-wave5b-repairs.ps1 -Repo F:\Workspace\business-platform\target\w5b-review-1009 -OutDir F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-gates\repair-scenarios -Only static-r3-no-ambiguous-label,static-r7-no-array-append,ast-cleanup-normal-external,ast-cleanup-internal-evidence-retained,ast-cleanup-keepscratch,ast-cleanup-protected-refusals,ast-cleanup-outside-registered-parent,ast-register-refuses-root-equal-to-protected-parent,ast-cleanup-root-replaced-by-junction,ast-cleanup-parent-replaced-by-junction,ast-cleanup-junction-inside-tree,filter-unknown-only-refuses-before-executing,filter-counters-reported-for-a-valid-filter,entry-r3-explicit-evidencedir-reaches-evidence-rule,wrapper-r7-capture-unique-evidencedir-argument,wrapper-b7-known-negative-only-passes,wrapper-b7-stub-exit-7-propagates,wrapper-b8-evidence-not-overwritten
+进程 ID: 28184
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "run root 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent\run-guidbehind': 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent' is a reparse point pointing at 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\real-parent'; a run path must be a real directory, not a link standing in for someone else's tree"
+>> TerminatingError(): "run root 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent\run-guidbehind': 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent' is a reparse point pointing at 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\real-parent'; a run path must be a real directory, not a link standing in for someone else's tree"
+**********************
+PowerShell 记录结束
+结束时间: 20261009085808
+**********************

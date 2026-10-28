@@ -1,0 +1,10 @@
+proxy
+cargo
+run
+-q
+-p
+module-release-tool
+--
+catalog-check
+--repo
+F:\Workspace\business-platform

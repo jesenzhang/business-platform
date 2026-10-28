@@ -1,0 +1,26 @@
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Test-ReparsePoint, Get-UnsafeLink, Assert-PathChainIsReal, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+PASS static-r3-no-ambiguous-label
+PASS static-r7-no-array-append
+PASS ast-cleanup-normal-external
+internal evidence retained at 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-gates\repair-scenarios\scenario-internal\run-guidbbb\evidence'; the rest of the run root was cleaned
+PASS ast-cleanup-internal-evidence-retained
+kept scratch root (main): F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-gates\repair-scenarios\scenario-keep\run-guidccc
+PASS ast-cleanup-keepscratch
+PASS ast-cleanup-protected-refusals
+PASS ast-cleanup-outside-registered-parent
+PASS ast-register-refuses-root-equal-to-protected-parent
+unlinked replaced run root (work): 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkroot\parent\run-guidlink'; the tree behind the link was left alone
+PASS ast-cleanup-root-replaced-by-junction
+PASS ast-cleanup-parent-replaced-by-junction
+PASS ast-cleanup-junction-inside-tree
+PASS filter-unknown-only-refuses-before-executing
+PASS filter-counters-reported-for-a-valid-filter
+PASS entry-r3-explicit-evidencedir-reaches-evidence-rule
+SKIP entry-r4-internal-default-lifecycle
+PASS wrapper-r7-capture-unique-evidencedir-argument
+PASS wrapper-b7-known-negative-only-passes
+PASS wrapper-b7-stub-exit-7-propagates
+PASS wrapper-b8-evidence-not-overwritten
+
+repair-regressions: executed=18 skipped=1 failed=0 blocked=0 declared=19; logs in F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-gates\repair-scenarios
+Wave 5B-S1 repair regressions: all 18 executed scenarios matched their expectation.

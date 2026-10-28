@@ -1,0 +1,5 @@
+proxy
+pwsh
+-NoProfile
+-File
+scripts/check-architecture.ps1

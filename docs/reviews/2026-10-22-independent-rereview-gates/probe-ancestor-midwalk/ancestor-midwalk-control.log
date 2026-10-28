@@ -1,0 +1,4 @@
+swapped_during_walk=True
+external_sentinel_survives=True
+remove_tree_message=
+cleanup_done=True

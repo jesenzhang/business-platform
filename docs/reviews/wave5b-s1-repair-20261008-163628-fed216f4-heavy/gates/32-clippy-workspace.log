@@ -1,0 +1,10 @@
+# gate: 32-clippy-workspace
+# command: rtk proxy cargo clippy --workspace --all-targets --all-features -- -D warnings
+# started: 2026-10-08 16:37:26 +08:00
+# finished: 2026-10-08 16:37:28 +08:00
+# duration-seconds: 2
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.08s

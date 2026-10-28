@@ -1,0 +1,38 @@
+[
+  {
+    "path": "scripts/test-plan0014-wave5b-repairs.ps1",
+    "candidate_sha256": "8973636c36909be0c89b73e7a65ad0bf1440e4f13b9e57e5016db2abbe435035",
+    "current_raw_sha256": "99150c2a21f1876127be2ed6f39e6f7f2f654942135ca9e0026a131537160a71",
+    "candidate_git_blob": "6784892a82f833700f3e42e8f2873b82cfdae676"
+  },
+  {
+    "path": "scripts/test-plan0014-wave5b.ps1",
+    "candidate_sha256": "0a5d28319d2979db4d0449e14019a2e7262b7f2040d987a891486a449a6117bd",
+    "current_raw_sha256": "5996b6bc4c3e796436d27b1fcfe571e877255adfc7f7bc626248a0d078921036",
+    "candidate_git_blob": "b4f8c3b1e1512262730b5ddfe2a9add94bf3e1c3"
+  },
+  {
+    "path": "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1",
+    "candidate_sha256": "3b76a5b843c9c4c8fe7d3f2cb7bb186de63d85166bd95a27f397360392e9fd5a",
+    "current_raw_sha256": "8afec70e81ebee4d917c5483892d42371db5b59cc029c77d4e122eca01f3b93c",
+    "candidate_git_blob": "7e4ff5af08ab64f987190f091770925b22417679"
+  },
+  {
+    "path": "tools/module-release-tool/scripts/run-wave5b-gates.ps1",
+    "candidate_sha256": "d5292c289c9720fca85aaf2cfe66a0a855718ed3e5d04bc23bf056327452c7c4",
+    "current_raw_sha256": "d5292c289c9720fca85aaf2cfe66a0a855718ed3e5d04bc23bf056327452c7c4",
+    "candidate_git_blob": "9564b14fa113bf0fbed544b1cdc91475445ae002"
+  },
+  {
+    "path": "tools/module-release-tool/src/catalog.rs",
+    "candidate_sha256": "95ab1f2be2306277e9fab09bf4c145c23bdb45e301ddcd19bc4ce245a66a93a6",
+    "current_raw_sha256": "200d3bd45c933f90a673d7aea3c1c8dd408290500aae2475109e6eee4a8f3623",
+    "candidate_git_blob": "bba1d023aed338dc8f5adb5ccf1d183cd4c934ef"
+  },
+  {
+    "path": "tools/module-release-tool/tests/wave5b_catalog.rs",
+    "candidate_sha256": "a63bb4c042fdae3cfd3a4d9811478fd395273f588d027ce63cd6c805564f01dc",
+    "current_raw_sha256": "a63bb4c042fdae3cfd3a4d9811478fd395273f588d027ce63cd6c805564f01dc",
+    "candidate_git_blob": "d9d76ed4faba6f7acf996159b5ea186d155c19d9"
+  }
+]

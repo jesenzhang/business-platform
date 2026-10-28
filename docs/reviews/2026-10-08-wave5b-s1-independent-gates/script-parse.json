@@ -1,0 +1,55 @@
+[
+  {
+    "file": "scripts/test-plan0014-wave5b.ps1",
+    "errors": []
+  },
+  {
+    "file": "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1",
+    "errors": [
+      {
+        "line": 15,
+        "message": "函数参数列表中缺少“)”。"
+      },
+      {
+        "line": 62,
+        "message": "“[”后缺少类型名称。"
+      },
+      {
+        "line": 62,
+        "message": "“[”后缺少类型名称。"
+      },
+      {
+        "line": 73,
+        "message": "表达式或语句中存在意外的标记“' + $q + '”。"
+      },
+      {
+        "line": 73,
+        "message": "表达式或语句中存在意外的标记“schema_version' + $q + ':”。"
+      },
+      {
+        "line": 76,
+        "message": "“<”运算符保留供将来使用。"
+      },
+      {
+        "line": 86,
+        "message": "字符串缺少终止符: '。"
+      },
+      {
+        "line": 72,
+        "message": "语句块或类型定义中缺少右大括号 '}'。"
+      }
+    ]
+  },
+  {
+    "file": "tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1",
+    "errors": []
+  },
+  {
+    "file": "tools/module-release-tool/scripts/build-wave5b-closeout.ps1",
+    "errors": []
+  },
+  {
+    "file": "tools/module-release-tool/scripts/run-wave5b-gates.ps1",
+    "errors": []
+  }
+]

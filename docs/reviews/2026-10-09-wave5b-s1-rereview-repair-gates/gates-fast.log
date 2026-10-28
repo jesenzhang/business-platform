@@ -1,0 +1,9 @@
+# step: gates-fast
+# command: pwsh -NoProfile -File 'F:\Workspace\business-platform\tools\module-release-tool\scripts\run-wave5b-gates.ps1' -Phase fast -Repo 'F:\Workspace\business-platform' -EvidenceDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-fast'
+# head: 6bcdd89d14d188f62e99bbd068cf786b8207699b
+# started: 2026-10-09 10:06:33 +08:00
+# finished: 2026-10-09 10:06:55 +08:00
+# duration-seconds: 23
+# exit-code: 0
+
+phase fast complete

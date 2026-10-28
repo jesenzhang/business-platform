@@ -1,0 +1,9 @@
+# gate: 30-fmt-check
+# command: rtk proxy cargo fmt --all -- --check
+# started: 2026-10-09 10:06:53 +08:00
+# finished: 2026-10-09 10:06:55 +08:00
+# duration-seconds: 3
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings

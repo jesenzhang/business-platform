@@ -1,0 +1,25 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261009095659
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1 -Repo F:\Workspace\business-platform -OutDir F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\repair-scenarios
+进程 ID: 44512
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "run root 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\host\anchor\scratch\run-owned': 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\host\anchor' is a reparse point pointing at 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\outside'; a run path must be a real directory, not a link standing in for someone else's tree"
+>> TerminatingError(): "run root 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\host\anchor\scratch\run-owned': 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\host\anchor' is a reparse point pointing at 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-90aebb9f24154a3c9aa261ac4a0cedaa\scenario-registerlink-fcd84bfd4b3743f78aa317a14306ca78\outside'; a run path must be a real directory, not a link standing in for someone else's tree"
+**********************
+PowerShell 记录结束
+结束时间: 20261009095659
+**********************

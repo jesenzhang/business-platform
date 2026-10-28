@@ -1,0 +1,28 @@
+warning: constant `VALUE` is never used
+ --> F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\rust-lexical-controls.rs:6:15
+  |
+6 |     pub const VALUE: &str = r#embed!("../../migrations");
+  |               ^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `VALUE` is never used
+  --> F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\rust-lexical-controls.rs:10:15
+   |
+10 |     pub const VALUE: &str = embed!("../../migrations");
+   |               ^^^^^
+
+warning: constant `QUOTE` is never used
+  --> F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\rust-lexical-controls.rs:13:11
+   |
+13 |     const QUOTE: char = '"';
+   |           ^^^^^
+
+warning: constant `VALUE` is never used
+  --> F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\rust-lexical-controls.rs:15:15
+   |
+15 |     pub const VALUE: &str = embed!("../../migrations");
+   |               ^^^^^
+
+warning: 4 warnings emitted
+

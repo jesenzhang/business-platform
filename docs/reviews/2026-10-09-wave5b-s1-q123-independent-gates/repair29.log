@@ -1,0 +1,42 @@
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Test-ReparsePoint, Get-UnsafeLink, Assert-PathChainIsReal, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+PASS static-r3-no-ambiguous-label
+PASS static-r7-no-array-append
+PASS static-cleanup-surface-is-self-contained
+PASS static-no-recursive-delete-in-either-harness
+PASS ast-cleanup-normal-external
+internal evidence retained at 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-q123-independent-gates\repair29\scenario-internal\run-guidbbb\evidence'; the rest of the run root was cleaned
+PASS ast-cleanup-internal-evidence-retained
+kept scratch root (main): F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-q123-independent-gates\repair29\scenario-keep\run-guidccc
+PASS ast-cleanup-keepscratch
+PASS ast-cleanup-protected-refusals
+PASS ast-cleanup-outside-registered-parent
+PASS ast-register-refuses-root-equal-to-protected-parent
+unlinked replaced run root (work): 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-096bb8c6367c42e9a44469dec776f671\scenario-linkroot-61d460ec122548b3b77d9af70328bc63\parent\run-guidlink'; the tree behind the link was left alone
+PASS ast-cleanup-root-replaced-by-junction
+PASS ast-cleanup-parent-replaced-by-junction
+PASS ast-cleanup-junction-inside-tree
+PASS ast-cleanup-ancestor-above-parent-replaced-by-junction
+PASS ast-register-refuses-link-already-above-parent
+PASS ast-remove-tree-linked-ancestor-retains-tree
+PASS ast-cleanup-ownership-witness-is-required
+PASS ast-remove-tree-queued-directory-swapped-before-pop
+PASS ast-remove-tree-directory-swapped-after-enumeration
+PASS filter-unknown-only-refuses-before-executing
+PASS filter-counters-reported-for-a-valid-filter
+PASS helper-scratch-never-reuses-previous-run-root
+PASS helper-scratch-repeat-and-concurrent-runs-are-disjoint
+PASS entry-r3-explicit-evidencedir-reaches-evidence-rule
+FAIL entry-r4-internal-default-lifecycle : default internal-mode driver run exited 1; see entry-r4-child-output.txt
+PASS wrapper-r7-capture-unique-evidencedir-argument
+PASS wrapper-b7-known-negative-only-passes
+PASS wrapper-b7-stub-exit-7-propagates
+PASS wrapper-b8-evidence-not-overwritten
+
+repair-regressions: executed=29 skipped=0 failed=1 blocked=0 declared=29; logs in F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-q123-independent-gates\repair29
+  FAILED: entry-r4-internal-default-lifecycle : default internal-mode driver run exited 1; see entry-r4-child-output.txt
+Exception: F:\Workspace\business-platform\target\w5b-q123-review\scripts\test-plan0014-wave5b-repairs.ps1:1524
+Line |
+1524 |      throw "$($script:Failures.Count) repair regression scenario(s) fa …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | 1 repair regression scenario(s) failed (raw logs in
+     | 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-q123-independent-gates\repair29')

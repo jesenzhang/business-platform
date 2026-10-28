@@ -1,0 +1,24 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261008213758
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\target\wave5b-final-independent-20261008\candidate\scripts\test-plan0014-wave5b-repairs.ps1 -Repo F:\Workspace\business-platform\target\wave5b-final-independent-20261008\candidate -OutDir F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\repair-scenarios -Only static-r3-no-ambiguous-label,static-r7-no-array-append,ast-cleanup-normal-external,ast-cleanup-internal-evidence-retained,ast-cleanup-keepscratch,ast-cleanup-protected-refusals,ast-cleanup-outside-registered-parent,ast-register-refuses-root-equal-to-protected-parent,entry-r3-explicit-evidencedir-reaches-evidence-rule,wrapper-r7-capture-unique-evidencedir-argument,wrapper-b7-known-negative-only-passes,wrapper-b7-stub-exit-7-propagates,wrapper-b8-evidence-not-overwritten
+进程 ID: 14104
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+kept scratch root (main): F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\repair-scenarios\scenario-keep\run-guidccc
+**********************
+PowerShell 记录结束
+结束时间: 20261008213758
+**********************

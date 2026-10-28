@@ -1,0 +1,7 @@
+proxy
+pwsh
+-NoProfile
+-File
+scripts/test-plan0014-wave5b.ps1
+-EvidenceDir
+docs\reviews\2026-10-22-independent-rereview-gates\repair-scenarios\scenario-b8-ev\gates-evidence\wave5b-cases

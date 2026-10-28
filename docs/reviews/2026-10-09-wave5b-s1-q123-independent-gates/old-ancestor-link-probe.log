@@ -1,0 +1,15 @@
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4",
+  "anchor_link": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor",
+  "parent": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor\\scratch",
+  "root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor\\scratch\\run-owned",
+  "outside_actual_root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\outside-owned-test\\scratch\\run-owned",
+  "anchor_attributes": "Directory, ReparsePoint",
+  "reported_unsafe_link": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor",
+  "sentinel_survives": true,
+  "sha_before": "860D0FE3E3CA46ACE6F5B47164EEBB84C31C358BFA34A121DC13C60864337C63",
+  "original_parked_root_survives": true,
+  "messages": [
+    "refusing to delete 'C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor\\scratch\\run-owned': 'C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-3b3f45c1914340c0a453db698f9accb4\\anchor' is a reparse point, so this path no longer names the tree the run created"
+  ]
+}

@@ -1,0 +1,11 @@
+# gate: 35-build-no-run-outbox-reliability
+# command: rtk proxy cargo test -p messaging --test outbox_reliability --no-run
+# started: 2026-10-09 01:05:11 +08:00
+# finished: 2026-10-09 01:05:13 +08:00
+# duration-seconds: 2
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.67s
+  Executable tests\outbox_reliability.rs (target\debug\deps\outbox_reliability-06f8f52e776617d4.exe)

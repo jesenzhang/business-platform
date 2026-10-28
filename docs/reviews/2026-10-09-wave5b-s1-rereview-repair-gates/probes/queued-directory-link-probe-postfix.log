@@ -1,0 +1,17 @@
+# step: queued-directory-link-probe-postfix
+# command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\queued-directory-link-probe-postfix.ps1'
+# head: 6bcdd89d14d188f62e99bbd068cf786b8207699b
+# started: 2026-10-09 10:28:51 +08:00
+# finished: 2026-10-09 10:28:52 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-queue-f458ade9aec846f1971d8e64304c79d7",
+  "swapped_after_enumeration": true,
+  "sentinel_survives": true,
+  "original_parked_child_survives": true,
+  "sha_before": "3F962E42C8471C12F5E11DAB2391F98C70FC6DC4626AFFDEEDE72379F9CAF4CA"
+}
+removal_refusal=Remove-Tree retained 1 object(s) instead of deleting them: 'C:\Users\admin\AppData\Local\Temp\wave5b-review1009-queue-f458ade9aec846f1971d8e64304c79d7\run-owned\child' is itself a reparse point. A directory that stopped being the directory that was queued is not entered, the entries read from it are not deleted, and the tree is left where it stands.
+sentinel_sha_after=3F962E42C8471C12F5E11DAB2391F98C70FC6DC4626AFFDEEDE72379F9CAF4CA

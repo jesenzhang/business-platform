@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "manifest_has_cr": true,
+  "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001+002 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\manifest-crlf\r\n"
+}

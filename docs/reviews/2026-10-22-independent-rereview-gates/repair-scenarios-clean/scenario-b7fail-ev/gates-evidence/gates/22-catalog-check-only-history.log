@@ -1,0 +1,7 @@
+# gate: 22-catalog-check-only-history
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform --only pinned-baseline-history
+# started: 2026-10-22 13:31:45 +08:00
+# finished: 2026-10-22 13:31:45 +08:00
+# duration-seconds: 0
+# exit-code: 7
+# expected-exit-code: 0

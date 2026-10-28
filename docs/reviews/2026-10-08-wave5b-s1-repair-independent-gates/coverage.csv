@@ -1,0 +1,12 @@
+path,status,review,reason
+scripts/test-plan0014-wave5b.ps1,modified,reviewed,current repair diff
+tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1,modified,reviewed,current repair diff
+tools/module-release-tool/scripts/run-wave5b-gates.ps1,modified,reviewed,current repair diff
+tools/module-release-tool/src/catalog.rs,modified,reviewed,current repair diff
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/manifest-crlf-repro.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/ocr-preview.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/ocr-rules.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/repro-results.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/scratch-repro.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/script-parse.json,added,skipped,"prior independent-review evidence, outside repair scope"
+docs/reviews/2026-10-08-wave5b-s1-independent-gates/takeover-repro.json,added,skipped,"prior independent-review evidence, outside repair scope"

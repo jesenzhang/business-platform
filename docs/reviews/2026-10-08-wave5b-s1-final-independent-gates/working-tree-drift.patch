@@ -1,0 +1,96 @@
+diff --git a/scripts/test-plan0014-wave5b-repairs.ps1 b/scripts/test-plan0014-wave5b-repairs.ps1
+index 6784892..bc1f837 100644
+--- a/scripts/test-plan0014-wave5b-repairs.ps1
++++ b/scripts/test-plan0014-wave5b-repairs.ps1
+@@ -52,6 +52,9 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+ 
+ $script:Failures = [System.Collections.Generic.List[string]]::new()
+ $script:OnlyList = @($Only -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
++# Every scenario name the sweep knows about; a -Only entry that names none of
++# them is a typo, never a silent all-SKIP pass.
++$script:ScenarioNames = [System.Collections.Generic.List[string]]::new()
+ 
+ function Write-RepairLog([string]$Line) { Write-Host $Line }
+ 
+@@ -59,6 +62,7 @@ function Invoke-RepairScenario {
+     <#  Runs one scenario body, tee-ing all streams into $OutDir\<Name>.log.
+         A throwing body is a FAIL, never an interruption of the sweep. #>
+     param([string]$Name, [scriptblock]$Body)
++    $script:ScenarioNames.Add($Name) | Out-Null
+     if ($script:OnlyList.Count -gt 0 -and $script:OnlyList -notcontains $Name) {
+         Write-RepairLog "SKIP $Name"
+         return
+@@ -524,4 +528,8 @@ if ($script:Failures.Count -gt 0) {
+     }
+     throw "$($script:Failures.Count) repair regression scenario(s) failed (raw logs in '$OutDir')"
+ }
++$missedFilters = @($script:OnlyList | Where-Object { $script:ScenarioNames -notcontains $_ })
++if ($missedFilters.Count -gt 0) {
++    throw "repair-regressions: -Only named no such scenario: $($missedFilters -join ', '); known scenarios: $($script:ScenarioNames -join ', ')"
++}
+ Write-RepairLog 'Wave 5B-S1 repair regressions (R3/R4/R7): every scenario matched its expectation.'
+\ No newline at end of file
+diff --git a/scripts/test-plan0014-wave5b.ps1 b/scripts/test-plan0014-wave5b.ps1
+index b4f8c3b..483262c 100644
+--- a/scripts/test-plan0014-wave5b.ps1
++++ b/scripts/test-plan0014-wave5b.ps1
+@@ -63,11 +63,16 @@ function Write-Log([string]$Line) {
+ 
+ function Get-CanonicalPath([string]$Path) {
+     <#  Returns the canonical absolute form of Path. For non-existent paths,
+-        resolves the parent and appends the final component. #>
++        resolves the parent and appends the final component. A relative path
++        whose ancestors do not exist is a named refusal: recursing on the
++        empty parent would surface as an opaque parameter-binding error. #>
+     if (Test-Path -LiteralPath $Path) {
+         return (Resolve-Path -LiteralPath $Path).Path
+     }
+     $parent = Split-Path -Parent $Path
++    if ([string]::IsNullOrWhiteSpace($parent)) {
++        throw "cannot canonicalise relative path '$Path': no existing ancestor resolves it"
++    }
+     $child = Split-Path -Leaf $Path
+     $canonicalParent = Get-CanonicalPath $parent
+     return Join-Path $canonicalParent $child
+diff --git a/tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1 b/tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1
+index 7e4ff5a..6aa51cc 100644
+--- a/tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1
++++ b/tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1
+@@ -76,6 +76,7 @@ $sb = [System.Text.StringBuilder]::new()
+ [void]$sb.Append('  ' + $q + 'digest_rule' + $q + ': ' + $q + 'SHA-256 of the exact bytes returned by git cat-file blob for <pinned_revision>:<path>; never a Git object id and never working-tree bytes' + $q + ',' + $nl)
+ [void]$sb.Append('  ' + $q + 'entries' + $q + ': [' + $nl)
+ $items = [System.Collections.Generic.List[string]]::new()
++$formCounts = [System.Collections.Generic.SortedDictionary[string, int]]::new()
+ foreach ($name in $names) {
+     $bytes = Get-BlobBytes $pinned "migrations/$name"
+     $raw = Get-Sha256Hex $bytes
+@@ -83,6 +84,7 @@ foreach ($name in $names) {
+     $crlf = Get-Sha256Hex (Get-ToCrlf $bytes)
+     $rec = $recorded[$name]
+     $form = if ($rec -eq $lf) { "lf" } elseif ($rec -eq $crlf) { "crlf" } elseif ($rec -eq $raw) { "raw" } else { throw "recorded digest for $name matches no line-ending form" }
++    if ($formCounts.ContainsKey($form)) { $formCounts[$form] += 1 } else { $formCounts[$form] = 1 }
+     $rev = ($name -split '_')[0]
+     $item = "    {`n" +
+         "      `"path`": `"migrations/$name`",`n" +
+@@ -104,4 +106,4 @@ $items.Add("    {`n" +
+ [System.IO.File]::WriteAllText($out, $sb.ToString(), [System.Text.UTF8Encoding]::new($false))
+ Write-Output "wrote $out"
+ Write-Output ("entries=" + ($items.Count))
+-Write-Output ("forms: lf=" + (@($names | Where-Object { $true }).Count))
++Write-Output ("forms: " + (($formCounts.Keys | ForEach-Object { "$_=$($formCounts[$_])" }) -join ' '))
+diff --git a/tools/module-release-tool/src/catalog.rs b/tools/module-release-tool/src/catalog.rs
+index bba1d02..e89420a 100644
+--- a/tools/module-release-tool/src/catalog.rs
++++ b/tools/module-release-tool/src/catalog.rs
+@@ -2051,9 +2051,8 @@ fn body_events(tokens: &[Token], from: usize, shown: &str) -> ToolResult<Vec<Sql
+             return Err(refuse(
+                 CHECK_CATALOG,
+                 format!(
+-                    "{shown}: a 'USING' clause outside 'DELETE … USING' names an access method \
+-                     or a join column list, which the owner scan cannot attribute; it is outside \
+-                     the supported SQL subset"
++                    "{shown}: a 'USING' clause outside 'DELETE … USING' names no table the owner \
++                     scan can attribute; it is outside the supported SQL subset"
+                 ),
+             ));
+         }

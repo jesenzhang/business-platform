@@ -1,0 +1,52 @@
+[
+  {
+    "id": "Q4",
+    "case": "replace after last actual check before file mutation",
+    "expected": "replacement blocked or safe refusal; external hash and count unchanged"
+  },
+  {
+    "id": "Q4-attributes",
+    "case": "replace after attributes before disposition",
+    "expected": "handle-bound disposition never targets outside"
+  },
+  {
+    "id": "Q4-ancestor",
+    "case": "replace ancestor above walk root",
+    "expected": "held ancestor blocks replacement or failure retains all"
+  },
+  {
+    "id": "Q5",
+    "case": "ordinary file under an existing junction parent",
+    "expected": "named refusal; outside file remains unchanged"
+  },
+  {
+    "id": "Q5-link",
+    "case": "link leaf under a linked parent",
+    "expected": "parent-chain refusal before unlink"
+  },
+  {
+    "id": "positive-file",
+    "case": "ordinary and read-only owned files on NTFS/exFAT",
+    "expected": "removed through owned handles"
+  },
+  {
+    "id": "positive-tree",
+    "case": "normal owned tree and link leaf with real parent",
+    "expected": "tree/link removed; link target unchanged"
+  },
+  {
+    "id": "sharing",
+    "case": "pre-existing incompatible write/delete handle",
+    "expected": "named refusal; no unsafe fallback"
+  },
+  {
+    "id": "release",
+    "case": "exception mid-walk and normal success",
+    "expected": "all own handles released"
+  },
+  {
+    "id": "legacy",
+    "case": "Q1-Q3, internal evidence, KeepScratch and protected paths",
+    "expected": "existing intent preserved; AST manifest accurate"
+  }
+]

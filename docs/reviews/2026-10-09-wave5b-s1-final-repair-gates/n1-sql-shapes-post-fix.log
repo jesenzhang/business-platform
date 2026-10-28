@@ -1,0 +1,20 @@
+control_foreign_alias            exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-control_foreign_alias\migrations/modul
+same_owner_plain                 exit=0  namespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19 status=ok
+foreign_after_alias_columns      exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-foreign_after_alias_columns\migrations
+same_owner_alias_columns         exit=0  namespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19 status=ok
+foreign_after_join_on            exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-foreign_after_join_on\migrations/modul
+same_owner_join_on               exit=0  namespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19 status=ok
+delete_foreign_alias_columns     exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-delete_foreign_alias_columns\migration
+delete_same_owner_columns        exit=0  namespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19 status=ok
+inheritance_star                 exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-inheritance_star\migrations/modules\po
+inheritance_star_same_owner      exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-inheritance_star_same_owner\migrations
+join_using_columns               exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-join_using_columns\migrations/modules\
+index_using_btree                exit=0  namespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19 status=ok
+table_function                   exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-table_function\migrations/modules\poli
+join_on_subquery                 exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-join_on_subquery\migrations/modules\po
+where_subquery                   exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-where_subquery\migrations/modules\poli
+cross_join_list                  exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-cross_join_list\migrations/modules\pol
+natural_join_list                exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-natural_join_list\migrations/modules\p
+where_subquery_after_join        exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-where_subquery_after_join\migrations/m
+alias_column_list_join           exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-alias_column_list_join\migrations/modu
+qualified_after_join_on          exit=1  module-release: refused by the [module-catalog] check: F:\Workspace\business-platform\target\wave5b-n1-probe\probes\sql-qualified_after_join_on\migrations/mod

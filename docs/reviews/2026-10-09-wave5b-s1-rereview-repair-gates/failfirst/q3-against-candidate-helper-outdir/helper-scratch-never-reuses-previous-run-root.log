@@ -1,0 +1,25 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261009094945
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\target\wave5b-q123\hybrid-final-scenarios-prefix-helper.ps1 -Repo F:\Workspace\business-platform\target\wave5b-q123\prefix-repo -OutDir F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\failfirst\q3-against-candidate-helper-outdir -Only helper-scratch-never-reuses-previous-run-root,helper-scratch-repeat-and-concurrent-runs-are-disjoint
+进程 ID: 11092
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "Q3: the helper handed back the scratch of an earlier run ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-q3decoy-5a8a1bb9771846b29fcb4cb5a3a3935f') instead of creating its own"
+>> TerminatingError(): "Q3: the helper handed back the scratch of an earlier run ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-q3decoy-5a8a1bb9771846b29fcb4cb5a3a3935f') instead of creating its own"
+**********************
+PowerShell 记录结束
+结束时间: 20261009094945
+**********************

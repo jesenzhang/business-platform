@@ -1,0 +1,43 @@
+{
+  "schema_version": "1",
+  "mode": "range",
+  "repository": "F:/Workspace/business-platform",
+  "from": "0f29573",
+  "to": "53ef8b2",
+  "merge_base": "0f295731d4cfc5f57cd8638d5a1fd2ca234f0caa",
+  "total_files": 4,
+  "reviewable_count": 2,
+  "excluded_count": 2,
+  "total_insertions": 1436,
+  "total_deletions": 59,
+  "reviewable_files": [
+    {
+      "path": "scripts/test-plan0014-wave5b-repairs.ps1",
+      "status": "modified",
+      "insertions": 756,
+      "deletions": 21
+    },
+    {
+      "path": "scripts/test-plan0014-wave5b.ps1",
+      "status": "modified",
+      "insertions": 224,
+      "deletions": 38
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "docs/reviews/2026-10-09-wave5b-s1-repair-rereview.md",
+      "status": "added",
+      "insertions": 95,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-09-wave5b-s1-rereview-repair-closeout.md",
+      "status": "added",
+      "insertions": 361,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    }
+  ]
+}

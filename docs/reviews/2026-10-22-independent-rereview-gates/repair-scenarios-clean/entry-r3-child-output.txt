@@ -1,0 +1,6 @@
+Exception: F:\Workspace\business-platform\scripts\test-plan0014-wave5b.ps1:373
+Line |
+ 373 |  …             throw "evidence directory '$Path' already holds $($existi …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | evidence directory
+     | 'F:\Workspace\business-platform\docs\reviews\2026-10-22-independent-rereview-gates\repair-scenarios-clean\scenario-entry-external-ev\evidence' already holds 1 item(s); pass -Force to replace it, or choose a new directory

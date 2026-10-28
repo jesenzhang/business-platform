@@ -1,0 +1,4 @@
+sequential first: exit=0 root=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-2a36f09160004632a74bcc2b5b5eedc5\scenario-shared-name-c856b84be2ec46e9a5ea2b3df87aaf58
+sequential second: exit=0 root=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-848476782a0e40839978f7786ebd4b76\scenario-shared-name-0d5fb04aa61843a6b3f8a662ea6570da
+concurrent parallel-left: exit=0 root=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-4ec7373871ee4142acdeaa18f4440dae\scenario-shared-name-bdebd5c71cbd4a77a232df80e62fbd8a
+concurrent parallel-right: exit=0 root=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-5d7b0a49e5154cf398478ce8b5ce11f9\scenario-shared-name-1e6a3fc6683c46a798ed77f5f2fbb0bf

@@ -1,0 +1,6 @@
+# command: rtk proxy cargo fmt --all -- --check
+# started: 10/08/2026 13:45:39
+# finished: 10/08/2026 13:45:41
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings

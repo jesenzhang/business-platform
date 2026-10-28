@@ -1,0 +1,8 @@
+# gate: 20-catalog-check-default
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\wave5b-independent-20261008\gate-wrapper-probe
+# started: 2026-10-08 10:50:42 +08:00
+# finished: 2026-10-08 10:50:42 +08:00
+# duration-seconds: 0
+# exit-code: 7
+
+forced failing command: exit 7

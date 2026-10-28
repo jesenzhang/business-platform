@@ -1,0 +1,134 @@
+[
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\20-catalog-check-default.log",
+    "sha256": "d9533245023092963fe1b7b03ebd5df9ede7e9f5a26fae1d7fed6c0288b4557d",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\21-catalog-check-only-catalog.log",
+    "sha256": "d48c0c3ec3445afb6596839797fb3bab164d89f907736570d988e69681746386",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\22-catalog-check-only-history.log",
+    "sha256": "8c96e5b1e6ce5fd386296e8272584ee7c1002221fe6c973900d668ff0f58ffdc",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\23-catalog-check-only-embed.log",
+    "sha256": "0476cf081aca1892282c17c962637b3263d4b0853a3286e88dc95b713107c107",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\24-catalog-check-only-freeze.log",
+    "sha256": "f5f3aa92a6d651f842705a5c3fda7cb8ec99225ece0e0e25594aca958aff59a7",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\25-catalog-check-unknown-check.log",
+    "sha256": "dce8af6844cc1c4d12c9f2c108ca99e3e3e6a6497c5d497633254e5de283a186",
+    "actual": "1",
+    "expected": "1"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\30-fmt-check.log",
+    "sha256": "859406b50c6adbab4e627c42978f01e915f9800fef9262eeddb387a9c69fd1e0",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\50-git-diff-check.log",
+    "sha256": "dddd729d212f61ca04a4b6c10da1e8a0605322ff5307ad05710e6e6bf46eeb7b",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-fast\\gates\\51-git-status-short.log",
+    "sha256": "c2c5658ccc3092a905e3ccf4573142dc27c81493bea3c11deb0d03f4fad3b580",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\31-check-workspace.log",
+    "sha256": "ae0dac20339338d6fc0b3b8bced14df03e89cddf3780861cc21b4e6f4225f030",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\32-clippy-workspace.log",
+    "sha256": "ed2b2da86b02bc2e117aec9275e8690fe907ff72b6f8b6198b3429447a05f08e",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\33-test-runtime-migration.log",
+    "sha256": "2ef1df457ebd3ea7fc0f2d835814e399632bd2de1f7be5fea3ffb73f066b5ca0",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\34-test-module-release-tool.log",
+    "sha256": "886cf675ee6f158113a585b426fcf58fb505039c350c789b313a2494bae88b8b",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\35-build-no-run-outbox-reliability.log",
+    "sha256": "c3fb92324afcb07ca0f3d5e93688aa95fa459e3757181f566619e4818035a768",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-heavy\\gates\\36-build-no-run-chain-pg.log",
+    "sha256": "3c343be37a670680f7d11ef32da1cae5f325088364fc5aaa05a9ef57d4f6443c",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\37-test-workspace.log",
+    "sha256": "78a1e2c6d38505991aaa61806a007aa8f0e15f7b32708c6760402fe0ebf46d37",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\40-check-architecture.log",
+    "sha256": "4e1b7a2cd9b2f2ab5fb3b52d3c7146f6ef78892b298aee741320315a430e55b4",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\41-wave5b-offline-catalog-gate.log",
+    "sha256": "b95f04b886eadc27553f4ecca1fdf60475937a064814dfeeee6164a94ed27439",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\42-test-module-release-tool-at-candidate.log",
+    "sha256": "b6c9fb92fdef7bd03181ad32e78d64bcc3d23606276bef9d5c4d4c388630cf86",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\52-git-diff-check-at-candidate.log",
+    "sha256": "d5d95f2c86b3ddee14e7f277c914198c52bb8bc34f8d1cd3956ed6badab99651",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\53-git-status-short-at-candidate.log",
+    "sha256": "b5c70d97c1ccc20b09d9ed6fdf9f7a0198be500426c187978c9dc1ffd76afdd0",
+    "actual": "0",
+    "expected": "0"
+  },
+  {
+    "path": "docs\\reviews\\wave5b-s1-repair-20261008-163628-fed216f4-post\\gates\\54-git-candidate-anchors.log",
+    "sha256": "f47cb111a47a072e37e0dd0447d407fac6024e7924ff4dc54641de1064ebf8d3",
+    "actual": "0",
+    "expected": "0"
+  }
+]

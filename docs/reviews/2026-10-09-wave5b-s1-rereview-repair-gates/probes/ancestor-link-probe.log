@@ -1,0 +1,23 @@
+# step: ancestor-link-probe
+# command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\ancestor-link-probe.ps1'
+# head: 6bcdd89d14d188f62e99bbd068cf786b8207699b
+# started: 2026-10-09 10:28:49 +08:00
+# finished: 2026-10-09 10:28:51 +08:00
+# duration-seconds: 2
+# exit-code: 0
+
+{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a",
+  "anchor_link": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor",
+  "parent": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor\\scratch",
+  "root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor\\scratch\\run-owned",
+  "outside_actual_root": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\outside-owned-test\\scratch\\run-owned",
+  "anchor_attributes": "Directory, ReparsePoint",
+  "reported_unsafe_link": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor",
+  "sentinel_survives": true,
+  "sha_before": "860D0FE3E3CA46ACE6F5B47164EEBB84C31C358BFA34A121DC13C60864337C63",
+  "original_parked_root_survives": true,
+  "messages": [
+    "refusing to delete 'C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor\\scratch\\run-owned': 'C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-review1009-ancestor-f9525534ca854b87ab986eba00a7876a\\anchor' is a reparse point, so this path no longer names the tree the run created"
+  ]
+}

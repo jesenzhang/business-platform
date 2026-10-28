@@ -1,0 +1,8 @@
+unlinked replaced run root (work): 'C:\Users\admin\AppData\Local\Temp\wave5b-n2-probe\scratch\run-probe'; the tree behind the link was left alone
+sentinel_survives=True
+sentinel_bytes=sentinel-bytes
+
+nested_survives=True
+root_survives=False
+messages=unlinked replaced run root (work): 'C:\Users\admin\AppData\Local\Temp\wave5b-n2-probe\scratch\run-probe'; the tree behind the link was left alone
+note=the junction lives under the temporary directory because the repository volume is exFAT and cannot host a reparse point at all

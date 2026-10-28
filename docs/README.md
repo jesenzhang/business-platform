@@ -241,6 +241,7 @@ docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md
 - Agent Runtime、Workspace Turn 和 SSE 恢复；
 - Capability 撤销与安全事件响应；
 - 遗留系统切流与回滚。
+- [工作区迁移与 staging 脚本路径修复](operations/workspace-relocation/README.md)。
 
 Runbook 是架构的操作实现，不得修改 Baseline 语义。
 

@@ -1,0 +1,7 @@
+{
+  "scripts/test-plan0014-wave5b-repairs.ps1": "e6717866f641b9a3ff2a1c1e88c0c95e6407baa996a88cbca887ca7bd5e9b674",
+  "scripts/test-plan0014-wave5b.ps1": "606ccece5e63cdea106a8491e1f4959900e762492213290efde464feab127cd3",
+  "tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1": "1fbd4fdfa746e84055b73c73eb14c24da1193769eb2222df70d6fd55b18f3b05",
+  "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1": "8afec70e81ebee4d917c5483892d42371db5b59cc029c77d4e122eca01f3b93c",
+  "tools/module-release-tool/src/catalog.rs": "c8ad4dea4e5bf3074faf1286d97f70c9e3c188d2e0f8b1dfa136a0772bf6a90f"
+}

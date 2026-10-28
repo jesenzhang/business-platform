@@ -1,0 +1,5 @@
+{
+  "case": "sql-platform-table-takeover",
+  "exit": 0,
+  "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-platform-table-create\r\n"
+}

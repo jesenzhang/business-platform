@@ -10,7 +10,7 @@
   the closeout is hand-transcribed from a terminal.
 #>
 param(
-    [string]$Repo = 'F:\Workspace\business-platform',
+    [string]$Repo = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, '..', '..', '..')),
     [string]$Closeout = 'docs\reviews\2026-09-30-wave5b-s1-closeout.md',
     [string]$DocsSha = '<docs commit>'
 )

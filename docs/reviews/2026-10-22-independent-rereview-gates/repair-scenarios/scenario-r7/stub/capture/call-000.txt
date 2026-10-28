@@ -1,0 +1,5 @@
+proxy
+cargo
+test
+--workspace
+--all-features

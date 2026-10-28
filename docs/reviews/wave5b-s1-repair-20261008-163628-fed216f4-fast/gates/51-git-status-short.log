@@ -1,0 +1,46 @@
+# gate: 51-git-status-short
+# command: git status --short
+# started: 2026-10-08 16:36:50 +08:00
+# finished: 2026-10-08 16:36:50 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0
+
+ M scripts/test-plan0014-wave5b.ps1
+ M tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1
+ M tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1
+ M tools/module-release-tool/scripts/run-wave5b-gates.ps1
+ M tools/module-release-tool/src/catalog.rs
+ M tools/module-release-tool/tests/fixtures/wave5b/catalogs/EXPECTATIONS.json
+ M tools/module-release-tool/tests/wave5b_catalog.rs
+?? docs/OPERATIONAL_RUNBOOK.md
+?? docs/reviews/2026-10-08-wave5b-s1-fixes.md
+?? docs/reviews/2026-10-08-wave5b-s1-independent-gates/
+?? docs/reviews/2026-10-08-wave5b-s1-independent-review.md
+?? docs/reviews/2026-10-08-wave5b-s1-qwen38-flash-zcode-repair-instructions.md
+?? docs/reviews/2026-10-08-wave5b-s1-repair-independent-gates/
+?? docs/reviews/2026-10-08-wave5b-s1-repair-independent-review.md
+?? docs/reviews/wave5b-s1-repair-20261008-163628-fed216f4-fast/
+?? scripts/clean-target.ps1
+?? scripts/test-plan0014-wave5b-repairs.ps1
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/
+?? tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/

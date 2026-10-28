@@ -1,0 +1,18 @@
+Exception: F:\Workspace\business-platform\target\w5b-q123-review\scripts\test-plan0014-wave5b-repairs.ps1:69
+Line |
+  69 |          throw $Message
+     |          ~~~~~~~~~~~~~~
+     | -Only named no such scenario: 'no-such-scenario-name'; this run knows 29 scenarios:
+     | static-r3-no-ambiguous-label, static-r7-no-array-append, static-cleanup-surface-is-self-contained,
+     | static-no-recursive-delete-in-either-harness, ast-cleanup-normal-external,
+     | ast-cleanup-internal-evidence-retained, ast-cleanup-keepscratch, ast-cleanup-protected-refusals,
+     | ast-cleanup-outside-registered-parent, ast-register-refuses-root-equal-to-protected-parent,
+     | ast-cleanup-root-replaced-by-junction, ast-cleanup-parent-replaced-by-junction,
+     | ast-cleanup-junction-inside-tree, ast-cleanup-ancestor-above-parent-replaced-by-junction,
+     | ast-register-refuses-link-already-above-parent, ast-remove-tree-linked-ancestor-retains-tree,
+     | ast-cleanup-ownership-witness-is-required, ast-remove-tree-queued-directory-swapped-before-pop,
+     | ast-remove-tree-directory-swapped-after-enumeration, filter-unknown-only-refuses-before-executing,
+     | filter-counters-reported-for-a-valid-filter, helper-scratch-never-reuses-previous-run-root,
+     | helper-scratch-repeat-and-concurrent-runs-are-disjoint, entry-r3-explicit-evidencedir-reaches-evidence-rule,
+     | entry-r4-internal-default-lifecycle, wrapper-r7-capture-unique-evidencedir-argument,
+     | wrapper-b7-known-negative-only-passes, wrapper-b7-stub-exit-7-propagates, wrapper-b8-evidence-not-overwritten

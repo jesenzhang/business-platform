@@ -1,0 +1,213 @@
+wave5b-s1 offline catalog gate
+repo=F:\Workspace\business-platform\target\w5b-q123-review
+$ git -C F:\Workspace\business-platform\target\w5b-q123-review rev-parse HEAD -> exit=0
+repository head=6bcdd89d14d188f62e99bbd068cf786b8207699b
+$ git --version -> exit=0
+git=git version 2.50.1.windows.1
+pwsh=7.6.6
+scratch=F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c
+evidence=F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\evidence
+repository index and work tree are never written by this script
+$ cargo build -q -p module-release-tool -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-reserved --only module-catalog -> exit=0
+[catalog-cases] case=reserved expect=pass actual=pass verdict=MATCH detail=status=RESERVED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-validated --only module-catalog -> exit=0
+[catalog-cases] case=validated expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-crlf-checkout-validated --only module-catalog -> exit=0
+[catalog-cases] case=crlf-checkout-validated expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-unknown-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-field expect=fail actual=fail verdict=MATCH detail=matched-substring='table_prefix'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-missing-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-missing-field expect=fail actual=fail verdict=MATCH detail=matched-substring='ledger'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-duplicate-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-duplicate-field expect=fail actual=fail verdict=MATCH detail=matched-substring='declared twice'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-wrong-type --only module-catalog -> exit=1
+[catalog-cases] case=catalog-wrong-type expect=fail actual=fail verdict=MATCH detail=matched-substring='invalid type'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-unknown-schema --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-schema expect=fail actual=fail verdict=MATCH detail=matched-substring='plan-0014.wave5b.catalog.v2'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-owner-mismatch --only module-catalog -> exit=1
+[catalog-cases] case=catalog-owner-mismatch expect=fail actual=fail verdict=MATCH detail=matched-substring='does not equal namespace'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-directory-mismatch --only module-catalog -> exit=1
+[catalog-cases] case=catalog-directory-mismatch expect=fail actual=fail verdict=MATCH detail=matched-substring='does not equal the directory name'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-unknown-context --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-context expect=fail actual=fail verdict=MATCH detail=matched-substring='authoritative contexts'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-bad-ledger --only module-catalog -> exit=1
+[catalog-cases] case=catalog-bad-ledger expect=fail actual=fail verdict=MATCH detail=matched-substring='platform_module_migrations'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-bad-sql-schema --only module-catalog -> exit=1
+[catalog-cases] case=catalog-bad-sql-schema expect=fail actual=fail verdict=MATCH detail=matched-substring='sql_schema'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-catalog-not-a-directory --only module-catalog -> exit=1
+[catalog-cases] case=catalog-not-a-directory expect=fail actual=fail verdict=MATCH detail=matched-substring='is not a namespace directory'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-path-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-path-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-absolute-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-absolute-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-parent-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-parent-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-backslash-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-backslash-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-dot-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-dot-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-ghost-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-ghost-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='no such file is in'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-missing-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-missing-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='absent from'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-duplicate-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-duplicate-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='lists '001_wave5b_fixture_foundation.sql' twice'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-revision-duplicate --only module-catalog -> exit=1
+[catalog-cases] case=revision-duplicate expect=fail actual=fail verdict=MATCH detail=matched-substring='revision 001 is used by more than one file'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-revision-gap --only module-catalog -> exit=1
+[catalog-cases] case=revision-gap expect=fail actual=fail verdict=MATCH detail=matched-substring='leaves a gap'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-non-canonical-digest --only module-catalog -> exit=1
+[catalog-cases] case=manifest-non-canonical-digest expect=fail actual=fail verdict=MATCH detail=matched-substring='canonical LF digest'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-empty-not-zero-bytes --only module-catalog -> exit=1
+[catalog-cases] case=manifest-empty-not-zero-bytes expect=fail actual=fail verdict=MATCH detail=matched-substring='blank line'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-manifest-unknown-digest --only module-catalog -> exit=1
+[catalog-cases] case=manifest-unknown-digest expect=fail actual=fail verdict=MATCH detail=matched-substring='canonical LF digest'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-unknown-namespace --only module-catalog -> exit=1
+[catalog-cases] case=dependency-unknown-namespace expect=fail actual=fail verdict=MATCH detail=matched-substring='unknown namespace 'acme''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-baseline-zero --only module-catalog -> exit=1
+[catalog-cases] case=dependency-baseline-zero expect=fail actual=fail verdict=MATCH detail=matched-substring='positive revision'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-baseline-unavailable --only module-catalog -> exit=1
+[catalog-cases] case=dependency-baseline-unavailable expect=fail actual=fail verdict=MATCH detail=matched-substring='pinned baseline provides 19'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-without-revision --only module-catalog -> exit=1
+[catalog-cases] case=dependency-without-revision expect=fail actual=fail verdict=MATCH detail=matched-substring=''<name>@<revision>''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-self --only module-catalog -> exit=1
+[catalog-cases] case=dependency-self expect=fail actual=fail verdict=MATCH detail=matched-substring='depends on itself'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-duplicate --only module-catalog -> exit=1
+[catalog-cases] case=dependency-duplicate expect=fail actual=fail verdict=MATCH detail=matched-substring='more than once'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-cycle --only module-catalog -> exit=1
+[catalog-cases] case=dependency-cycle expect=fail actual=fail verdict=MATCH detail=matched-substring='form a cycle'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-revision-unavailable --only module-catalog -> exit=1
+[catalog-cases] case=dependency-revision-unavailable expect=fail actual=fail verdict=MATCH detail=matched-substring='requires revision 1 of 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-dependency-same-target-twice --only module-catalog -> exit=1
+[catalog-cases] case=dependency-same-target-twice expect=fail actual=fail verdict=MATCH detail=matched-substring='more than once'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-renames-whole-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-renames-whole-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''RENAME TO' renames the whole table'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-likes-other-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-likes-other-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''LIKE <table>' copies another table's definition'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-partitions-of-host-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-partitions-of-host-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''PARTITION OF' inherits a parent table'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-drops-host-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-drops-host-table expect=fail actual=fail verdict=MATCH detail=matched-substring='may not destroy it, even as its owner'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-drops-own-revision-table --only module-catalog -> exit=0
+[catalog-cases] case=sql-drops-own-revision-table expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-references-other-owner --only module-catalog -> exit=1
+[catalog-cases] case=sql-references-other-owner expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-creates-other-owner-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-creates-other-owner-table expect=fail actual=fail verdict=MATCH detail=matched-substring='host baseline table owned by 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-references-platform-ledger --only module-catalog -> exit=1
+[catalog-cases] case=sql-references-platform-ledger expect=fail actual=fail verdict=MATCH detail=matched-substring='platform ledger'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-undeclared-new-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-undeclared-new-table expect=fail actual=fail verdict=MATCH detail=matched-substring='without an '@bp-owned: wave5b_fixture_policy_t4' declaration'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-declared-not-created --only module-catalog -> exit=1
+[catalog-cases] case=sql-declared-not-created expect=fail actual=fail verdict=MATCH detail=matched-substring='never creates it'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-dynamic-sql --only module-catalog -> exit=1
+[catalog-cases] case=sql-dynamic-sql expect=fail actual=fail verdict=MATCH detail=matched-substring='dollar-quoted'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-qualified-reference --only module-catalog -> exit=1
+[catalog-cases] case=sql-qualified-reference expect=fail actual=fail verdict=MATCH detail=matched-substring='schema-qualified'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-sql-unsupported-statement --only module-catalog -> exit=1
+[catalog-cases] case=sql-unsupported-statement expect=fail actual=fail verdict=MATCH detail=matched-substring='is outside the supported SQL subset'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-table-name-conflict --only module-catalog -> exit=1
+[catalog-cases] case=table-name-conflict expect=fail actual=fail verdict=MATCH detail=matched-substring='two namespaces may not create the same table'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-rename-target-v0_demo_role_permissions --only module-catalog -> exit=1
+[catalog-cases] case=r1-rename-target-v0_demo_role_permissions expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-rename-target-v0_demo_user_roles --only module-catalog -> exit=1
+[catalog-cases] case=r1-rename-target-v0_demo_user_roles expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-rename-target-v0_demo_roles --only module-catalog -> exit=1
+[catalog-cases] case=r1-rename-target-v0_demo_roles expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-rename-target-v0_demo_permissions --only module-catalog -> exit=1
+[catalog-cases] case=r1-rename-target-v0_demo_permissions expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-reserved-documents --only module-catalog -> exit=1
+[catalog-cases] case=r1-reserved-documents expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-reserved-sqlx-migrations --only module-catalog -> exit=1
+[catalog-cases] case=r1-reserved-sqlx-migrations expect=fail actual=fail verdict=MATCH detail=matched-substring='already exists in the pinned host baseline'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r1-owned-host-table-reference --only module-catalog -> exit=0
+[catalog-cases] case=r1-owned-host-table-reference expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-in-from-alias --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-in-from-alias expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-in-using --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-in-using expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-first-in-list --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-first-in-list expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-middle-in-list --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-middle-in-list expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-last-in-list --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-last-in-list expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-foreign-in-as-alias --only module-catalog -> exit=1
+[catalog-cases] case=r2-foreign-in-as-alias expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-qualified-after-comma --only module-catalog -> exit=1
+[catalog-cases] case=r2-qualified-after-comma expect=fail actual=fail verdict=MATCH detail=matched-substring='schema-qualified'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-same-owner-alias-list --only module-catalog -> exit=0
+[catalog-cases] case=r2-same-owner-alias-list expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r2-comment-string-not-reference --only module-catalog -> exit=0
+[catalog-cases] case=r2-comment-string-not-reference expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r6-index-using-btree --only module-catalog -> exit=0
+[catalog-cases] case=r6-index-using-btree expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r6-index-unknown-method --only module-catalog -> exit=1
+[catalog-cases] case=r6-index-unknown-method expect=fail actual=fail verdict=MATCH detail=matched-substring='index access method 'mystery''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r6-join-using-columns --only module-catalog -> exit=1
+[catalog-cases] case=r6-join-using-columns expect=fail actual=fail verdict=MATCH detail=matched-substring='outside the supported SQL subset'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r6-inherits-parent --only module-catalog -> exit=1
+[catalog-cases] case=r6-inherits-parent expect=fail actual=fail verdict=MATCH detail=matched-substring=''INHERITS (parent)''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-r6-attach-partition --only module-catalog -> exit=1
+[catalog-cases] case=r6-attach-partition expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-alias-column-list --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-alias-column-list expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-same-owner-alias-column-list --only module-catalog -> exit=0
+[catalog-cases] case=n1-same-owner-alias-column-list expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-join-on --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-join-on expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-same-owner-join-on --only module-catalog -> exit=0
+[catalog-cases] case=n1-same-owner-join-on expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-delete-using-columns --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-delete-using-columns expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-same-owner-delete-using-columns --only module-catalog -> exit=0
+[catalog-cases] case=n1-same-owner-delete-using-columns expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-cross-join --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-cross-join expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-natural-join --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-natural-join expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-foreign-after-alias-column-list-join --only module-catalog -> exit=1
+[catalog-cases] case=n1-foreign-after-alias-column-list-join expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-qualified-after-join-on --only module-catalog -> exit=1
+[catalog-cases] case=n1-qualified-after-join-on expect=fail actual=fail verdict=MATCH detail=matched-substring='schema-qualified'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-inheritance-star-with-foreign --only module-catalog -> exit=1
+[catalog-cases] case=n1-inheritance-star-with-foreign expect=fail actual=fail verdict=MATCH detail=matched-substring='inheriting tables'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-inheritance-star-same-owner --only module-catalog -> exit=1
+[catalog-cases] case=n1-inheritance-star-same-owner expect=fail actual=fail verdict=MATCH detail=matched-substring='inheriting tables'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-table-function-call --only module-catalog -> exit=1
+[catalog-cases] case=n1-table-function-call expect=fail actual=fail verdict=MATCH detail=matched-substring='table function'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-sub-query-in-join-condition --only module-catalog -> exit=1
+[catalog-cases] case=n1-sub-query-in-join-condition expect=fail actual=fail verdict=MATCH detail=matched-substring='a sub-query inside a 'JOIN'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-sub-query-after-join-condition --only module-catalog -> exit=1
+[catalog-cases] case=n1-sub-query-after-join-condition expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\catalog-n1-same-owner-sub-query-after-join --only module-catalog -> exit=0
+[catalog-cases] case=n1-same-owner-sub-query-after-join expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ git clone --quiet --no-checkout F:\Workspace\business-platform\target\w5b-q123-review F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\history-repo -> exit=0
+$ git -C F:\Workspace\business-platform\target\w5b-q123-review rev-parse HEAD -> exit=0
+$ git -C F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\history-repo checkout --quiet --force 6bcdd89d14d188f62e99bbd068cf786b8207699b -> exit=1
+error: unable to create file docs/reviews/2026-09-28-wave4-round2-storage-lane/attempts/10-fault-target-child-cases-ran-directly/02-cleanup-fault-scenarios.log: Filename too long
+error: unable to create file docs/reviews/2026-09-28-wave4-round3-storage-lane/attempts/01-child-record-parser-dropped-first-line/02-cleanup-fault-scenarios.log: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/dependency-same-target-twice/identity-management/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-foreign-after-alias-column-list-join/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-foreign-after-alias-column-list/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-foreign-after-delete-using-columns/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-inheritance-star-with-foreign/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-same-owner-alias-column-list/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-same-owner-delete-using-columns/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-same-owner-sub-query-after-join/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/n1-sub-query-after-join-condition/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/001_wave5b_fixture_identity.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/001_wave5b_fixture_foundation.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/sql-drops-own-revision-table/identity-management/001_wave5b_fixture_identity.sql: Filename too long
+error: unable to create file tools/module-release-tool/tests/fixtures/wave5b/catalogs/sql-drops-own-revision-table/identity-management/002_wave5b_fixture_identity_drop.sql: Filename too long
+
+internal evidence retained at 'F:\Workspace\business-platform\target\w5b-q123-review\target\tmp\plan0014-wave5b\run-ce34a3648cf24052bed075316e5ad13c\evidence'; the rest of the run root was cleaned
+Exception: F:\Workspace\business-platform\target\w5b-q123-review\scripts\test-plan0014-wave5b.ps1:830
+Line |
+ 830 |      throw "the scratch clone could not check out $head"
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | the scratch clone could not check out 6bcdd89d14d188f62e99bbd068cf786b8207699b

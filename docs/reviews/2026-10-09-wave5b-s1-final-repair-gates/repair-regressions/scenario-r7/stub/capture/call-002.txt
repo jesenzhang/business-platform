@@ -1,0 +1,7 @@
+proxy
+pwsh
+-NoProfile
+-File
+scripts/test-plan0014-wave5b.ps1
+-EvidenceDir
+F:\Workspace\business-platform\target\wave5b-n-candidate-20261009-005959\repair-regressions\r7 evidence dir with spaces\wave5b-cases

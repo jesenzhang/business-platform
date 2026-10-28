@@ -1,0 +1,44 @@
+diff --git a/sample-resources.ps1 b/sample-resources.ps1
+--- a/sample-resources.ps1
++++ b/sample-resources.ps1
+@@ -3 +3 @@
+-$out = 'F:\Workspace\business-platform-staging\evidence\11-resource-samples.csv'
++$out = Join-Path $PSScriptRoot 'evidence\11-resource-samples.csv'
+diff --git a/sample-resources2.ps1 b/sample-resources2.ps1
+--- a/sample-resources2.ps1
++++ b/sample-resources2.ps1
+@@ -3 +3 @@
+-$out = 'F:\Workspace\business-platform-staging\evidence\14-resource-samples.csv'
++$out = Join-Path $PSScriptRoot 'evidence\14-resource-samples.csv'
+diff --git a/tools/capture-authcode.py b/tools/capture-authcode.py
+--- a/tools/capture-authcode.py
++++ b/tools/capture-authcode.py
+@@ -10 +10 @@
+-STG = r"F:\Workspace\business-platform-staging"
++STG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+diff --git a/tools/prod-e2e-acceptance.py b/tools/prod-e2e-acceptance.py
+--- a/tools/prod-e2e-acceptance.py
++++ b/tools/prod-e2e-acceptance.py
+@@ -11,0 +12 @@
++import os
+@@ -25 +26 @@
+-STAGING = r"F:\Workspace\business-platform-staging"
++STAGING = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+diff --git a/start-services-dev.sh b/start-services-dev.sh
+--- a/start-services-dev.sh
++++ b/start-services-dev.sh
+@@ -6,2 +6,2 @@
+-STG=/f/Workspace/business-platform-staging
+-REPO=/f/Workspace/business-platform
++STG="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
++REPO="$(cd -- "$STG/../business-platform" && pwd)"
+diff --git a/ci-contract-battery.sh b/ci-contract-battery.sh
+--- a/ci-contract-battery.sh
++++ b/ci-contract-battery.sh
+@@ -5 +5,2 @@
+-cd /f/Workspace/business-platform
++STG="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
++cd -- "$STG/../business-platform"
+@@ -13 +14 @@
+-  if [ "$rc" -ne 0 ]; then echo "FAILED(rc=$rc): $*"; fails=$((fails+1)); grep -A6 "panicked at" /tmp/battery-run.log | head -40; cp /tmp/battery-run.log "/f/Workspace/business-platform-staging/evidence/battery-fail-$(echo "$*" | tr ' /-' '___').log"; fi
++  if [ "$rc" -ne 0 ]; then echo "FAILED(rc=$rc): $*"; fails=$((fails+1)); grep -A6 "panicked at" /tmp/battery-run.log | head -40; cp /tmp/battery-run.log "$STG/evidence/battery-fail-$(echo "$*" | tr ' /-' '___').log"; fi

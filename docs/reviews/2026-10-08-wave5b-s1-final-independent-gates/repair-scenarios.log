@@ -1,0 +1,20 @@
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+PASS static-r3-no-ambiguous-label
+PASS static-r7-no-array-append
+PASS ast-cleanup-normal-external
+internal evidence retained at 'F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\repair-scenarios\scenario-internal\run-guidbbb\evidence'; the rest of the run root was cleaned
+PASS ast-cleanup-internal-evidence-retained
+kept scratch root (main): F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\repair-scenarios\scenario-keep\run-guidccc
+PASS ast-cleanup-keepscratch
+PASS ast-cleanup-protected-refusals
+PASS ast-cleanup-outside-registered-parent
+PASS ast-register-refuses-root-equal-to-protected-parent
+PASS entry-r3-explicit-evidencedir-reaches-evidence-rule
+SKIP entry-r4-internal-default-lifecycle
+PASS wrapper-r7-capture-unique-evidencedir-argument
+PASS wrapper-b7-known-negative-only-passes
+PASS wrapper-b7-stub-exit-7-propagates
+PASS wrapper-b8-evidence-not-overwritten
+
+repair-regressions: 0 scenario failure(s); logs in F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\repair-scenarios
+Wave 5B-S1 repair regressions (R3/R4/R7): every scenario matched its expectation.

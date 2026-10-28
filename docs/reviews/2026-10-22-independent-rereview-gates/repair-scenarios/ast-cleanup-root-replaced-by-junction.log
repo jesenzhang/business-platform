@@ -1,0 +1,24 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261022131327
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File scripts/test-plan0014-wave5b-repairs.ps1 -OutDir docs/reviews/2026-10-22-independent-rereview-gates/repair-scenarios
+进程 ID: 82888
+PSVersion: 7.6.7
+PSEdition: Core
+GitCommitId: 7.6.7
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+unlinked replaced run root (work): 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-a1e47921462347d28c05529c99200897\scenario-linkroot-1fa34e997ef94d209de17369e9f7a45c\parent\run-guidlink'; the tree behind the link was left alone
+**********************
+PowerShell 记录结束
+结束时间: 20261022131327
+**********************

@@ -1,0 +1,11 @@
+# gate: 54-git-candidate-anchors
+# command: git log --oneline -n 3 --format=%H %ad %s --date=iso-strict
+# started: 2026-10-08 21:38:01 +08:00
+# finished: 2026-10-08 21:38:01 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0
+
+5fa0ff46ed29e7ed0dfdebf01f3542779b3e3a22 2026-10-08T17:08:54+08:00 test(plan-0014): stabilise the wave 5b-s1 repair driver assertions
+6c612722a841a7d0be5d5d56569de55e7fe4b9bf 2026-10-08T16:44:40+08:00 fix(plan-0014): repair the wave 5b-s1 offline gate review findings R1-R7
+87e8a318fa32ff43d41ad45da8a0f83b3b19a2a4 2026-10-08T09:50:44+08:00 docs(plan-0014): record the at-docs-commit gate re-check

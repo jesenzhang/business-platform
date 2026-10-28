@@ -1,0 +1,74 @@
+# command: rtk proxy cargo test -p module-release-tool --test wave5b_catalog --all-features
+# started: 10/08/2026 13:42:57
+# finished: 10/08/2026 13:43:39
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling version_check v0.9.5
+   Compiling typenum v1.20.1
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.20
+   Compiling serde_json v1.0.151
+   Compiling cfg-if v1.0.4
+   Compiling itoa v1.0.18
+   Compiling cpufeatures v0.2.17
+   Compiling memchr v2.8.3
+   Compiling semver v1.0.28
+   Compiling generic-array v0.14.9
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling syn v3.0.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling business-module-contracts v0.1.0 (F:\Workspace\business-platform\crates\business-module-contracts)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hn0fcaay86-1gzy0d1-working`
+
+   Compiling business-application-compiler v0.1.0 (F:\Workspace\business-platform\crates\business-application-compiler)
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hn0fcb1m6d-03zln54-working`
+
+   Compiling module-release-tool v0.1.0 (F:\Workspace\business-platform\tools\module-release-tool)
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hn0fcbzqya-1quvzld-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hn0fce3657-1r1jis8-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\wave5b_catalog-21k64cmnijcwc\s-hn0fce366i-1xunpf9-working`
+
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+warning: `module-release-tool` (test "wave5b_catalog") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.34s
+     Running tests\wave5b_catalog.rs (target\debug\deps\wave5b_catalog-bdd8b303089467b9.exe)
+
+running 19 tests
+test host_table_ownership_is_unique_and_inside_the_authoritative_contexts ... ok
+test the_default_gate_excludes_the_candidate_freeze ... ok
+test dependency_grammar_is_fixed_and_does_not_guess ... ok
+test unattributable_sql_forms_are_refused_by_name ... ok
+test the_embedded_pinned_table_is_the_checked_in_fixture ... ok
+test the_conformance_tests_do_not_embed_a_second_baseline ... ok
+test migration_019_is_not_a_module_catalog ... ok
+test the_attribution_table_is_migration_019_itself ... ok
+test no_fixture_directory_is_left_uncovered ... ok
+test the_freeze_only_counts_the_flat_baseline ... ok
+test a_new_namespace_digest_is_canonical_lf_only ... ok
+warning: in the working copy of 'migrations/001_initial.sql', LF will be replaced by CRLF the next time Git touches it
+test a_git_object_id_is_never_a_content_digest ... ok
+test exactly_one_file_embeds_the_host_baseline_catalog ... ok
+test a_repository_without_the_pinned_commit_is_refused_without_a_fallback ... ok
+test every_shared_fixture_case_produces_the_recorded_verdict ... ok
+test the_seven_c1_entries_are_pinned_by_blob_even_though_the_manifest_is_crlf ... ok
+test every_pinned_entry_is_the_blob_of_the_pinned_commit ... ok
+test head_and_index_still_hold_the_pinned_baseline ... ok
+test the_repository_itself_passes_the_default_checks ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.65s
+

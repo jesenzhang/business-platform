@@ -1,0 +1,25 @@
+# gate: 36-build-no-run-chain-pg
+# command: rtk proxy cargo test -p audit-postgres --test chain_pg --no-run
+# started: 2026-10-08 16:43:28 +08:00
+# finished: 2026-10-08 16:43:51 +08:00
+# duration-seconds: 23
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling md-5 v0.10.6
+   Compiling hkdf v0.12.4
+   Compiling sqlx-core v0.8.6
+   Compiling audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+   Compiling sqlx-sqlite v0.8.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling runtime-migration v0.1.0 (F:\Workspace\business-platform\crates\runtime-migration)
+   Compiling audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.66s
+  Executable tests\chain_pg.rs (target\debug\deps\chain_pg-d2a565c98adcbc87.exe)

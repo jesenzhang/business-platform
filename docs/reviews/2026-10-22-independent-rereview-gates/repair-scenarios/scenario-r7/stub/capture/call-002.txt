@@ -1,0 +1,7 @@
+proxy
+pwsh
+-NoProfile
+-File
+scripts/test-plan0014-wave5b.ps1
+-EvidenceDir
+docs\reviews\2026-10-22-independent-rereview-gates\repair-scenarios\r7 evidence dir with spaces\wave5b-cases

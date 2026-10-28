@@ -1,0 +1,4 @@
+{
+  "exit": 1,
+  "output": "Exception: F:\\Workspace\\business-platform\\scripts\\test-plan0014-wave5b.ps1:81\r\nLine |\r\n  81 |          throw \"${Label}: candidate path '$Candidate' equals the prote …\r\n     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | scratch validation: candidate path 'F:\\Workspace\\business-platform' equals the protected path\r\n     | 'F:\\Workspace\\business-platform'\r\n"
+}

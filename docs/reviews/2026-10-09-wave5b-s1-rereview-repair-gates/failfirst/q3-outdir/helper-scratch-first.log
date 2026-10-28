@@ -1,0 +1,5 @@
+RUNID=
+ROOT=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-shared-name
+BASE=C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe
+SENTINEL_ALIVE=true
+RESULT=OWNED-SCRATCH-SURVIVED

@@ -1,0 +1,52 @@
+[
+  {
+    "case": "sql-inherits-foreign",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-inherits-foreign\r\n"
+  },
+  {
+    "case": "sql-delete-using-foreign",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-delete-using-foreign\r\n"
+  },
+  {
+    "case": "sql-comma-from-foreign",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-comma-from-foreign\r\n"
+  },
+  {
+    "case": "sql-attach-partition-foreign",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-attach-partition-foreign\r\n"
+  },
+  {
+    "case": "sql-direct-foreign-control",
+    "exit": 1,
+    "output": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-direct-foreign-control\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\r\n"
+  },
+  {
+    "case": "sql-ledger-create",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-ledger-create\r\n"
+  },
+  {
+    "case": "sql-platform-table-create",
+    "exit": 0,
+    "output": "checks=module-catalog\r\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\r\norder=policy\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\sql-platform-table-create\r\n"
+  },
+  {
+    "case": "embed-alias",
+    "exit": 0,
+    "output": "checks=baseline-embed\r\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\r\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\embed-base\r\n"
+  },
+  {
+    "case": "embed-import",
+    "exit": 0,
+    "output": "checks=baseline-embed\r\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\r\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\r\nstatus=ok\r\nroot=F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\embed-base\r\n"
+  },
+  {
+    "case": "embed-direct-control",
+    "exit": 1,
+    "output": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/probe/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\r\n"
+  }
+]

@@ -1,0 +1,164 @@
+{
+  "schema_version": "1",
+  "mode": "workspace",
+  "repository": "F:/Workspace/business-platform",
+  "total_files": 23,
+  "reviewable_count": 11,
+  "excluded_count": 12,
+  "total_insertions": 2816,
+  "total_deletions": 44,
+  "reviewable_files": [
+    {
+      "path": "scripts/test-plan0014-wave5b.ps1",
+      "status": "modified",
+      "insertions": 127,
+      "deletions": 17
+    },
+    {
+      "path": "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1",
+      "status": "modified",
+      "insertions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tools/module-release-tool/scripts/run-wave5b-gates.ps1",
+      "status": "modified",
+      "insertions": 61,
+      "deletions": 25
+    },
+    {
+      "path": "tools/module-release-tool/src/catalog.rs",
+      "status": "modified",
+      "insertions": 236,
+      "deletions": 1
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/manifest-crlf-repro.json",
+      "status": "added",
+      "insertions": 5,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/ocr-preview.json",
+      "status": "added",
+      "insertions": 1485,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/ocr-rules.json",
+      "status": "added",
+      "insertions": 53,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/repro-results.json",
+      "status": "added",
+      "insertions": 52,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/scratch-repro.json",
+      "status": "added",
+      "insertions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/script-parse.json",
+      "status": "added",
+      "insertions": 55,
+      "deletions": 0
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/takeover-repro.json",
+      "status": "added",
+      "insertions": 5,
+      "deletions": 0
+    }
+  ],
+  "excluded_files": [
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-fixes.md",
+      "status": "added",
+      "insertions": 29,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/architecture-attempt2.log",
+      "status": "added",
+      "insertions": 60,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/architecture.log",
+      "status": "added",
+      "insertions": 96,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/catalog-default-attempt2.log",
+      "status": "added",
+      "insertions": 47,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/catalog-default.log",
+      "status": "added",
+      "insertions": 96,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/fmt-attempt2.log",
+      "status": "added",
+      "insertions": 6,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/fmt.log",
+      "status": "added",
+      "insertions": 96,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/focused-catalog-tests-attempt2.log",
+      "status": "added",
+      "insertions": 48,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/focused-catalog-tests.log",
+      "status": "added",
+      "insertions": 96,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/gate-wrapper-forced-failure.log",
+      "status": "added",
+      "insertions": 8,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-gates/reviewable-files.csv",
+      "status": "added",
+      "insertions": 17,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "docs/reviews/2026-10-08-wave5b-s1-independent-review.md",
+      "status": "added",
+      "insertions": 131,
+      "deletions": 0,
+      "exclude_reason": "unsupported_ext"
+    }
+  ]
+}

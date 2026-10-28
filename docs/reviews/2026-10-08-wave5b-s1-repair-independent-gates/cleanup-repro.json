@@ -1,0 +1,5 @@
+{
+  "main_left": true,
+  "fallback_left": true,
+  "messages": "refusing to delete scratch 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\cleanup-main-run': not under validated scratch root 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\cleanup-main-run'\r\nrefusing to delete scratch 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\cleanup-fallback-run': not under validated scratch root 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\cleanup-main-run'\r\n"
+}

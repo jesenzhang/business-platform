@@ -1,0 +1,40 @@
+# gate: 35-build-no-run-outbox-reliability
+# command: rtk proxy cargo test -p messaging --test outbox_reliability --no-run
+# started: 2026-10-08 16:42:56 +08:00
+# finished: 2026-10-08 16:43:28 +08:00
+# duration-seconds: 32
+# exit-code: 0
+# expected-exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+   Compiling serde v1.0.229
+   Compiling windows-sys v0.61.2
+   Compiling chrono v0.4.45
+   Compiling tokio-stream v0.1.19
+   Compiling uuid v1.26.0
+   Compiling smallvec v1.16.0
+   Compiling either v1.18.0
+   Compiling serde_urlencoded v0.7.1
+   Compiling parking_lot_core v0.9.12
+   Compiling icu_normalizer v2.3.0
+   Compiling parking_lot v0.12.5
+   Compiling idna_adapter v1.2.2
+   Compiling futures-intrusive v0.5.0
+   Compiling idna v1.1.0
+   Compiling shared-kernel v0.1.0 (F:\Workspace\business-platform\crates\shared-kernel)
+   Compiling url v2.5.8
+   Compiling sqlx-core v0.8.6
+   Compiling mio v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling home v0.5.12
+   Compiling etcetera v0.8.0
+   Compiling tokio v1.53.1
+   Compiling sqlx-sqlite v0.8.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling messaging v0.1.0 (F:\Workspace\business-platform\crates\messaging)
+   Compiling runtime-migration v0.1.0 (F:\Workspace\business-platform\crates\runtime-migration)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.60s
+  Executable tests\outbox_reliability.rs (target\debug\deps\outbox_reliability-06f8f52e776617d4.exe)

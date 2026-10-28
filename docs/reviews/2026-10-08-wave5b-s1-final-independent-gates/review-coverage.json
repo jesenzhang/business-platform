@@ -1,0 +1,22 @@
+{
+  "total_files": 75,
+  "reviewable_files": 7,
+  "reviewed_files": 7,
+  "skipped_files": 0,
+  "coverage_rate": 1.0,
+  "reviewed": [
+    "scripts/test-plan0014-wave5b-repairs.ps1",
+    "scripts/test-plan0014-wave5b.ps1",
+    "tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1",
+    "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1",
+    "tools/module-release-tool/scripts/run-wave5b-gates.ps1",
+    "tools/module-release-tool/src/catalog.rs",
+    "tools/module-release-tool/tests/wave5b_catalog.rs"
+  ],
+  "excluded_count": 68,
+  "excluded_supplement": {
+    "fixture_files": 64,
+    "historical_reports_and_handoff": 4
+  },
+  "closeout_report": "840f5a0befcc6aaea815edc244e03835fdd28bf4:docs/reviews/2026-10-08-wave5b-s1-repair-closeout.md"
+}

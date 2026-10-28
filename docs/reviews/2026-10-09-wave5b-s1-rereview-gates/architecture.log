@@ -1,0 +1,19 @@
+Cargo metadata architecture fitness: PASS
+OpenAPI contract: PASS
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling syn v3.0.4
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling architecture-check v0.1.0 (F:\Workspace\business-platform\target\w5b-review-1009\crates\architecture-check)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.72s
+     Running `F:\Workspace\business-platform\target\w5b-review-1009-build\debug\architecture-check.exe check`
+error: failed to remove file `F:\Workspace\business-platform\target\w5b-review-1009-build\debug\module-release-tool.exe`
+
+Caused by:
+  拒绝访问。 (os error 5)
+Exception: F:\Workspace\business-platform\target\w5b-review-1009\scripts\check-architecture.ps1:786
+Line |
+ 786 |          throw "Wave 5B-S1 offline catalog gate failed (exit $LASTEXIT …
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Wave 5B-S1 offline catalog gate failed (exit 101)

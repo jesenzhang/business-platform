@@ -1,0 +1,13 @@
+Exception: F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1:65
+Line |
+  65 |          throw $Message
+     |          ~~~~~~~~~~~~~~
+     | -Only named no such scenario: 'no-such-scenario-name'; this run knows 19 scenarios:
+     | static-r3-no-ambiguous-label, static-r7-no-array-append, ast-cleanup-normal-external,
+     | ast-cleanup-internal-evidence-retained, ast-cleanup-keepscratch, ast-cleanup-protected-refusals,
+     | ast-cleanup-outside-registered-parent, ast-register-refuses-root-equal-to-protected-parent,
+     | ast-cleanup-root-replaced-by-junction, ast-cleanup-parent-replaced-by-junction,
+     | ast-cleanup-junction-inside-tree, filter-unknown-only-refuses-before-executing,
+     | filter-counters-reported-for-a-valid-filter, entry-r3-explicit-evidencedir-reaches-evidence-rule,
+     | entry-r4-internal-default-lifecycle, wrapper-r7-capture-unique-evidencedir-argument,
+     | wrapper-b7-known-negative-only-passes, wrapper-b7-stub-exit-7-propagates, wrapper-b8-evidence-not-overwritten

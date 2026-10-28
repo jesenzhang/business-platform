@@ -1,0 +1,165 @@
+{
+  "schema_version": "plan-0014.wave5b.pinned-baseline-history.v1",
+  "pinned_revision": "5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601",
+  "baseline_revision": 19,
+  "digest_rule": "SHA-256 of the exact bytes returned by git cat-file blob for <pinned_revision>:<path>; never a Git object id and never working-tree bytes",
+  "entries": [
+    {
+      "path": "migrations/001_initial.sql",
+      "kind": "baseline-sql",
+      "revision": "001",
+      "blob_sha256": "d6a90f391d35a4483ae9fcc29804af1de5db4ccdf673864a38391a7a8c340dbb",
+      "historical_manifest_digest": "d6a90f391d35a4483ae9fcc29804af1de5db4ccdf673864a38391a7a8c340dbb",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/002_document_metadata.sql",
+      "kind": "baseline-sql",
+      "revision": "002",
+      "blob_sha256": "86a254284ca78ec57cb8329f7bc48c9d1167b5c548489b3c5cc923c39ec0435b",
+      "historical_manifest_digest": "b22bb38d2948d37960d54d6ff6e1e6eff5f9ef4b42575b4668f642cc3897145d",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/003_outbox_reliability.sql",
+      "kind": "baseline-sql",
+      "revision": "003",
+      "blob_sha256": "9c7a4fe686ebf3c5768ed7be646cdd9cf7e8890cc7817da903134b3c79f8825e",
+      "historical_manifest_digest": "f4c52e53bc29f3b49ea66790035c5864edcf9a2acdf2a7667da2b81ad09a3ae0",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/004_outbox_state_reconciliation.sql",
+      "kind": "baseline-sql",
+      "revision": "004",
+      "blob_sha256": "c3a68cf4e0d272880d046585af98961da916d42ea705b129f55fb9cae771cde3",
+      "historical_manifest_digest": "3d92d6259b7ea363d52ab0d2b51bde20d99b532294498594338a724082e65da5",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/005_document_idempotency.sql",
+      "kind": "baseline-sql",
+      "revision": "005",
+      "blob_sha256": "0c9828a4aea74d7986ef8cb6cd9e90818de8cf80bda02b8d3c7b6a63008b68b4",
+      "historical_manifest_digest": "da8ca0220339b33f236a2d8287062a562e98726ae8a4e2eed0968eecb57657c0",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/006_inbox_idempotency.sql",
+      "kind": "baseline-sql",
+      "revision": "006",
+      "blob_sha256": "1eba4945cfa89ddf6ef459cbb10469dca51e7828a544990f8e2200649885009d",
+      "historical_manifest_digest": "5b5423a4949f5eff461af9030c663bfdc894a41126b91e6e6c1b7a386db6cdcd",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/007_document_integrity_constraints.sql",
+      "kind": "baseline-sql",
+      "revision": "007",
+      "blob_sha256": "4bb5fc18d2eb9db923794aab66e947f4397ed40bb2e4d2ffbceadc0d02d7c2b0",
+      "historical_manifest_digest": "f3b4ce7e57a6e6a4cc3d0f12e3f6160ec1408d14dcc5a60a21615dab5ddfcc60",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/008_document_query_indexes.sql",
+      "kind": "baseline-sql",
+      "revision": "008",
+      "blob_sha256": "8f47236b4bd244e95ed359f2012b66ed70eb612bd6e8f595db98ab634fa4c5fa",
+      "historical_manifest_digest": "37217a830a8346819311e9546d3190ec9c72b415d373cbb0933c6e56cf5ff33c",
+      "historical_manifest_form": "crlf"
+    },
+    {
+      "path": "migrations/009_document_content_revision.sql",
+      "kind": "baseline-sql",
+      "revision": "009",
+      "blob_sha256": "dd7eb2a49e40424fc90eebd3721727face042d4a5c35034870ccdd1281f2af8d",
+      "historical_manifest_digest": "dd7eb2a49e40424fc90eebd3721727face042d4a5c35034870ccdd1281f2af8d",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/010_document_processing_mvp.sql",
+      "kind": "baseline-sql",
+      "revision": "010",
+      "blob_sha256": "993211bdaa4790bea588575423258f6e8212dde26aef6eaa2b67e22896452fea",
+      "historical_manifest_digest": "993211bdaa4790bea588575423258f6e8212dde26aef6eaa2b67e22896452fea",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/011_document_processing_execution_correctness.sql",
+      "kind": "baseline-sql",
+      "revision": "011",
+      "blob_sha256": "23c10c19977dbab49d27275b67d383e5e4d4188b2a9222892801007c6bbe61d9",
+      "historical_manifest_digest": "23c10c19977dbab49d27275b67d383e5e4d4188b2a9222892801007c6bbe61d9",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/012_runtime_audit_integrity_repair.sql",
+      "kind": "baseline-sql",
+      "revision": "012",
+      "blob_sha256": "daff16d6ca508f7157fe410b880925558596b7cc62ab394e9efc539d52278512",
+      "historical_manifest_digest": "daff16d6ca508f7157fe410b880925558596b7cc62ab394e9efc539d52278512",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/013_runtime_governance_revision1.sql",
+      "kind": "baseline-sql",
+      "revision": "013",
+      "blob_sha256": "75db3032e1b7a6982d114655093961bb038571a6fa87ff744e1f26500bb6eaaf",
+      "historical_manifest_digest": "75db3032e1b7a6982d114655093961bb038571a6fa87ff744e1f26500bb6eaaf",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/014_document_processing_review_idempotency.sql",
+      "kind": "baseline-sql",
+      "revision": "014",
+      "blob_sha256": "10b7fad4bfba2c537ce00bac2e9db27417d0d3806eb2cf101e92b6133d500e5b",
+      "historical_manifest_digest": "10b7fad4bfba2c537ce00bac2e9db27417d0d3806eb2cf101e92b6133d500e5b",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/015_runtime_governance_revision2.sql",
+      "kind": "baseline-sql",
+      "revision": "015",
+      "blob_sha256": "00eec4d4f5e38650f0638d9e24ccb27b645e2e77688c53724debeab252e4cfe6",
+      "historical_manifest_digest": "00eec4d4f5e38650f0638d9e24ccb27b645e2e77688c53724debeab252e4cfe6",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/016_document_revision_evidence_foundation.sql",
+      "kind": "baseline-sql",
+      "revision": "016",
+      "blob_sha256": "8df3aa56ac87c642801aa72f1fad75771b5e8adcec71d496b3967a44adb07859",
+      "historical_manifest_digest": "8df3aa56ac87c642801aa72f1fad75771b5e8adcec71d496b3967a44adb07859",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/017_document_revision_evidence_integrity.sql",
+      "kind": "baseline-sql",
+      "revision": "017",
+      "blob_sha256": "8307eff2e1375cb87c5ba654b5904792ee86220ce3949f49587ef60c22556b23",
+      "historical_manifest_digest": "8307eff2e1375cb87c5ba654b5904792ee86220ce3949f49587ef60c22556b23",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/018_processing_correlation_propagation.sql",
+      "kind": "baseline-sql",
+      "revision": "018",
+      "blob_sha256": "451988f0f7067a464430a55caeb3b7835ea34d186b113377765eca43c27a3637",
+      "historical_manifest_digest": "451988f0f7067a464430a55caeb3b7835ea34d186b113377765eca43c27a3637",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/019_identity_authorization_foundation.sql",
+      "kind": "baseline-sql",
+      "revision": "019",
+      "blob_sha256": "dcb5eb6261b03d06ccb0be98550aa69ad4e0abf85cc88d393a7dbb4eb5403d13",
+      "historical_manifest_digest": "dcb5eb6261b03d06ccb0be98550aa69ad4e0abf85cc88d393a7dbb4eb5403d13",
+      "historical_manifest_form": "lf"
+    },
+    {
+      "path": "migrations/MANIFEST.sha256",
+      "kind": "baseline-manifest",
+      "blob_sha256": "2dab28ce370eaa12e7e86b1ed84ea5c6fe77fa452938a85077a72270cde40c4c"
+    }
+  ]
+}

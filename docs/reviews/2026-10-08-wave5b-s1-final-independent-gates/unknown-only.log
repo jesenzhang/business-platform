@@ -1,0 +1,18 @@
+imported production cleanup functions from the current driver AST: Get-CanonicalPath, Remove-Tree, Register-RunRoot, Remove-RunScratch, Write-Log
+SKIP static-r3-no-ambiguous-label
+SKIP static-r7-no-array-append
+SKIP ast-cleanup-normal-external
+SKIP ast-cleanup-internal-evidence-retained
+SKIP ast-cleanup-keepscratch
+SKIP ast-cleanup-protected-refusals
+SKIP ast-cleanup-outside-registered-parent
+SKIP ast-register-refuses-root-equal-to-protected-parent
+SKIP entry-r3-explicit-evidencedir-reaches-evidence-rule
+SKIP entry-r4-internal-default-lifecycle
+SKIP wrapper-r7-capture-unique-evidencedir-argument
+SKIP wrapper-b7-known-negative-only-passes
+SKIP wrapper-b7-stub-exit-7-propagates
+SKIP wrapper-b8-evidence-not-overwritten
+
+repair-regressions: 0 scenario failure(s); logs in F:\Workspace\business-platform\docs\reviews\2026-10-08-wave5b-s1-final-independent-gates\unknown-only
+Wave 5B-S1 repair regressions (R3/R4/R7): every scenario matched its expectation.

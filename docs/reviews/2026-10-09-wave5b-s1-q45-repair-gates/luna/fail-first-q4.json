@@ -1,0 +1,9 @@
+﻿{
+  "base": "C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-q123-independent-b79558af7e3b4bcdad641b26e237b914",
+  "swapped_after_post_enumeration_check": true,
+  "root_checks": 3,
+  "sentinel_survives": false,
+  "original_parked_file_survives": true,
+  "thrown": "Remove-Tree retained 1 object(s) instead of deleting them: 'C:\\Users\\admin\\AppData\\Local\\Temp\\wave5b-q123-independent-b79558af7e3b4bcdad641b26e237b914\\run-owned' is itself a reparse point. A directory that stopped being the directory that was queued is not removed.",
+  "sha_before": "ABFD7EA533AA2E62E64C699FFE9DCA23F9949EBE877C05FABB76E511343CE8E5"
+}

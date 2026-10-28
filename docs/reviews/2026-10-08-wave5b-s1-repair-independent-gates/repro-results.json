@@ -1,0 +1,111 @@
+[
+  {
+    "case": "sql-inherits-foreign",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-inherits-foreign\\migrations/modules\\policy\\001_probe.sql: 'INHERITS' without opening parenthesis\n"
+  },
+  {
+    "case": "sql-delete-using-foreign",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-delete-using-foreign\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "sql-comma-from-foreign",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-comma-from-foreign\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "sql-attach-partition-foreign",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-attach-partition-foreign\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "sql-direct-foreign-control",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-direct-foreign-control\\migrations/modules\\policy\\001_probe.sql: references 'platform_users', which the host baseline gives to owner 'identity-management', not to 'policy'\n"
+  },
+  {
+    "case": "sql-ledger-create",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-ledger-create\\migrations/modules\\policy\\001_probe.sql: creates '_sqlx_migrations', which already exists in the pinned host baseline; a module revision may not declare an existing platform object as its own new table\n"
+  },
+  {
+    "case": "sql-platform-table-create",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\sql-platform-table-create\\migrations/modules\\policy\\001_probe.sql: creates 'documents', which already exists in the pinned host baseline; a module revision may not declare an existing platform object as its own new table\n"
+  },
+  {
+    "case": "manifest-crlf",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: catalog manifest 'F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\manifest-crlf\\migrations/modules\\policy\\MANIFEST.sha256' contains a CR byte; a namespace manifest is LF-only\n"
+  },
+  {
+    "case": "from-alias-comma",
+    "exit": 0,
+    "stdout": "checks=module-catalog\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\norder=policy\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\from-alias-comma\n",
+    "stderr": ""
+  },
+  {
+    "case": "using-comma",
+    "exit": 0,
+    "stdout": "checks=module-catalog\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\norder=policy\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\using-comma\n",
+    "stderr": ""
+  },
+  {
+    "case": "using-index-btree",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\using-index-btree\\migrations/modules\\policy\\001_probe.sql: references 'btree', which is neither owned by 'policy' nor created by an earlier statement or revision of this catalog\n"
+  },
+  {
+    "case": "reserved-renamed-table",
+    "exit": 0,
+    "stdout": "checks=module-catalog\nnamespace=policy owner=policy status=VALIDATED revisions=001 depends_on=platform-baseline@19\norder=policy\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\reserved-renamed-table\n",
+    "stderr": "",
+    "sql": "-- @bp-owned: v0_demo_roles\nCREATE TABLE IF NOT EXISTS v0_demo_roles (id bigint);\nDELETE FROM v0_demo_roles;\n"
+  },
+  {
+    "case": "inherits-own-table",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [module-catalog] check: F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\inherits-own-table\\migrations/modules\\policy\\001_probe.sql: 'INHERITS' without opening parenthesis\n"
+  },
+  {
+    "case": "embed-alias",
+    "exit": 0,
+    "stdout": "checks=baseline-embed\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\embed-base\n",
+    "stderr": ""
+  },
+  {
+    "case": "embed-import",
+    "exit": 0,
+    "stdout": "checks=baseline-embed\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\embed-base\n",
+    "stderr": ""
+  },
+  {
+    "case": "embed-group-import",
+    "exit": 0,
+    "stdout": "checks=baseline-embed\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\embed-base\n",
+    "stderr": ""
+  },
+  {
+    "case": "embed-whitespace",
+    "exit": 0,
+    "stdout": "checks=baseline-embed\nembed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0\nembed site=crates/runtime-migration/src/lib.rs argument='../../migrations' resolves_to=migrations kind=baseline\nstatus=ok\nroot=F:\\Workspace\\business-platform\\target\\wave5b-repair-independent-20261008\\embed-base\n",
+    "stderr": ""
+  },
+  {
+    "case": "embed-direct-control",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/probe/src/lib.rs':1, 'crates/runtime-migration/src/lib.rs':1); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'\n"
+  }
+]

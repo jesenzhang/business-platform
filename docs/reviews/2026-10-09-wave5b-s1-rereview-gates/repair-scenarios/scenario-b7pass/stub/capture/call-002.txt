@@ -1,0 +1,12 @@
+proxy
+cargo
+run
+-q
+-p
+module-release-tool
+--
+catalog-check
+--repo
+F:\Workspace\business-platform\target\w5b-review-1009
+--only
+pinned-baseline-history

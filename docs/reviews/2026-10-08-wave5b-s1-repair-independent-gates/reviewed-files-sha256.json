@@ -1,0 +1,6 @@
+{
+  "scripts/test-plan0014-wave5b.ps1": "1429a37d4389a73ea999a48d711881861ad1b77a8edbf25045b450bef3f30cbf",
+  "tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1": "3b76a5b843c9c4c8fe7d3f2cb7bb186de63d85166bd95a27f397360392e9fd5a",
+  "tools/module-release-tool/scripts/run-wave5b-gates.ps1": "94bb0aff866def291e59f79b8e113a63894dcebb9141ace9f5e521b40ba7f10c",
+  "tools/module-release-tool/src/catalog.rs": "aaaede543912230fc20f76ab1cfd71ef1a1ea9baf21096da8a5b91e2c414ebcd"
+}

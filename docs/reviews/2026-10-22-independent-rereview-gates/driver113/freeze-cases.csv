@@ -1,0 +1,6 @@
+"Case","Expect","Actual","Verdict","Detail"
+"F2-extra-baseline-sql","fail","fail","MATCH","module-release: refused by the [baseline-candidate-freeze] check: the flat baseline directory must hold exactly the 19 pinned SQL files: '020_wave5b_negative.sql' is not part of the pinned baseline"
+"F3-module-sql-not-baseline","pass","pass","MATCH","freeze baseline_sql_files=19 subdirectories=modules"
+"F1-clean-copy","pass","pass","MATCH","freeze baseline_sql_files=19 subdirectories=modules"
+"F4-extra-subdirectory","fail","fail","MATCH","module-release: refused by the [baseline-candidate-freeze] check: 'migrations/archive' mixes a subdirectory into the flat baseline; only 'migrations/modules' is allowed there"
+"F5-stray-file","fail","fail","MATCH","module-release: refused by the [baseline-candidate-freeze] check: 'migrations/NOTES.txt' is not part of the pinned baseline directory, which holds exactly the 19 pinned SQL files, the pinned manifest and 'migrations/modules'"

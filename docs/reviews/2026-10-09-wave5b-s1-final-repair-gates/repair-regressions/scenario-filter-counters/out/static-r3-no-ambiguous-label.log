@@ -1,0 +1,23 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261009012057
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1 -Repo F:\Workspace\business-platform -OutDir F:\Workspace\business-platform\target\wave5b-n-candidate-20261009-005959\repair-regressions\scenario-filter-counters\out -Only static-r3-no-ambiguous-label
+进程 ID: 35320
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+**********************
+PowerShell 记录结束
+结束时间: 20261009012057
+**********************

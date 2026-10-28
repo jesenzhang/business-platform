@@ -1,0 +1,24 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261022131329
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File scripts/test-plan0014-wave5b-repairs.ps1 -OutDir docs/reviews/2026-10-22-independent-rereview-gates/repair-scenarios
+进程 ID: 82888
+PSVersion: 7.6.7
+PSEdition: Core
+GitCommitId: 7.6.7
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "Remove-Tree retained 1 object(s) instead of deleting them: 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-a1e47921462347d28c05529c99200897\scenario-enumswap-3cf415a29f5540a88fd98ba23739b4b6\unit\run-owned\child' is itself a reparse point while it was being enumerated. A directory that stopped being the directory that was queued is not entered, the entries read from it are not deleted, and the tree is left where it stands."
+**********************
+PowerShell 记录结束
+结束时间: 20261022131329
+**********************

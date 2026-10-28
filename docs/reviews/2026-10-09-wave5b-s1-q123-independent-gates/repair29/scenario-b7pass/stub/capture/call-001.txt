@@ -1,0 +1,12 @@
+proxy
+cargo
+run
+-q
+-p
+module-release-tool
+--
+catalog-check
+--repo
+F:\Workspace\business-platform\target\w5b-q123-review
+--only
+module-catalog

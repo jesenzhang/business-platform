@@ -1,0 +1,6 @@
+{
+  "exit": 1,
+  "sentinel_survived": false,
+  "evidence_survived": true,
+  "output": "Exception: F:\\Workspace\\business-platform\\scripts\\test-plan0014-wave5b.ps1:112\r\nLine |\r\n 112 |  …             throw \"evidence directory '$Path' already holds $($existi …\r\n     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | evidence directory 'F:\\Workspace\\business-platform\\target\\wave5b-independent-20261008\\protected-evidence'\r\n     | already holds 1 item(s); pass -Force to replace it, or choose a new directory\r\n"
+}

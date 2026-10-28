@@ -1,0 +1,33 @@
+START repair-scenarios at 2026-10-09 09:56:54 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1' -Repo 'F:\Workspace\business-platform' -OutDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\repair-scenarios'
+END   repair-scenarios at 2026-10-09 10:01:58 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\repair-scenarios.log
+
+START driver-offline-113 at 2026-10-09 10:01:58 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\scripts\test-plan0014-wave5b.ps1' -Repo 'F:\Workspace\business-platform' -EvidenceDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\driver113'
+END   driver-offline-113 at 2026-10-09 10:06:33 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\driver113.log
+
+START gates-fast at 2026-10-09 10:06:33 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\tools\module-release-tool\scripts\run-wave5b-gates.ps1' -Phase fast -Repo 'F:\Workspace\business-platform' -EvidenceDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-fast'
+END   gates-fast at 2026-10-09 10:06:55 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-fast.log
+
+START gates-heavy at 2026-10-09 10:06:55 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\tools\module-release-tool\scripts\run-wave5b-gates.ps1' -Phase heavy -Repo 'F:\Workspace\business-platform' -EvidenceDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-heavy'
+END   gates-heavy at 2026-10-09 10:12:18 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-heavy.log
+
+START gates-post at 2026-10-09 10:12:18 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\tools\module-release-tool\scripts\run-wave5b-gates.ps1' -Phase post -Repo 'F:\Workspace\business-platform' -EvidenceDir 'F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-post'
+END   gates-post at 2026-10-09 10:28:49 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\gates-post.log
+
+START ancestor-link-probe at 2026-10-09 10:28:49 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\ancestor-link-probe.ps1'
+END   ancestor-link-probe at 2026-10-09 10:28:51 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\probes\ancestor-link-probe.log
+
+START queued-directory-link-probe-postfix at 2026-10-09 10:28:51 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\queued-directory-link-probe-postfix.ps1'
+END   queued-directory-link-probe-postfix at 2026-10-09 10:28:52 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\probes\queued-directory-link-probe-postfix.log
+
+START global-scratch-probe at 2026-10-09 10:28:52 HEAD=6bcdd89d14d188f62e99bbd068cf786b8207699b
+  command: pwsh -NoProfile -File 'F:\Workspace\business-platform\target\wave5b-q123\global-scratch-probe.ps1'
+END   global-scratch-probe at 2026-10-09 10:28:54 exit=0 -> F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\probes\global-scratch-probe.log
+
+ALL STEPS DONE 2026-10-09 10:28:54

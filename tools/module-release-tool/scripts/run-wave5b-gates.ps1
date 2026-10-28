@@ -7,7 +7,7 @@
 param(
     [ValidateSet('fast', 'heavy', 'post')]
     [string]$Phase = 'fast',
-    [string]$Repo = 'F:\Workspace\business-platform',
+    [string]$Repo = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, '..', '..', '..')),
     [string]$EvidenceDir = ''
 )
 

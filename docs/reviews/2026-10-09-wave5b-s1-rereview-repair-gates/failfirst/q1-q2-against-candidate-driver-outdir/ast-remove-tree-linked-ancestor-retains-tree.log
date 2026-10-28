@@ -1,0 +1,25 @@
+**********************
+PowerShell 记录开始
+开始时间: 20261009094943
+用户名: DESKTOP-0NQSPBS\admin
+RunAs 用户: DESKTOP-0NQSPBS\admin
+配置名称: 
+计算机: DESKTOP-0NQSPBS (Microsoft Windows NT 10.0.19045.0)
+主机应用程序: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File F:\Workspace\business-platform\scripts\test-plan0014-wave5b-repairs.ps1 -Repo F:\Workspace\business-platform\target\wave5b-q123\prefix-repo -OutDir F:\Workspace\business-platform\docs\reviews\2026-10-09-wave5b-s1-rereview-repair-gates\failfirst\q1-q2-against-candidate-driver-outdir -Only static-cleanup-surface-is-self-contained,ast-cleanup-ancestor-above-parent-replaced-by-junction,ast-register-refuses-link-already-above-parent,ast-remove-tree-linked-ancestor-retains-tree,ast-cleanup-ownership-witness-is-required,ast-remove-tree-queued-directory-swapped-before-pop,ast-remove-tree-directory-swapped-after-enumeration
+进程 ID: 42584
+PSVersion: 7.6.6
+PSEdition: Core
+GitCommitId: 7.6.6
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "Remove-Tree walked into a tree reached through a junction instead of refusing ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-removetreelink-7f63f70c72eb40329d2089042d3de239\unit\outside-owned\run-owned\sentinel.txt' is gone; the external tree went from 4 to 0 item(s)); it said: "
+>> TerminatingError(): "Remove-Tree walked into a tree reached through a junction instead of refusing ('C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe-fcceeffe14f0474a839a7578113ce1c8\scenario-removetreelink-7f63f70c72eb40329d2089042d3de239\unit\outside-owned\run-owned\sentinel.txt' is gone; the external tree went from 4 to 0 item(s)); it said: "
+**********************
+PowerShell 记录结束
+结束时间: 20261009094943
+**********************

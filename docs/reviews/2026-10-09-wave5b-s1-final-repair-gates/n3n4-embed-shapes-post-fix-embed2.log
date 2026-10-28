@@ -1,0 +1,10 @@
+byte_char_raw_string   exit=0  embed scanned_rs_files=2 baseline_embed_points=1 crate_relative_embeds=0
+   file: const B: u8 = b'\n'; const R: &str = r#"sqlx::migrate!(\"hide\")#"; static M: Migrator = sqlx::migrate!("../../migrations");
+unterminated_char      exit=1  module-release: refused by the [baseline-embed] check: 'crates/second/src/lib.rs:1': an apostrophe there is neither a closed char literal nor a lifeti
+   file: const B: char = '\ ; static M: Migrator = sqlx::migrate!("../../migrations");
+stray_apostrophe       exit=1  module-release: refused by the [baseline-embed] check: 'crates/second/src/lib.rs:1': an apostrophe there is neither a closed char literal nor a lifeti
+   file: const B: char = ''; static M: Migrator = sqlx::migrate!("../../migrations");
+lifetime_chain         exit=1  module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/runtime-migration/src/lib.rs':1, 'crates/
+quote_char_then_call   exit=1  module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/runtime-migration/src/lib.rs':1, 'crates/
+raw_hash_two           exit=1  module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/runtime-migration/src/lib.rs':1, 'crates/
+c_string               exit=1  module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/runtime-migration/src/lib.rs':1, 'crates/

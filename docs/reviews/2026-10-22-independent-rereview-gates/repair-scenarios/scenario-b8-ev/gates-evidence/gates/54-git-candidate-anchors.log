@@ -1,0 +1,11 @@
+# gate: 54-git-candidate-anchors
+# command: git log --oneline -n 3 --format=%H %ad %s --date=iso-strict
+# started: 2026-10-22 13:18:19 +08:00
+# finished: 2026-10-22 13:18:19 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0
+
+325d249e744e499796db5dbeecf486488c5dc9bc 2026-10-22T12:10:15+08:00 docs(reports): record the 2026-10-22 workspace audit and cleanup
+7d712609b82a20ed4296371f001f68ecf7452833 2026-10-22T12:10:07+08:00 chore(ops): adopt a hardened target cleanup script and document temp hygiene
+53ef8b289f2a1bf11b108cb5504d90f21153ebc8 2026-10-09T10:30:31+08:00 docs(plan-0014): record the wave 5b-s1 Q1-Q3 re-review repair closeout

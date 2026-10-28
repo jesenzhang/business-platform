@@ -1,0 +1,222 @@
+[
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\20-catalog-check-default.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 4187
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\21-catalog-check-only-catalog.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 1347
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\22-catalog-check-only-history.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 3481
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\23-catalog-check-only-embed.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 1577
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\24-catalog-check-only-freeze.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 1181
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\25-catalog-check-unknown-check.log",
+    "actual": [
+      "1"
+    ],
+    "expected": [
+      "1"
+    ],
+    "bytes": 1190
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\30-fmt-check.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 293
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\50-git-diff-check.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 199
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-fast\\gates\\51-git-status-short.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 874
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\31-check-workspace.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 5463
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\32-clippy-workspace.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 5480
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\33-test-runtime-migration.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 821
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\34-test-module-release-tool.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 16560
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\35-build-no-run-outbox-reliability.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 523
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-heavy\\gates\\36-build-no-run-chain-pg.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 488
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\37-test-workspace.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 115318
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\40-check-architecture.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 4530
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\41-wave5b-offline-catalog-gate.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 53331
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\42-test-module-release-tool-at-candidate.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 16573
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\52-git-diff-check-at-candidate.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 212
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\53-git-status-short-at-candidate.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 887
+  },
+  {
+    "path": "docs\\reviews\\2026-10-09-wave5b-s1-rereview-repair-gates\\gates-post\\gates\\54-git-candidate-anchors.log",
+    "actual": [
+      "0"
+    ],
+    "expected": [
+      "0"
+    ],
+    "bytes": 652
+  }
+]

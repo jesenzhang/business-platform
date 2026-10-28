@@ -1,0 +1,322 @@
+[
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/EXPECTATIONS.json",
+    "git_blob_sha256": "24d9bd5be603d9e314a82d05098c0e0af1e828c05e57526b9d474e2de98ca54e",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/001_wave5b_fixture_identity.sql",
+    "git_blob_sha256": "588aff34a7d6878dd6743d37bf9b6f37f6e24dc10378d5c46a23a5fa1dd6e636",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/MANIFEST.sha256",
+    "git_blob_sha256": "554c5e92543f371a3e7c809a98772044830b913aa1cc5fec0a1238d55a827f39",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-owned-host-table-reference/identity-management/catalog.json",
+    "git_blob_sha256": "4eb7eea67bc5b716152c887a74bdc58f4ea428844d23501de41455501e8df6fd",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "27f2fd6555600414072301e929d20d5d11c81ffa81588a19da2ab00b9f3abb65",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/MANIFEST.sha256",
+    "git_blob_sha256": "9a5d66d7e5741d73f6e8b31c9ad8ecb7df3f5e04c7d4fac36849d01af6b4c1c6",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_permissions/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "6e8eacec2f99f46e7537ebb4877e953b0f42ac8ba13d2598a360321308ed614a",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/MANIFEST.sha256",
+    "git_blob_sha256": "acec2adaadffd03b88bd3759636a32825ab887e104018a2b5b19ea6b97ec677f",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_role_permissions/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "3a6d166052b13628e18ea4a5e3214ab54b59a1039cb04e0bc6d00896afedf170",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/MANIFEST.sha256",
+    "git_blob_sha256": "35651f448a488f74c52ca86e7f71296f58390ed60dd186c7e0565422240690a8",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_roles/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "96e7a2fe46883a2af7e95f6b013a0a4e9db11717c252c15259682cba0744a31d",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/MANIFEST.sha256",
+    "git_blob_sha256": "e8f23f0acd362a1b93b974a6622a030bf67b92ff15e7a7a5efaa6a5ba8171bd0",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-rename-target-v0_demo_user_roles/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "a8bda06705000049745d28b6883d4a80918d67dae97f2f3bea87227854f6830a",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/MANIFEST.sha256",
+    "git_blob_sha256": "b5aa5b75b6f291cea0f954e02ac00d24189150a358bd144b102410300f129dab",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-documents/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "4b0c94f95f678bd3b4e8f8de21afaca2222ff4615e97ddd9228d52f94992db1a",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/MANIFEST.sha256",
+    "git_blob_sha256": "05498371904a26b16cef2a2f5ce0b2b5331eaa683ea96db2b4901a91ee073b58",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r1-reserved-sqlx-migrations/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "ec43cec61117d63e1f982cc2addc13c14345a93f3d794ef91b4ae3ea70e7f233",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/MANIFEST.sha256",
+    "git_blob_sha256": "2024f42c9f3779f2dab2e7ac6e3012870d983712800b5d136a7aa921d5a616de",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-comment-string-not-reference/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "e6c85fd28254ed2d0e9b921fd68899e375247c3d8f9f8c86e10ea532a0b85310",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/MANIFEST.sha256",
+    "git_blob_sha256": "8ab1e3e50f3210f05fb30a9c870cd53e16e0d8ff6f11625efb95af9e9c7b96c5",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-first-in-list/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "e269147c1f8f00611bf346e92e2a8ee5420ecc446d555fd8bd6a7281a920d84d",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/MANIFEST.sha256",
+    "git_blob_sha256": "daa2dcf8ca191166f8c6586f090966ec1120aed5a093e82d72af0c123c502b04",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-as-alias/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "8fbbf2243f383a7c7e1d6038ced55c6a47dfd039199fc8ecc7ada8a378662c87",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/MANIFEST.sha256",
+    "git_blob_sha256": "3e0c963a9b6fccddecc72d2055f0933ec64a5180ea484334dd138378aa2f52b8",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-from-alias/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "5f0e0631abf5dac98fa6815d9bd21e27be2de79dc4c43f7bd1b9689c6248412e",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/MANIFEST.sha256",
+    "git_blob_sha256": "c20fa437fa6e8ace535483aec8212694b3d1ef84a46a6df6a4da2bce73164fa2",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-in-using/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "6bc89e5f3f2e23cdd430528153c6e238fab0ce7b73d6cce25ef34afa21e9ad39",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/MANIFEST.sha256",
+    "git_blob_sha256": "58276f36e3a30402c7ad008b2d985c32ab6fb0c43a7eeb974d901dba3fb0aead",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-last-in-list/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "9c122a7cf46ca83cff226152f83c05223897e3b5655688022c75e5f81a659268",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/MANIFEST.sha256",
+    "git_blob_sha256": "5d302067cee31787f5490b4feb441b07aff8a6c5c143118ba4eb66905c0eebcf",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-foreign-middle-in-list/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "ada1ae5dadfc528afc68127af2418c173d0f8522e3f73cff7a86a50c512c2430",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/MANIFEST.sha256",
+    "git_blob_sha256": "3ab090aaad6288a2195cac2cf42caa5008d21f12e7ecb23370ad95fc6a3706a1",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-qualified-after-comma/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "e47ccf0fda3b0c7292f3a55d80884fd98c5d5388b8f4dea07d3642b519299ebf",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/MANIFEST.sha256",
+    "git_blob_sha256": "0a5ddbc4306ced6ede54a3da370fb792f301ba46fd4b903119266b9fa8287a09",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r2-same-owner-alias-list/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "1017acf80f56bcc0a7174b315613354c1657fdbe6115e56507733f17c22ab939",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/MANIFEST.sha256",
+    "git_blob_sha256": "dafe6199aba585b5d828de9f0367a6cf8079b7f51ddea6f00615c6180976dece",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-attach-partition/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "9f17137a7e9c0757b780f8691c3bbb279acfc1bb238b6b8f25eb49b642f18bb7",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/MANIFEST.sha256",
+    "git_blob_sha256": "ff7c847027a993cb8c3f3c4ab52c70ba305ead1cbd48f0aef945eb706f2cb545",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-unknown-method/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "e150a8859579269f0ff68775c5186300b98fde297d2b4e3b77ca2659a3e15419",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/MANIFEST.sha256",
+    "git_blob_sha256": "f322b71252e4b34ec15a4344ce8b43f74dac6f22a936888b76365a89b1837ba3",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-index-using-btree/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "382908b8486096d274e96ec30b45dc076e363e03be49ad906186201e1f50eeb9",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/MANIFEST.sha256",
+    "git_blob_sha256": "686ad7bbe3a5dfb5a935549753f7750339d306bdc06c98fd9cfbf9f0d84639ef",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-inherits-parent/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/001_wave5b_fixture_foundation.sql",
+    "git_blob_sha256": "e09e32d31d58a35390021ce00e097d8e17c08ff9bcf9aa06284798ce88a98b22",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/MANIFEST.sha256",
+    "git_blob_sha256": "477c82adcc5d1afc10d7b13b64cc1ce00a377f132694f30e04c675f86901b56e",
+    "cr_bytes": 0
+  },
+  {
+    "path": "tools/module-release-tool/tests/fixtures/wave5b/catalogs/r6-join-using-columns/policy/catalog.json",
+    "git_blob_sha256": "baddc539bbc2a293bfde8afc5b712598730a80e7cf326ed48fe33476afb92783",
+    "cr_bytes": 0
+  }
+]

@@ -1,0 +1,1 @@
+refusing to delete 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent\run-guidbehind': 'C:\Users\admin\AppData\Local\Temp\wave5b-reparse-probe\scenario-linkparent\host\link-parent' is a reparse point, so this path no longer names the tree the run created

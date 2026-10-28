@@ -1,0 +1,14 @@
+# gate: 50-git-diff-check
+# command: git diff --check
+# started: 2026-10-08 16:36:50 +08:00
+# finished: 2026-10-08 16:36:50 +08:00
+# duration-seconds: 0
+# exit-code: 0
+# expected-exit-code: 0
+
+warning: in the working copy of 'scripts/test-plan0014-wave5b.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/scripts/generate-wave5b-fixtures.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/scripts/generate-wave5b-pinned-history.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/scripts/run-wave5b-gates.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/catalog.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/tests/wave5b_catalog.rs', LF will be replaced by CRLF the next time Git touches it
