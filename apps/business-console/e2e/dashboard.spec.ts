@@ -40,9 +40,9 @@ test('renders an explicit empty state when the overview has no data', async ({ p
   await expect(card(page, 'Documents')).toContainText('0')
   await expect(card(page, 'Succeeded jobs')).toContainText('0')
   await expect(page.getByText('+0 in the last day')).toBeVisible()
-  await expect(page.getByText('No processing jobs in this scope yet.')).toBeVisible()
-  await expect(page.getByText('No audit events yet.')).toBeVisible()
-  await expect(page.getByText('No processing jobs in this scope.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No processing jobs in this scope yet.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No audit events yet.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No processing jobs in this scope.' })).toBeVisible()
   // No chart canvas is created for an empty status map.
   await expect(page.locator('canvas')).toHaveCount(0)
 })

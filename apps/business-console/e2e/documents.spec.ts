@@ -76,5 +76,5 @@ test('empty register explains the next step', async ({ page }) => {
   await mockConsoleApi(page, { documents: [] })
   await page.goto('/documents')
   await expect(page.getByRole('heading', { name: 'No documents yet' })).toBeVisible()
-  await expect(page.getByText('Upload the first document to make the pipeline visible.')).toBeVisible()
+  await expect(page.getByText('Upload the first document to make the pipeline visible.', { exact: true })).toBeVisible()
 })

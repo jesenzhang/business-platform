@@ -12,7 +12,7 @@ test('identity & authorization views render from mocked admin APIs', async ({ pa
 
   await page.goto('/identities')
   await expect(page.getByRole('heading', { level: 1, name: 'Identities' })).toBeVisible()
-  await expect(page.getByText('No memberships yet.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No memberships yet.' })).toBeVisible()
 
   await page.goto('/roles')
   await expect(page.getByRole('heading', { level: 1, name: 'Roles & permissions' })).toBeVisible()
