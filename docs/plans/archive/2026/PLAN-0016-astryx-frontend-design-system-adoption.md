@@ -2,10 +2,10 @@
 
 - **文档 ID:** PLAN-0016
 - **版本:** 1.0
-- **状态:** Active（S0、S1、S2、S3、S4 已完成并验收；S5 仅制定路线，未实施）
+- **状态:** Completed / Archived（S0–S5 全部完成并验收；2026-11-18 归档）
 - **日期:** 2026-11-18
 - **所有者:** `apps/business-console`（前端表现层）
-- **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
+- **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md` … `S5-STANDARDS.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md`、`docs/operations/ASTRYX_UPGRADE_RUNBOOK.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
 - **替代/被替代:** 无
 - **迁移分支:** `feat/frontend-astryx-adoption-20261118`（基线 `505d203`）
 
@@ -207,3 +207,12 @@ S0–S2 完成定义：
 3. Dashboard 在真实 Chromium 下通过状态/视口/主题矩阵；
 4. Tailwind 3 与 Astryx 层序可验证、无静默覆盖；
 5. 形成 S3–S5 切片、依赖与风险清单，并给出继续与否的 GO / NO-GO 结论。
+
+## 11. 归档记录（2026-11-18）
+
+- **最终提交**：S5-5 文档提交（本提交；分支 `feat/frontend-astryx-adoption-20261118`，起点 `505d203`）。
+- **验收**：S0–S5 全部通过；每阶段独立提交、可回滚；最终门禁 `lint/typecheck/test(10)/build/test:e2e(41)/astryx doctor(0 fail)` 全绿。
+- **结果**：Astryx 0.7.16 成为 `apps/business-console` 默认设计系统；Tailwind 3 安全共存；11 个业务路由全部由 Astryx 组件渲染；Radix Dialog 与 TanStack Table 移除；字体自托管；路由级代码分割（主包 gzip 742→263 kB）；CI 纳入 `astryx doctor` 与 axe 底线。
+- **规范**：`docs/standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md`（Baseline）、`docs/operations/ASTRYX_UPGRADE_RUNBOOK.md`。
+- **未完成/后续**：Dashboard chunk（ECharts）仍约 1.15 MB；axe 仅对 serious/critical 设门禁；视觉截图仍为人工评审；`astryx doctor` 保留 3 条已登记 warn。
+- **后续计划**：由 STD-FRONTEND-001 与升级 Runbook 承接，不再单列迁移计划。

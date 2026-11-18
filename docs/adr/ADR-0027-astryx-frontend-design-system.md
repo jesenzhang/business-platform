@@ -1,6 +1,6 @@
 # ADR-0027：Astryx 作为前端默认设计系统
 
-> 状态：Accepted（范围为 S0–S2 试点 + S3–S5 路线；“默认设计系统”的最终确立以 S5 退出条件满足为前提）
+> 状态：Accepted（S0–S5 已全部完成；Astryx 自 2026-11-18 起为 `apps/business-console` 的默认设计系统）
 > 日期：2026-11-18
 > 决策所有者：`apps/business-console` 前端表现层
 > 关联文档：`docs/plans/current/PLAN-0016-astryx-frontend-design-system-adoption.md`、`docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`
@@ -127,10 +127,12 @@ React Router 仍是唯一路由与 active 状态来源。若 Astryx 导航组件
 ## 8. 验证证据
 
 - S0 基准：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`（基线 `505d203`、六项门禁 PASS、20 项组件清单、12 张截图、既有缺陷 D1–D6）；
-- S1 证据：依赖锁定 0.7.16、`astryx doctor` 输出、层序与 Foundation Check 的 Chromium 断言、全页面无回归截图；
-- S2 证据：Dashboard 状态/视口/主题矩阵 e2e、前后截图与差异说明。
-
-（S1/S2 证据在对应阶段报告中补充引用，本 ADR 不预写结论。）
+- S1：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S1-FOUNDATION.md`（0.7.16 版本组、层序产物验证、Foundation Check computed-style、桌面像素差 0.000%）；
+- S2：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S2-DASHBOARD.md`（状态/视口/主题矩阵、前后截图）；
+- S3：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S3-APPSHELL.md`（LinkProvider + SideNav + Drawer、Radix 移除、7 条 shell e2e）；
+- S4：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S4-PAGES.md`（11 个路由迁移、18 条新 e2e、Roles 集合替换保持不变、TanStack Table 移除）；
+- S5：`docs/reports/2026-11-18-ASTRYX-MIGRATION-S5-STANDARDS.md`（路由级分割、字体自托管、CSS 边界守卫、axe 底线、CI 接入）；
+- 基线规范：`docs/standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md`；升级流程：`docs/operations/ASTRYX_UPGRADE_RUNBOOK.md`。
 
 ## 9. 后续复审条件
 
@@ -138,6 +140,6 @@ React Router 仍是唯一路由与 active 状态来源。若 Astryx 导航组件
 
 1. Astryx 主版本升级导致 Tailwind 3 共存配方失效；
 2. `@astryxdesign/*` 的许可证或维护状态发生变化；
-3. S3 或 S4 出现无法在不改变业务行为的前提下解决的兼容阻碍；
-4. 前端技术栈整体迁移（React 主版本、Tailwind 4、构建器替换）；
-5. S5 完成并确立默认设计系统满一个发布周期。
+3. 前端技术栈整体迁移（React 主版本、Tailwind 4、构建器替换）；
+4. 设计系统标准（STD-FRONTEND-001）中登记的外壳/Tab 例外被证明不可维护；
+5. 默认设计系统运行满一个发布周期后的回顾（检查回归、体积与升级成本）。

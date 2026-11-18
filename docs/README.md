@@ -56,6 +56,7 @@
 | 查询与数据库适配 | [`standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md`](standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md) | Baseline | Query Object、Read DTO、分页、SQL/ORM 与多数据库规则 |
 | 跨模块通信 | [`standards/INTER_MODULE_COMMUNICATION_STANDARD.md`](standards/INTER_MODULE_COMMUNICATION_STANDARD.md) | Proposed input to ADR-0022 | Query、Command、Event、ResourceRef、Snapshot、Projection 和 Saga 边界 |
 | SaaS Module 独立发布 | [`standards/SAAS_MODULE_STANDARD.md`](standards/SAAS_MODULE_STANDARD.md) | Baseline | 每个 Platform/Business/Agent 模块的独立 identity/version/manifest/contracts/migration/adapters/release 与 embedded/remote/provider 可替换规则 |
+| 前端设计系统 | [`standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md`](standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md) | Baseline | `apps/business-console` 的 Astryx 组件三层边界、样式层级、Token、CLI 使用、门禁与升级政策 |
 | 基础设施验证 | [`../企业AI业务平台基础设施开发验证与预生产方案_v1.md`](../企业AI业务平台基础设施开发验证与预生产方案_v1.md) | Baseline | 本地、测试、CI、预生产与恢复 |
 | 文档治理 | [`governance/DOCUMENT_MANAGEMENT.md`](governance/DOCUMENT_MANAGEMENT.md) | Baseline | 文档目录、生命周期、变更和归档 |
 
@@ -155,7 +156,7 @@ reference/EVER_GAUZY_REFERENCE_ANALYSIS.md
 - v0.1 已发布：PLAN-0012 Integrated / Archived，annotated tag v0.1 → 2383651；真实 PostgreSQL + MinIO + vLLM + Prometheus/Grafana 与真实 Auth0 production-mode 验收已记录在完成审计。
 - 发布后供应链修复已进入 main：rustls 0.23.45 清除 RUSTSEC-2026-0285；MinIO/mc 镜像从已下线的 Docker Hub 仓库迁移到 quay.io。
 - 身份与授权已生产化：[PLAN-0013 Identity and Authorization Foundation](plans/archive/2026/PLAN-0013-identity-and-authorization-foundation.md) Integrated / Archived（PR #17）——PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope 与统一 default-DENY Policy Decision 已实现，Governance API 已迁移到统一 Authorize + 有界兼容桥（7 个 governance 键，flag 默认开启）。
-- 前端设计系统迁移进行中：[PLAN-0016 Astryx Frontend Design System Adoption](plans/current/PLAN-0016-astryx-frontend-design-system-adoption.md) Active，决策见 [ADR-0027](adr/ADR-0027-astryx-frontend-design-system.md)；[S0 迁移前基准](reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md)、[S1 基础接入](reports/2026-11-18-ASTRYX-MIGRATION-S1-FOUNDATION.md)、[S2 Dashboard 试点](reports/2026-11-18-ASTRYX-MIGRATION-S2-DASHBOARD.md)、[S3 共享 AppShell](reports/2026-11-18-ASTRYX-MIGRATION-S3-APPSHELL.md)、[S4 业务页面](reports/2026-11-18-ASTRYX-MIGRATION-S4-PAGES.md) 与 [S0–S2 交付报告（含 S3–S5 路线，GO）](reports/2026-11-18-ASTRYX-MIGRATION-DELIVERY-S0-S2.md) 已记录；只改 `apps/business-console` 表现层，不触碰 API/权限/数据结构。
+- 前端设计系统已完成迁移：[PLAN-0016](plans/archive/2026/PLAN-0016-astryx-frontend-design-system-adoption.md) Integrated / Archived，Astryx 为 `apps/business-console` 默认设计系统（[ADR-0027](adr/ADR-0027-astryx-frontend-design-system.md)），规范见 [STD-FRONTEND-001](standards/FRONTEND_DESIGN_SYSTEM_STANDARD.md)；阶段证据：[S0 基准](reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md)、[S1 基础接入](reports/2026-11-18-ASTRYX-MIGRATION-S1-FOUNDATION.md)、[S2 Dashboard](reports/2026-11-18-ASTRYX-MIGRATION-S2-DASHBOARD.md)、[S3 AppShell](reports/2026-11-18-ASTRYX-MIGRATION-S3-APPSHELL.md)、[S4 业务页面](reports/2026-11-18-ASTRYX-MIGRATION-S4-PAGES.md)、[S5 规范固化](reports/2026-11-18-ASTRYX-MIGRATION-S5-STANDARDS.md)。
 - 当前下一候选是 Contract Business Vertical Slice（待创建计划）：Contract List/Detail → Document Revision → AI Extract/Evidence → Review → Apply Candidate → Contract Version Update。
 - [PLAN-0006 Enterprise AI Workspace](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md) 仍为 Revision 1 / Proposed / BLOCKED：PLAN-0013 已集成，还需等待首个 Contract 真实垂直切片集成。
 - Business Application Platform 的 package/contribution/compiler/dry-plan foundation 已实现，但 Module Registry、安装执行器、Marketplace、动态插件 Runtime 尚未实现。
@@ -242,7 +243,8 @@ docs/adr/ADR-0020-business-module-isolation-and-semantic-contract.md
 - Provider 故障和任务恢复；
 - Agent Runtime、Workspace Turn 和 SSE 恢复；
 - Capability 撤销与安全事件响应；
-- 遗留系统切流与回滚。
+- 遗留系统切流与回滚；
+- Astryx 升级验证（已建立）：[`operations/ASTRYX_UPGRADE_RUNBOOK.md`](operations/ASTRYX_UPGRADE_RUNBOOK.md)。
 
 Runbook 是架构的操作实现，不得修改 Baseline 语义。
 
