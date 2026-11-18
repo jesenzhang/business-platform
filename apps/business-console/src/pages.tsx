@@ -488,7 +488,28 @@ export function RepairsPage() {
   const query = useQuery({ queryKey: ['findings', 'repair'], queryFn: () => listFindings(50) })
   if (query.isPending) return <Loading />
   if (query.isError) return <ErrorState error={query.error} />
-  return <><PageHeader eyebrow="CONTROLLED CHANGE" title="Repairs" description="Prepare → Preview → Confirm → Execute. This console never turns a finding into an unreviewed write." /><div className="callout"><strong>Safe operating boundary</strong><span>Repair execution remains permissioned, version-bound, and owned by the Governance application service. Use the API dry-run endpoint for a preview before approval.</span></div><article className="panel"><div className="panel-heading"><div><h2>Repair candidates</h2><p>Signals currently eligible for an operator review.</p></div></div>{query.data.items.length ? <FindingsTable findings={query.data.items.filter((item) => item.status !== 'repaired')} /> : <Empty>No repair candidates are present.</Empty>}</article></>
+  const candidates = query.data.items.filter((item) => item.status !== 'repaired')
+  return <>
+    <PageHeader eyebrow="CONTROLLED CHANGE" title="Repairs" description="Prepare → Preview → Confirm → Execute. This console never turns a finding into an unreviewed write." />
+    <VStack gap={4}>
+      <Banner
+        status="warning"
+        title="Safe operating boundary"
+        description="Repair execution remains permissioned, version-bound, and owned by the Governance application service. Use the API dry-run endpoint for a preview before approval."
+      />
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Repair candidates</Heading>
+            <Text type="supporting">Signals currently eligible for an operator review.</Text>
+          </VStack>
+          {candidates.length
+            ? <FindingsTable findings={candidates} />
+            : <Empty>No repair candidates are present.</Empty>}
+        </VStack>
+      </Card>
+    </VStack>
+  </>
 }
 
 export function AuditPage() {

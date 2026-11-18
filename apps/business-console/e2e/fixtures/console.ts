@@ -3,6 +3,7 @@ import type {
   AuditEvent,
   Candidate,
   Document,
+  IntegrityFinding,
   OperationsOverview,
   Page as ApiPage,
   PermissionView,
@@ -135,6 +136,42 @@ export const candidate: Candidate = {
   version: 3,
   created_at: '2026-11-16T08:20:00.000Z',
 }
+
+export const findings: IntegrityFinding[] = [
+  {
+    id: 'f1000000-0000-4000-8000-000000000001',
+    rule_id: 'document.storage_missing',
+    bounded_context: 'document-management',
+    resource_type: 'document',
+    resource_id: 'd1000000-0000-4000-8000-000000000001',
+    severity: 'high',
+    status: 'open',
+    repairability: 'automatic',
+    first_detected_at: '2026-11-15T06:00:00.000Z',
+    last_detected_at: '2026-11-16T07:30:00.000Z',
+    occurrence_count: 4,
+    version: 1,
+  },
+  {
+    id: 'f1000000-0000-4000-8000-000000000002',
+    rule_id: 'audit.sequence_gap',
+    bounded_context: 'governance',
+    resource_type: 'audit_event',
+    resource_id: 'e1000000-0000-4000-8000-000000000009',
+    severity: 'medium',
+    status: 'repaired',
+    repairability: 'manual',
+    first_detected_at: '2026-11-14T05:00:00.000Z',
+    last_detected_at: '2026-11-15T09:00:00.000Z',
+    occurrence_count: 1,
+    version: 2,
+  },
+]
+
+export const auditEvents: AuditEvent[] = [
+  auditEvent({ id: 'e1000000-0000-4000-8000-000000000001', action: 'document_uploaded', result: 'succeeded', occurred_at: '2026-11-16T07:59:00.000Z' }),
+  auditEvent({ id: 'e1000000-0000-4000-8000-000000000002', action: 'processing_job_failed', result: 'failed', failure_code: 'extract_timeout', occurred_at: '2026-11-16T08:05:00.000Z', stream_sequence: 42 }),
+]
 
 export const permissions: PermissionView[] = [
   { key: 'identity.read', description: 'Read identities', reserved: false, active: true },
