@@ -1,0 +1,6 @@
+# Text normalization for files whose exact bytes are verified by tooling.
+
+# `astryx doctor` compares the generated theme module with the CLI's own output
+# byte for byte. A CRLF conversion on Windows makes the check fail, so this
+# generated file is always checked out with LF.
+apps/business-console/src/astryx-themes.ts text eol=lf
