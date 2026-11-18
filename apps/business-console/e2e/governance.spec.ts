@@ -53,11 +53,11 @@ test('governance empty states explain the scope', async ({ page }) => {
   await page.route('**/api/v1/admin/audit-events?limit=*', (route) => route.fulfill({ json: { success: true, data: { items: [], next_cursor: null } } }))
 
   await page.goto('/findings')
-  await expect(page.getByText('Integrity is quiet in this tenant.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Integrity is quiet in this tenant.' })).toBeVisible()
 
   await page.goto('/repairs')
-  await expect(page.getByText('No repair candidates are present.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No repair candidates are present.' })).toBeVisible()
 
   await page.goto('/audit')
-  await expect(page.getByText('No audit events yet.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No audit events yet.' })).toBeVisible()
 })

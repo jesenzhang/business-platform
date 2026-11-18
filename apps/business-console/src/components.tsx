@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom'
 import { SideNav, SideNavItem } from '@astryxdesign/core/SideNav'
 import { Badge } from '@astryxdesign/core/Badge'
@@ -117,7 +117,11 @@ export function AppShell() {
             {themeButton}
           </HStack>
         </header>
-        <section className="page-content"><Outlet /></section>
+        <section className="page-content">
+          <Suspense fallback={<Loading />}>
+            <Outlet />
+          </Suspense>
+        </section>
       </main>
     </div>
   )

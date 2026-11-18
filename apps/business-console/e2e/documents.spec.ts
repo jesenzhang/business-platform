@@ -75,6 +75,6 @@ test('surfaces a bounded upload error and keeps the page usable', async ({ page 
 test('empty register explains the next step', async ({ page }) => {
   await mockConsoleApi(page, { documents: [] })
   await page.goto('/documents')
-  await expect(page.getByText('No documents yet')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No documents yet' })).toBeVisible()
   await expect(page.getByText('Upload the first document to make the pipeline visible.')).toBeVisible()
 })
