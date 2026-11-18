@@ -121,6 +121,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Design-system gate (PLAN-0016 S5): catches CLI/core drift, a broken theme
+      # wiring or an unlayered reset before the Playwright jobs run.
+      - run: npm exec -- astryx doctor
 
   frontend-e2e:
     name: Frontend Playwright smoke
