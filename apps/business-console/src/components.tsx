@@ -3,9 +3,11 @@ import { SideNav, SideNavItem } from '@astryxdesign/core/SideNav'
 import { Text } from '@astryxdesign/core/Text'
 import {
   Building2, CircleUser, FileText, HelpCircle, KeyRound, LayoutDashboard, Link2,
-  RefreshCw, ScrollText, ShieldAlert, Wrench,
+  Moon, RefreshCw, ScrollText, ShieldAlert, Sun, Wrench,
 } from 'lucide-react'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
+import { HStack } from '@astryxdesign/core/HStack'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useConsoleStore } from './store'
 
@@ -58,14 +60,37 @@ export function AppShell() {
           </Dialog.Portal>
         </Dialog.Root>
         <Brand compact />
+        <div className="mobile-bar-actions">
+          <IconButton
+            label="Toggle theme"
+            tooltip={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            icon={theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+            variant="ghost"
+            size="sm"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          />
+        </div>
       </div>
       <main className="main-content">
         <header className="toolbar">
-          <div><span className="eyebrow">BUSINESS PLATFORM</span><span className="toolbar-title">Operations Console</span></div>
-          <div className="toolbar-actions">
-            <span className="secure-label"><span className="status-dot" /> Tenant-scoped session</span>
-            <button className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">{theme === 'light' ? '☾' : '☀'}</button>
-          </div>
+          <HStack gap={3} vAlign="center">
+            <Text type="label" as="span" color="secondary">BUSINESS PLATFORM</Text>
+            <Text type="supporting" as="span">Operations Console</Text>
+          </HStack>
+          <HStack gap={3} vAlign="center">
+            <HStack gap={1} vAlign="center">
+              <StatusDot variant="success" label="Tenant-scoped session" />
+              <Text type="supporting" as="span">Tenant-scoped session</Text>
+            </HStack>
+            <IconButton
+              label="Toggle theme"
+              tooltip={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+              icon={theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+              variant="secondary"
+              size="sm"
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            />
+          </HStack>
         </header>
         <section className="page-content"><Outlet /></section>
       </main>

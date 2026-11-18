@@ -62,10 +62,8 @@
 .sidebar-footer { color: var(--muted); font-size: 11px; line-height: 1.45; display: flex; align-items: center; gap: 7px; }
 .main-content { width: calc(100% - 260px); margin-left: 260px; }
 .toolbar { height: 76px; display: flex; justify-content: space-between; align-items: center; padding: 0 46px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 78%, transparent); backdrop-filter: blur(18px); position: sticky; top: 0; z-index: 5; }
-.toolbar-title { margin-left: 12px; font-size: 14px; color: var(--muted); }
-.toolbar-actions { display: flex; align-items: center; gap: 18px; }
-.secure-label, .subtle { color: var(--muted); font-size: 12px; }
 .eyebrow { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.subtle { color: var(--muted); font-size: 12px; }
 .page-content { padding: 44px 46px 72px; max-width: 1540px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; gap: 28px; align-items: flex-end; margin-bottom: 30px; }
 .page-header h1 { margin: 7px 0 8px; font-size: clamp(28px, 3vw, 42px); letter-spacing: -.055em; line-height: 1.02; font-weight: 700; }
@@ -94,6 +92,7 @@
 .review-grid { grid-template-columns: 1fr 340px; align-items: start; } .json-view { margin: 0; padding: 18px; border: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 75%, transparent); border-radius: 11px; color: var(--ink); overflow: auto; font-size: 12px; line-height: 1.7; min-height: 320px; } .field-label { display: block; color: var(--muted); font-size: 12px; margin: 22px 0 8px; } .review-sidebar textarea { width: 100%; resize: vertical; border: 1px solid var(--line); color: var(--ink); background: var(--canvas); border-radius: 9px; padding: 10px; outline: none; font-size: 12px; } .review-sidebar textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); } .button-row { display: flex; gap: 9px; justify-content: flex-end; margin-top: 15px; }
 .audit-list { display: grid; gap: 16px; } .audit-item { display: flex; gap: 12px; } .audit-marker { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: 0 0 auto; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); } .audit-main { min-width: 0; width: 100%; } .audit-main > div { display: flex; align-items: center; gap: 9px; } .audit-main strong { font-size: 13px; text-transform: capitalize; } .audit-main .status-pill { font-size: 10px; padding: 3px 7px; }
 .mobile-bar { display: none; }
+.mobile-bar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 20; } .mobile-drawer { position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 21; background: var(--canvas); padding: 0; outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1050px) { .detail-grid, .review-grid { grid-template-columns: 1fr; } }
