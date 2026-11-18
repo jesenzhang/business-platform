@@ -1,6 +1,6 @@
 // --- PLAN-0013 Identity & Authorization management pages (Stage 9) ---
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addUnitMember, createOrganizationUnit, createRole, createRoleBinding, createTenantMembership,
@@ -8,14 +8,43 @@ import {
   listRoles, listTenantMemberships, listUnitMembers, removeUnitMember, revokeRoleBinding,
   setRolePermissions, suspendMembership, reactivateMembership, updateOrganizationUnit, updateRole,
 } from './api'
-import type { OrganizationUnitView } from './contracts'
-import { Empty, ErrorState, Loading, PageHeader, StatusPill } from './components'
+import type {
+  AdminUser, ExplainEvaluation, MembershipView, OrganizationMemberView, OrganizationUnitView,
+  RoleBindingView, RoleView,
+} from './contracts'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Banner } from '@astryxdesign/core/Banner'
+import { Button } from '@astryxdesign/core/Button'
+import { Card } from '@astryxdesign/core/Card'
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
+import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { Grid } from '@astryxdesign/core/Grid'
+import { HStack } from '@astryxdesign/core/HStack'
+import { Heading } from '@astryxdesign/core/Heading'
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
+import { Selector } from '@astryxdesign/core/Selector'
+import { Table, proportional } from '@astryxdesign/core/Table'
+import { Text } from '@astryxdesign/core/Text'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { VStack } from '@astryxdesign/core/VStack'
+import { ErrorState, Loading, PageHeader, StatusPill } from './components'
 
 const date = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 
 function MutationError({ isError, error }: { isError: boolean; error: Error | null }) {
-  return isError ? <div className="inline-error">{error?.message ?? 'Request failed.'}</div> : null
+  return isError ? <Banner status="error" title="Request failed" description={error?.message ?? 'Request failed.'} /> : null
 }
+
+/** Identity codes are opaque; show a bounded prefix, never the whole value. */
+const shortId = (value: string) => `${value.slice(0, 12)}…`
+
+type MembershipRow = MembershipView & Record<string, unknown>
+type UserRow = AdminUser & Record<string, unknown>
+type RoleRow = RoleView & Record<string, unknown>
+type BindingRow = RoleBindingView & Record<string, unknown>
+type UnitRow = OrganizationUnitView & { depth: number } & Record<string, unknown>
+type UnitMemberRow = OrganizationMemberView & Record<string, unknown>
+type EvaluationRow = ExplainEvaluation & Record<string, unknown>
 
 export function IdentitiesPage() {
   const queryClient = useQueryClient()
@@ -35,16 +64,84 @@ export function IdentitiesPage() {
   if (membershipsQuery.isError) return <ErrorState error={membershipsQuery.error} />
   return <>
     <PageHeader eyebrow="IDENTITY MANAGEMENT" title="Identities" description="Platform users and tenant memberships. Authentication proves who you are; membership decides whether this tenant can see you at all." />
-    <div className="upload-panel panel"><div><h2>Attach a user to this tenant</h2><p>Memberships are permissioned, audited, and idempotent server-side.</p></div><div className="upload-control"><input className="text-input" placeholder="Existing user id" value={attachUserId} onChange={(event) => setAttachUserId(event.target.value)} /><button className="primary-button" disabled={!attachUserId || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Attaching…' : 'Attach membership'}</button></div><MutationError {...create} /></div>
-    <div className="detail-grid">
-      <article className="panel"><div className="panel-heading"><div><h2>Tenant memberships</h2><p>{membershipsQuery.data.items.length} members in this page</p></div></div>
-        {membershipsQuery.data.items.length ? <div className="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Source</th><th>Joined</th><th>Action</th></tr></thead><tbody>{membershipsQuery.data.items.map((row) => <tr key={row.membership_id}><td className="mono">{row.user_id.slice(0, 12)}…</td><td><StatusPill value={row.status} /></td><td>{row.source}</td><td>{date(row.joined_at)}</td><td><button className="secondary-button" disabled={status.isPending} onClick={() => status.mutate({ userId: row.user_id, version: row.version, suspended: row.status === 'active' })}>{row.status === 'active' ? 'Suspend' : 'Reactivate'}</button></td></tr>)}</tbody></table></div> : <Empty>No memberships yet.</Empty>}
-      </article>
-      <article className="panel"><div className="panel-heading"><div><h2>Platform users</h2><p>Provisioned deterministically from external identities.</p></div></div>
-        {usersQuery.data.items.length ? <div className="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Created</th></tr></thead><tbody>{usersQuery.data.items.map((user) => <tr key={user.user_id}><td className="mono">{user.user_id.slice(0, 12)}…</td><td><StatusPill value={user.status} /></td><td>{date(user.created_at)}</td></tr>)}</tbody></table></div> : <Empty>No platform users yet.</Empty>}
-      </article>
-    </div>
-    <MutationError {...status} />
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Attach a user to this tenant</Heading>
+            <Text type="supporting">Memberships are permissioned, audited, and idempotent server-side.</Text>
+          </VStack>
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <TextInput label="Existing user id" value={attachUserId} onChange={setAttachUserId} placeholder="Existing user id" />
+            <Button
+              label={create.isPending ? 'Attaching…' : 'Attach membership'}
+              variant="primary"
+              isDisabled={!attachUserId || create.isPending}
+              isLoading={create.isPending}
+              onClick={() => create.mutate()}
+            />
+          </HStack>
+          <MutationError {...create} />
+        </VStack>
+      </Card>
+      <Grid columns={{ minWidth: 340, max: 2 }} gap={4}>
+        <Card padding={5}>
+          <VStack gap={4}>
+            <VStack gap={1}>
+              <Heading level={2}>Tenant memberships</Heading>
+              <Text type="supporting">{membershipsQuery.data.items.length} members in this page</Text>
+            </VStack>
+            {membershipsQuery.data.items.length ? (
+              <Table<MembershipRow>
+                data={membershipsQuery.data.items as MembershipRow[]}
+                idKey="membership_id"
+                density="compact"
+                columns={[
+                  { key: 'user_id', header: 'User', renderCell: (row) => <Text type="code" as="span">{shortId(row.user_id)}</Text> },
+                  { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                  { key: 'source', header: 'Source' },
+                  { key: 'joined_at', header: 'Joined', renderCell: (row) => <Text as="span" type="supporting">{date(row.joined_at)}</Text> },
+                  {
+                    key: 'membership_id',
+                    header: 'Action',
+                    renderCell: (row) => (
+                      <Button
+                        label={row.status === 'active' ? 'Suspend' : 'Reactivate'}
+                        variant="secondary"
+                        size="sm"
+                        isDisabled={status.isPending}
+                        onClick={() => status.mutate({ userId: row.user_id, version: row.version, suspended: row.status === 'active' })}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            ) : <EmptyState isCompact title="No memberships yet." />}
+          </VStack>
+        </Card>
+        <Card padding={5}>
+          <VStack gap={4}>
+            <VStack gap={1}>
+              <Heading level={2}>Platform users</Heading>
+              <Text type="supporting">Provisioned deterministically from external identities.</Text>
+            </VStack>
+            {usersQuery.data.items.length ? (
+              <Table<UserRow>
+                data={usersQuery.data.items as UserRow[]}
+                idKey="user_id"
+                density="compact"
+                columns={[
+                  { key: 'user_id', header: 'User', renderCell: (row) => <Text type="code" as="span">{shortId(row.user_id)}</Text> },
+                  { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                  { key: 'created_at', header: 'Created', renderCell: (row) => <Text as="span" type="supporting">{date(row.created_at)}</Text> },
+                ]}
+              />
+            ) : <EmptyState isCompact title="No platform users yet." />}
+          </VStack>
+        </Card>
+      </Grid>
+      <MutationError {...status} />
+    </VStack>
   </>
 }
 
@@ -79,20 +176,133 @@ export function RolesPage() {
   const openEdit = (roleId: string, permissionKeys: string[]) => { setEditRoleId(roleId); setEditSelected(permissionKeys) }
   return <>
     <PageHeader eyebrow="POLICY MANAGEMENT" title="Roles & permissions" description="Roles grant permission keys inside the policy context. System roles are immutable by contract; every mutation is permissioned, versioned, and audited." />
-    <article className="panel"><div className="panel-heading"><div><h2>Create a tenant role</h2><p>Tick the permission keys this role should carry, then create. Permission sets are replaced transactionally, never appended blindly.</p></div></div>
-      <div className="upload-control"><input className="text-input" placeholder="stable-key" value={form.stable_key} onChange={(event) => setForm({ ...form, stable_key: event.target.value })} /><input className="text-input" placeholder="Display name" value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} /><button className="primary-button" disabled={!form.stable_key || !form.display_name || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Creating…' : 'Create role'}</button></div>
-      <div className="chip-grid">{catalog.map((permission) => <label key={permission.key} className="chip"><input type="checkbox" checked={selected.includes(permission.key)} onChange={(event) => toggleSelected(permission.key, event.target.checked)} /><span>{permission.key}</span>{permission.reserved && <small>reserved</small>}</label>)}</div>
-      <MutationError {...create} />
-    </article>
-    <article className="panel"><div className="panel-heading"><div><h2>Registered roles</h2><p>{rolesQuery.data.length} roles visible in this tenant</p></div></div>
-      {rolesQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>Role</th><th>Status</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>{rolesQuery.data.map((role) => <tr key={role.role_id}><td><span className="table-primary">{role.display_name}</span><span className="table-secondary mono">{role.stable_key}{role.system ? ' · system' : ''}</span></td><td><StatusPill value={role.status} /></td><td>{role.permission_keys.length ? <span className="mono">{role.permission_keys.join(', ')}</span> : <span className="subtle">none</span>}</td><td><div className="button-row compact">{!role.system && <button className="secondary-button" onClick={() => editRoleId === role.role_id ? closeEdit() : openEdit(role.role_id, role.permission_keys)}>{editRoleId === role.role_id ? 'Cancel' : 'Edit permissions'}</button>}{!role.system && role.status === 'active' && <button className="secondary-button" disabled={disable.isPending} onClick={() => disable.mutate({ roleId: role.role_id, version: role.version })}>Disable</button>}{role.system && <span className="subtle">immutable</span>}</div></td></tr>)}</tbody></table></div> : <Empty>No roles are registered in this tenant.</Empty>}
-      {editing && <div className="panel nested-panel"><div className="panel-heading"><div><h2>Permissions for {editing.display_name}</h2><p>Set replace at optimistic version v{editing.version}. Unchecking a key you currently hold can lock you out — the self-escalation guard prevents the reverse.</p></div></div>
-        <div className="chip-grid">{catalog.map((permission) => <label key={permission.key} className="chip"><input type="checkbox" checked={editSelected.includes(permission.key)} onChange={(event) => toggleEditSelected(permission.key, event.target.checked)} /><span>{permission.key}</span></label>)}</div>
-        <div className="button-row"><button className="primary-button" disabled={setPermissions.isPending} onClick={() => setPermissions.mutate({ roleId: editing.role_id, keys: editSelected, version: editing.version })}>Save permissions</button></div>
-        <MutationError {...setPermissions} />
-      </div>}
-      <MutationError {...disable} />
-    </article>
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Create a tenant role</Heading>
+            <Text type="supporting">Tick the permission keys this role should carry, then create. Permission sets are replaced transactionally, never appended blindly.</Text>
+          </VStack>
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <TextInput label="Stable key" value={form.stable_key} onChange={(value) => setForm({ ...form, stable_key: value })} placeholder="stable-key" />
+            <TextInput label="Display name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="Display name" />
+            <Button
+              label={create.isPending ? 'Creating…' : 'Create role'}
+              variant="primary"
+              isDisabled={!form.stable_key || !form.display_name || create.isPending}
+              isLoading={create.isPending}
+              onClick={() => create.mutate()}
+            />
+          </HStack>
+          <Grid columns={{ minWidth: 180, max: 4 }} gap={2}>
+            {catalog.map((permission) => (
+              <CheckboxInput
+                key={permission.key}
+                label={permission.reserved ? `${permission.key} (reserved)` : permission.key}
+                value={selected.includes(permission.key)}
+                onChange={(checked) => toggleSelected(permission.key, checked)}
+              />
+            ))}
+          </Grid>
+          <MutationError {...create} />
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Registered roles</Heading>
+            <Text type="supporting">{rolesQuery.data.length} roles visible in this tenant</Text>
+          </VStack>
+          {rolesQuery.data.length ? (
+            <Table<RoleRow>
+              data={rolesQuery.data as RoleRow[]}
+              idKey="role_id"
+              density="compact"
+              columns={[
+                {
+                  key: 'display_name',
+                  header: 'Role',
+                  width: proportional(2),
+                  renderCell: (row) => (
+                    <VStack gap={0.5}>
+                      <Text weight="semibold">{row.display_name}</Text>
+                      <Text type="code" as="span">{`${row.stable_key}${row.system ? ' · system' : ''}`}</Text>
+                    </VStack>
+                  ),
+                },
+                { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                {
+                  key: 'permission_keys',
+                  header: 'Permissions',
+                  width: proportional(2),
+                  renderCell: (row) => row.permission_keys.length
+                    ? <Text type="code" as="span">{row.permission_keys.join(', ')}</Text>
+                    : <Text type="supporting">none</Text>,
+                },
+                {
+                  key: 'role_id',
+                  header: 'Actions',
+                  renderCell: (row) => (
+                    <HStack gap={2} wrap="wrap">
+                      {!row.system && (
+                        <Button
+                          label={editRoleId === row.role_id ? 'Cancel' : 'Edit permissions'}
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => editRoleId === row.role_id ? closeEdit() : openEdit(row.role_id, row.permission_keys)}
+                        />
+                      )}
+                      {!row.system && row.status === 'active' && (
+                        <Button
+                          label="Disable"
+                          variant="secondary"
+                          size="sm"
+                          isDisabled={disable.isPending}
+                          onClick={() => disable.mutate({ roleId: row.role_id, version: row.version })}
+                        />
+                      )}
+                      {row.system && <Text type="supporting">immutable</Text>}
+                    </HStack>
+                  ),
+                },
+              ]}
+            />
+          ) : <EmptyState isCompact title="No roles are registered in this tenant." />}
+
+          <MutationError {...disable} />
+        </VStack>
+      </Card>
+      {editing && (
+        <Card padding={5}>
+          <VStack gap={4}>
+            <VStack gap={1}>
+              <Heading level={2}>Permissions for {editing.display_name}</Heading>
+              <Text type="supporting">Set replace at optimistic version v{editing.version}. Unchecking a key you currently hold can lock you out — the self-escalation guard prevents the reverse.</Text>
+            </VStack>
+            <Grid columns={{ minWidth: 180, max: 4 }} gap={2}>
+              {catalog.map((permission) => (
+                <CheckboxInput
+                  key={permission.key}
+                  label={permission.key}
+                  value={editSelected.includes(permission.key)}
+                  onChange={(checked) => toggleEditSelected(permission.key, checked)}
+                />
+              ))}
+            </Grid>
+            <HStack gap={2} hAlign="end">
+              <Button
+                label="Save permissions"
+                variant="primary"
+                isDisabled={setPermissions.isPending}
+                isLoading={setPermissions.isPending}
+                onClick={() => setPermissions.mutate({ roleId: editing.role_id, keys: editSelected, version: editing.version })}
+              />
+            </HStack>
+            <MutationError {...setPermissions} />
+          </VStack>
+        </Card>
+      )}
+    </VStack>
   </>
 }
 
@@ -113,23 +323,111 @@ export function BindingsPage() {
   if (bindingsQuery.isError) return <ErrorState error={bindingsQuery.error} />
   if (rolesQuery.isError) return <ErrorState error={rolesQuery.error} />
   const scopeOk = form.scope === 'tenant' || (form.scope === 'org_unit' && Boolean(form.org_unit_id)) || (form.scope === 'resource_type' && Boolean(form.resource_kind))
+  const activeRoles = rolesQuery.data.filter((role) => role.status === 'active').map((role) => ({ value: role.role_id, label: role.display_name }))
   return <>
     <PageHeader eyebrow="POLICY MANAGEMENT" title="Role bindings" description="A binding grants a role over a bounded scope. Suspension, expiry, and revocation take effect on the next request — an unexpired token never wins." />
-    <article className="panel"><div className="panel-heading"><div><h2>Create a binding</h2><p>The domain rejects self-escalation: you cannot grant yourself IAM-management authority unless you already hold it via a system bootstrap role.</p></div></div>
-      <div className="upload-control">
-        <input className="text-input" placeholder="User id" value={form.user_id} onChange={(event) => setForm({ ...form, user_id: event.target.value })} />
-        <select className="text-input" value={form.role_id} onChange={(event) => setForm({ ...form, role_id: event.target.value })}><option value="">Choose a role…</option>{rolesQuery.data.filter((role) => role.status === 'active').map((role) => <option key={role.role_id} value={role.role_id}>{role.display_name}</option>)}</select>
-        <select className="text-input" value={form.scope} onChange={(event) => setForm({ ...form, scope: event.target.value })}><option value="tenant">Whole tenant</option><option value="org_unit">Organization unit</option><option value="resource_type">Resource kind</option></select>
-        {form.scope === 'org_unit' && <input className="text-input" placeholder="Org unit id" value={form.org_unit_id} onChange={(event) => setForm({ ...form, org_unit_id: event.target.value })} />}
-        {form.scope === 'resource_type' && <input className="text-input" placeholder="Resource kind" value={form.resource_kind} onChange={(event) => setForm({ ...form, resource_kind: event.target.value })} />}
-        <button className="primary-button" disabled={!form.user_id || !form.role_id || !scopeOk || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Binding…' : 'Bind role'}</button>
-      </div><MutationError {...create} />
-    </article>
-    <article className="panel"><div className="panel-heading"><div><h2>Bindings</h2><p>{bindingsQuery.data.length} bindings in this tenant</p></div></div>
-      {bindingsQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Scope</th><th>Status</th><th>Window</th><th>Action</th></tr></thead><tbody>{bindingsQuery.data.map((binding) => <tr key={binding.binding_id}><td className="mono">{binding.user_id.slice(0, 12)}…</td><td className="mono">{binding.role_id.slice(0, 12)}…</td><td className="mono">{binding.scope.scope === 'tenant' ? 'tenant' : binding.scope.scope === 'org_unit' ? `org_unit ${binding.scope.org_unit_id.slice(0, 8)}…` : binding.scope.resource_kind}</td><td><StatusPill value={binding.status} /></td><td>{date(binding.effective_at)}{binding.expires_at ? ` → ${date(binding.expires_at)}` : ''}</td><td>{binding.status === 'active' && <button className="secondary-button" disabled={revoke.isPending} onClick={() => revoke.mutate({ bindingId: binding.binding_id, version: binding.version })}>Revoke</button>}</td></tr>)}</tbody></table></div> : <Empty>No bindings exist in this tenant.</Empty>}
-      <MutationError {...revoke} />
-    </article>
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Create a binding</Heading>
+            <Text type="supporting">The domain rejects self-escalation: you cannot grant yourself IAM-management authority unless you already hold it via a system bootstrap role.</Text>
+          </VStack>
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <TextInput label="User id" value={form.user_id} onChange={(value) => setForm({ ...form, user_id: value })} placeholder="User id" />
+            <Selector
+              label="Role"
+              aria-label="Role"
+              options={activeRoles}
+              value={form.role_id}
+              onChange={(value) => setForm({ ...form, role_id: value })}
+              placeholder="Choose a role…"
+            />
+            <Selector
+              label="Scope"
+              aria-label="Scope"
+              options={[
+                { value: 'tenant', label: 'Whole tenant' },
+                { value: 'org_unit', label: 'Organization unit' },
+                { value: 'resource_type', label: 'Resource kind' },
+              ]}
+              value={form.scope}
+              onChange={(value) => setForm({ ...form, scope: value })}
+            />
+            {form.scope === 'org_unit' && <TextInput label="Org unit id" value={form.org_unit_id} onChange={(value) => setForm({ ...form, org_unit_id: value })} placeholder="Org unit id" />}
+            {form.scope === 'resource_type' && <TextInput label="Resource kind" value={form.resource_kind} onChange={(value) => setForm({ ...form, resource_kind: value })} placeholder="Resource kind" />}
+            <Button
+              label={create.isPending ? 'Binding…' : 'Bind role'}
+              variant="primary"
+              isDisabled={!form.user_id || !form.role_id || !scopeOk || create.isPending}
+              isLoading={create.isPending}
+              onClick={() => create.mutate()}
+            />
+          </HStack>
+          <MutationError {...create} />
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Bindings</Heading>
+            <Text type="supporting">{bindingsQuery.data.length} bindings in this tenant</Text>
+          </VStack>
+          {bindingsQuery.data.length ? (
+            <Table<BindingRow>
+              data={bindingsQuery.data as BindingRow[]}
+              idKey="binding_id"
+              density="compact"
+              columns={[
+                { key: 'user_id', header: 'User', renderCell: (row) => <Text type="code" as="span">{shortId(row.user_id)}</Text> },
+                { key: 'role_id', header: 'Role', renderCell: (row) => <Text type="code" as="span">{shortId(row.role_id)}</Text> },
+                {
+                  key: 'scope',
+                  header: 'Scope',
+                  renderCell: (row) => (
+                    <Text type="code" as="span">
+                      {row.scope.scope === 'tenant' ? 'tenant' : row.scope.scope === 'org_unit' ? `org_unit ${shortId(row.scope.org_unit_id)}` : row.scope.resource_kind}
+                    </Text>
+                  ),
+                },
+                { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                {
+                  key: 'effective_at',
+                  header: 'Window',
+                  renderCell: (row) => <Text as="span" type="supporting">{`${date(row.effective_at)}${row.expires_at ? ` → ${date(row.expires_at)}` : ''}`}</Text>,
+                },
+                {
+                  key: 'binding_id',
+                  header: 'Action',
+                  renderCell: (row) => row.status === 'active'
+                    ? <Button label="Revoke" variant="secondary" size="sm" isDisabled={revoke.isPending} onClick={() => revoke.mutate({ bindingId: row.binding_id, version: row.version })} />
+                    : null,
+                },
+              ]}
+            />
+          ) : <EmptyState isCompact title="No bindings exist in this tenant." />}
+          <MutationError {...revoke} />
+        </VStack>
+      </Card>
+    </VStack>
   </>
+}
+
+function flattenUnits(units: OrganizationUnitView[]) {
+  const byParent = new Map<string | null, OrganizationUnitView[]>()
+  for (const unit of units) {
+    const key = unit.parent_id ?? null
+    byParent.set(key, [...(byParent.get(key) ?? []), unit])
+  }
+  const rows: Array<{ unit: OrganizationUnitView; depth: number }> = []
+  const walk = (parent: string | null, depth: number) => {
+    for (const unit of byParent.get(parent) ?? []) {
+      rows.push({ unit, depth })
+      walk(unit.unit_id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  return rows
 }
 
 export function OrganizationPage() {
@@ -158,24 +456,135 @@ export function OrganizationPage() {
   if (unitsQuery.isPending) return <Loading />
   if (unitsQuery.isError) return <ErrorState error={unitsQuery.error} />
   const roots = unitsQuery.data.filter((unit) => !unit.parent_id)
-  const renderUnit = (unit: OrganizationUnitView, depth: number): ReactNode => <>
-    <tr key={unit.unit_id}><td><span className="table-primary" style={{ paddingLeft: `${depth * 16}px` }}>{unit.name}</span><span className="table-secondary">{unit.unit_type}</span></td><td><StatusPill value={unit.status} /></td><td><div className="button-row compact"><button className="secondary-button" onClick={() => setSelectedUnit(unit.unit_id)}>Members</button>{unit.status === 'active' && <button className="secondary-button" disabled={disable.isPending} onClick={() => disable.mutate({ unitId: unit.unit_id, version: unit.version })}>Disable</button>}</div></td></tr>
-    {unitsQuery.data.filter((child) => child.parent_id === unit.unit_id).map((child) => renderUnit(child, depth + 1))}
-  </>
+  const unitRows: UnitRow[] = flattenUnits(unitsQuery.data).map(({ unit, depth }) => ({ ...unit, depth }))
+  const selectedUnitName = unitsQuery.data.find((unit) => unit.unit_id === selectedUnit)?.name
   return <>
     <PageHeader eyebrow="ORGANIZATION" title="Organization units" description="Authorization-only organization: units scope resource grants. Memberships here never become business facts." />
-    <article className="panel"><div className="panel-heading"><div><h2>Unit tree</h2><p>{unitsQuery.data.length} units in this tenant</p></div></div>
-      <div className="upload-control"><input className="text-input" placeholder="Unit name" value={unitForm.name} onChange={(event) => setUnitForm({ ...unitForm, name: event.target.value })} /><select className="text-input" value={unitForm.unit_type} onChange={(event) => setUnitForm({ ...unitForm, unit_type: event.target.value })}><option value="company">company</option><option value="department">department</option><option value="team">team</option></select><select className="text-input" value={unitForm.parent_id} onChange={(event) => setUnitForm({ ...unitForm, parent_id: event.target.value })}><option value="">No parent (root)</option>{roots.map((unit) => <option key={unit.unit_id} value={unit.unit_id}>{unit.name}</option>)}</select><button className="primary-button" disabled={!unitForm.name || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Creating…' : 'Create unit'}</button></div>
-      {unitsQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>Unit</th><th>Status</th><th>Actions</th></tr></thead><tbody>{roots.map((unit) => renderUnit(unit, 0))}</tbody></table></div> : <Empty>No organization units yet.</Empty>}
-      <MutationError {...create} /><MutationError {...disable} />
-    </article>
-    {selectedUnit && <article className="panel"><div className="panel-heading"><div><h2>Members of {unitsQuery.data.find((unit) => unit.unit_id === selectedUnit)?.name ?? `${selectedUnit.slice(0, 12)}…`}</h2><p>Add or remove tenant members with idempotent, audited operations.</p></div><button className="secondary-button" onClick={() => setSelectedUnit(null)}>Close</button></div>
-      {membersQuery.isPending ? <Loading /> : membersQuery.isError ? <ErrorState error={membersQuery.error} /> : <>
-        <div className="upload-control"><input className="text-input" placeholder="Tenant user id" value={memberForm.user_id} onChange={(event) => setMemberForm({ ...memberForm, user_id: event.target.value })} /><select className="text-input" value={memberForm.membership_type} onChange={(event) => setMemberForm({ ...memberForm, membership_type: event.target.value })}><option value="member">member</option><option value="leader">leader</option></select><button className="primary-button" disabled={!memberForm.user_id || addMember.isPending} onClick={() => addMember.mutate({ unitId: selectedUnit, userId: memberForm.user_id, membershipType: memberForm.membership_type })}>Add member</button></div>
-        {membersQuery.data.length ? <div className="table-wrap"><table><thead><tr><th>User</th><th>Type</th><th>Status</th><th>Joined</th><th>Action</th></tr></thead><tbody>{membersQuery.data.map((member) => <tr key={member.membership_id}><td className="mono">{member.user_id.slice(0, 12)}…</td><td>{member.membership_type}</td><td><StatusPill value={member.status} /></td><td>{date(member.joined_at)}</td><td>{member.status === 'active' && <button className="secondary-button" disabled={removeMember.isPending} onClick={() => removeMember.mutate({ unitId: selectedUnit, userId: member.user_id, membershipType: member.membership_type, version: member.version })}>Remove</button>}</td></tr>)}</tbody></table></div> : <Empty>This unit has no members.</Empty>}
-        <MutationError {...addMember} /><MutationError {...removeMember} />
-      </>}
-    </article>}
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Unit tree</Heading>
+            <Text type="supporting">{unitsQuery.data.length} units in this tenant</Text>
+          </VStack>
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <TextInput label="Unit name" value={unitForm.name} onChange={(value) => setUnitForm({ ...unitForm, name: value })} placeholder="Unit name" />
+            <Selector
+              label="Unit type"
+              aria-label="Unit type"
+              options={['company', 'department', 'team']}
+              value={unitForm.unit_type}
+              onChange={(value) => setUnitForm({ ...unitForm, unit_type: value })}
+            />
+            <Selector
+              label="Parent unit"
+              aria-label="Parent unit"
+              options={[{ value: 'none', label: 'No parent (root)' }, ...roots.map((unit) => ({ value: unit.unit_id, label: unit.name }))]}
+              value={unitForm.parent_id || 'none'}
+              onChange={(value) => setUnitForm({ ...unitForm, parent_id: value === 'none' ? '' : value })}
+            />
+            <Button
+              label={create.isPending ? 'Creating…' : 'Create unit'}
+              variant="primary"
+              isDisabled={!unitForm.name || create.isPending}
+              isLoading={create.isPending}
+              onClick={() => create.mutate()}
+            />
+          </HStack>
+          {unitRows.length ? (
+            <Table<UnitRow>
+              data={unitRows}
+              idKey="unit_id"
+              density="compact"
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Unit',
+                  width: proportional(2),
+                  renderCell: (row) => (
+                    <VStack gap={0.5}>
+                      <Text weight="semibold">{`${'— '.repeat(row.depth)}${row.name}`}</Text>
+                      <Text type="supporting">{row.unit_type}</Text>
+                    </VStack>
+                  ),
+                },
+                { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                {
+                  key: 'unit_id',
+                  header: 'Actions',
+                  renderCell: (row) => (
+                    <HStack gap={2} wrap="wrap">
+                      <Button label="Members" variant="secondary" size="sm" onClick={() => setSelectedUnit(row.unit_id)} />
+                      {row.status === 'active' && (
+                        <Button label="Disable" variant="secondary" size="sm" isDisabled={disable.isPending} onClick={() => disable.mutate({ unitId: row.unit_id, version: row.version })} />
+                      )}
+                    </HStack>
+                  ),
+                },
+              ]}
+            />
+          ) : <EmptyState isCompact title="No organization units yet." />}
+          <MutationError {...create} />
+          <MutationError {...disable} />
+        </VStack>
+      </Card>
+      {selectedUnit && (
+        <Card padding={5}>
+          <VStack gap={4}>
+            <HStack gap={3} hAlign="between" vAlign="start" wrap="wrap">
+              <VStack gap={1}>
+                <Heading level={2}>Members of {selectedUnitName ?? shortId(selectedUnit)}</Heading>
+                <Text type="supporting">Add or remove tenant members with idempotent, audited operations.</Text>
+              </VStack>
+              <Button label="Close" variant="secondary" size="sm" onClick={() => setSelectedUnit(null)} />
+            </HStack>
+            {membersQuery.isPending ? <Loading /> : membersQuery.isError ? <ErrorState error={membersQuery.error} /> : (
+              <>
+                <HStack gap={3} vAlign="end" wrap="wrap">
+                  <TextInput label="Tenant user id" value={memberForm.user_id} onChange={(value) => setMemberForm({ ...memberForm, user_id: value })} placeholder="Tenant user id" />
+                  <Selector
+                    label="Membership type"
+                    aria-label="Membership type"
+                    options={['member', 'leader']}
+                    value={memberForm.membership_type}
+                    onChange={(value) => setMemberForm({ ...memberForm, membership_type: value })}
+                  />
+                  <Button
+                    label="Add member"
+                    variant="primary"
+                    isDisabled={!memberForm.user_id || addMember.isPending}
+                    isLoading={addMember.isPending}
+                    onClick={() => addMember.mutate({ unitId: selectedUnit, userId: memberForm.user_id, membershipType: memberForm.membership_type })}
+                  />
+                </HStack>
+                {membersQuery.data.length ? (
+                  <Table<UnitMemberRow>
+                    data={membersQuery.data as UnitMemberRow[]}
+                    idKey="membership_id"
+                    density="compact"
+                    columns={[
+                      { key: 'user_id', header: 'User', renderCell: (row) => <Text type="code" as="span">{shortId(row.user_id)}</Text> },
+                      { key: 'membership_type', header: 'Type' },
+                      { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+                      { key: 'joined_at', header: 'Joined', renderCell: (row) => <Text as="span" type="supporting">{date(row.joined_at)}</Text> },
+                      {
+                        key: 'membership_id',
+                        header: 'Action',
+                        renderCell: (row) => row.status === 'active'
+                          ? <Button label="Remove" variant="secondary" size="sm" isDisabled={removeMember.isPending} onClick={() => removeMember.mutate({ unitId: selectedUnit, userId: row.user_id, membershipType: row.membership_type, version: row.version })} />
+                          : null,
+                      },
+                    ]}
+                  />
+                ) : <EmptyState isCompact title="This unit has no members." />}
+                <MutationError {...addMember} />
+                <MutationError {...removeMember} />
+              </>
+            )}
+          </VStack>
+        </Card>
+      )}
+    </VStack>
   </>
 }
 
@@ -184,15 +593,68 @@ export function ExplainPage() {
   const explain = useMutation({ mutationFn: () => explainDecision({ user_id: form.user_id, permission: form.permission }) })
   return <>
     <PageHeader eyebrow="AUTHORIZATION" title="Explain a decision" description="Ask the evaluator, not the database: the same default-DENY engine answers with bounded, redacted reasons for every binding it considered." />
-    <article className="panel"><div className="panel-heading"><div><h2>Evaluate one permission</h2><p>Requires the policy.explain permission. The response never contains raw claims, tokens, or store internals.</p></div></div>
-      <div className="upload-control"><input className="text-input" placeholder="User id" value={form.user_id} onChange={(event) => setForm({ ...form, user_id: event.target.value })} /><input className="text-input" placeholder="permission.key" value={form.permission} onChange={(event) => setForm({ ...form, permission: event.target.value })} /><button className="primary-button" disabled={!form.user_id || !form.permission || explain.isPending} onClick={() => explain.mutate()}>{explain.isPending ? 'Evaluating…' : 'Explain'}</button></div>
-      <MutationError {...explain} />
-      {explain.data && <div className="detail-grid" style={{ marginTop: 16 }}>
-        <article className="panel detail-card"><span className="eyebrow">DECISION</span><StatusPill value={explain.data.allowed ? 'allow' : 'deny'} /><dl><dt>Reason</dt><dd className="mono">{explain.data.reason}</dd>{explain.data.matched_binding && <><dt>Matched binding</dt><dd className="mono">{explain.data.matched_binding}</dd></>}{explain.data.matched_scope && <><dt>Scope</dt><dd className="mono">{JSON.stringify(explain.data.matched_scope)}</dd></>}<dt>Policy reference</dt><dd className="mono">{explain.data.policy_reference}</dd></dl></article>
-        <article className="panel"><div className="panel-heading"><div><h2>Bindings considered</h2><p>{explain.data.evaluations.length} candidate evaluations</p></div></div>
-          {explain.data.evaluations.length ? <div className="table-wrap"><table><thead><tr><th>Binding</th><th>Active</th><th>In validity</th><th>Grants key</th><th>Outcome</th></tr></thead><tbody>{explain.data.evaluations.map((evaluation) => <tr key={evaluation.binding_id}><td className="mono">{evaluation.binding_id.slice(0, 12)}…</td><td>{evaluation.binding_active ? 'yes' : 'no'}</td><td>{evaluation.within_validity ? 'yes' : 'no'}</td><td>{evaluation.role_grants_permission ? 'yes' : 'no'}</td><td><StatusPill value={evaluation.outcome} /></td></tr>)}</tbody></table></div> : <Empty>No candidate binding existed for this subject and tenant.</Empty>}
-        </article>
-      </div>}
-    </article>
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Evaluate one permission</Heading>
+            <Text type="supporting">Requires the policy.explain permission. The response never contains raw claims, tokens, or store internals.</Text>
+          </VStack>
+          <HStack gap={3} vAlign="end" wrap="wrap">
+            <TextInput label="User id" value={form.user_id} onChange={(value) => setForm({ ...form, user_id: value })} placeholder="User id" />
+            <TextInput label="Permission key" value={form.permission} onChange={(value) => setForm({ ...form, permission: value })} placeholder="permission.key" />
+            <Button
+              label={explain.isPending ? 'Evaluating…' : 'Explain'}
+              variant="primary"
+              isDisabled={!form.user_id || !form.permission || explain.isPending}
+              isLoading={explain.isPending}
+              onClick={() => explain.mutate()}
+            />
+          </HStack>
+          <MutationError {...explain} />
+        </VStack>
+      </Card>
+      {explain.data && (
+        <Grid columns={{ minWidth: 340, max: 2 }} gap={4}>
+          <Card padding={5}>
+            <VStack gap={4}>
+              <Text type="label" color="secondary">DECISION</Text>
+              <HStack gap={2}>
+                <StatusPill value={explain.data.allowed ? 'allow' : 'deny'} />
+                <Badge variant={explain.data.allowed ? 'success' : 'error'} label={explain.data.allowed ? 'allowed' : 'denied'} />
+              </HStack>
+              <MetadataList>
+                <MetadataListItem label="Reason"><Text type="code" as="span">{explain.data.reason}</Text></MetadataListItem>
+                {explain.data.matched_binding && <MetadataListItem label="Matched binding"><Text type="code" as="span">{explain.data.matched_binding}</Text></MetadataListItem>}
+                {explain.data.matched_scope && <MetadataListItem label="Scope"><Text type="code" as="span">{JSON.stringify(explain.data.matched_scope)}</Text></MetadataListItem>}
+                <MetadataListItem label="Policy reference"><Text type="code" as="span">{explain.data.policy_reference}</Text></MetadataListItem>
+              </MetadataList>
+            </VStack>
+          </Card>
+          <Card padding={5}>
+            <VStack gap={4}>
+              <VStack gap={1}>
+                <Heading level={2}>Bindings considered</Heading>
+                <Text type="supporting">{explain.data.evaluations.length} candidate evaluations</Text>
+              </VStack>
+              {explain.data.evaluations.length ? (
+                <Table<EvaluationRow>
+                  data={explain.data.evaluations as EvaluationRow[]}
+                  idKey="binding_id"
+                  density="compact"
+                  columns={[
+                    { key: 'binding_id', header: 'Binding', renderCell: (row) => <Text type="code" as="span">{shortId(row.binding_id)}</Text> },
+                    { key: 'binding_active', header: 'Active', renderCell: (row) => (row.binding_active ? 'yes' : 'no') },
+                    { key: 'within_validity', header: 'In validity', renderCell: (row) => (row.within_validity ? 'yes' : 'no') },
+                    { key: 'role_grants_permission', header: 'Grants key', renderCell: (row) => (row.role_grants_permission ? 'yes' : 'no') },
+                    { key: 'outcome', header: 'Outcome', renderCell: (row) => <StatusPill value={row.outcome} /> },
+                  ]}
+                />
+              ) : <EmptyState isCompact title="No candidate binding existed for this subject and tenant." />}
+            </VStack>
+          </Card>
+        </Grid>
+      )}
+    </VStack>
   </>
 }

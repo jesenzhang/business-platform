@@ -49,14 +49,14 @@ test('editing role permissions keeps existing keys in the set-replacement', asyn
 
   await page.goto('/roles')
   await page.getByRole('button', { name: 'Edit permissions' }).click()
-  const editPanel = page.locator('.nested-panel')
+  const editPanel = page.locator('.astryx-card').filter({ has: page.getByRole('heading', { name: 'Permissions for Contract Reviewer' }) })
   await expect(editPanel.getByRole('heading', { name: 'Permissions for Contract Reviewer' })).toBeVisible()
   // The role's current keys must render as checked when the panel opens.
-  await expect(editPanel.locator('label.chip', { hasText: 'identity.read' }).locator('input')).toBeChecked()
-  await expect(editPanel.locator('label.chip', { hasText: 'audit.read' }).locator('input')).toBeChecked()
+  await expect(editPanel.getByRole('checkbox', { name: 'identity.read' })).toBeChecked()
+  await expect(editPanel.getByRole('checkbox', { name: 'audit.read' })).toBeChecked()
 
   // Adding a key must send the full replacement: existing keys plus the new one.
-  await editPanel.locator('label.chip', { hasText: 'policy.explain' }).click()
+  await editPanel.getByRole('checkbox', { name: 'policy.explain' }).check()
   await page.getByRole('button', { name: 'Save permissions' }).click()
   await expect.poll(() => saves.length).toBe(1)
   expect(JSON.parse(saves[0]).permission_keys.sort()).toEqual(['audit.read', 'identity.read', 'policy.explain'])
