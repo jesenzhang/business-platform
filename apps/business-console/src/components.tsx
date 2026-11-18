@@ -1,14 +1,16 @@
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { SideNav, SideNavItem } from '@astryxdesign/core/SideNav'
 import { Text } from '@astryxdesign/core/Text'
 import {
   Building2, CircleUser, FileText, HelpCircle, KeyRound, LayoutDashboard, Link2,
-  Moon, RefreshCw, ScrollText, ShieldAlert, Sun, Wrench,
+  Menu, Moon, RefreshCw, ScrollText, ShieldAlert, Sun, Wrench,
 } from 'lucide-react'
+import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer'
+import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { HStack } from '@astryxdesign/core/HStack'
-import * as Dialog from '@radix-ui/react-dialog'
 import { useConsoleStore } from './store'
 
 /**
@@ -43,34 +45,57 @@ function useActiveNav() {
 export function AppShell() {
   const theme = useConsoleStore((state) => state.theme)
   const setTheme = useConsoleStore((state) => state.setTheme)
+  const { pathname } = useLocation()
+  const [isNavOpen, setIsNavOpen] = useState(false)
+
+  // A drawer that stays open after a route change hides the page the user just
+  // asked for. Closing on navigation keeps the previous behaviour without the
+  // old `document.body.click()` trick.
+  useEffect(() => { setIsNavOpen(false) }, [pathname])
+
+  const themeButton = (
+    <IconButton
+      label="Toggle theme"
+      tooltip={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+      icon={theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+      variant="secondary"
+      size="sm"
+      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+    />
+  )
+
   return (
     <div className={theme === 'dark' ? 'app dark' : 'app'}>
       <aside className="sidebar desktop-sidebar">
         <Navigation />
       </aside>
       <div className="mobile-bar">
-        <Dialog.Root>
-          <Dialog.Trigger asChild><button className="icon-button" aria-label="Open navigation">☰</button></Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="dialog-overlay" />
-            <Dialog.Content className="mobile-drawer">
-              <Dialog.Title className="sr-only">Navigation</Dialog.Title>
-              <Navigation closeOnClick />
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+        <IconButton
+          label="Open navigation"
+          icon={<Menu size={18} />}
+          variant="secondary"
+          size="sm"
+          onClick={() => setIsNavOpen(true)}
+        />
         <Brand compact />
-        <div className="mobile-bar-actions">
-          <IconButton
-            label="Toggle theme"
-            tooltip={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
-            icon={theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          />
-        </div>
+        <div className="mobile-bar-actions">{themeButton}</div>
       </div>
+      <Drawer
+        isOpen={isNavOpen}
+        onOpenChange={setIsNavOpen}
+        label="Navigation"
+        side="start"
+        width={300}
+      >
+        <Layout
+          header={<DrawerHeader title="Navigation" onOpenChange={setIsNavOpen} />}
+          content={(
+            <LayoutContent padding={3}>
+              <Navigation showBrand={false} onNavigate={() => setIsNavOpen(false)} />
+            </LayoutContent>
+          )}
+        />
+      </Drawer>
       <main className="main-content">
         <header className="toolbar">
           <HStack gap={3} vAlign="center">
@@ -82,14 +107,7 @@ export function AppShell() {
               <StatusDot variant="success" label="Tenant-scoped session" />
               <Text type="supporting" as="span">Tenant-scoped session</Text>
             </HStack>
-            <IconButton
-              label="Toggle theme"
-              tooltip={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
-              icon={theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-              variant="secondary"
-              size="sm"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            />
+            {themeButton}
           </HStack>
         </header>
         <section className="page-content"><Outlet /></section>
@@ -102,12 +120,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
   return <Link to="/" className={compact ? 'brand compact' : 'brand'}><span className="brand-mark">B</span><span><strong>Business</strong><small>{compact ? '' : 'Platform'}</small></span></Link>
 }
 
-function Navigation({ closeOnClick = false }: { closeOnClick?: boolean }) {
+function Navigation({ showBrand = true, onNavigate }: { showBrand?: boolean; onNavigate?: () => void }) {
   const isActive = useActiveNav()
   return (
     <SideNav
       aria-label="Primary navigation"
-      header={<Brand />}
+      header={showBrand ? <Brand /> : undefined}
       footer={(
         <div className="sidebar-footer">
           <StatusDot variant="success" label="API connected" />
@@ -122,7 +140,7 @@ function Navigation({ closeOnClick = false }: { closeOnClick?: boolean }) {
           icon={item.icon}
           href={item.to}
           isSelected={isActive(item.to)}
-          onClick={closeOnClick ? () => document.body.click() : undefined}
+          onClick={onNavigate}
         />
       ))}
     </SideNav>
