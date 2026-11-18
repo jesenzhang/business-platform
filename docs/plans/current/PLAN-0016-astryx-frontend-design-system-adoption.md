@@ -2,7 +2,7 @@
 
 - **文档 ID:** PLAN-0016
 - **版本:** 1.0
-- **状态:** Active（S0、S1 已完成并验收；S2 实施中；S3–S5 仅制定路线）
+- **状态:** Active（S0、S1、S2 已完成并验收；S3–S5 仅制定路线，本轮不实施）
 - **日期:** 2026-11-18
 - **所有者:** `apps/business-console`（前端表现层）
 - **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
@@ -89,7 +89,7 @@
 
 验收（全部必须 PASS）：`npm ci` 可复现；`astryx doctor` 无失败；lint / typecheck / test / build / test:e2e 通过；Chromium 组件基础样式正确；light/dark 切换且刷新保持；旧页面无非预期回归；无重复 React 实例。
 
-### S2 — Dashboard 真实页面试点
+### S2 — Dashboard 真实页面试点（已完成，见 `docs/reports/2026-11-18-ASTRYX-MIGRATION-S2-DASHBOARD.md`）
 
 - 保留 `getOverview`、TanStack Query `refetchInterval`、ECharts 图表语义、加载/错误状态、跳转行为；
 - 四个统计指标卡片与页面展示区域改用 Astryx `Card` + 布局/文本基础组件；
@@ -101,7 +101,9 @@
 
 验收：真实业务契约不变；原有测试全绿；新增浏览器测试通过；无重复布局/状态/请求代码；新增依赖与抽象都有直接使用者。
 
-### S3 — 共享 AppShell（下一轮，本轮不实施）
+### S3 — 共享 AppShell（下一轮首个切片；本轮不实施）
+
+前置：S2 已验收（Dashboard 试点可用）。S3 开始时需要重新审视 S1 的 `.app` 排版降级规则，把 shell 自身排版一次性交给 Astryx。
 
 - 评估 Astryx `AppShell` / `TopNav` / `SideNav` / `MobileNav` / `Layout`；
 - React Router 保持唯一导航真相源；路由表与 active 状态不变；

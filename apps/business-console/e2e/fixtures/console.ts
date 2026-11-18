@@ -210,7 +210,7 @@ export async function mockConsoleApi(page: Page, options: MockConsoleOptions = {
 }
 
 /** Deterministic theme selection that mirrors the console's own persistence key. */
-export async function useConsoleTheme(page: Page, theme: 'light' | 'dark') {
+export async function applyConsoleTheme(page: Page, theme: 'light' | 'dark') {
   await page.addInitScript((value) => {
     window.localStorage.setItem('business-console-theme', value)
   }, theme)

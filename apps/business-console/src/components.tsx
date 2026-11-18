@@ -67,10 +67,6 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
   return <div className="page-header"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div>{action}</div>}</div>
 }
 
-export function StatCard({ label, value, detail, tone = 'blue' }: { label: string; value: string | number; detail?: string; tone?: 'blue' | 'orange' | 'green' | 'purple' }) {
-  return <article className={`stat-card tone-${tone}`}><span className="stat-label">{label}</span><strong>{value}</strong>{detail && <span className="stat-detail">{detail}</span>}</article>
-}
-
 export function StatusPill({ value }: { value: string }) {
   return <span className={`status-pill status-${value.replaceAll('_', '-')}`}><span className="status-dot" />{value.replaceAll('_', ' ')}</span>
 }

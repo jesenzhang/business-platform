@@ -1,41 +1,126 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Card } from '@astryxdesign/core/Card'
+import { Grid } from '@astryxdesign/core/Grid'
+import { HStack } from '@astryxdesign/core/HStack'
+import { Heading } from '@astryxdesign/core/Heading'
+import { Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
 import { ApiError, getCandidate, getDocument, getJob, getOverview, listAudit, listDocumentJobs, listDocuments, listFindings, listJobs, startProcessing, submitReview, uploadDocument } from './api'
 import type { AuditEvent, Candidate, Document, IntegrityFinding, ProcessingJob } from './contracts'
-import { Empty, ErrorState, IdLink, Loading, PageHeader, StatCard, StatusPill } from './components'
+import { Empty, ErrorState, IdLink, Loading, PageHeader, StatusPill } from './components'
+import { useConsoleStore } from './store'
 
 const date = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 const bytes = (value?: number | null) => value == null ? '—' : `${(value / 1024).toFixed(1)} KB`
 
+/**
+ * ECharts paints on a canvas, so it cannot read CSS custom properties: each
+ * colour has to be a concrete value. Resolve the design-system tokens through a
+ * hidden probe (which lets the browser evaluate `light-dark()` for the active
+ * scheme) instead of hard-coding light and dark palettes in the page.
+ */
+function resolveChartColors() {
+  const probe = document.createElement('span')
+  probe.style.cssText = 'position:absolute;visibility:hidden;display:block'
+  document.body.appendChild(probe)
+  const read = (token: string, fallback: string) => {
+    probe.style.color = `var(${token})`
+    const value = getComputedStyle(probe).color
+    return value && value !== 'rgba(0, 0, 0, 0)' ? value : fallback
+  }
+  const colors = {
+    axis: read('--color-text-secondary', '#6e6e73'),
+    grid: read('--color-border', 'rgba(0, 0, 0, 0.08)'),
+  }
+  probe.remove()
+  return colors
+}
+
 export function DashboardPage() {
   const query = useQuery({ queryKey: ['overview'], queryFn: getOverview, refetchInterval: 10_000 })
+  const theme = useConsoleStore((state) => state.theme)
+  const [chartColors, setChartColors] = useState(resolveChartColors)
+  useEffect(() => { setChartColors(resolveChartColors()) }, [theme])
   if (query.isPending) return <Loading />
   if (query.isError) return <ErrorState error={query.error} />
   const overview = query.data
+  const statuses = Object.entries(overview.processing_by_status)
+  const metrics = [
+    { label: 'Documents', value: overview.document_total, detail: `+${overview.document_created_today} in the last day` },
+    { label: 'Review queue', value: overview.review_pending, detail: 'Candidates awaiting a decision' },
+    { label: 'Open findings', value: overview.unresolved_findings, detail: 'Integrity signals needing attention' },
+    { label: 'Succeeded jobs', value: overview.processing_by_status.succeeded ?? 0, detail: 'Durable execution history' },
+  ]
   const chartOption = {
+    // Categorical status colours stay stable across modes: they carry the
+    // chart's business meaning. Only the chrome follows the theme tokens.
     color: ['#0071e3', '#34c759', '#ff9f0a', '#af52de', '#ff375f'],
     tooltip: { trigger: 'axis' },
     grid: { left: 8, right: 16, top: 12, bottom: 24, containLabel: true },
-    xAxis: { type: 'category', data: Object.keys(overview.processing_by_status).map((key) => key.replaceAll('_', ' ')), axisLabel: { color: '#6e6e73' } },
-    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#e5e5ea' } }, axisLabel: { color: '#6e6e73' } },
-    series: [{ type: 'bar', barWidth: 24, data: Object.values(overview.processing_by_status), itemStyle: { borderRadius: [6, 6, 0, 0] } }],
+    xAxis: { type: 'category', data: statuses.map(([key]) => key.replaceAll('_', ' ')), axisLabel: { color: chartColors.axis }, axisLine: { lineStyle: { color: chartColors.grid } } },
+    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: chartColors.grid } }, axisLabel: { color: chartColors.axis } },
+    series: [{ type: 'bar', barWidth: 24, data: statuses.map(([, count]) => count), itemStyle: { borderRadius: [6, 6, 0, 0] } }],
   }
   return <>
-    <PageHeader eyebrow="LIVE OPERATIONS" title="Good morning, operator." description="A calm view of document intelligence, processing health, and governance signals." action={<span className="live-badge"><span className="status-dot" /> Live</span>} />
-    <div className="stats-grid">
-      <StatCard label="Documents" value={overview.document_total} detail={`+${overview.document_created_today} in the last day`} />
-      <StatCard label="Review queue" value={overview.review_pending} detail="Candidates awaiting a decision" tone="orange" />
-      <StatCard label="Open findings" value={overview.unresolved_findings} detail="Integrity signals needing attention" tone="purple" />
-      <StatCard label="Succeeded jobs" value={overview.processing_by_status.succeeded ?? 0} detail="Durable execution history" tone="green" />
-    </div>
-    <div className="dashboard-grid">
-      <article className="panel chart-panel"><div className="panel-heading"><div><h2>Processing flow</h2><p>Current durable job states</p></div><Link className="text-button" to="/processing">View jobs →</Link></div><ReactECharts option={chartOption} style={{ height: 260 }} /></article>
-      <article className="panel"><div className="panel-heading"><div><h2>Recent activity</h2><p>Tenant-scoped audit trail</p></div><Link className="text-button" to="/audit">Open audit →</Link></div><AuditList events={overview.recent_audit_events} /></article>
-    </div>
-    <article className="panel"><div className="panel-heading"><div><h2>Recently moving</h2><p>Jobs that changed state most recently</p></div><Link className="text-button" to="/processing">All processing →</Link></div><JobsTable jobs={overview.recent_jobs} /></article>
+    <PageHeader eyebrow="LIVE OPERATIONS" title="Good morning, operator." description="A calm view of document intelligence, processing health, and governance signals." action={<Badge variant="green" label="Live" />} />
+    <VStack gap={4}>
+      <Grid columns={{ minWidth: 150, max: 4 }} gap={3}>
+        {metrics.map((metric) => (
+          <Card key={metric.label} padding={5}>
+            <VStack gap={2}>
+              <Text type="supporting">{metric.label}</Text>
+              <Text type="display-2" hasTabularNumbers>{metric.value}</Text>
+              <Text type="supporting">{metric.detail}</Text>
+            </VStack>
+          </Card>
+        ))}
+      </Grid>
+      <Grid columns={{ minWidth: 380, max: 2 }} gap={3}>
+        <Card padding={5}>
+          <VStack gap={4}>
+            <HStack gap={4} hAlign="between" vAlign="start">
+              <VStack gap={1}>
+                <Heading level={2}>Processing flow</Heading>
+                <Text type="supporting">Current durable job states</Text>
+              </VStack>
+              <Link className="text-button" to="/processing">View jobs →</Link>
+            </HStack>
+            {statuses.length
+              ? <ReactECharts option={chartOption} style={{ height: 260 }} />
+              : <Empty>No processing jobs in this scope yet.</Empty>}
+          </VStack>
+        </Card>
+        <Card padding={5}>
+          <VStack gap={4}>
+            <HStack gap={4} hAlign="between" vAlign="start">
+              <VStack gap={1}>
+                <Heading level={2}>Recent activity</Heading>
+                <Text type="supporting">Tenant-scoped audit trail</Text>
+              </VStack>
+              <Link className="text-button" to="/audit">Open audit →</Link>
+            </HStack>
+            <AuditList events={overview.recent_audit_events} />
+          </VStack>
+        </Card>
+      </Grid>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <HStack gap={4} hAlign="between" vAlign="start">
+            <VStack gap={1}>
+              <Heading level={2}>Recently moving</Heading>
+              <Text type="supporting">Jobs that changed state most recently</Text>
+            </VStack>
+            <Link className="text-button" to="/processing">All processing →</Link>
+          </HStack>
+          <JobsTable jobs={overview.recent_jobs} />
+        </VStack>
+      </Card>
+    </VStack>
   </>
 }
 

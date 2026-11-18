@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
-import { mockConsoleApi, useConsoleTheme } from './fixtures/console'
+import { emptyOverview, mockConsoleApi, applyConsoleTheme } from './fixtures/console'
 
 /**
  * Opt-in screenshot capture for migration evidence.
@@ -65,7 +65,7 @@ for (const view of views) {
       test(`${view.name} ${viewport.name} ${theme}`, async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height })
         await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme })
-        await useConsoleTheme(page, theme)
+        await applyConsoleTheme(page, theme)
         await mockConsoleApi(page)
         await page.goto(view.path)
         await expect(page.getByText(view.readyText, { exact: false })).toBeVisible()
@@ -105,5 +105,35 @@ for (const view of views) {
         await writeFile(path.join(directory, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`, 'utf8')
       })
     }
+  }
+}
+
+/**
+ * Dashboard state screenshots for review: an empty overview and a failed
+ * request. They are captured at desktop width in both themes because the state
+ * treatment (not the responsive layout) is what a reviewer needs to compare.
+ */
+const dashboardStates = [
+  { name: 'dashboard-empty', options: { overview: emptyOverview }, readyText: 'No processing jobs in this scope yet.' },
+  { name: 'dashboard-error', options: { overviewStatus: 500 }, readyText: 'Couldn’t load this view.' },
+] as const
+
+for (const state of dashboardStates) {
+  for (const theme of themes) {
+    test(`${state.name} ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme })
+      await applyConsoleTheme(page, theme)
+      await mockConsoleApi(page, state.options)
+      await page.goto('/')
+      await expect(page.getByText(state.readyText, { exact: false })).toBeVisible()
+      await page.waitForLoadState('networkidle')
+      await page.evaluate(() => document.fonts.ready)
+
+      const directory = path.resolve(String(outDir))
+      await mkdir(directory, { recursive: true })
+      const file = path.join(directory, `${state.name}--desktop--${theme}.png`)
+      await page.screenshot({ path: file, fullPage: true, animations: 'disabled' })
+    })
   }
 }
