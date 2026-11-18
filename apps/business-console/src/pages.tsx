@@ -12,6 +12,7 @@ import { FileInput } from '@astryxdesign/core/FileInput'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Heading } from '@astryxdesign/core/Heading'
+import { List, ListItem } from '@astryxdesign/core/List'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { Link as AstryxLink } from '@astryxdesign/core/Link'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
@@ -433,12 +434,54 @@ export function FindingsPage() {
   const query = useQuery({ queryKey: ['findings'], queryFn: () => listFindings(50) })
   if (query.isPending) return <Loading />
   if (query.isError) return <ErrorState error={query.error} />
-  return <><PageHeader eyebrow="DATA GOVERNANCE" title="Integrity findings" description="Findings are evidence of a consistency problem, not an instruction to bypass the owning context." action={<Link className="secondary-button" to="/repairs">Repair controls →</Link>} /><article className="panel"><div className="panel-heading"><div><h2>Open signals</h2><p>{query.data.items.length} bounded findings</p></div></div><FindingsTable findings={query.data.items} /></article></>
+  return <>
+    <PageHeader
+      eyebrow="DATA GOVERNANCE"
+      title="Integrity findings"
+      description="Findings are evidence of a consistency problem, not an instruction to bypass the owning context."
+      action={<Button label="Repair controls" variant="secondary" href="/repairs" endContent={<Text as="span">→</Text>} />}
+    />
+    <Card padding={5}>
+      <VStack gap={4}>
+        <VStack gap={1}>
+          <Heading level={2}>Open signals</Heading>
+          <Text type="supporting">{query.data.items.length} bounded findings</Text>
+        </VStack>
+        <FindingsTable findings={query.data.items} />
+      </VStack>
+    </Card>
+  </>
 }
 
+type FindingRow = IntegrityFinding & Record<string, unknown>
+
 function FindingsTable({ findings }: { findings: IntegrityFinding[] }) {
-  if (!findings.length) return <Empty>Integrity is quiet in this tenant.</Empty>
-  return <div className="table-wrap"><table><thead><tr><th>Rule</th><th>Resource</th><th>Severity</th><th>Status</th><th>Occurrences</th><th>Last detected</th></tr></thead><tbody>{findings.map((finding) => <tr key={finding.id}><td><span className="table-primary">{finding.rule_id}</span><span className="table-secondary">{finding.bounded_context}</span></td><td className="mono">{finding.resource_type}:{finding.resource_id.slice(0, 12)}</td><td><StatusPill value={finding.severity} /></td><td><StatusPill value={finding.status} /></td><td>{finding.occurrence_count}</td><td>{date(finding.last_detected_at)}</td></tr>)}</tbody></table></div>
+  return (
+    <Table<FindingRow>
+      data={findings as FindingRow[]}
+      idKey="id"
+      density="compact"
+      emptyState={<EmptyState isCompact title="Integrity is quiet in this tenant." />}
+      columns={[
+        {
+          key: 'rule_id',
+          header: 'Rule',
+          width: proportional(2),
+          renderCell: (row) => (
+            <VStack gap={0.5}>
+              <Text weight="semibold">{row.rule_id}</Text>
+              <Text type="supporting">{row.bounded_context}</Text>
+            </VStack>
+          ),
+        },
+        { key: 'resource_id', header: 'Resource', renderCell: (row) => <Text type="code" as="span">{`${row.resource_type}:${row.resource_id.slice(0, 12)}`}</Text> },
+        { key: 'severity', header: 'Severity', renderCell: (row) => <StatusPill value={row.severity} /> },
+        { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+        { key: 'occurrence_count', header: 'Occurrences', renderCell: (row) => <Text as="span" hasTabularNumbers>{row.occurrence_count}</Text> },
+        { key: 'last_detected_at', header: 'Last detected', renderCell: (row) => <Text as="span" type="supporting">{date(row.last_detected_at)}</Text> },
+      ]}
+    />
+  )
 }
 
 export function RepairsPage() {
@@ -452,7 +495,18 @@ export function AuditPage() {
   const query = useQuery({ queryKey: ['audit'], queryFn: () => listAudit(50) })
   if (query.isPending) return <Loading />
   if (query.isError) return <ErrorState error={query.error} />
-  return <><PageHeader eyebrow="RUNTIME GOVERNANCE" title="Audit" description="Immutable, tenant-scoped evidence for business and operational transitions." /><article className="panel"><div className="panel-heading"><div><h2>Event stream</h2><p>{query.data.items.length} recent events</p></div></div><AuditList events={query.data.items} expanded /></article></>
+  return <>
+    <PageHeader eyebrow="RUNTIME GOVERNANCE" title="Audit" description="Immutable, tenant-scoped evidence for business and operational transitions." />
+    <Card padding={5}>
+      <VStack gap={4}>
+        <VStack gap={1}>
+          <Heading level={2}>Event stream</Heading>
+          <Text type="supporting">{query.data.items.length} recent events</Text>
+        </VStack>
+        <AuditList events={query.data.items} expanded />
+      </VStack>
+    </Card>
+  </>
 }
 
 type JobRow = ProcessingJob & Record<string, unknown>
@@ -478,5 +532,22 @@ function JobsTable({ jobs }: { jobs: ProcessingJob[] }) {
 
 function AuditList({ events, expanded = false }: { events: AuditEvent[]; expanded?: boolean }) {
   if (!events.length) return <Empty>No audit events yet.</Empty>
-  return <div className="audit-list">{events.map((event) => <div className="audit-item" key={event.id}><div className="audit-marker" /><div className="audit-main"><div><strong>{event.action.replaceAll('_', ' ')}</strong><StatusPill value={event.result} /></div><span className="table-secondary">{event.resource_type} · {event.resource_id.slice(0, 12)} · {date(event.occurred_at)}</span>{expanded && event.failure_code && <span className="table-secondary">Failure: {event.failure_code}</span>}</div></div>)}</div>
+  return (
+    <List density="compact" edge="flush">
+      {events.map((event) => (
+        <ListItem
+          key={event.id}
+          startContent={<StatusDot variant={event.result === 'failed' ? 'error' : 'success'} label={event.result} />}
+          label={<Text weight="medium">{event.action.replaceAll('_', ' ')}</Text>}
+          description={(
+            <Text type="supporting">
+              {`${event.resource_type} · ${event.resource_id.slice(0, 12)} · ${date(event.occurred_at)}`}
+              {expanded && event.failure_code ? ` · Failure: ${event.failure_code}` : ''}
+            </Text>
+          )}
+          endContent={<StatusPill value={event.result} />}
+        />
+      ))}
+    </List>
+  )
 }
