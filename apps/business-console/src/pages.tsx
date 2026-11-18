@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@astryxdesign/core/Badge'
+import { Banner } from '@astryxdesign/core/Banner'
+import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
+import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { FileInput } from '@astryxdesign/core/FileInput'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Heading } from '@astryxdesign/core/Heading'
+import { Link as AstryxLink } from '@astryxdesign/core/Link'
+import { Table, proportional } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { ApiError, getCandidate, getDocument, getJob, getOverview, listAudit, listDocumentJobs, listDocuments, listFindings, listJobs, startProcessing, submitReview, uploadDocument } from './api'
@@ -133,22 +138,84 @@ export function DocumentsPage() {
   if (query.isError) return <ErrorState error={query.error} />
   return <>
     <PageHeader eyebrow="DOCUMENT MANAGEMENT" title="Documents" description="Content revisions are owned by Document Management. Processing reads them through a durable job." />
-    <div className="upload-panel panel"><div><h2>Bring a document into the pipeline</h2><p>PDF, TXT, DOC, and DOCX up to 10 MiB. Storage keys are generated server-side.</p></div><div className="upload-control"><label className="file-input"><input type="file" accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} /><span>{selectedFile ? selectedFile.name : 'Choose a file'}</span></label><button className="primary-button" disabled={!selectedFile || upload.isPending} onClick={() => selectedFile && upload.mutate(selectedFile)}>{upload.isPending ? 'Uploading…' : 'Upload document'}</button></div>{upload.isError && <div className="inline-error">{upload.error instanceof ApiError ? upload.error.message : 'Upload failed. Check the API connection.'}</div>}</div>
-    <article className="panel"><div className="panel-heading"><div><h2>Document register</h2><p>{query.data.items.length} records in this page</p></div><span className="subtle">All records are tenant-scoped</span></div><DocumentTable documents={query.data.items} /></article>
+    <VStack gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Bring a document into the pipeline</Heading>
+            <Text type="supporting">PDF, TXT, DOC, and DOCX up to 10 MiB. Storage keys are generated server-side.</Text>
+          </VStack>
+          <HStack gap={4} vAlign="end" wrap="wrap">
+            <FileInput
+              label="Document file"
+              value={selectedFile}
+              onChange={(files) => setSelectedFile(files instanceof File ? files : null)}
+              accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              maxSize={10 * 1024 * 1024}
+              placeholder="Choose a file"
+              description="Accepted formats: PDF, TXT, DOC, DOCX up to 10 MiB."
+            />
+            <Button
+              label={upload.isPending ? 'Uploading…' : 'Upload document'}
+              variant="primary"
+              isDisabled={!selectedFile || upload.isPending}
+              isLoading={upload.isPending}
+              onClick={() => selectedFile && upload.mutate(selectedFile)}
+            />
+          </HStack>
+          {upload.isError && (
+            <Banner
+              status="error"
+              title="Upload failed"
+              description={upload.error instanceof ApiError ? upload.error.message : 'Upload failed. Check the API connection.'}
+            />
+          )}
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
+            <VStack gap={1}>
+              <Heading level={2}>Document register</Heading>
+              <Text type="supporting">{query.data.items.length} records in this page</Text>
+            </VStack>
+            <Text type="supporting">All records are tenant-scoped</Text>
+          </HStack>
+          <DocumentTable documents={query.data.items} />
+        </VStack>
+      </Card>
+    </VStack>
   </>
 }
 
+type DocumentRow = Document & Record<string, unknown>
+
 function DocumentTable({ documents }: { documents: Document[] }) {
-  const columns = useMemo<ColumnDef<Document>[]>(() => [
-    { accessorKey: 'original_filename', header: 'Document', cell: ({ row }) => <div><Link className="table-primary" to={`/documents/${row.original.id}`}>{row.original.original_filename}</Link><span className="table-secondary">{row.original.content_type}</span></div> },
-    { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusPill value={row.original.status} /> },
-    { accessorKey: 'content_revision', header: 'Revision' },
-    { accessorKey: 'size_bytes', header: 'Size', cell: ({ row }) => bytes(row.original.size_bytes) },
-    { accessorKey: 'updated_at', header: 'Updated', cell: ({ row }) => date(row.original.updated_at) },
-  ], [])
-  const table = useReactTable({ data: documents, columns, getCoreRowModel: getCoreRowModel() })
-  if (!documents.length) return <Empty>Upload the first document to make the pipeline visible.</Empty>
-  return <div className="table-wrap"><table><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id}>{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></table></div>
+  return (
+    <Table<DocumentRow>
+      data={documents as DocumentRow[]}
+      idKey="id"
+      density="compact"
+      emptyState={<EmptyState isCompact title="No documents yet" description="Upload the first document to make the pipeline visible." />}
+      columns={[
+        {
+          key: 'original_filename',
+          header: 'Document',
+          width: proportional(2),
+          renderCell: (row) => (
+            <VStack gap={0.5}>
+              <AstryxLink href={`/documents/${row.id}`}>{row.original_filename}</AstryxLink>
+              <Text type="supporting" maxLines={1}>{row.content_type}</Text>
+            </VStack>
+          ),
+        },
+        { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+        { key: 'content_revision', header: 'Revision' },
+        { key: 'size_bytes', header: 'Size', renderCell: (row) => <Text as="span" hasTabularNumbers>{bytes(row.size_bytes)}</Text> },
+        { key: 'updated_at', header: 'Updated', renderCell: (row) => <Text as="span" type="supporting">{date(row.updated_at)}</Text> },
+      ]}
+    />
+  )
 }
 
 export function DocumentDetailPage() {
