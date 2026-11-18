@@ -2,7 +2,7 @@
 
 - **文档 ID:** PLAN-0016
 - **版本:** 1.0
-- **状态:** Active（S0 已完成，S1/S2 授权实施；S3–S5 仅制定路线）
+- **状态:** Active（S0、S1 已完成并验收；S2 实施中；S3–S5 仅制定路线）
 - **日期:** 2026-11-18
 - **所有者:** `apps/business-console`（前端表现层）
 - **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
@@ -75,7 +75,7 @@
 
 验收：不做用户可见业务页面修改；所有拟替换组件识别了使用者；明确变更/禁改文件；兼容性阻碍有解决办法。
 
-### S1 — Astryx 基础接入
+### S1 — Astryx 基础接入（已完成，见 `docs/reports/2026-11-18-ASTRYX-MIGRATION-S1-FOUNDATION.md`）
 
 1. 安装 `@astryxdesign/core@0.7.16`、`@astryxdesign/theme-neutral@0.7.16`、`@stylexjs/stylex@0.19.2`、devDependency `@astryxdesign/cli@0.7.16`；`package-lock.json` 必须记录同一版本组。
 2. `npm exec -- astryx doctor` 输出留档。

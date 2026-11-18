@@ -34,6 +34,31 @@ const themes = ['light', 'dark'] as const
 
 const metrics: Array<Record<string, unknown>> = []
 
+/**
+ * ECharts animates its first paint in JavaScript, so a screenshot taken as soon
+ * as the canvas exists can catch a half-grown bar. Sample the canvas until two
+ * consecutive samples agree; bounded so a continuously animating chart still
+ * produces a screenshot.
+ */
+async function waitForCanvasToSettle(page: import('@playwright/test').Page) {
+  const sample = () => page.evaluate(() => {
+    const canvas = document.querySelector('canvas')
+    if (!canvas) return 'missing'
+    const pixels = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data
+    if (!pixels) return 'unreadable'
+    let hash = 0
+    for (let index = 0; index < pixels.length; index += 41) hash = (hash * 31 + pixels[index]) | 0
+    return String(hash)
+  })
+  let previous = await sample()
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await page.waitForTimeout(120)
+    const next = await sample()
+    if (next === previous) return
+    previous = next
+  }
+}
+
 for (const view of views) {
   for (const viewport of viewports) {
     for (const theme of themes) {
@@ -48,6 +73,7 @@ for (const view of views) {
         await page.evaluate(() => document.fonts.ready)
         if (view.name === 'dashboard') {
           await expect(page.locator('canvas').first()).toBeVisible()
+          await waitForCanvasToSettle(page)
         }
 
         const measured = await page.evaluate(() => {

@@ -1,13 +1,57 @@
-@tailwind base;
+/*
+ * Global stylesheet for the console.
+ *
+ * Cascade layer order is declared once in `layers.css`, which `main.tsx`
+ * imports before this file and before any Astryx stylesheet. Astryx's own
+ * stylesheets are imported there too, so the load order stays explicit.
+ *
+ * Only Tailwind's preflight may fight the design system, so it is layered
+ * (`tw-preflight`) below `astryx-base`/`astryx-theme`. Utilities stay
+ * unlayered on purpose: existing utility classes keep winning.
+ */
+@layer tw-preflight {
+  @tailwind base;
+}
 @tailwind components;
 @tailwind utilities;
 
-:root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #1d1d1f; background: #f5f5f7; font-synthesis: none; text-rendering: optimizeLegibility; }
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input, textarea { font: inherit; }
-button { cursor: pointer; }
-.app { --ink: #1d1d1f; --muted: #6e6e73; --canvas: #f5f5f7; --panel: #fff; --line: #e5e5ea; --accent: #0071e3; min-height: 100vh; display: flex; background: var(--canvas); color: var(--ink); transition: background .2s ease, color .2s ease; }
+/*
+ * The app reset belongs in the lowest layer. Before Astryx existed these rules
+ * were unlayered, which is harmless in a layered-free page but silently beats
+ * every design-system layer once cascade layers are in play. Same CSS, same
+ * rendered result for the legacy shell, no override of Astryx components.
+ */
+@layer reset {
+  :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #1d1d1f; background: #f5f5f7; font-synthesis: none; text-rendering: optimizeLegibility; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 320px; min-height: 100vh; }
+  button, input, textarea { font: inherit; }
+  button { cursor: pointer; }
+
+  /*
+   * Demote the Astryx theme's element reset for the legacy shell.
+   *
+   * The neutral theme restyles bare `h1..h6`, `p`, `small` and `code/pre`
+   * inside `[data-astryx-theme]` at zero specificity (reset layer). Because the
+   * Theme boundary is the document root, that would restyle every page that has
+   * not been migrated yet: different font family, font sizes, colours and line
+   * boxes. These rules re-apply the pre-Astryx normalization for `.app` only.
+   *
+   * Two layers of ranking keep this safe:
+   *   - a class + `:where()` selector (0,1,0) outranks the theme's `:where()`
+   *     (0,0,0) inside the same reset layer;
+   *   - Astryx component typography lives in `astryx-base`, a later layer, so
+   *     migrated components still win regardless of specificity.
+   * App class rules such as `.page-header h1` are unlayered and keep winning.
+   * Remove these rules per page as S4 migrates it.
+   */
+  .app :where(h1, h2, h3, h4, h5, h6) { font-family: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; margin: 0; color: inherit; }
+  .app :where(p) { font-family: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; margin: 0; color: inherit; }
+  .app :where(small) { font-size: smaller; font-weight: inherit; line-height: inherit; color: inherit; }
+  .app :where(code, kbd, samp, pre) { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 1em; line-height: inherit; }
+}
+
+.app { --ink: #1d1d1f; --muted: #6e6e73; --canvas: #f5f5f7; --panel: #fff; --line: #e5e5ea; --accent: #0071e3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; min-height: 100vh; display: flex; background: var(--canvas); color: var(--ink); transition: background .2s ease, color .2s ease; }
 .app.dark { --ink: #f5f5f7; --muted: #a1a1a6; --canvas: #161617; --panel: #232326; --line: #3b3b40; --accent: #5caaff; }
 .sidebar { width: 248px; padding: 28px 18px 22px; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 88%, transparent); position: fixed; inset: 0 auto 0 0; z-index: 10; }
 .brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; color: var(--ink); padding: 0 10px; margin-bottom: 40px; }
@@ -51,20 +95,20 @@ button { cursor: pointer; }
 .icon-button:hover { border-color: var(--accent); color: var(--accent); }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 10%, transparent); color: var(--muted); font-size: 11px; text-transform: capitalize; white-space: nowrap; }
 .status-succeeded, .status-accepted, .status-repaired { color: #238636; background: color-mix(in srgb, #34c759 12%, transparent); } .status-failed, .status-rejected, .status-open { color: #d70015; background: color-mix(in srgb, #ff375f 10%, transparent); } .status-running, .status-waiting-for-review, .status-repairing { color: #a15c00; background: color-mix(in srgb, #ff9f0a 15%, transparent); } .status-queued, .status-waiting-for-ai { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); }
-.table-wrap { overflow-x: auto; margin: 0 -8px; } table { width: 100%; border-collapse: collapse; min-width: 680px; } th { color: var(--muted); font-size: 10px; text-align: left; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; padding: 10px 8px; border-bottom: 1px solid var(--line); } td { padding: 14px 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; vertical-align: middle; } tr:last-child td { border-bottom: 0; } .table-primary, .table-secondary { display: block; } .table-primary { color: var(--ink); font-weight: 600; text-decoration: none; } .table-primary:hover { color: var(--accent); } .table-secondary { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.table-wrap { overflow-x: auto; margin: 0 -8px; } .table-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; } .table-wrap th { color: var(--muted); font-size: 10px; text-align: left; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; padding: 10px 8px; border-bottom: 1px solid var(--line); } .table-wrap td { padding: 14px 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; vertical-align: middle; } .table-wrap tr:last-child td { border-bottom: 0; } .table-primary, .table-secondary { display: block; } .table-primary { color: var(--ink); font-weight: 600; text-decoration: none; } .table-primary:hover { color: var(--accent); } .table-secondary { color: var(--muted); font-size: 11px; margin-top: 4px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
 .upload-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; border-style: dashed; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); margin-bottom: 18px; } .upload-panel h2 { font-size: 16px; margin: 0 0 5px; } .upload-panel p { margin: 0; color: var(--muted); font-size: 12px; } .upload-control { display: flex; gap: 9px; align-items: center; } .file-input { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .file-input input { position: absolute; opacity: 0; width: 1px; }
 .primary-button, .secondary-button { border-radius: 9px; padding: 10px 14px; border: 1px solid transparent; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; white-space: nowrap; } .primary-button { background: var(--accent); color: white; } .primary-button:hover { filter: brightness(.92); } .primary-button:disabled, .secondary-button:disabled { opacity: .5; cursor: not-allowed; } .secondary-button { background: var(--panel); border-color: var(--line); color: var(--ink); } .secondary-button:hover { border-color: var(--accent); color: var(--accent); } .block-button { width: 100%; margin-top: 20px; }
 .loading, .empty { min-height: 180px; display: grid; place-items: center; color: var(--muted); font-size: 13px; gap: 10px; } .loading { min-height: 50vh; } .spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } } @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 .error-state, .callout, .success-note, .inline-error { padding: 15px 17px; border-radius: 11px; font-size: 13px; } .error-state, .inline-error { color: #d70015; background: color-mix(in srgb, #ff375f 8%, var(--panel)); border: 1px solid color-mix(in srgb, #ff375f 22%, var(--line)); } .error-state strong, .error-state span { display: block; } .error-state span { margin-top: 4px; font-size: 12px; } .success-note { color: #238636; background: color-mix(in srgb, #34c759 10%, var(--panel)); margin-top: 14px; } .callout { display: flex; gap: 12px; align-items: baseline; margin-bottom: 18px; border-left: 3px solid #ff9f0a; } .callout strong { white-space: nowrap; font-size: 13px; } .callout span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .detail-card h2 { margin: 8px 0 10px; letter-spacing: -.035em; } dl { display: grid; grid-template-columns: 120px 1fr; gap: 12px 15px; margin: 26px 0 0; font-size: 13px; } dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; } .pipeline { display: grid; gap: 9px; } .pipeline-step { display: flex; align-items: center; gap: 11px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; text-transform: capitalize; } .pipeline-step span { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--line); font-size: 10px; } .pipeline-step.done { color: #238636; border-color: color-mix(in srgb, #34c759 25%, var(--line)); } .pipeline-step.done span { background: #34c759; color: white; } .pipeline-step.current { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 5%, transparent); } .pipeline-step.current span { background: var(--accent); color: white; }
-.review-grid { grid-template-columns: 1fr 340px; align-items: start; } .json-view { margin: 0; padding: 18px; border: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 75%, transparent); border-radius: 11px; color: var(--ink); overflow: auto; font-size: 12px; line-height: 1.7; min-height: 320px; } .field-label { display: block; color: var(--muted); font-size: 12px; margin: 22px 0 8px; } textarea { width: 100%; resize: vertical; border: 1px solid var(--line); color: var(--ink); background: var(--canvas); border-radius: 9px; padding: 10px; outline: none; font-size: 12px; } textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); } .button-row { display: flex; gap: 9px; justify-content: flex-end; margin-top: 15px; }
+.review-grid { grid-template-columns: 1fr 340px; align-items: start; } .json-view { margin: 0; padding: 18px; border: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 75%, transparent); border-radius: 11px; color: var(--ink); overflow: auto; font-size: 12px; line-height: 1.7; min-height: 320px; } .field-label { display: block; color: var(--muted); font-size: 12px; margin: 22px 0 8px; } .review-sidebar textarea { width: 100%; resize: vertical; border: 1px solid var(--line); color: var(--ink); background: var(--canvas); border-radius: 9px; padding: 10px; outline: none; font-size: 12px; } .review-sidebar textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); } .button-row { display: flex; gap: 9px; justify-content: flex-end; margin-top: 15px; }
 .audit-list { display: grid; gap: 16px; } .audit-item { display: flex; gap: 12px; } .audit-marker { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: 0 0 auto; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); } .audit-main { min-width: 0; width: 100%; } .audit-main > div { display: flex; align-items: center; gap: 9px; } .audit-main strong { font-size: 13px; text-transform: capitalize; } .audit-main .status-pill { font-size: 10px; padding: 3px 7px; }
 .mobile-bar { display: none; }
 .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 20; } .mobile-drawer { position: fixed; inset: 0 auto 0 0; width: 270px; z-index: 21; background: var(--canvas); padding: 28px 18px; outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1050px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid, .detail-grid, .review-grid { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .desktop-sidebar { display: none; } .mobile-bar { height: 62px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 88%, transparent); backdrop-filter: blur(18px); } .mobile-bar .brand { margin: 0; padding: 0; } .main-content { width: 100%; margin-left: 0; } .toolbar { display: none; } .page-content { padding: 28px 18px 50px; } .page-header { align-items: flex-start; flex-direction: column; margin-bottom: 23px; } .page-header h1 { font-size: 32px; } .stats-grid { gap: 10px; } .stat-card { padding: 16px; } .stat-card strong { font-size: 25px; } .upload-panel { grid-template-columns: 1fr; } .upload-control { align-items: stretch; flex-direction: column; } .file-input { max-width: none; } .callout { align-items: flex-start; flex-direction: column; gap: 5px; } }
+@media (max-width: 760px) { .app { flex-direction: column; } .desktop-sidebar { display: none; } .mobile-bar { height: 62px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 88%, transparent); backdrop-filter: blur(18px); } .mobile-bar .brand { margin: 0; padding: 0; } .main-content { width: 100%; margin-left: 0; } .toolbar { display: none; } .page-content { padding: 28px 18px 50px; } .page-header { align-items: flex-start; flex-direction: column; margin-bottom: 23px; } .page-header h1 { font-size: 32px; } .stats-grid { gap: 10px; } .stat-card { padding: 16px; } .stat-card strong { font-size: 25px; } .upload-panel { grid-template-columns: 1fr; } .upload-control { align-items: stretch; flex-direction: column; } .file-input { max-width: none; } .callout { align-items: flex-start; flex-direction: column; gap: 5px; } }
 
 /* PLAN-0013 identity & authorization surfaces */
 .text-input { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; color: var(--ink); background: var(--panel); font-size: 12px; outline: none; min-width: 170px; }
