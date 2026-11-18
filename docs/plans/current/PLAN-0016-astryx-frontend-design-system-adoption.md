@@ -2,7 +2,7 @@
 
 - **文档 ID:** PLAN-0016
 - **版本:** 1.0
-- **状态:** Active（S0、S1、S2 已完成并验收；S3–S5 仅制定路线，本轮不实施）
+- **状态:** Active（S0、S1、S2、S3 已完成并验收；S4 待启动，S5 仅制定路线）
 - **日期:** 2026-11-18
 - **所有者:** `apps/business-console`（前端表现层）
 - **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
@@ -101,14 +101,16 @@
 
 验收：真实业务契约不变；原有测试全绿；新增浏览器测试通过；无重复布局/状态/请求代码；新增依赖与抽象都有直接使用者。
 
-### S3 — 共享 AppShell（下一轮首个切片；本轮不实施）
+### S3 — 共享 AppShell（已完成，见 `docs/reports/2026-11-18-ASTRYX-MIGRATION-S3-APPSHELL.md`）
 
-前置：S2 已验收（Dashboard 试点可用）。S3 开始时需要重新审视 S1 的 `.app` 排版降级规则，把 shell 自身排版一次性交给 Astryx。
+前置：S2 已验收（Dashboard 试点可用）。
 
 - 评估 Astryx `AppShell` / `TopNav` / `SideNav` / `MobileNav` / `Layout`；
 - React Router 保持唯一导航真相源；路由表与 active 状态不变；
 - 移动端导航若替换 Radix Dialog，必须验证打开/关闭/遮罩/焦点管理/Esc/路由跳转/触摸；
 - 若 Astryx 导航无法自然接入 React Router，则保留现有导航行为，只采用 Astryx 布局与 Token，不引入复杂适配层。
+
+**执行结果（S3-1..S3-5）：** 采用 `LinkProvider` + `SideNav` + `IconButton`/`Toolbar` 原语 + `Drawer`（替换 Radix）+ 排版作用域收窄；**未**采用 `AppShell`/`TopNav` 整体框架（几何/滚动模型/品牌位置评估见报告 §2），保留 260px 固定侧栏与 sticky 工具栏。新增 7 条 shell e2e，Radix 依赖删除，页面内容像素级不变。
 
 ### S4 — 逐业务页面（本轮不实施）
 

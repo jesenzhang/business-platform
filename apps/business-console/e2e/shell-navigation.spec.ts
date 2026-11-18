@@ -80,6 +80,23 @@ test('navigation is client-side and keeps the router in charge', async ({ page }
   await expect(page.getByRole('heading', { name: 'Roles & permissions' })).toBeVisible()
 })
 
+test('every top-level route renders inside the migrated shell', async ({ page }) => {
+  test.setTimeout(120_000)
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await mockConsoleApi(page)
+
+  const primary = nav(page)
+  for (const [path, label] of routes) {
+    await page.goto(path)
+    await expect(page.locator('h1')).toBeVisible()
+    await expect(primary).toBeVisible()
+    await expect(primary.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
+    await expect(primary.locator('[aria-current="page"]')).toHaveCount(1)
+    expect(pageErrors, `route ${path} rendered without an uncaught error`).toEqual([])
+  }
+})
+
 test.describe('mobile drawer', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

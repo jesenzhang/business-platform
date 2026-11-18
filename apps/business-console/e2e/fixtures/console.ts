@@ -207,6 +207,11 @@ export async function mockConsoleApi(page: Page, options: MockConsoleOptions = {
   await page.route('**/api/v1/admin/permissions', (route) => route.fulfill({
     json: envelope(options.permissions ?? permissions),
   }))
+  // Array-shaped admin endpoints. Without these the catch-all would answer with
+  // a page envelope and a page that calls `.filter` on the payload would crash,
+  // which would hide a real regression behind a fixture gap.
+  await page.route('**/api/v1/admin/role-bindings*', (route) => route.fulfill({ json: envelope([]) }))
+  await page.route('**/api/v1/admin/organization-units*', (route) => route.fulfill({ json: envelope([]) }))
 }
 
 /** Deterministic theme selection that mirrors the console's own persistence key. */

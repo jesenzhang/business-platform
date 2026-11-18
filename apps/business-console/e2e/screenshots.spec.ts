@@ -137,3 +137,22 @@ for (const state of dashboardStates) {
     })
   }
 }
+
+/** Mobile navigation drawer, open, in both themes. */
+for (const theme of themes) {
+  test(`mobile drawer ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme })
+    await applyConsoleTheme(page, theme)
+    await mockConsoleApi(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    await expect(page.getByRole('dialog', { name: 'Navigation' })).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
+
+    const directory = path.resolve(String(outDir))
+    await mkdir(directory, { recursive: true })
+    const file = path.join(directory, `mobile-drawer--mobile--${theme}.png`)
+    await page.screenshot({ path: file, fullPage: false, animations: 'disabled' })
+  })
+}
