@@ -11,21 +11,21 @@ test('identity & authorization views render from mocked admin APIs', async ({ pa
   await page.route('**/api/v1/admin/organization-units*', async (route) => route.fulfill({ json: envelope([]) }))
 
   await page.goto('/identities')
-  await expect(page.getByRole('heading', { name: 'Identities' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Identities' })).toBeVisible()
   await expect(page.getByText('No memberships yet.')).toBeVisible()
 
   await page.goto('/roles')
-  await expect(page.getByRole('heading', { name: 'Roles & permissions' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Roles & permissions' })).toBeVisible()
   await expect(page.getByText('Contract Reviewer')).toBeVisible()
 
   await page.goto('/bindings')
-  await expect(page.getByRole('heading', { name: 'Role bindings' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Role bindings' })).toBeVisible()
 
   await page.goto('/organization')
-  await expect(page.getByRole('heading', { name: 'Organization units' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Organization units' })).toBeVisible()
 
   await page.goto('/explain')
-  await expect(page.getByRole('heading', { name: 'Explain a decision' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Explain a decision' })).toBeVisible()
 })
 
 test('editing role permissions keeps existing keys in the set-replacement', async ({ page }) => {

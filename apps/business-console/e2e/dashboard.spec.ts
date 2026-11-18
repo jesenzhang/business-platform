@@ -16,7 +16,7 @@ const card = (page: import('@playwright/test').Page, label: string) =>
 test('renders the four live metrics and the three dashboard sections', async ({ page }) => {
   await mockConsoleApi(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Good morning, operator.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Good morning, operator.' })).toBeVisible()
 
   await expect(card(page, 'Documents')).toContainText('128')
   await expect(card(page, 'Review queue')).toContainText('4')
@@ -35,7 +35,7 @@ test('renders the four live metrics and the three dashboard sections', async ({ 
 test('renders an explicit empty state when the overview has no data', async ({ page }) => {
   await mockConsoleApi(page, { overview: emptyOverview })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Good morning, operator.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Good morning, operator.' })).toBeVisible()
 
   await expect(card(page, 'Documents')).toContainText('0')
   await expect(card(page, 'Succeeded jobs')).toContainText('0')
@@ -52,7 +52,7 @@ test('surfaces the bounded error state instead of a blank page', async ({ page }
   await page.goto('/')
   await expect(page.getByText('Couldn’t load this view.')).toBeVisible()
   await expect(page.getByText('Operations overview is temporarily unavailable')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Good morning, operator.' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1, name: 'Good morning, operator.' })).toHaveCount(0)
 })
 
 test('a refetch updates the metrics and the chart', async ({ page }) => {
@@ -92,12 +92,12 @@ test('dashboard links keep their existing destinations', async ({ page }) => {
 
   await page.getByRole('link', { name: 'View jobs →' }).click()
   await expect(page).toHaveURL(/\/processing$/)
-  await expect(page.getByRole('heading', { name: 'Processing' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Processing' })).toBeVisible()
 
   await page.goBack()
   await page.getByRole('link', { name: 'Open audit →' }).click()
   await expect(page).toHaveURL(/\/audit$/)
-  await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Audit' })).toBeVisible()
 
   await page.goBack()
   await page.getByRole('link', { name: 'All processing →' }).click()
@@ -111,7 +111,7 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 900 }, { name: '
       await applyConsoleTheme(page, theme)
       await mockConsoleApi(page)
       await page.goto('/')
-      await expect(page.getByRole('heading', { name: 'Good morning, operator.' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Good morning, operator.' })).toBeVisible()
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
 
       const layout = await page.evaluate(() => {

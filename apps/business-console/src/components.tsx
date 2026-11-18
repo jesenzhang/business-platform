@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom'
 import { SideNav, SideNavItem } from '@astryxdesign/core/SideNav'
+import { Badge } from '@astryxdesign/core/Badge'
+import { Banner } from '@astryxdesign/core/Banner'
+import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { Heading } from '@astryxdesign/core/Heading'
+import { HStack } from '@astryxdesign/core/HStack'
+import { Spinner } from '@astryxdesign/core/Spinner'
 import { Text } from '@astryxdesign/core/Text'
+import { Link } from '@astryxdesign/core/Link'
+import { VStack } from '@astryxdesign/core/VStack'
 import {
   Building2, CircleUser, FileText, HelpCircle, KeyRound, LayoutDashboard, Link2,
   Menu, Moon, RefreshCw, ScrollText, ShieldAlert, Sun, Wrench,
@@ -10,7 +18,6 @@ import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
-import { HStack } from '@astryxdesign/core/HStack'
 import { useConsoleStore } from './store'
 
 /**
@@ -117,7 +124,7 @@ export function AppShell() {
 }
 
 function Brand({ compact = false }: { compact?: boolean }) {
-  return <Link to="/" className={compact ? 'brand compact' : 'brand'}><span className="brand-mark">B</span><span><strong>Business</strong><small>{compact ? '' : 'Platform'}</small></span></Link>
+  return <RouterLink to="/" className={compact ? 'brand compact' : 'brand'}><span className="brand-mark">B</span><span><strong>Business</strong><small>{compact ? '' : 'Platform'}</small></span></RouterLink>
 }
 
 function Navigation({ showBrand = true, onNavigate }: { showBrand?: boolean; onNavigate?: () => void }) {
@@ -127,10 +134,10 @@ function Navigation({ showBrand = true, onNavigate }: { showBrand?: boolean; onN
       aria-label="Primary navigation"
       header={showBrand ? <Brand /> : undefined}
       footer={(
-        <div className="sidebar-footer">
+        <HStack gap={1} vAlign="center">
           <StatusDot variant="success" label="API connected" />
           <Text type="supporting" as="span">API connected through Business API</Text>
-        </div>
+        </HStack>
       )}
     >
       {navItems.map((item) => (
@@ -147,15 +154,74 @@ function Navigation({ showBrand = true, onNavigate }: { showBrand?: boolean; onN
   )
 }
 
+/**
+ * Page title block: the single heading-1 of a route, with the optional eyebrow
+ * and description the console uses across business pages.
+ */
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: React.ReactNode; action?: React.ReactNode }) {
-  return <div className="page-header"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div>{action}</div>}</div>
+  return (
+    <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap" paddingBlockEnd={4}>
+      <VStack gap={1}>
+        {eyebrow && <Text type="label" color="secondary">{eyebrow}</Text>}
+        <Heading level={1}>{title}</Heading>
+        {description && <Text type="supporting">{description}</Text>}
+      </VStack>
+      {action && <HStack gap={2} vAlign="center">{action}</HStack>}
+    </HStack>
+  )
+}
+
+/**
+ * Status vocabulary → design-system badge tone. Kept as a table so the mapping
+ * is reviewable in one place and unknown values degrade to a neutral badge
+ * instead of inventing a colour.
+ */
+const STATUS_TONE: Record<string, 'green' | 'red' | 'orange' | 'blue' | 'neutral' | 'purple' | 'yellow'> = {
+  succeeded: 'green',
+  accepted: 'green',
+  repaired: 'green',
+  completed: 'green',
+  active: 'green',
+  allowed: 'green',
+  allow: 'green',
+  failed: 'red',
+  rejected: 'red',
+  open: 'red',
+  critical: 'red',
+  high: 'red',
+  deny: 'red',
+  denied: 'red',
+  running: 'orange',
+  repairing: 'orange',
+  waiting_for_review: 'orange',
+  waiting_for_ai: 'blue',
+  medium: 'orange',
+  warning: 'orange',
+  queued: 'blue',
+  pending: 'blue',
+  info: 'blue',
+  low: 'neutral',
+  disabled: 'neutral',
+  suspended: 'neutral',
+  revoked: 'neutral',
 }
 
 export function StatusPill({ value }: { value: string }) {
-  return <span className={`status-pill status-${value.replaceAll('_', '-')}`}><span className="status-dot" />{value.replaceAll('_', ' ')}</span>
+  return <Badge variant={STATUS_TONE[value] ?? 'neutral'} label={value.replaceAll('_', ' ')} />
 }
 
-export function Loading() { return <div className="loading"><span className="spinner" /> Loading live data…</div> }
-export function Empty({ children = 'No data in this scope yet.' }: { children?: React.ReactNode }) { return <div className="empty">{children}</div> }
-export function ErrorState({ error }: { error: Error }) { return <div className="error-state"><strong>Couldn’t load this view.</strong><span>{error.message}</span></div> }
-export function IdLink({ id, to }: { id: string; to: string }) { return <Link className="mono link" to={to}>{id.slice(0, 8)}…</Link> }
+export function Loading() {
+  return <HStack hAlign="center" paddingBlock={10}><Spinner label="Loading live data…" /></HStack>
+}
+
+export function Empty({ children = 'No data in this scope yet.' }: { children?: React.ReactNode }) {
+  return <EmptyState isCompact title={typeof children === 'string' ? children : 'No data in this scope yet.'} />
+}
+
+export function ErrorState({ error }: { error: Error }) {
+  return <Banner status="error" title="Couldn’t load this view." description={error.message} />
+}
+
+export function IdLink({ id, to }: { id: string; to: string }) {
+  return <Link href={to}>{id.slice(0, 8)}…</Link>
+}

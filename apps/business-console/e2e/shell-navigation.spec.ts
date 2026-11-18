@@ -77,7 +77,7 @@ test('navigation is client-side and keeps the router in charge', async ({ page }
   await expect(page).toHaveURL(/\/roles$/)
   // A full document reload would drop this flag.
   expect(await page.evaluate(() => (window as unknown as { __spa?: boolean }).__spa)).toBe(true)
-  await expect(page.getByRole('heading', { name: 'Roles & permissions' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Roles & permissions' })).toBeVisible()
 })
 
 test('every top-level route renders inside the migrated shell', async ({ page }) => {
@@ -168,7 +168,7 @@ test.describe('mobile drawer', () => {
     await dialog.getByRole('link', { name: 'Audit' }).tap()
     await expect(page).toHaveURL(/\/audit$/)
     await expect(dialog).toBeHidden()
-    await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Audit' })).toBeVisible()
     await context.close()
   })
 
