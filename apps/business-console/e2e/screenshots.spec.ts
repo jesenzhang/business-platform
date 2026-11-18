@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
-import { emptyOverview, mockConsoleApi, applyConsoleTheme } from './fixtures/console'
+import { auditEvents, emptyOverview, findings, jobs, mockConsoleApi, applyConsoleTheme } from './fixtures/console'
 
 /**
  * Opt-in screenshot capture for migration evidence.
@@ -156,3 +156,42 @@ for (const theme of themes) {
     await page.screenshot({ path: file, fullPage: false, animations: 'disabled' })
   })
 }
+
+/**
+ * One desktop screenshot per top-level route, so the S4 review can see every
+ * migrated page rather than only the three sampled views.
+ */
+const captureRoutes = [
+  { name: 'overview', path: '/' },
+  { name: 'documents', path: '/documents' },
+  { name: 'processing', path: '/processing' },
+  { name: 'findings', path: '/findings' },
+  { name: 'repairs', path: '/repairs' },
+  { name: 'audit', path: '/audit' },
+  { name: 'identities', path: '/identities' },
+  { name: 'roles', path: '/roles' },
+  { name: 'bindings', path: '/bindings' },
+  { name: 'organization', path: '/organization' },
+  { name: 'explain', path: '/explain' },
+] as const
+
+test('all routes (desktop, light)', async ({ page }) => {
+  test.setTimeout(180_000)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' })
+  await applyConsoleTheme(page, 'light')
+  await mockConsoleApi(page)
+  await page.route('**/api/v1/processing-jobs?limit=*', (route) => route.fulfill({ json: { success: true, data: { items: jobs, next_cursor: null } } }))
+  await page.route('**/api/v1/admin/integrity/findings?limit=*', (route) => route.fulfill({ json: { success: true, data: { items: findings, next_cursor: null } } }))
+  await page.route('**/api/v1/admin/audit-events?limit=*', (route) => route.fulfill({ json: { success: true, data: { items: auditEvents, next_cursor: null } } }))
+
+  const directory = path.resolve(String(outDir))
+  await mkdir(directory, { recursive: true })
+  for (const entry of captureRoutes) {
+    await page.goto(entry.path)
+    await expect(page.locator('h1')).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: path.join(directory, `route--${entry.name}.png`), fullPage: true, animations: 'disabled' })
+  }
+})

@@ -2,7 +2,7 @@
 
 - **文档 ID:** PLAN-0016
 - **版本:** 1.0
-- **状态:** Active（S0、S1、S2、S3 已完成并验收；S4 待启动，S5 仅制定路线）
+- **状态:** Active（S0、S1、S2、S3、S4 已完成并验收；S5 仅制定路线，未实施）
 - **日期:** 2026-11-18
 - **所有者:** `apps/business-console`（前端表现层）
 - **关联文档:** `docs/reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md`、`docs/adr/ADR-0027-astryx-frontend-design-system.md`、`docs/governance/DOCUMENT_MANAGEMENT.md`
@@ -112,7 +112,7 @@
 
 **执行结果（S3-1..S3-5）：** 采用 `LinkProvider` + `SideNav` + `IconButton`/`Toolbar` 原语 + `Drawer`（替换 Radix）+ 排版作用域收窄；**未**采用 `AppShell`/`TopNav` 整体框架（几何/滚动模型/品牌位置评估见报告 §2），保留 260px 固定侧栏与 sticky 工具栏。新增 7 条 shell e2e，Radix 依赖删除，页面内容像素级不变。
 
-### S4 — 逐业务页面（本轮不实施）
+### S4 — 逐业务页面（已完成，见 `docs/reports/2026-11-18-ASTRYX-MIGRATION-S4-PAGES.md`）
 
 顺序与切片边界：
 

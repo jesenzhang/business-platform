@@ -282,7 +282,7 @@ PLAN-0003 Revision 1 的 Document Management 参考切片必须遵循以下额�
 - 只改前端表现层：不得修改 `src/api.ts`、`src/contracts.ts` 的语义，不得修改请求头、幂等键、乐观锁版本、提交载荷、确认流程、权限要求或数据结构；前端迁移不触发 Rust、OpenAPI、迁移或数据库变更。
 - Tailwind 3 保留。级联顺序固定为 `reset → tw-preflight → astryx-base → astryx-theme`，由 `src/layers.css` 首先加载；`@tailwind base` 位于 `tw-preflight` 层；utilities 保持无层。不得引入 Astryx 的 Tailwind v4 桥 `tailwind-theme.css`。
 - 主题状态唯一来源是 Zustand `theme` + `localStorage["business-console-theme"]`；不得新增第二套主题状态，也不得用 `prefers-color-scheme` 覆盖用户选择。
-- 不建立组件包装层。只允许“业务语义 → 组件色调/文案”的映射和必要的布局组合，且必须有直接使用者。
-- 未迁移页面必须保持既有视觉：`.app` 作用域内的 Astryx 主题排版重置已在 `src/styles.css` 的 `reset` 层降级，逐页迁移时同步移除对应条目。
+- 不建立组件包装层。只允许“业务语义 → 组件色调/文案”的映射和必要的布局组合，且必须有直接使用者。`StatusPill` 的 `STATUS_TONE` 表与组织树扁平化是仅有的两处此类映射。`Selector` 的可视 label 不会命名 combobox，必须显式传 `aria-label`。
+- S4 已把全部业务页面迁移到 Astryx：`src/styles.css` 只保留外壳几何与 Tailwind 层序，历史页面级全局 CSS 与排版降级规则已删除；新增页面直接使用 Astryx 组件，不得再引入页面级全局 CSS。
 - 迁移既有页面时保留原页面结构、路由与业务逻辑，不按 Astryx 模板重写页面，也不为了用组件而新增请求或状态。
 - 质量门禁：在 `apps/business-console` 下执行 `npm run lint`、`npm run typecheck`、`npm test`、`npm run build`、`npm run test:e2e`、`npx astryx doctor`；凡是 UI 迁移切片，必须附真实 Chromium 截图与交互证据。
