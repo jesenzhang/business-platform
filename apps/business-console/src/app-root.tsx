@@ -1,4 +1,6 @@
 import { Theme } from '@astryxdesign/core/theme'
+import { LinkProvider } from '@astryxdesign/core/Link'
+import { Link as RouterLink } from 'react-router-dom'
 import App from './App'
 import { defaultThemeSlug, themes } from './astryx-themes'
 import { useConsoleStore } from './store'
@@ -23,7 +25,15 @@ export function AppRoot() {
   const theme = useConsoleStore((state) => state.theme)
   return (
     <Theme theme={themes[defaultThemeSlug]} mode={theme}>
-      <App />
+      {/*
+        Every Astryx link (SideNav items, Link, Button href) renders through
+        React Router, so client-side navigation and the router's own active
+        state stay the single source of truth. Astryx passes `to={href}` to the
+        custom component and keeps its destination safety checks.
+      */}
+      <LinkProvider component={RouterLink}>
+        <App />
+      </LinkProvider>
     </Theme>
   )
 }

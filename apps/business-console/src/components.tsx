@@ -1,32 +1,50 @@
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { SideNav, SideNavItem } from '@astryxdesign/core/SideNav'
+import { Text } from '@astryxdesign/core/Text'
+import {
+  Building2, CircleUser, FileText, HelpCircle, KeyRound, LayoutDashboard, Link2,
+  RefreshCw, ScrollText, ShieldAlert, Wrench,
+} from 'lucide-react'
+import { StatusDot } from '@astryxdesign/core/StatusDot'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useConsoleStore } from './store'
 
+/**
+ * Navigation is defined once. `href` values are consumed by Astryx
+ * `SideNavItem`; `LinkProvider` (see `app-root.tsx`) turns them into React
+ * Router links, so the router remains the only navigation source of truth and
+ * no route adapter lives here.
+ */
 const navItems = [
-  ['/', 'Overview', '⌂'],
-  ['/documents', 'Documents', '▤'],
-  ['/processing', 'Processing', '↻'],
-  ['/findings', 'Integrity', '◈'],
-  ['/repairs', 'Repairs', '✓'],
-  ['/audit', 'Audit', '≡'],
-  ['/identities', 'Identities', '◉'],
-  ['/roles', 'Roles', '⚿'],
-  ['/bindings', 'Bindings', '⇆'],
-  ['/organization', 'Organization', '⛁'],
-  ['/explain', 'Explain', '？'],
+  { to: '/', label: 'Overview', icon: LayoutDashboard },
+  { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/processing', label: 'Processing', icon: RefreshCw },
+  { to: '/findings', label: 'Integrity', icon: ShieldAlert },
+  { to: '/repairs', label: 'Repairs', icon: Wrench },
+  { to: '/audit', label: 'Audit', icon: ScrollText },
+  { to: '/identities', label: 'Identities', icon: CircleUser },
+  { to: '/roles', label: 'Roles', icon: KeyRound },
+  { to: '/bindings', label: 'Bindings', icon: Link2 },
+  { to: '/organization', label: 'Organization', icon: Building2 },
+  { to: '/explain', label: 'Explain', icon: HelpCircle },
 ] as const
+
+/**
+ * Same matching rule the previous `NavLink`s used: `end` only for the root,
+ * otherwise a path segment prefix (`/documents/42` selects Documents).
+ */
+function useActiveNav() {
+  const { pathname } = useLocation()
+  return (to: string) => to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+}
 
 export function AppShell() {
   const theme = useConsoleStore((state) => state.theme)
   const setTheme = useConsoleStore((state) => state.setTheme)
   return (
     <div className={theme === 'dark' ? 'app dark' : 'app'}>
-      <aside className="sidebar desktop-sidebar" aria-label="Primary navigation">
-        <Brand />
+      <aside className="sidebar desktop-sidebar">
         <Navigation />
-        <div className="sidebar-footer">
-          <span className="status-dot" /> API connected through Business API
-        </div>
       </aside>
       <div className="mobile-bar">
         <Dialog.Root>
@@ -35,7 +53,7 @@ export function AppShell() {
             <Dialog.Overlay className="dialog-overlay" />
             <Dialog.Content className="mobile-drawer">
               <Dialog.Title className="sr-only">Navigation</Dialog.Title>
-              <Brand /><Navigation closeOnClick />
+              <Navigation closeOnClick />
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
@@ -60,7 +78,30 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function Navigation({ closeOnClick = false }: { closeOnClick?: boolean }) {
-  return <nav className="nav-list">{navItems.map(([to, label, icon]) => <NavLink key={to} to={to} end={to === '/'} onClick={closeOnClick ? () => document.body.click() : undefined} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><span className="nav-icon">{icon}</span><span>{label}</span></NavLink>)}</nav>
+  const isActive = useActiveNav()
+  return (
+    <SideNav
+      aria-label="Primary navigation"
+      header={<Brand />}
+      footer={(
+        <div className="sidebar-footer">
+          <StatusDot variant="success" label="API connected" />
+          <Text type="supporting" as="span">API connected through Business API</Text>
+        </div>
+      )}
+    >
+      {navItems.map((item) => (
+        <SideNavItem
+          key={item.to}
+          label={item.label}
+          icon={item.icon}
+          href={item.to}
+          isSelected={isActive(item.to)}
+          onClick={closeOnClick ? () => document.body.click() : undefined}
+        />
+      ))}
+    </SideNav>
+  )
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: React.ReactNode; action?: React.ReactNode }) {
