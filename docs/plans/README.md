@@ -25,10 +25,11 @@ plans/
 ## 当前计划与顺序
 
 1. [PLAN-0014 Reference Conformance and R2 Module Readiness](current/PLAN-0014-reference-conformance-and-r2-module-readiness.md)：**Active / Review-first，2026-09-23 → 2026-10-23**。横向执行现有成熟模块的参考对齐、差距审阅、失败/安全测试与 R2 pilot；只直接修复 C0/C1，不以参考对齐制造大范围重构。
-2. **Contract Business Vertical Slice**：当前下一项主要业务代码计划，待创建并激活（前置 PLAN-0013 已 Integrated）。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础；可与 PLAN-0014 的 review/test 工作并行。
-3. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
-4. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
-5. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
+2. [PLAN-0016 Astryx Frontend Design System Adoption](current/PLAN-0016-astryx-frontend-design-system-adoption.md)：**Active，2026-11-18 起**。`apps/business-console` 以 Astryx 为目标默认设计系统；S0 基准 / S1 基础接入 / S2 Dashboard 试点已授权，S3–S5 只制定路线。只改前端表现层，不改 API、权限、数据结构与后端。
+3. **Contract Business Vertical Slice**：当前下一项主要业务代码计划，待创建并激活（前置 PLAN-0013 已 Integrated）。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础；可与 PLAN-0014 的 review/test 工作并行。
+4. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
+5. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
+6. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
 
 ## 已归档计划
 

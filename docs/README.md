@@ -86,6 +86,7 @@
 - [`adr/ADR-0023-ai-worker-model-provider-dependency.md`](adr/ADR-0023-ai-worker-model-provider-dependency.md)：Accepted，ai-worker model-provider 可替换性与依赖边界。
 - [`adr/ADR-0024-authentication-externalized-authorization-internal.md`](adr/ADR-0024-authentication-externalized-authorization-internal.md)：Accepted，人员认证/凭证外置到 OIDC IdP，平台内部拥有租户、业务授权和审计。
 - [`adr/ADR-0025-enterprise-ai-saas-platform-and-independent-modules.md`](adr/ADR-0025-enterprise-ai-saas-platform-and-independent-modules.md)：Accepted，business-platform 作为 Enterprise AI SaaS Platform 主承载；模块以 R2 独立发布为最低目标，独立发布与独立部署分离，外部 OSS 通过 Port/Contract 接入。
+- [`adr/ADR-0027-astryx-frontend-design-system.md`](adr/ADR-0027-astryx-frontend-design-system.md)：Accepted（范围：S0–S2 试点 + S3–S5 路线），`apps/business-console` 以 Astryx 为目标默认设计系统，Tailwind 3 共存、主题状态单一权威、业务契约冻结、按切片渐进迁移。
 
 ## 6. 文档目录
 
@@ -154,6 +155,7 @@ reference/EVER_GAUZY_REFERENCE_ANALYSIS.md
 - v0.1 已发布：PLAN-0012 Integrated / Archived，annotated tag v0.1 → 2383651；真实 PostgreSQL + MinIO + vLLM + Prometheus/Grafana 与真实 Auth0 production-mode 验收已记录在完成审计。
 - 发布后供应链修复已进入 main：rustls 0.23.45 清除 RUSTSEC-2026-0285；MinIO/mc 镜像从已下线的 Docker Hub 仓库迁移到 quay.io。
 - 身份与授权已生产化：[PLAN-0013 Identity and Authorization Foundation](plans/archive/2026/PLAN-0013-identity-and-authorization-foundation.md) Integrated / Archived（PR #17）——PlatformUser/TenantMembership/Organization/Role/Permission/RoleBinding/ResourceScope 与统一 default-DENY Policy Decision 已实现，Governance API 已迁移到统一 Authorize + 有界兼容桥（7 个 governance 键，flag 默认开启）。
+- 前端设计系统迁移进行中：[PLAN-0016 Astryx Frontend Design System Adoption](plans/current/PLAN-0016-astryx-frontend-design-system-adoption.md) Active，决策见 [ADR-0027](adr/ADR-0027-astryx-frontend-design-system.md)，迁移前基准见 [S0 报告](reports/2026-11-18-ASTRYX-MIGRATION-S0-BASELINE.md)；只改 `apps/business-console` 表现层，不触碰 API/权限/数据结构。
 - 当前下一候选是 Contract Business Vertical Slice（待创建计划）：Contract List/Detail → Document Revision → AI Extract/Evidence → Review → Apply Candidate → Contract Version Update。
 - [PLAN-0006 Enterprise AI Workspace](plans/current/PLAN-0006-enterprise-ai-workspace-foundation.md) 仍为 Revision 1 / Proposed / BLOCKED：PLAN-0013 已集成，还需等待首个 Contract 真实垂直切片集成。
 - Business Application Platform 的 package/contribution/compiler/dry-plan foundation 已实现，但 Module Registry、安装执行器、Marketplace、动态插件 Runtime 尚未实现。
