@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type {
   AuditEvent,
+  Candidate,
   Document,
   OperationsOverview,
   Page as ApiPage,
@@ -114,6 +115,26 @@ export const documents: Document[] = [
     updated_at: '2026-11-16T08:02:00.000Z',
   },
 ]
+
+/** Processing jobs reused by the list, detail and review routes. */
+export const jobs: ProcessingJob[] = [
+  job({ job_id: 'a1000000-0000-4000-8000-000000000001', status: 'succeeded', current_step: 'await_review', attempt_count: 1, candidate_available: true, review_available: true, updated_at: '2026-11-16T08:21:00.000Z' }),
+  job({ job_id: 'a1000000-0000-4000-8000-000000000002', document_id: 'd1000000-0000-4000-8000-000000000002', status: 'running', current_step: 'extract_text', updated_at: '2026-11-16T08:04:00.000Z' }),
+]
+
+export const candidate: Candidate = {
+  candidate_id: 'c1000000-0000-4000-8000-000000000001',
+  job_id: 'a1000000-0000-4000-8000-000000000001',
+  content_revision: 2,
+  schema_version: 'contract.v1',
+  payload: { title: 'Master Services Agreement', counterparty: 'Acme GmbH', value: 128000, currency: 'EUR' },
+  evidence: [{ page: 1, quote: 'Acme GmbH' }, { page: 3, quote: '128,000 EUR' }],
+  provider: 'local-vllm',
+  model: 'qwen2.5-14b-instruct',
+  prompt_version: 'extract.v3',
+  version: 3,
+  created_at: '2026-11-16T08:20:00.000Z',
+}
 
 export const permissions: PermissionView[] = [
   { key: 'identity.read', description: 'Read identities', reserved: false, active: true },

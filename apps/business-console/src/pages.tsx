@@ -6,14 +6,18 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
+import { CodeBlock } from '@astryxdesign/core/CodeBlock'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { FileInput } from '@astryxdesign/core/FileInput'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Heading } from '@astryxdesign/core/Heading'
+import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { Link as AstryxLink } from '@astryxdesign/core/Link'
+import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { Table, proportional } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
+import { TextArea } from '@astryxdesign/core/TextArea'
 import { VStack } from '@astryxdesign/core/VStack'
 import { ApiError, getCandidate, getDocument, getJob, getOverview, listAudit, listDocumentJobs, listDocuments, listFindings, listJobs, startProcessing, submitReview, uploadDocument } from './api'
 import type { AuditEvent, Candidate, Document, IntegrityFinding, ProcessingJob } from './contracts'
@@ -227,7 +231,51 @@ export function DocumentDetailPage() {
   if (documentQuery.isPending || jobsQuery.isPending) return <Loading />
   if (documentQuery.isError) return <ErrorState error={documentQuery.error} />
   const document = documentQuery.data
-  return <><PageHeader eyebrow="DOCUMENT DETAIL" title={document.original_filename} description={`${document.content_type} · revision ${document.content_revision}`} action={<button className="primary-button" disabled={start.isPending} onClick={() => start.mutate()}>{start.isPending ? 'Starting…' : 'Start processing'}</button>} /><div className="detail-grid"><article className="panel detail-card"><span className="eyebrow">DOCUMENT</span><h2>{document.original_filename}</h2><StatusPill value={document.status} /><dl><dt>Document ID</dt><dd className="mono">{document.id}</dd><dt>Size</dt><dd>{bytes(document.size_bytes)}</dd><dt>Created</dt><dd>{date(document.created_at)}</dd><dt>Updated</dt><dd>{date(document.updated_at)}</dd></dl></article><article className="panel"><div className="panel-heading"><div><h2>Processing history</h2><p>Each revision creates its own durable execution trail.</p></div></div>{jobsQuery.data?.length ? <JobsTable jobs={jobsQuery.data} /> : <Empty>No processing job has been started for this document.</Empty>}</article></div>{start.isError && <div className="inline-error">{start.error.message}</div>}</>
+  return <>
+    <PageHeader
+      eyebrow="DOCUMENT DETAIL"
+      title={document.original_filename}
+      description={`${document.content_type} · revision ${document.content_revision}`}
+      action={(
+        <Button
+          label={start.isPending ? 'Starting…' : 'Start processing'}
+          variant="primary"
+          isLoading={start.isPending}
+          isDisabled={start.isPending}
+          onClick={() => start.mutate()}
+        />
+      )}
+    />
+    <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Text type="label" color="secondary">DOCUMENT</Text>
+            <Heading level={2}>{document.original_filename}</Heading>
+            <HStack gap={2}><StatusPill value={document.status} /></HStack>
+          </VStack>
+          <MetadataList>
+            <MetadataListItem label="Document ID"><Text type="code" as="span">{document.id}</Text></MetadataListItem>
+            <MetadataListItem label="Size">{bytes(document.size_bytes)}</MetadataListItem>
+            <MetadataListItem label="Created">{date(document.created_at)}</MetadataListItem>
+            <MetadataListItem label="Updated">{date(document.updated_at)}</MetadataListItem>
+          </MetadataList>
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Processing history</Heading>
+            <Text type="supporting">Each revision creates its own durable execution trail.</Text>
+          </VStack>
+          {jobsQuery.data?.length
+            ? <JobsTable jobs={jobsQuery.data} />
+            : <Empty>No processing job has been started for this document.</Empty>}
+        </VStack>
+      </Card>
+    </Grid>
+    {start.isError && <Banner status="error" title="Couldn’t start processing" description={start.error.message} />}
+  </>
 }
 
 export function ProcessingPage() {
@@ -237,11 +285,79 @@ export function ProcessingPage() {
   if (query.isError) return <ErrorState error={query.error} />
   if (jobId) return <JobDetail job={query.data as ProcessingJob} />
   const page = query.data as { items: ProcessingJob[] }
-  return <><PageHeader eyebrow="DURABLE EXECUTION" title="Processing" description="Leases, retries, checkpoints, and review boundaries stay in the processing context." /><article className="panel"><div className="panel-heading"><div><h2>Job queue</h2><p>{page.items.length} recent jobs</p></div></div><JobsTable jobs={page.items} /></article></>
+  return <>
+    <PageHeader eyebrow="DURABLE EXECUTION" title="Processing" description="Leases, retries, checkpoints, and review boundaries stay in the processing context." />
+    <Card padding={5}>
+      <VStack gap={4}>
+        <VStack gap={1}>
+          <Heading level={2}>Job queue</Heading>
+          <Text type="supporting">{page.items.length} recent jobs</Text>
+        </VStack>
+        <JobsTable jobs={page.items} />
+      </VStack>
+    </Card>
+  </>
 }
 
+const PIPELINE_STEPS = ['validate_source', 'detect_type', 'extract_text', 'extract_fields', 'validate_candidate', 'await_review'] as const
+
 function JobDetail({ job }: { job: ProcessingJob }) {
-  return <><PageHeader eyebrow="PROCESSING JOB" title={job.current_step.replaceAll('_', ' ')} description={<span className="mono">{job.job_id}</span>} action={<StatusPill value={job.status} />} /><div className="detail-grid"><article className="panel detail-card"><span className="eyebrow">EXECUTION STATE</span><dl><dt>Document</dt><dd><IdLink id={job.document_id} to={`/documents/${job.document_id}`} /></dd><dt>Content revision</dt><dd>{job.content_revision}</dd><dt>Current step</dt><dd>{job.current_step.replaceAll('_', ' ')}</dd><dt>Attempts</dt><dd>{job.attempt_count}</dd><dt>Updated</dt><dd>{date(job.updated_at)}</dd></dl></article><article className="panel pipeline-card"><span className="eyebrow">FIXED PIPELINE</span><div className="pipeline">{['validate_source', 'detect_type', 'extract_text', 'extract_fields', 'validate_candidate', 'await_review'].map((step, index) => <div key={step} className={step === job.current_step ? 'pipeline-step current' : index < 2 ? 'pipeline-step done' : 'pipeline-step'}><span>{index + 1}</span>{step.replaceAll('_', ' ')}</div>)}</div>{job.candidate_available && <Link className="primary-button block-button" to={`/processing/${job.job_id}/candidate`}>Review candidate →</Link>}</article></div></>
+  return <>
+    <PageHeader
+      eyebrow="PROCESSING JOB"
+      title={job.current_step.replaceAll('_', ' ')}
+      description={<Text type="code" as="span">{job.job_id}</Text>}
+      action={<StatusPill value={job.status} />}
+    />
+    <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <Text type="label" color="secondary">EXECUTION STATE</Text>
+          <MetadataList>
+            <MetadataListItem label="Document"><IdLink id={job.document_id} to={`/documents/${job.document_id}`} /></MetadataListItem>
+            <MetadataListItem label="Content revision">{job.content_revision}</MetadataListItem>
+            <MetadataListItem label="Current step">{job.current_step.replaceAll('_', ' ')}</MetadataListItem>
+            <MetadataListItem label="Attempts">{job.attempt_count}</MetadataListItem>
+            <MetadataListItem label="Updated">{date(job.updated_at)}</MetadataListItem>
+          </MetadataList>
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <Text type="label" color="secondary">FIXED PIPELINE</Text>
+          <VStack gap={2}>
+            {PIPELINE_STEPS.map((step, index) => {
+              const state = step === job.current_step ? 'current' : index < 2 ? 'done' : 'pending'
+              return (
+                <HStack key={step} gap={2} vAlign="center" padding={2} hAlign="between">
+                  <HStack gap={2} vAlign="center">
+                    <StatusDot
+                      variant={state === 'current' ? 'accent' : state === 'done' ? 'success' : 'neutral'}
+                      label={`${step.replaceAll('_', ' ')} ${state}`}
+                    />
+                    <Text type={state === 'pending' ? 'supporting' : 'body'} weight={state === 'current' ? 'semibold' : 'normal'}>
+                      {index + 1}. {step.replaceAll('_', ' ')}
+                    </Text>
+                  </HStack>
+                  {state === 'current' && <Badge variant="blue" label="current" />}
+                  {state === 'done' && <Badge variant="green" label="done" />}
+                </HStack>
+              )
+            })}
+          </VStack>
+          {job.candidate_available && (
+            <Button
+              label="Review candidate"
+              variant="primary"
+              width="100%"
+              href={`/processing/${job.job_id}/candidate`}
+              endContent={<Text as="span">→</Text>}
+            />
+          )}
+        </VStack>
+      </Card>
+    </Grid>
+  </>
 }
 
 export function CandidatePage() {
@@ -256,7 +372,61 @@ function CandidateReview({ candidate }: { candidate: Candidate }) {
   const [comment, setComment] = useState('')
   const [submitted, setSubmitted] = useState<string | null>(null)
   const mutation = useMutation({ mutationFn: (decision: 'accepted' | 'rejected') => submitReview(candidate.job_id, decision, candidate.version, comment), onSuccess: (_, decision) => setSubmitted(decision) })
-  return <><PageHeader eyebrow="HUMAN REVIEW" title="Candidate review" description="Review a bounded candidate with evidence before it becomes a business decision." action={<StatusPill value={submitted ?? 'waiting_for_review'} />} /><div className="review-grid"><article className="panel"><div className="panel-heading"><div><h2>Extracted fields</h2><p>Schema {candidate.schema_version} · candidate v{candidate.version}</p></div></div><pre className="json-view">{JSON.stringify(candidate.payload, null, 2)}</pre></article><article className="panel review-sidebar"><div className="panel-heading"><div><h2>Decision</h2><p>Provider metadata is bounded and read-only.</p></div></div><dl><dt>Provider</dt><dd>{candidate.provider}</dd><dt>Model</dt><dd>{candidate.model}</dd><dt>Evidence</dt><dd>{candidate.evidence.length} references</dd></dl><label className="field-label" htmlFor="review-comment">Comment</label><textarea id="review-comment" rows={4} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Optional reviewer context" /><div className="button-row"><button className="secondary-button" disabled={mutation.isPending || Boolean(submitted)} onClick={() => mutation.mutate('rejected')}>Reject</button><button className="primary-button" disabled={mutation.isPending || Boolean(submitted)} onClick={() => mutation.mutate('accepted')}>Accept candidate</button></div>{mutation.isError && <div className="inline-error">{mutation.error.message}</div>}{submitted && <div className="success-note">Decision recorded. The application service handled versioning, idempotency, and audit.</div>}</article></div></>
+  const isLocked = mutation.isPending || Boolean(submitted)
+  return <>
+    <PageHeader
+      eyebrow="HUMAN REVIEW"
+      title="Candidate review"
+      description="Review a bounded candidate with evidence before it becomes a business decision."
+      action={<StatusPill value={submitted ?? 'waiting_for_review'} />}
+    />
+    <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Extracted fields</Heading>
+            <Text type="supporting">Schema {candidate.schema_version} · candidate v{candidate.version}</Text>
+          </VStack>
+          <CodeBlock
+            code={JSON.stringify(candidate.payload, null, 2)}
+            language="json"
+            title="candidate payload"
+            hasLineNumbers
+            isCollapsible
+            maxHeight={420}
+            width="100%"
+          />
+        </VStack>
+      </Card>
+      <Card padding={5}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>Decision</Heading>
+            <Text type="supporting">Provider metadata is bounded and read-only.</Text>
+          </VStack>
+          <MetadataList>
+            <MetadataListItem label="Provider">{candidate.provider}</MetadataListItem>
+            <MetadataListItem label="Model">{candidate.model}</MetadataListItem>
+            <MetadataListItem label="Evidence">{candidate.evidence.length} references</MetadataListItem>
+          </MetadataList>
+          <TextArea
+            label="Comment"
+            value={comment}
+            onChange={setComment}
+            placeholder="Optional reviewer context"
+            rows={4}
+            isDisabled={isLocked}
+          />
+          <HStack gap={2} hAlign="end">
+            <Button label="Reject" variant="secondary" isDisabled={isLocked} onClick={() => mutation.mutate('rejected')} />
+            <Button label="Accept candidate" variant="primary" isDisabled={isLocked} isLoading={mutation.isPending} onClick={() => mutation.mutate('accepted')} />
+          </HStack>
+          {mutation.isError && <Banner status="error" title="Decision not recorded" description={mutation.error.message} />}
+          {submitted && <Banner status="success" title="Decision recorded" description="The application service handled versioning, idempotency, and audit." />}
+        </VStack>
+      </Card>
+    </Grid>
+  </>
 }
 
 export function FindingsPage() {
@@ -285,9 +455,25 @@ export function AuditPage() {
   return <><PageHeader eyebrow="RUNTIME GOVERNANCE" title="Audit" description="Immutable, tenant-scoped evidence for business and operational transitions." /><article className="panel"><div className="panel-heading"><div><h2>Event stream</h2><p>{query.data.items.length} recent events</p></div></div><AuditList events={query.data.items} expanded /></article></>
 }
 
+type JobRow = ProcessingJob & Record<string, unknown>
+
 function JobsTable({ jobs }: { jobs: ProcessingJob[] }) {
-  if (!jobs.length) return <Empty>No processing jobs in this scope.</Empty>
-  return <div className="table-wrap"><table><thead><tr><th>Job</th><th>Document</th><th>Step</th><th>Status</th><th>Attempts</th><th>Updated</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.job_id}><td><IdLink id={job.job_id} to={`/processing/${job.job_id}`} /></td><td><IdLink id={job.document_id} to={`/documents/${job.document_id}`} /></td><td>{job.current_step.replaceAll('_', ' ')}</td><td><StatusPill value={job.status} /></td><td>{job.attempt_count}</td><td>{date(job.updated_at)}</td></tr>)}</tbody></table></div>
+  return (
+    <Table<JobRow>
+      data={jobs as JobRow[]}
+      idKey="job_id"
+      density="compact"
+      emptyState={<EmptyState isCompact title="No processing jobs in this scope." />}
+      columns={[
+        { key: 'job_id', header: 'Job', renderCell: (row) => <IdLink id={row.job_id} to={`/processing/${row.job_id}`} /> },
+        { key: 'document_id', header: 'Document', renderCell: (row) => <IdLink id={row.document_id} to={`/documents/${row.document_id}`} /> },
+        { key: 'current_step', header: 'Step', renderCell: (row) => row.current_step.replaceAll('_', ' ') },
+        { key: 'status', header: 'Status', renderCell: (row) => <StatusPill value={row.status} /> },
+        { key: 'attempt_count', header: 'Attempts', renderCell: (row) => <Text as="span" hasTabularNumbers>{row.attempt_count}</Text> },
+        { key: 'updated_at', header: 'Updated', renderCell: (row) => <Text as="span" type="supporting">{date(row.updated_at)}</Text> },
+      ]}
+    />
+  )
 }
 
 function AuditList({ events, expanded = false }: { events: AuditEvent[]; expanded?: boolean }) {
