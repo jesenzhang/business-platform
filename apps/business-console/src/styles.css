@@ -36,10 +36,6 @@
 .toolbar { height: 76px; display: flex; justify-content: space-between; align-items: center; padding: 0 46px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 78%, transparent); backdrop-filter: blur(18px); position: sticky; top: 0; z-index: 5; }
 .page-content { padding: 44px 46px 72px; max-width: 1540px; margin: 0 auto; }
 
-/* Inline text links still used by the dashboard sections; the visual language is
-   the console's own accent token rather than an Astryx Link variant. */
-.text-button { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.text-button:hover { text-decoration: underline; }
 
 .mobile-bar { display: none; }
 .mobile-bar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
