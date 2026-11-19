@@ -58,7 +58,11 @@ jobs:
     name: Architecture Fitness
     runs-on: windows-2025
     steps:
+      # PLAN-0014's pinned-baseline gate verifies a fixed historical commit;
+      # a shallow checkout would hide it and fail closed for the wrong reason.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - shell: pwsh
         run: |
           ./scripts/check-architecture.ps1
@@ -227,6 +231,10 @@ jobs:
       WAVE4_S3_CLEANUP_PAGE_SIZE: "3"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The final step runs check-architecture.ps1, whose PLAN-0014
+          # pinned-baseline gate needs the fixed historical commit in history.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@1.94.1
       - uses: Swatinem/rust-cache@v2
       - run: rustc --version --verbose
