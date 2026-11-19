@@ -154,7 +154,7 @@ impl JwksServer {
 fn test_jwk() -> Value {
     let signing = signing_key();
     let verifying = p256::ecdsa::VerifyingKey::from(&signing);
-    let encoded = verifying.to_encoded_point(false);
+    let encoded = verifying.to_sec1_point(false);
     let p256::elliptic_curve::sec1::Coordinates::Uncompressed { x, y } = encoded.coordinates()
     else {
         unreachable!("uncompressed point");
