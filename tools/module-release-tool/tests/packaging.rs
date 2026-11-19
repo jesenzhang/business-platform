@@ -121,7 +121,7 @@ fn payload_carries_no_host_path_host_identity_or_generation_timestamp() {
         files.len()
     );
     for file in &files {
-        let shown = payload.join(file.path.replace('/', "\\"));
+        let shown = payload.join(&file.path);
         let raw = fs::read(&shown).expect("read member");
         assert!(
             !raw.contains(&b'\r'),
@@ -198,7 +198,7 @@ fn members_outside_the_digest_are_declared_not_silently_ignored() {
             "excluded member '{path}' is also hashed"
         );
         assert!(
-            artifact.directory.join(path.replace('/', "\\")).is_file(),
+            artifact.directory.join(path).is_file(),
             "declared member '{path}' is missing from the artifact"
         );
     }

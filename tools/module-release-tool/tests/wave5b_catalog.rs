@@ -86,7 +86,7 @@ fn copy_tree(source: &Path, target: &Path) {
 
 fn workspace_for(case: &str) -> TempDir {
     let work = TempDir::new(&format!("wave5b-{case}")).expect("temp dir");
-    let modules = work.path().join(MODULES_DIRECTORY.replace('/', "\\"));
+    let modules = work.path().join(MODULES_DIRECTORY);
     copy_tree(&fixture_root().join(case), &modules);
     work
 }
@@ -345,7 +345,7 @@ fn head_and_index_still_hold_the_pinned_baseline() {
         assert!(staged.is_some(), "{} is not in the index", entry.path);
         let in_index = staged.expect("checked above");
         assert_eq!(sha256_hex(&in_index), entry.blob_sha256, "{}", entry.path);
-        let on_disk = fs::read(root.join(entry.path.replace('/', "\\"))).expect("work tree");
+        let on_disk = fs::read(root.join(&entry.path)).expect("work tree");
         assert_eq!(
             sha256_hex(&fold_line_endings(&on_disk)),
             sha256_hex(&fold_line_endings(&pinned)),
@@ -692,7 +692,7 @@ fn the_conformance_tests_do_not_embed_a_second_baseline() {
         "crates/messaging/tests/outbox_reliability.rs",
         "crates/audit-postgres/tests/chain_pg.rs",
     ] {
-        let read = fs::read_to_string(repository().join(site.replace('/', "\\")));
+        let read = fs::read_to_string(repository().join(site));
         assert!(read.is_ok(), "{site} exists");
         let text = read.expect("checked above");
         let code: Vec<&str> = text

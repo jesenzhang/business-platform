@@ -62,7 +62,7 @@ fn check_of(error: &ToolError) -> String {
 fn input(root: &Path, repo_path: &str) -> ProvenanceInput {
     ProvenanceInput::from_working_tree(
         repo_path.to_owned(),
-        std::fs::read(root.join(repo_path.replace('/', "\\"))).expect("read input"),
+        std::fs::read(root.join(repo_path)).expect("read input"),
     )
 }
 

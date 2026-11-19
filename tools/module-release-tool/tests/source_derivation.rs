@@ -92,7 +92,7 @@ fn copy_tree(from: &Path, to: &Path) {
 }
 
 fn member_path(artifact: &Path, member: &str) -> PathBuf {
-    artifact.join("package").join(member.replace('/', "\\"))
+    artifact.join("package").join(member)
 }
 
 fn read_json(path: &Path) -> serde_json::Value {
@@ -220,9 +220,9 @@ fn input_paths(module: &str) -> Vec<String> {
 fn copy_inputs(module: &str, into: &Path) {
     let context = context();
     for path in input_paths(module) {
-        let from = context.root().join(path.replace('/', "\\"));
+        let from = context.root().join(&path);
         assert!(from.is_file(), "'{path}' is missing from the working tree");
-        let to = into.join(path.replace('/', "\\"));
+        let to = into.join(&path);
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent).expect("create parent");
         }
@@ -374,9 +374,7 @@ fn a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consisten
     let (_out, artifact) = candidate("identity", "f1a-spec");
     let (_copy, damaged) = pristine_copy(&artifact, "f1a-spec-copy");
 
-    let spec_file = context()
-        .root()
-        .join(spec::spec_path("identity").replace('/', "\\"));
+    let spec_file = context().root().join(spec::spec_path("identity"));
     let text = fs::read_to_string(&spec_file).expect("release spec");
     let mut value: serde_json::Value = serde_json::from_str(&text).expect("spec json");
     value["published_queries"][0]["version"] = serde_json::Value::String("9.9.9".to_owned());

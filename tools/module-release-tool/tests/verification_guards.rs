@@ -76,7 +76,7 @@ fn write_json(path: &Path, value: &serde_json::Value) {
 }
 
 fn payload(artifact: &Path, member: &str) -> PathBuf {
-    artifact.join("package").join(member.replace('/', "\\"))
+    artifact.join("package").join(member)
 }
 
 fn check_of(error: &module_release_tool::ToolError) -> String {

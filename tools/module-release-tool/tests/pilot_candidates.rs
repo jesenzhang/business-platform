@@ -40,7 +40,7 @@ fn artifact(
 }
 
 fn payload(artifact: &Path, member: &str) -> std::path::PathBuf {
-    artifact.join("package").join(member.replace('/', "\\"))
+    artifact.join("package").join(member)
 }
 
 fn read_identity(artifact: &Path) -> ModuleReleaseIdentity {
@@ -260,9 +260,7 @@ fn the_migration_mapping_equals_the_formal_catalog() {
             "{module} pins no migration files"
         );
         for file in &mapping.files {
-            let manifest = context
-                .root()
-                .join(file.catalog_manifest.replace('/', "\\"));
+            let manifest = context.root().join(&file.catalog_manifest);
             let recorded = fs::read_to_string(manifest)
                 .expect("catalog manifest")
                 .lines()
@@ -280,13 +278,8 @@ fn the_migration_mapping_equals_the_formal_catalog() {
                 "{}: the mapping does not carry the catalog's own checksum",
                 file.file_name
             );
-            let bytes = fs::read(
-                context
-                    .root()
-                    .join(file.catalog.replace('/', "\\"))
-                    .join(&file.file_name),
-            )
-            .expect("catalog file");
+            let bytes = fs::read(context.root().join(&file.catalog).join(&file.file_name))
+                .expect("catalog file");
             let raw = module_release_tool::canonical::sha256_hex(&bytes);
             let folded = module_release_tool::canonical::sha256_hex(
                 &module_release_tool::canonical::fold_line_endings(&bytes),

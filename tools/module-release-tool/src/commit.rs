@@ -103,7 +103,7 @@ impl Inputs {
     pub fn bytes(&self, repo_path: &str) -> ToolResult<Vec<u8>> {
         match self {
             Self::WorkingTree { root } => {
-                let path = root.join(repo_path.replace('/', "\\"));
+                let path = root.join(repo_path);
                 let shown = path.display().to_string();
                 let metadata =
                     std::fs::symlink_metadata(&path).map_err(|source| ToolError::Io {
@@ -151,7 +151,7 @@ impl Inputs {
         let prefix = prefix.trim_end_matches('/');
         match self {
             Self::WorkingTree { root } => {
-                let directory = root.join(prefix.replace('/', "\\"));
+                let directory = root.join(prefix);
                 let shown = directory.display().to_string();
                 let metadata =
                     std::fs::symlink_metadata(&directory).map_err(|source| ToolError::Io {
