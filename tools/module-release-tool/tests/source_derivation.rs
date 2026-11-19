@@ -310,13 +310,13 @@ fn a_packed_manifest_the_pinned_commit_cannot_produce_is_refused() {
         ),
         (
             "features the commit does not declare",
-            "uuid = { version = \"=1.26.0\", features = [\"serde\", \"v4\", \"v5\", \"v7\"] }",
-            "uuid = { version = \"=1.26.0\", features = [\"serde\", \"v4\", \"v5\", \"v7\", \"v9\"] }",
+            "uuid = { version = \"=1.29.3\", features = [\"serde\", \"v4\", \"v5\", \"v7\"] }",
+            "uuid = { version = \"=1.29.3\", features = [\"serde\", \"v4\", \"v5\", \"v7\", \"v9\"] }",
         ),
         (
             "a path dependency pointing back into a source tree",
-            "thiserror = { version = \"=2.0.20\" }",
-            "thiserror = { version = \"=2.0.20\", path = \"../../../../crates/thiserror\" }",
+            "thiserror = { version = \"=2.0.21\" }",
+            "thiserror = { version = \"=2.0.21\", path = \"../../../../crates/thiserror\" }",
         ),
     ] {
         let (_copy, damaged) = pristine_copy(&artifact, "f1a-cargo-copy");

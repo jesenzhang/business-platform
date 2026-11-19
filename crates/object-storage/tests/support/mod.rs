@@ -158,7 +158,11 @@ pub async fn ensure_bucket() {
     match sdk.create_bucket().bucket(&name).send().await {
         Ok(_) => println!("LANE created bucket {name}"),
         Err(error) => {
-            let text = error.to_string();
+            // Newer aws-sdk-s3 versions render a typed service error as the
+            // generic "service error" in Display; the code/message live in the
+            // Debug representation. Match both so an already-owned bucket is
+            // still recognised across SDK versions.
+            let text = format!("{error} {error:?}");
             assert!(
                 text.contains("BucketAlreadyOwnedByYou")
                     || text.contains("BucketAlreadyExists")
