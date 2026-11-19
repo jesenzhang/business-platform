@@ -444,7 +444,7 @@ fn a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consisten
 #[test]
 fn generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused() {
     let (_out, copy) = isolated_checkout("f1b-missing", "identity");
-    let dropped = copy.join("crates\\identity\\src\\testing.rs");
+    let dropped = copy.join("crates/identity/src/testing.rs");
     assert!(
         dropped.is_file(),
         "the fixture starts from a complete checkout of the packed crate"
@@ -470,7 +470,7 @@ fn generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused() 
 fn generating_from_a_checkout_with_an_uncommitted_source_file_is_refused() {
     let (_out, copy) = isolated_checkout("f1b-extra", "identity");
     fs::write(
-        copy.join("crates\\identity\\src\\review_untracked.rs"),
+        copy.join("crates/identity/src/review_untracked.rs"),
         "// never committed\n",
     )
     .expect("write an extra source file");
@@ -542,16 +542,16 @@ fn a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move() {
     let (_out, artifact) = candidate("identity", "compat-move");
     let (_copy, checkout) = isolated_checkout("compat-move-checkout", "identity");
     fs::write(
-        checkout.join("crates\\identity\\Cargo.toml"),
+        checkout.join("crates/identity/Cargo.toml"),
         "# edited after the candidate was cut\n",
     )
     .expect("modify a feeding input");
     fs::write(
-        checkout.join("crates\\identity\\src\\review_untracked.rs"),
+        checkout.join("crates/identity/src/review_untracked.rs"),
         "// uncommitted\n",
     )
     .expect("add an extra source file");
-    fs::remove_file(checkout.join("crates\\identity\\src\\testing.rs")).expect("delete a source");
+    fs::remove_file(checkout.join("crates/identity/src/testing.rs")).expect("delete a source");
 
     let isolated = RepoContext::with_root(checkout).expect("isolated context");
     let index = verify(&isolated, &artifact)

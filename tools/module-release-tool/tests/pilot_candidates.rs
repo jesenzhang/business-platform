@@ -341,7 +341,7 @@ fn a_stateless_module_pins_no_migration_revision() {
     let text = fs::read_to_string(
         context
             .root()
-            .join("tools\\module-release-tool\\specs\\identity.json"),
+            .join("tools/module-release-tool/specs/identity.json"),
     )
     .expect("spec file");
     let mut value: serde_json::Value = serde_json::from_str(&text).expect("spec json");
