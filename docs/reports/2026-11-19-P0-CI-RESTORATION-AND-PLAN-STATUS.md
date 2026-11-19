@@ -1,6 +1,6 @@
 # 2026-11-19 交付状态：主干 CI 恢复、合同垂直切片计划、PLAN-0014 S1 整改
 
-> 状态基线：`main` @ `19672b0`，与 `origin/main` 一致，工作区干净。
+> 状态基线：`main` @ `02753e4`（docs-only 报告提交），与 `origin/main` 一致，工作区干净。
 > 失败基线：CI run `44310190041` @ `e3d7c30`（10 作业 8 绿 2 红）。
 
 ## 1. P0 — 主干 CI 已恢复，完整 CI 全绿（已验收）
@@ -10,7 +10,8 @@
 | Commit | CI run | 结论 |
 |---|---|---|
 | `75f526a` | `44475634539` | **success**，10/10 作业通过 |
-| `19672b0`（当前 main HEAD） | `44476988954` | **success**，10/10 作业通过 |
+| `19672b0`（CI 配置修复） | `44476988954` | **success**，10/10 作业通过 |
+| `02753e4`（当前 main HEAD） | `44480903602` | **success**，10/10 作业通过 |
 
 通过作业：Format / Check / Clippy / Architecture Fitness / Security scanning（含 gitleaks + trivy）/ Frontend checks / Frontend Playwright smoke / CLI and MCP contracts / Unit tests / PostgreSQL + MinIO + E2E contracts。
 
