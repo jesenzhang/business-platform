@@ -24,4 +24,5 @@
 | Six-project synthesis | Business Application Platform architecture | Platform Core、Business Module、contribution、communication、lifecycle，以及 Provider/Tool runtime resolution 的综合取舍 | [`BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md`](BUSINESS_APPLICATION_PLATFORM_REFERENCE_SYNTHESIS.md) |
 | Plane / Chatwoot / Comp AI CRM | 专业协作与 Agentic Business App | 项目、客户交互、Evidence-first Agent、Durable Agent Task | [`BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](BUSINESS_DOMAIN_REFERENCE_PROJECTS.md) |
 | OpenContracts / Mayan EDMS / Paperless-ngx / Documenso | 合同与企业文档 | Document/File/Version、解析绑定、Evidence、恢复、签署 | [`BUSINESS_DOMAIN_REFERENCE_PROJECTS.md`](BUSINESS_DOMAIN_REFERENCE_PROJECTS.md) |
-
+| Web Office 技术选型初步调研 | 企业文件统一预览、Office 在线编辑与 Agent 文档能力 | Open File Viewer（统一只读预览）、ONLYOFFICE Docs、Univer、GenOffice、Collabora：分工、许可、保真与 Agent 安全 PoC 门禁；仅 Reference，未形成 ADR | [`WEB_OFFICE_TECHNOLOGY_EVALUATION.md`](WEB_OFFICE_TECHNOLOGY_EVALUATION.md) |
+| Enterprise SaaS 前端组件候选 | P0 基础前端能力 / P1 Agent 与业务交互 | 基于现有 React/Vite/Radix/TanStack/ECharts 的缺口分析；shadcn/RHF/Zod/Uppy/Open File Viewer、JSON Forms、assistant-ui/CopilotKit、json-render 等候选，含许可、复用接口和 PoC 门禁；仅 Reference | [`FRONTEND_COMPONENT_CANDIDATES.md`](FRONTEND_COMPONENT_CANDIDATES.md) |

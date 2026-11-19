@@ -26,9 +26,10 @@ plans/
 
 1. [PLAN-0014 Reference Conformance and R2 Module Readiness](current/PLAN-0014-reference-conformance-and-r2-module-readiness.md)：**Active / Review-first，2026-09-23 → 2026-10-23**。横向执行现有成熟模块的参考对齐、差距审阅、失败/安全测试与 R2 pilot；只直接修复 C0/C1，不以参考对齐制造大范围重构。
 2. **Contract Business Vertical Slice**：当前下一项主要业务代码计划，待创建并激活（前置 PLAN-0013 已 Integrated）。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础；可与 PLAN-0014 的 review/test 工作并行。
-3. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
-4. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
-5. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
+3. [PLAN-0016 Contract Vertical Slice P0 Frontend Component Validation](current/PLAN-0016-contract-frontend-p0-validation.md)：**Proposed / NOT ACTIVE，2026-10-08**。仅对齐现有 Console 与待建 Contract Business Vertical Slice，优先验证 Radix/shadcn 基础交互、RHF/Zod、反馈、脱敏离线预览；正式 FilePreview/ApplyCandidate 受 Document Content 和 Contract Owner API 门禁阻断。不抢占 PLAN-0014，不代表 Contract 切片已激活。
+4. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
+5. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
+6. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
 
 ## 已归档计划
 
