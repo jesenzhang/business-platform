@@ -121,6 +121,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Design-system gate (PLAN-0016 S5): catches CLI/core drift, a broken theme
+      # wiring or an unlayered reset before the Playwright jobs run.
+      - run: npm exec -- astryx doctor
 
   frontend-e2e:
     name: Frontend Playwright smoke
@@ -180,10 +183,16 @@ jobs:
           --health-timeout 5s
           --health-retries 20
       minio:
-        # Docker Hub `minio/minio` repository was removed (anonymous pulls
-        # 404/denied as of 2026-09-18); the same immutable RELEASE tag is
-        # served from Quay. Do not "restore" the docker.io reference.
-        image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
+        # Upstream MinIO became source-only in 2025-10 and quay.io/minio/minio
+        # now denies anonymous pulls (token access.actions=[]), which is the
+        # cause of the "unauthorized: access to the requested resource" CI
+        # failure. Use a public, immutable RELEASE-tag mirror of the real
+        # MinIO server binaries; it keeps the upstream entrypoint, env vars,
+        # /minio/health/live, curl and mc. Do not switch to a moving `latest`
+        # tag or to a non-MinIO S3 implementation. Bump policy: verify the
+        # replacement tag is anonymously pullable from the registry before
+        # changing the digest/tag here.
+        image: openebs/minio:RELEASE.2024-12-18T13-15-44Z
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
@@ -223,8 +232,12 @@ jobs:
       - run: rustc --version --verbose
       - run: cargo --version
       - name: Create private MinIO test bucket
+        # The pinned MinIO service image above also ships the matching
+        # upstream `mc` client at /usr/bin/mc; reuse that fixed tag instead of
+        # the retired quay.io/minio/mc image. `--entrypoint /usr/bin/sh` is
+        # used because the upstream image has no /bin/sh path.
         run: |
-          docker run --network host --rm --entrypoint /bin/sh quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
+          docker run --network host --rm --entrypoint /usr/bin/sh openebs/minio:RELEASE.2024-12-18T13-15-44Z -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/contract-test-bucket && mc anonymous set none local/contract-test-bucket"
       - name: Apply migrations
         run: cargo run -p migration -- --backend postgres up
       - name: Run real infrastructure and E2E tests

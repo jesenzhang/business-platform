@@ -74,7 +74,7 @@ bytes = { workspace = true }
 futures-util = { workspace = true }
 sha2 = { workspace = true }
 tokio-util = { workspace = true }
-p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+p256 = { version = "0.14", features = ["ecdsa", "pem", "pkcs8"] }
 base64 = { workspace = true }
 
 [lints]

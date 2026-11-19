@@ -1,0 +1,10 @@
+/*
+ * Placeholder for `@astryxdesign/theme-neutral/fonts.css`.
+ *
+ * The package's font stylesheet is an `@import url(https://fonts.googleapis.com/...)`.
+ * The console self-hosts Figtree through @fontsource instead (see `main.tsx`),
+ * so `vite.config.ts` aliases that stylesheet to this file. The generated theme
+ * module keeps its import — which is what `astryx doctor` verifies — while the
+ * built app makes no request to a font CDN. `e2e/fonts.spec.ts` fails if such a
+ * request reappears.
+ */

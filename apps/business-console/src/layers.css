@@ -1,0 +1,18 @@
+/*
+ * Cascade layer order for the Astryx + Tailwind 3 coexistence.
+ *
+ * This file must be the first stylesheet the page loads, before any Astryx
+ * stylesheet and before styles.css. A layer's rank is set by the first
+ * stylesheet that names it; if Astryx CSS or Tailwind loaded first, the order
+ * below would be appended after their names and the design system would lose
+ * to Tailwind preflight (see `npx astryx docs migration/migration-setup`).
+ *
+ * reset         app + Astryx resets; lowest priority
+ * tw-preflight  Tailwind 3 preflight, layered so astryx-base/theme can win
+ * astryx-base   Astryx component styles
+ * astryx-theme  Astryx theme tokens and component overrides
+ *
+ * Tailwind utilities stay unlayered (declared in styles.css) so existing and
+ * future utility classes keep winning over component defaults.
+ */
+@layer reset, tw-preflight, astryx-base, astryx-theme;

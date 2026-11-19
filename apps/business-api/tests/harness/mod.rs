@@ -68,7 +68,7 @@ fn encoding_key() -> EncodingKey {
 
 fn test_jwk() -> Value {
     let verifying = p256::ecdsa::VerifyingKey::from(&signing_key());
-    let encoded = verifying.to_encoded_point(false);
+    let encoded = verifying.to_sec1_point(false);
     let p256::elliptic_curve::sec1::Coordinates::Uncompressed { x, y } = encoded.coordinates()
     else {
         unreachable!("uncompressed point");

@@ -1,14 +1,64 @@
-# cargo-audit configuration (PLAN-0012 release hardening).
+# cargo-audit configuration (PLAN-0012 release hardening; CI run 44310190041 follow-up).
 #
+# Scope rule: every entry below is a single, explicitly justified advisory
+# ignore with a re-review trigger. Never add a blanket ignore, and never add
+# an entry for an advisory that has an in-scope fix.
+#
+# ---------------------------------------------------------------------------
 # RUSTSEC-2023-0071 (rsa: Marvin attack, RSA PKCS#1 v1.5 timing side-channel)
 #   * `rsa` enters Cargo.lock only through sqlx's optional `mysql` driver
-#     feature (sqlx -> sqlx-mysql -> rsa). The workspace sqlx dependency in
-#     the root Cargo.toml enables only `postgres` and `sqlite`, so the crate
-#     is never compiled or linked into any artifact of this repository:
-#     `cargo tree -i rsa@0.9.10 --target all` resolves to nothing.
-#   * RustSec lists "No fixed upgrade is available!" for this advisory.
-#   * Re-review and remove this entry when a fixed `rsa` release exists,
-#     when upstream sqlx drops the dependency, or if any future build
-#     enables a code path that actually compiles `rsa`.
+#     (sqlx -> sqlx-mysql -> rsa). The workspace sqlx dependency enables only
+#     `postgres` and `sqlite`, so the crate is never compiled or linked into
+#     any artifact of this repository; `cargo tree -i rsa@0.9.10 --target all`
+#     resolves to no active consumer.
+#   * RustSec lists no fixed 0.9.x upgrade; the fix is rsa >= 0.10, which
+#     upstream sqlx 0.8 does not accept.
+#   * Re-review and remove this entry when a fixed `rsa` release is accepted
+#     by sqlx, when sqlx drops the dependency, or if any build enables the
+#     mysql feature and actually compiles `rsa`.
+#
+# ---------------------------------------------------------------------------
+# RUSTSEC-2026-0459 (libsqlite3-sys: bundled SQLite CVE-2026-119375)
+#   * Risk acceptance, NOT a claim of no exposure: the bundled SQLite C source
+#     IS compiled here (sqlx 0.8 `sqlite` -> sqlx-sqlite `bundled` ->
+#     libsqlite3-sys `bundled`, verified with `cargo tree -e features -i`).
+#     The advisory is local-attack-only (crafted DB + mismatched -wal file
+#     supplied by a less-trusted party), CVSS 4.0 AV:L/AC:L/PR:N/UI:P, and
+#     needs a process to open those files.
+#   * A version fix exists (libsqlite3-sys >= 0.39.0, SQLite 3.54.0) but is
+#     unreachable on sqlx 0.8: sqlx-sqlite 0.8.6 pins `libsqlite3-sys ^0.30.1`.
+#     Moving to sqlx 0.9 was attempted and REVERTED because it breaks source
+#     compatibility (sqlx::TransactionManager re-export removed; new
+#     SqlSafeStr/AssertSqlSafe requirements on dynamic SQL; transaction API
+#     renames), requiring business-code changes that are out of scope for this
+#     dependency-only commit.
+#   * Re-review and REMOVE this ignore when ANY of the following occurs:
+#       1) a sqlx 0.8.x patch release accepts libsqlite3-sys >= 0.39.0;
+#       2) the planned sqlx 0.9 source migration lands (then bump
+#          libsqlite3-sys to >= 0.39.0 and delete this entry in the same PR);
+#       3) the vulnerability is upgraded to remotely exploitable, or a new
+#          advisory is filed against the locked bundled SQLite copy.
+#   * This entry covers ONLY RUSTSEC-2026-0459. Do not extend it.
+#
+# ---------------------------------------------------------------------------
+# RUSTSEC-2026-0543 (chrono: unmaintained) -- informational warning
+#   * The advisory marks ALL chrono versions as affected: `patched = []`,
+#     "No fixed upgrade is available!" (RustSec recommends jiff or time).
+#     No version bump within the current dependency tree can clear it.
+#   * chrono is a workspace-wide dependency declared by ~40 members, including
+#     public-api-contracts, the sqlx `chrono` feature and the Document/Approval/
+#     Audit/Identity aggregates. Replacing it would change public timestamp and
+#     serialization contracts plus OpenAPI/DB mappings -- a broad business-code
+#     change, explicitly out of scope for this dependency-only hardening commit.
+#   * Interim risk acceptance: informational "unmaintained" classification only;
+#     no known exploitable CVE and no patched release exists. Keep the locked
+#     chrono version unchanged; do not expand this ignore to any other advisory.
+#   * Re-review and REMOVE this ignore when ANY of the following occurs:
+#       1) RustSec publishes a patched chrono release (the advisory gains a
+#          patched version) or withdraws/updates RUSTSEC-2026-0543;
+#       2) a dedicated plan migrates this workspace to jiff or time and chrono
+#          is removed from Cargo.lock;
+#       3) any new informational or security advisory is filed against the
+#          locked chrono version (do not extend this entry to it).
 [advisories]
-ignore = ["RUSTSEC-2023-0071"]
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0459", "RUSTSEC-2026-0543"]

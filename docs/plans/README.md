@@ -25,7 +25,7 @@ plans/
 ## 当前计划与顺序
 
 1. [PLAN-0014 Reference Conformance and R2 Module Readiness](current/PLAN-0014-reference-conformance-and-r2-module-readiness.md)：**Active / Review-first，2026-09-23 → 2026-10-23**。横向执行现有成熟模块的参考对齐、差距审阅、失败/安全测试与 R2 pilot；只直接修复 C0/C1，不以参考对齐制造大范围重构。
-2. **Contract Business Vertical Slice**：当前下一项主要业务代码计划，待创建并激活（前置 PLAN-0013 已 Integrated）。目标是 Contract List/Detail → Document Revision → AI Extraction/Evidence → Review → Apply Candidate → Contract Version Update，验证现有 Document/Module/Policy/UI 基础；可与 PLAN-0014 的 review/test 工作并行。
+2. [PLAN-0017 Contract Business Vertical Slice](current/PLAN-0017-contract-business-vertical-slice.md)：**已创建 / Proposed / 待独立评审，NOT ACTIVE，2026-11-19**。当前下一项主要业务代码计划（前置 PLAN-0013 已 Integrated）。闭环固定为 Contract List/Detail → Document Revision → Extraction/Evidence → Human Review → Apply Candidate → Contract Version Update；与 PLAN-0014 的 review/test 并行编制与评审，R2 准入不是前置条件；**主干 CI 全绿是进入实现的硬门禁**。前端候选重评估见 [2026-11-19 PR #19 笔记](../reviews/2026-11-19-pr19-contract-frontend-recheck.md)。
 3. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
 4. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
 5. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
@@ -44,5 +44,6 @@ plans/
 - [PLAN-0011](archive/2026/PLAN-0011-business-application-packaging-and-contribution-foundation.md)：Integrated / Archived。
 - [PLAN-0012](archive/2026/PLAN-0012-runnable-v1-auth-ai-provider-observability.md)：Integrated / Archived；v0.1 预生产发布，merge 2383651，Main CI 33705531597，v0.1 tag → 2383651。
 - [PLAN-0013](archive/2026/PLAN-0013-identity-and-authorization-foundation.md)：Integrated / Archived；独立审阅修订（C1+M1-M5）完成，代码 head `1990a33`，CI `35418654378` 十作业全绿，merge `d3a9196`（PR #17），Main CI `35426688873` 全绿；完成审计 `docs/reports/PLAN-0013-COMPLETION-AUDIT.md`。
+- [PLAN-0016](archive/2026/PLAN-0016-astryx-frontend-design-system-adoption.md)：Completed / Archived（2026-11-18）。Astryx 成为 `apps/business-console` 默认设计系统；S0–S5 全部验收，规范见 STD-FRONTEND-001，升级见 `docs/operations/ASTRYX_UPGRADE_RUNBOOK.md`。
 
 归档路径按年份组织，文档生命周期遵循 [DOCUMENT_MANAGEMENT.md](../governance/DOCUMENT_MANAGEMENT.md)。

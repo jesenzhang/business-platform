@@ -11,21 +11,21 @@ test('identity & authorization views render from mocked admin APIs', async ({ pa
   await page.route('**/api/v1/admin/organization-units*', async (route) => route.fulfill({ json: envelope([]) }))
 
   await page.goto('/identities')
-  await expect(page.getByRole('heading', { name: 'Identities' })).toBeVisible()
-  await expect(page.getByText('No memberships yet.')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Identities' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No memberships yet.' })).toBeVisible()
 
   await page.goto('/roles')
-  await expect(page.getByRole('heading', { name: 'Roles & permissions' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Roles & permissions' })).toBeVisible()
   await expect(page.getByText('Contract Reviewer')).toBeVisible()
 
   await page.goto('/bindings')
-  await expect(page.getByRole('heading', { name: 'Role bindings' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Role bindings' })).toBeVisible()
 
   await page.goto('/organization')
-  await expect(page.getByRole('heading', { name: 'Organization units' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Organization units' })).toBeVisible()
 
   await page.goto('/explain')
-  await expect(page.getByRole('heading', { name: 'Explain a decision' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Explain a decision' })).toBeVisible()
 })
 
 test('editing role permissions keeps existing keys in the set-replacement', async ({ page }) => {
@@ -49,14 +49,14 @@ test('editing role permissions keeps existing keys in the set-replacement', asyn
 
   await page.goto('/roles')
   await page.getByRole('button', { name: 'Edit permissions' }).click()
-  const editPanel = page.locator('.nested-panel')
+  const editPanel = page.locator('.astryx-card').filter({ has: page.getByRole('heading', { name: 'Permissions for Contract Reviewer' }) })
   await expect(editPanel.getByRole('heading', { name: 'Permissions for Contract Reviewer' })).toBeVisible()
   // The role's current keys must render as checked when the panel opens.
-  await expect(editPanel.locator('label.chip', { hasText: 'identity.read' }).locator('input')).toBeChecked()
-  await expect(editPanel.locator('label.chip', { hasText: 'audit.read' }).locator('input')).toBeChecked()
+  await expect(editPanel.getByRole('checkbox', { name: 'identity.read' })).toBeChecked()
+  await expect(editPanel.getByRole('checkbox', { name: 'audit.read' })).toBeChecked()
 
   // Adding a key must send the full replacement: existing keys plus the new one.
-  await editPanel.locator('label.chip', { hasText: 'policy.explain' }).click()
+  await editPanel.getByRole('checkbox', { name: 'policy.explain' }).check()
   await page.getByRole('button', { name: 'Save permissions' }).click()
   await expect.poll(() => saves.length).toBe(1)
   expect(JSON.parse(saves[0]).permission_keys.sort()).toEqual(['audit.read', 'identity.read', 'policy.explain'])
