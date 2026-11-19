@@ -1,0 +1,46 @@
+cmd: DATABASE_URL=<local postgres>/plan0014_wave4 (dedicated, created empty for this round) cargo test -p document-postgres --all-features -- --include-ignored --test-threads=1
+start: 2026-09-28T11:07:07.4191370+08:00
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_persistence_contracts-1j29hgh7kutqn\s-hmp9ecwd0y-031st9m-working`
+
+warning: `document-persistence-contracts` (lib) generated 1 warning
+   Compiling document-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\tenant_fence_pg-0a611vh1z4kzv\s-hmpa4jv3x5-10nvjqr-working`
+
+warning: `document-postgres` (test "tenant_fence_pg") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.83s
+     Running unittests src\lib.rs (target\debug\deps\document_postgres-54a7751aef6b6008.exe)
+
+running 1 test
+test query_mapper::tests::query_mapper_fails_closed_for_invalid_stored_values ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\query_contracts.rs (target\debug\deps\query_contracts-d3ab7979b11711aa.exe)
+
+running 1 test
+test postgres_satisfies_shared_document_persistence_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.99s
+
+     Running tests\tenant_fence_pg.rs (target\debug\deps\tenant_fence_pg-651a3f123c472e31.exe)
+
+running 1 test
+test replay_never_returns_a_foreign_tenants_document ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+   Doc-tests document_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+pg_exit=0
+--- teardown: drop only databases matching plan0014_wave4% ---
+BEFORE: ["plan0014_wave4"]
+DROPPED plan0014_wave4
+AFTER: []
+teardown_exit=0

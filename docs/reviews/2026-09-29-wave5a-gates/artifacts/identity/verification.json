@@ -1,0 +1,38 @@
+{
+  "schema_version": "plan-0014.wave5a.verification.v1",
+  "module_id": "identity",
+  "module_version": "0.1.0-rc.1",
+  "artifact_integrity_digest": "68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700",
+  "checks": [
+    {
+      "id": "artifact-integrity-digest",
+      "description": "SHA-256 over the canonicalised members of package/ recomputed from disk",
+      "outcome": "PASS",
+      "detail": "21 members, plan-0014.artifact-integrity.v1 = 68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700"
+    },
+    {
+      "id": "contract-surface-file-digest",
+      "description": "sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest",
+      "outcome": "PASS",
+      "detail": "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107"
+    },
+    {
+      "id": "release-identity-consistency",
+      "description": "compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace)",
+      "outcome": "PASS",
+      "detail": "contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107 package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70 namespace=identity-management"
+    },
+    {
+      "id": "migration-mapping-matches-formal-catalog",
+      "description": "every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk",
+      "outcome": "PASS",
+      "detail": "namespace=identity-management set_digest=ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03 files=postgres:019_identity_authorization_foundation.sql,sqlite:001_identity_foundation.sql assessments=sqlite=MAPPED,postgres=BLOCKED"
+    },
+    {
+      "id": "source-provenance",
+      "description": "the artifact pins the source revision and toolchain it was built from",
+      "outcome": "PASS",
+      "detail": "source_revision=8036bc65ba7c77666e48afaa6439911ba7c083d7 toolchain=rust-toolchain-1.94.1 1.94.1"
+    }
+  ]
+}

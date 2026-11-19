@@ -1,0 +1,15 @@
+
+=== 02-generate-candidate ===
+$ F:\wave5a-red-8036bc65\target\debug\module-release-tool.exe generate --module identity --out F:\wave5a-red-8036bc65\red-out
+status=generated
+module_id=identity
+module_version=0.1.0-rc.1
+directory=F:\wave5a-red-8036bc65\red-out\identity-0.1.0-rc.1
+members=21
+contract_digest=3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107
+package_digest=b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70
+artifact_integrity_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+source_revision=8036bc65ba7c77666e48afaa6439911ba7c083d7
+toolchain=rust-toolchain-1.94.1 1.94.1
+platform_version=0.1.0
+exit code : 0

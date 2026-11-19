@@ -1,0 +1,7 @@
+title      : both identity records claim a real commit that does not contain the packed inputs
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\negatives\n11-stale-revision\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033315Z
+module-release: refused by the [source-inputs-match-revision] check: input 'tools/module-release-tool/specs/identity.json' is required to rebuild this candidate, but commit 'e2ce866616495b35974b704a5361853cf2b5b375' does not contain it; the artifact cannot claim that revision
+
+exit code : 1 (expected 1)

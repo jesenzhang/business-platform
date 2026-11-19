@@ -1,0 +1,10 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-2jp3ygl4kpo9q\s-hmonvqtmri-0tg9hcz-working`
+
+warning: `architecture-check` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-26hax9xyun9eq\s-hmonvspn3i-1d5qan7-working`
+
+warning: `architecture-check` (bin "architecture-check") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running `target\debug\architecture-check.exe check`
+Cargo metadata architecture fitness: PASS
+EXIT_CODE=0

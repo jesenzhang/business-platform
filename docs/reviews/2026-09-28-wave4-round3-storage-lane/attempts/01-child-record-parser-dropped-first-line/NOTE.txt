@@ -1,0 +1,14 @@
+First Round 3 lane run (run_id r3-20260928-155258).
+
+Outcome: contract exit=0, fault step exit=101 (2 of 5 failed), cleanup exit=0, cleanup-again exit=0.
+Both fault failures were a harness defect that this round added the channel for, found by running it:
+libtest prints `test <name> ... ` and the child's first println! continues on the same line, so
+parse_created_uploads' line-start rule dropped exactly the first created-upload record — scenario (b)
+saw 0 of 1 and scenario (d) saw 6 of 7. The assertions caught it instead of papering over it, which
+is the behaviour the channel exists to have.
+
+Fix: locate the marker anywhere in the line (support::parse_created_uploads), locked by
+s3_lane_pagination::a_record_sharing_a_line_with_the_harness_still_parses.
+
+Nothing was left in the bucket: step4 cleanup exited 0 for this run id, and the separate diagnostic
+prefix plan0014-wave4/r3-diag-1/ was cleaned by its own scoped cleanup pass (0 objects, 0 uploads).

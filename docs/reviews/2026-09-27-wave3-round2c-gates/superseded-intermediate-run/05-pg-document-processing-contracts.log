@@ -1,0 +1,25 @@
+== cargo test -p document-processing-postgres --test contracts --all-features -- --include-ignored --test-threads=1 ==
+    Blocking waiting for file lock on artifact directory
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp6vd033s-0x5kl4x-working`
+
+warning: `audit` (lib) generated 1 warning
+   Compiling document-processing-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-processing-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-3uork01ej0362\s-hmp6vhnu0k-0gto7ox-working`
+
+warning: `document-processing-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contracts-0xlqjyd1nsrk1\s-hmp6vjlh52-0v8iol8-working`
+
+warning: `document-processing-postgres` (test "contracts") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.82s
+     Running tests\contracts.rs (target\debug\deps\contracts-1fe666830c26cd41.exe)
+
+running 3 tests
+test postgres_processing_contract_claims_and_restarts ... ok
+test postgres_processing_contract_reclaims_expired_ai_task ... ok
+test postgres_processing_revision_one_uow_is_atomic_and_replayable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+
+EXIT_CODE=0
+

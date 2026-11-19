@@ -1,0 +1,1 @@
+INSERT INTO roles (role_id) SELECT r.id FROM roles r CROSS JOIN role_permissions rp, platform_users p;

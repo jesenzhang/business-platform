@@ -1,0 +1,5 @@
+warning: in the working copy of 'crates/document-processing-sqlite/tests/cancel_factuality.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/audit_chain.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/operational.rs', LF will be replaced by CRLF the next time Git touches it
+
+EXIT_CODE=0

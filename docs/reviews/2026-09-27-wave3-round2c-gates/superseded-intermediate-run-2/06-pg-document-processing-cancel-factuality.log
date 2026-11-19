@@ -1,0 +1,25 @@
+== cargo test -p document-processing-postgres --test cancel_factuality_pg --all-features -- --include-ignored --test-threads=1 ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp6vmeq23-0i9ya39-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-3uork01ej0362\s-hmp6vzguzg-0oe98dc-working`
+
+warning: `document-processing-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\cancel_factuality_pg-3tdz53io5l06v\s-hmp6w187r4-0pp2hmr-working`
+
+warning: `document-processing-postgres` (test "cancel_factuality_pg") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests\cancel_factuality_pg.rs (target\debug\deps\cancel_factuality_pg-bd0607ff235a2e64.exe)
+
+running 5 tests
+test cancel_fact_lands_exactly_once_at_the_step_boundary ... ok
+test cancelled_failure_disposition_audits_the_fact ... ok
+test cooperative_cancel_is_intent_only ... ok
+test reclaim_of_cancelled_expired_job_publishes_the_fact ... ok
+test waiting_for_ai_cancel_publishes_fact_once ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+
+EXIT_CODE=0
+

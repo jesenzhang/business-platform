@@ -1676,6 +1676,15 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
                 now,
             )
             .await?;
+            insert_processing_audit(
+                &mut transaction,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"step": completed_step.as_str()}),
+                now,
+            )
+            .await?;
             transaction.commit().await.map_err(map_sql_error)?;
             return Ok(job);
         }
@@ -1815,6 +1824,17 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
             now,
         )
         .await?;
+        if job.status() == ProcessingJobStatus::Cancelled {
+            insert_processing_audit(
+                &mut transaction,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"step": step.as_str()}),
+                now,
+            )
+            .await?;
+        }
         transaction.commit().await.map_err(map_sql_error)?;
         Ok(job)
     }
@@ -2123,6 +2143,17 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
             now,
         )
         .await?;
+        if status == "cancelled" {
+            insert_processing_audit(
+                &mut transaction,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"task_id": task_id}),
+                now,
+            )
+            .await?;
+        }
         let updated = load_ai_task_for_update(&mut transaction, tenant_id, task_id)
             .await?
             .ok_or(ProcessingRepositoryError::NotFound)?;
@@ -2360,23 +2391,39 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
                 .map_err(map_sql_error)?;
         }
         save_job_without_fence(&mut transaction, &job, expected).await?;
-        insert_processing_outbox(
-            &mut transaction,
-            &job,
-            "document.processing.cancelled.v1",
-            serde_json::json!({"requested_by": requested_by}),
-            now,
-        )
-        .await?;
+        // Cancellation is cooperative: the request is an intent and must only
+        // be audited (AGENTS.md §9, WORKFLOW baseline §13). The cancelled.v1
+        // fact event and fact audit are written only when this call is the
+        // transition into Cancelled; every other path (step boundary,
+        // cancelled disposition, reclaim, AI failure) owns that emission.
         insert_processing_audit(
             &mut transaction,
             &job,
-            "processing_cancelled",
+            "processing_cancel_requested",
             Some(requested_by),
             serde_json::json!({}),
             now,
         )
         .await?;
+        if job.status() == ProcessingJobStatus::Cancelled {
+            insert_processing_outbox(
+                &mut transaction,
+                &job,
+                "document.processing.cancelled.v1",
+                serde_json::json!({"requested_by": requested_by}),
+                now,
+            )
+            .await?;
+            insert_processing_audit(
+                &mut transaction,
+                &job,
+                "processing_cancelled",
+                Some(requested_by),
+                serde_json::json!({}),
+                now,
+            )
+            .await?;
+        }
         transaction.commit().await.map_err(map_sql_error)?;
         Ok(job)
     }
@@ -2462,7 +2509,61 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
         &self,
         now: DateTime<Utc>,
     ) -> Result<u64, ProcessingRepositoryError> {
-        ProcessingJobClaimPort::reclaim_expired(self, now).await
+        // Revision 1: the durable execution UoW owns the audit/outbox
+        // transitions for recovery, so reclaim is implemented here instead of
+        // delegating to the legacy claim-port seam, which carries no audit
+        // evidence.
+        let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
+        let rows = sqlx::query_as::<_, JobRow>("SELECT id, tenant_id, document_id, document_revision_id, content_revision, request_key, status, current_step, attempt_count, max_attempts, next_attempt_at, cancel_requested_at, failure_code, failure_message, lease_owner, lease_token, lease_expires_at, fence_version, version, created_by, created_at, updated_at, correlation_id FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= $1 FOR UPDATE SKIP LOCKED")
+            .bind(now)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(map_sql_error)?;
+        let mut reclaimed = 0_u64;
+        for row in rows {
+            let mut job = to_job(row)?;
+            let expected = job.aggregate_version().value();
+            if job
+                .reclaim_expired(now)
+                .map_err(|_| ProcessingRepositoryError::Failed)?
+            {
+                save_job(&mut transaction, &job, expected).await?;
+                insert_processing_audit(
+                    &mut transaction,
+                    &job,
+                    "job_reclaimed",
+                    None,
+                    serde_json::json!({}),
+                    now,
+                )
+                .await?;
+                // Cancel-priority reclaim lands the job in Cancelled; that
+                // transition is a fact and must not stay silent (baseline
+                // §13 and §18 recovery scan).
+                if job.status() == ProcessingJobStatus::Cancelled {
+                    insert_processing_outbox(
+                        &mut transaction,
+                        &job,
+                        "document.processing.cancelled.v1",
+                        serde_json::json!({}),
+                        now,
+                    )
+                    .await?;
+                    insert_processing_audit(
+                        &mut transaction,
+                        &job,
+                        "processing_cancelled",
+                        None,
+                        serde_json::json!({}),
+                        now,
+                    )
+                    .await?;
+                }
+                reclaimed = reclaimed.saturating_add(1);
+            }
+        }
+        transaction.commit().await.map_err(map_sql_error)?;
+        Ok(reclaimed)
     }
 
     async fn heartbeat_ai_task(

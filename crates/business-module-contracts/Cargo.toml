@@ -13,6 +13,7 @@ role = "platform-contract"
 data_owner = "platform-foundation"
 
 [dependencies]
+semver = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

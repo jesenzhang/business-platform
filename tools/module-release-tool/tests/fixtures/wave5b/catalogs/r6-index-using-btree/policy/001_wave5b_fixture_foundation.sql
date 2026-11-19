@@ -1,0 +1,1 @@
+CREATE INDEX wave5b_ix ON roles USING btree (role_id);

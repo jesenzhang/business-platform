@@ -1,0 +1,65 @@
+# Wave 5B-S1 gate evidence anchors
+
+date:            2026-10-08
+branch:          codex/plan-0014-wave5a-local-release-pilot
+base (parent):   6decf1ad9ea05233d66dd3539594ff210afd99f2
+candidate:       b25e2d4a9b455b776934495b8f3dfd2b71a13fe2
+pinned history:  5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601 (baseline revision 19)
+
+pwsh:            7.6.6
+git:             git version 2.50.1.windows.1
+rustc:           rustc 1.94.1 (e408947bf 2026-03-25)
+cargo:           cargo 1.94.1 (29ea6fb6a 2026-03-24)
+os:              Microsoft Windows 10 家庭中文版
+repo volume:     exFAT (no reparse points); core.autocrlf=true
+
+# Every command is wrapped with `rtk proxy`. Each gate log records its own command line,
+# start/stop timestamps and exit code, so any line can be re-run verbatim. Failed and
+# blocked attempts keep their own logs; nothing is silent.
+
+# Host facts that changed the gate outcome:
+#  * the two default-target workspace runs failed on `failed to remove file
+#    target\debug\business-api.exe` / `business-worker.exe`: both development processes were
+#    running on this machine (pids 31480 / 39848 observed at 17:3x). They were NOT killed;
+#    the workspace test was re-run in an isolated --target-dir per design 9.4 / V14 and passed.
+#  * the first isolated attempt (target/tmp/wave5b-gate-target) died in link.exe with exit 1207
+#    while linking business-api (test "security"); the retry in the shared gate-target dir was
+#    clean, which is why 37b is a single log with exit 0.
+#  * one evidence-directory refusal (driver without -Force into a non-empty evidence dir, exit 1
+#    "already holds 7 item(s)") is documented in the closeout section 4; its log was overwritten by
+#    the -Force re-run under the same gate name, so it survives only as a text record there.
+#  * P2-catalog-symlink is BLOCKED: creating a file symlink needs administrator rights and
+#    the repository volume is exFAT, which holds no reparse points. The junction variant (P1)
+#    was created for real and is covered.
+#  * workspace reconciliation: 883 passed / 0 failed / 70 ignored / 192 suites, i.e. the
+#    recorded 864/70/191 baseline plus the 19 tests of the new wave5b_catalog target.
+
+# gate logs (name -> exit code)
+ 20-catalog-check-default.log                     exit 0
+ 21-catalog-check-only-catalog.log                exit 0
+ 22-catalog-check-only-history.log                exit 0
+ 23-catalog-check-only-embed.log                  exit 0
+ 24-catalog-check-only-freeze.log                 exit 0
+ 25-catalog-check-unknown-check.log               exit 1
+ 26-catalog-check-fresh-clone.log                 exit 0
+ 30-fmt-check.log                                 exit 0
+ 31-check-workspace.log                           exit 0
+ 32-clippy-workspace.log                          exit 0
+ 33-test-runtime-migration.log                    exit 0
+ 34-test-module-release-tool.log                  exit 0
+ 35-build-no-run-outbox-reliability.log           exit 0
+ 36-build-no-run-chain-pg.log                     exit 0
+ 37-test-workspace-attempt-2.log                  exit 101
+ 37-test-workspace.log                            exit 101
+ 37b-test-workspace-isolated-target.log           exit 0
+ 40-check-architecture.log                        exit 0
+ 41-wave5b-offline-catalog-gate-attempt-2.log     exit 0
+ 41-wave5b-offline-catalog-gate.log               exit 1
+ 42-test-module-release-tool-at-candidate.log     exit 0
+ 43-test-module-release-tool-after-tooling-added.log exit 0
+ 44-check-architecture-after-tooling-added.log    exit 0
+ 50-git-diff-check.log                            exit 0
+ 51-git-status-short.log                          exit 0
+ 52-git-diff-check-at-candidate.log               exit 0
+ 53-git-status-short-at-candidate.log             exit 0
+ 54-git-candidate-anchors.log                     exit 0

@@ -1,0 +1,1 @@
+INSERT INTO roles (role_id) SELECT g.generate_series FROM generate_series(1, 3) g;

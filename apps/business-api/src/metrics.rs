@@ -6,39 +6,40 @@
 //! - `/metrics` is a public scrape endpoint and carries no auth context;
 //! - a scrape failure must not affect health endpoints or business routes.
 
-use std::sync::OnceLock;
-
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
-
-static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
+use metrics_exporter_prometheus::PrometheusHandle;
 
 /// Install the global Prometheus recorder exactly once and keep the render
 /// handle for the `/metrics` endpoint.
+///
+/// Installation is delegated to [`observability::metrics`] on purpose (PLAN-0014
+/// Wave 4 gap OBS-W4-03): that is where the `*_seconds` duration buckets are
+/// configured, and a process that installs its own recorder loses them, which
+/// silently blanks the versioned dashboard's `histogram_quantile(..._bucket)`
+/// panels. There is exactly one recorder per process either way, so going
+/// through the shared installer is the only way to keep both properties.
 ///
 /// # Panics
 ///
 /// Panics if the recorder fails to install, which can only happen if the
 /// process attempts a second installation; startup code and tests both go
 /// through this function's `OnceLock`, so that indicates a wiring bug.
-#[allow(clippy::expect_used)]
 pub fn install_metrics() -> &'static PrometheusHandle {
-    METRICS_HANDLE.get_or_init(|| {
-        PrometheusBuilder::new()
-            .install_recorder()
-            .expect("prometheus recorder must install exactly once")
-    })
+    observability::metrics::install_metrics()
+}
+
+/// Render the current Prometheus text exposition.
+#[must_use]
+pub fn render() -> String {
+    observability::metrics::render()
 }
 
 /// Public scrape endpoint rendering the Prometheus text exposition format.
 #[allow(clippy::unused_async)]
 pub async fn metrics_handler() -> impl IntoResponse {
-    let body = METRICS_HANDLE.get().map_or_else(
-        || "# metrics not installed\n".to_string(),
-        metrics_exporter_prometheus::PrometheusHandle::render,
-    );
+    let body = render();
     (
         [(
             axum::http::header::CONTENT_TYPE,
@@ -175,5 +176,24 @@ mod tests {
         assert_eq!(normalize_method(&murder), "OTHER");
         let trace = Method::from_bytes(b"TRACE").unwrap_or_else(|_| unreachable!());
         assert_eq!(normalize_method(&trace), "OTHER");
+    }
+
+    /// Gap OBS-W4-03: `/metrics` in this process must expose durations as
+    /// bucketed histograms, because the versioned dashboard resolves
+    /// `histogram_quantile(..._bucket)`. That only holds while the shared
+    /// recorder from `observability::metrics` is the installed one.
+    #[test]
+    fn duration_metrics_render_as_bucketed_histograms() {
+        super::install_metrics();
+        super::record_authorization_duration(std::time::Duration::from_millis(300));
+        let body = super::render();
+        assert!(
+            body.contains("authorization_duration_seconds_bucket{le=\"0.5\"} 1"),
+            "business-api durations must expose explicit histogram buckets, got:\n{body}"
+        );
+        assert!(
+            !body.contains("authorization_duration_seconds{quantile="),
+            "business-api durations must not degrade to client-side summary quantiles"
+        );
     }
 }

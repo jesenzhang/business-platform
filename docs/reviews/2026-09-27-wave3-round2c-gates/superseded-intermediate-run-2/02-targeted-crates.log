@@ -1,0 +1,149 @@
+== cargo test -p audit -p audit-sqlite -p document-sqlite --all-features ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp6vmeq23-0i9ya39-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-0nkg3l4t57fj6\s-hmp6vmex8e-01fmdlj-working`
+
+warning: unused variable: `tenant`
+   --> crates\audit\src\lib.rs:866:13
+    |
+866 |         let tenant = historical.tenant_id();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_tenant`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `audit` (lib) generated 1 warning
+warning: `audit` (lib test) generated 2 warnings (run `cargo fix --lib -p audit --tests` to apply 1 suggestion)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-1vunrzvq93s8g\s-hmp6vn4886-0m4xa7d-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-27dmxy0o7abtw\s-hmp6vn3ly7-19lch8f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-30uavfeydrbyt\s-hmp6vn5y31-0l8tmd5-working`
+
+warning: `document-sqlite` (lib) generated 1 warning
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\historical_chain-3cf75gro544pu\s-hmp6vrmgum-0q90pl8-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\operational-1roislbiluih4\s-hmp6vruugg-0tuy4ug-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contracts-1qkj8kyabr7o0\s-hmp6vrul1z-1ul7mat-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-28hdcseslued5\s-hmp6vruujy-0qw86kw-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_chain-338p639klxbcs\s-hmp6vru5pf-16hb0vz-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\revision_history-23th8tu23cd2j\s-hmp6vruugt-1v66nqi-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\concurrency-2c2zudloqdffu\s-hmp6vru629-03a0n9t-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-0sb02p7jaeo3i\s-hmp6vrmofp-1ysikx9-working`
+
+warning: `audit-sqlite` (test "historical_chain") generated 1 warning
+warning: `document-sqlite` (test "operational") generated 1 warning
+warning: `document-sqlite` (test "contracts") generated 1 warning
+warning: `document-sqlite` (lib test) generated 1 warning
+warning: `document-sqlite` (test "audit_chain") generated 1 warning
+warning: `document-sqlite` (test "revision_history") generated 1 warning
+warning: `document-sqlite` (test "concurrency") generated 1 warning
+warning: `audit-sqlite` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running unittests src\lib.rs (target\debug\deps\audit-421b7b51e098e5ef.exe)
+
+running 8 tests
+test tests::canonical_timestamp_truncates_without_leaving_the_representable_range ... ok
+test tests::legacy_details_are_redacted_for_readers ... ok
+test tests::append_sequence_is_independent_of_business_time ... ok
+test tests::hash_inputs_survive_a_microsecond_persistence_round_trip ... ok
+test tests::validates_and_redacts_sensitive_details ... ok
+test tests::hash_chain_detects_payload_change ... ok
+test tests::re_signing_a_historical_row_leaves_no_nanosecond_hashed_input ... ok
+test tests::rehydrate_preserves_historical_nanosecond_signed_content ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\audit_sqlite-07c97d0eec057dbb.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\historical_chain.rs (target\debug\deps\historical_chain-fefac43bc2790907.exe)
+
+running 2 tests
+test tampering_with_the_historical_row_breaks_verification ... ok
+test repository_reverifies_a_historical_nanosecond_row ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src\lib.rs (target\debug\deps\document_sqlite-3a99571c50430da5.exe)
+
+running 2 tests
+test tests::sqlite_pool_size_is_positive_and_bounded ... ok
+test mapper::tests::query_mapper_fails_closed_for_invalid_stored_values ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\audit_chain.rs (target\debug\deps\audit_chain-ce706217c9744e42.exe)
+
+running 7 tests
+test standalone_document_catalog_supports_create_and_replay ... ok
+test old_document_only_rows_remain_unverified_after_upgrade ... ok
+test old_composed_catalog_upgrade_preserves_verified_rows ... ok
+test document_created_audit_row_is_chain_verifiable_and_readable ... ok
+test legacy_null_chain_rows_stay_readable_and_are_counted_as_legacy ... ok
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ok
+test contradictory_chain_metadata_is_rejected_without_legacy_downgrade ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests\concurrency.rs (target\debug\deps\concurrency-4824cc3970768df6.exe)
+
+running 2 tests
+test concurrent_different_fingerprints_have_one_conflict_and_one_side_effect ... ok
+test concurrent_same_key_is_one_create_and_nine_replays ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests\contracts.rs (target\debug\deps\contracts-4bdd680fea1d9ecd.exe)
+
+running 2 tests
+test sqlite_rolls_back_the_document_when_atomic_side_effect_fails ... ok
+test sqlite_satisfies_shared_document_persistence_contract ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\operational.rs (target\debug\deps\operational-123aee4db7709b95.exe)
+
+running 1 test
+test file_database_uses_wal_and_busy_timeout_and_survives_reopen ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\revision_history.rs (target\debug\deps\revision_history-0a003cd2cf910ad2.exe)
+
+running 1 test
+test saving_a_new_revision_keeps_r1_and_updates_current_revision_atomically ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests audit
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests audit_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+EXIT_CODE=0
+

@@ -1,0 +1,6 @@
+
+=== 05-f2-verify-same-damage ===
+$ F:\wave5a-red-8036bc65\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\docs\reviews\2026-09-29-wave5a-repair1-gates\red-run\cases\f2-damaged-right
+module-release: artifact verification failed [artifact-integrity-digest]: recomputed '144ccac6b33b0c438b970c992620e447c80aaf38353446cb06babc90a43c1f8c' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'contract/packages/identity/src/lib.rs': 'd700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6' (719 bytes) != 'd80179d9b1b44a9474473962aadcdcb98ab0c18e26a23637c3fc4ac701d5387c' (752 bytes)
+exit code : 1
+  | module-release: artifact verification failed [artifact-integrity-digest]: recomputed '144ccac6b33b0c438b970c992620e447c80aaf38353446cb06babc90a43c1f8c' but artifact-manifest.json pins '68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700'; member differences: member 'contract/packages/identity/src/lib.rs': 'd700172c8f918a37fc65ec529000f63093799090d762b6f975257e019127aed6' (719 bytes) != 'd80179d9b1b44a9474473962aadcdcb98ab0c18e26a23637c3fc4ac701d5387c' (752 bytes)

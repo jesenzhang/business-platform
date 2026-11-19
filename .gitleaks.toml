@@ -1,0 +1,18 @@
+# Gitleaks allowlist for PLAN-0014 red-team evidence.
+#
+# The files below are deliberately captured "before fix" logs showing that
+# provider credentials leaked into logs. Every value is synthetic:
+#   access_key_id="AKIASYNTHETICPLAN0014"
+#   secret_access_key="synth-secret-plan0014-do-not-log"
+#   signed_url host = "*.s3.invalid"
+# They are evidence fixtures pinned by review digests, so rewriting them would
+# invalidate the review. Only this exact path is exempted; all other paths and
+# the default gitleaks rules remain active.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic credential strings in pinned PLAN-0014 log-safety evidence"
+paths = [
+  '''docs/reviews/2026-09-28-wave4-round2-gates/10-red-provider-log-safety-before-fix\.log''',
+]

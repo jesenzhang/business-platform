@@ -1,0 +1,6 @@
+guard : the consumer dependency graph must contain no path into the source workspace
+needle: F:\Workspace\business-platform\crates
+needle: F:\Workspace\business-platform\apps
+scanned: Cargo.lock + Cargo.toml of F:\Workspace\business-platform\target\wave5a\consumers\identity
+hits   : 0
+result: PASS

@@ -1,0 +1,7 @@
+title      : artifact-manifest.json declares a schema version this tool never wrote
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n04-unknown-schema\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075927Z
+module-release: artifact verification failed [artifact-record-format]: artifact-manifest.json declares schema_version 'plan-0014.wave5a.artifact-manifest.v99' which this tool does not understand; it only writes 'plan-0014.wave5a.artifact-manifest.v1'
+
+exit code : 1 (expected 1)

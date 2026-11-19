@@ -1,0 +1,129 @@
+{
+  "spec_version": "plan-0014.wave5a.release-spec.v1",
+  "module_id": "identity",
+  "module_version": "0.1.0-rc.1",
+  "data_owner": "identity-management",
+  "owned_bounded_contexts": [
+    "identity-management"
+  ],
+  "packed_crates": [
+    {
+      "crate_name": "identity",
+      "source_dir": "crates/identity"
+    }
+  ],
+  "platform_capabilities": [],
+  "published_commands": [
+    {
+      "contract_id": "resolve-authenticated-user",
+      "version": "1.0.0",
+      "authority": "docs/architecture/BACKEND_ARCHITECTURE_MANIFEST.md (identity is the authority for caller identity); crates/identity/src/application/resolve.rs",
+      "implemented_by": "crates/identity/src/application/resolve.rs::ResolveAuthenticatedUser::execute"
+    },
+    {
+      "contract_id": "create-tenant-membership",
+      "version": "1.0.0",
+      "authority": "docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md (tenant_memberships owned by identity-management); apps/business-api/src/routes/iam_admin.rs exposes the use case",
+      "implemented_by": "crates/identity/src/application/membership.rs::CreateTenantMembership::execute"
+    },
+    {
+      "contract_id": "change-tenant-membership-status",
+      "version": "1.0.0",
+      "authority": "docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md (tenant_memberships owned by identity-management); apps/business-api/src/routes/iam_admin.rs exposes the use case",
+      "implemented_by": "crates/identity/src/application/membership.rs::ChangeTenantMembershipStatus::execute"
+    },
+    {
+      "contract_id": "change-user-status",
+      "version": "1.0.0",
+      "authority": "docs/architecture/DATA_OWNERSHIP_AND_CONSISTENCY.md (platform_users owned by identity-management); apps/business-api/src/routes/iam_admin.rs exposes the use case",
+      "implemented_by": "crates/identity/src/application/user_status.rs::ChangeUserStatus::execute"
+    },
+    {
+      "contract_id": "bootstrap-administrator",
+      "version": "1.0.0",
+      "authority": "docs/reviews/2026-09-23-saas-align-identity-organization-policy.md (platform bootstrap path owned by identity-management)",
+      "implemented_by": "crates/identity/src/application/bootstrap.rs::BootstrapAdministrator::execute"
+    }
+  ],
+  "published_queries": [
+    {
+      "contract_id": "get-tenant-user",
+      "version": "1.0.0",
+      "authority": "docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md; apps/business-api/src/routes/iam_admin.rs",
+      "implemented_by": "crates/identity/src/application/queries.rs::GetTenantUser::execute"
+    },
+    {
+      "contract_id": "list-tenant-users",
+      "version": "1.0.0",
+      "authority": "docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md; apps/business-api/src/routes/iam_admin.rs",
+      "implemented_by": "crates/identity/src/application/queries.rs::ListTenantUsers::execute"
+    },
+    {
+      "contract_id": "list-memberships",
+      "version": "1.0.0",
+      "authority": "docs/standards/QUERY_MODEL_AND_DATABASE_ADAPTER_STANDARD.md; apps/business-api/src/routes/iam_admin.rs",
+      "implemented_by": "crates/identity/src/application/queries.rs::ListMemberships::execute"
+    },
+    {
+      "contract_id": "check-tenant-access",
+      "version": "1.0.0",
+      "authority": "docs/architecture/SECURITY_ARCHITECTURE.md (fail-closed tenant access); crates/identity/src/application/access.rs",
+      "implemented_by": "crates/identity/src/application/access.rs::TenantAccessChecker::check"
+    }
+  ],
+  "published_events": [],
+  "resource_kinds": [],
+  "data_classification": [
+    "confidential"
+  ],
+  "migration_namespace": "identity-management",
+  "persistent": true,
+  "migration_sets": [
+    {
+      "backend": "sqlite",
+      "catalog": "crates/identity-sqlite/migrations",
+      "catalog_manifest": "crates/identity-sqlite/migrations/MANIFEST.sha256",
+      "ledger_table": "identity_migrations",
+      "module_owned": true,
+      "ownership_note": "SQLite catalog is owned by identity-management; ledger table identity_migrations records the applied revisions.",
+      "files": [
+        "001_identity_foundation.sql"
+      ]
+    },
+    {
+      "backend": "postgres",
+      "catalog": "migrations",
+      "catalog_manifest": "migrations/MANIFEST.sha256",
+      "ledger_table": null,
+      "module_owned": false,
+      "ownership_note": "019_identity_authorization_foundation.sql is a single shared workspace-level file that creates the identity-management, organization and policy tables in one public schema and is embedded wholesale by runtime-migration; identity-management owns only its own statements inside it.",
+      "files": [
+        "019_identity_authorization_foundation.sql"
+      ]
+    }
+  ],
+  "dependencies": [],
+  "compatibility": {
+    "minimum_platform_version": "0.1.0",
+    "maximum_platform_version": null,
+    "authority": "platform product version 0.1.0 from the root [workspace.package]; no upper bound has been declared or reviewed"
+  },
+  "changelog_file": "tools/module-release-tool/specs/identity.changelog.md",
+  "declaration_authority": {
+    "module_id": "docs/plans/current/PLAN-0014-reference-conformance-and-r2-module-readiness.md §6 names identity as a Wave 5 pilot candidate.",
+    "module_version": "First independent release version for this module; docs/standards/SAAS_MODULE_STANDARD.md §8 requires a module release version separate from the workspace/product version, and 0.1.0-rc.1 states that the candidate is not GA. The workspace version stays 0.1.0.",
+    "owned_bounded_contexts": "crates/identity/Cargo.toml [package.metadata.architecture] bounded_context = identity-management, checked against docs/architecture/BOUNDED_CONTEXT_MAP.md.",
+    "data_owner": "crates/identity/Cargo.toml [package.metadata.architecture] data_owner = identity-management.",
+    "platform_capabilities": "No authoritative platform capability catalog exists yet (PLAN-0014 Wave 2 review G-204 registry is DEFER), so none is declared instead of inventing identifiers.",
+    "published_commands": "Application use cases in crates/identity/src/application, reachable from the IAM admin HTTP surface in apps/business-api/src/routes/iam_admin.rs. Contract version 1.0.0 is the initial declaration of this surface.",
+    "published_queries": "Query use cases in crates/identity/src/application/queries.rs, reachable from apps/business-api/src/routes/iam_admin.rs. Contract version 1.0.0 is the initial declaration of this surface.",
+    "published_events": "Not found: identity publishes no integration events today, so the set stays empty rather than being invented (docs/standards/INTER_MODULE_COMMUNICATION_STANDARD.md §6).",
+    "resource_kinds": "Not declared: identity publishes no ResourceRef resource kind yet; adding one is a published-contract change recorded as design proposal SP-5.",
+    "data_classification": "docs/architecture/SECURITY_ARCHITECTURE.md §8: authentication identifiers and membership facts are Confidential.",
+    "migration_namespace": "Equal to the authoritative data_owner, per docs/reviews/2026-09-24-saas-align-module-packaging.md §8 G-203 / §16 D-02.",
+    "persistent": "identity owns platform_users, external_identities, tenant_memberships, identity_idempotency and platform_bootstrap_executions.",
+    "dependencies": "identity declares no dependency on another business module; crates/identity-authorization-contracts is an adapter behaviour-contract suite consumed as a dev-dependency, not a module dependency.",
+    "compatibility": "No platform compatibility window has been reviewed or accepted; the minimum is pinned to the current platform version and no maximum is claimed.",
+    "authority_of_this_file": "docs/reviews/2026-09-29-wave5a-implementation-record.md §3, §4 and §6."
+  }
+}

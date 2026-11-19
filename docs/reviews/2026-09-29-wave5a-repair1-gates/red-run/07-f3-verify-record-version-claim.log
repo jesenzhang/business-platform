@@ -1,0 +1,13 @@
+
+=== 07-f3-verify-record-version-claim ===
+$ F:\wave5a-red-8036bc65\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\docs\reviews\2026-09-29-wave5a-repair1-gates\red-run\cases\f3b-record-version
+status=verified
+module_id=identity
+module_version=0.1.0-rc.1
+artifact_integrity_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+check[artifact-integrity-digest] SHA-256 over the canonicalised members of package/ recomputed from disk: PASS
+check[contract-surface-file-digest] sha256(package/contract/contract-surface.json) equals the pinned contract digest, so any third-party tool can reproduce contract_digest: PASS
+check[release-identity-consistency] compiler verify_release_identity over the re-compiled shipped manifest (module id, module version, manifest schema, contract digest, package digest, migration namespace): PASS
+check[migration-mapping-matches-formal-catalog] every pinned migration file is re-read from its formal catalog and must match that catalog's MANIFEST.sha256 and its bytes on disk: PASS
+check[source-provenance] the artifact pins the source revision and toolchain it was built from: PASS
+exit code : 0

@@ -1,0 +1,13 @@
+# gate: 50-git-diff-check
+# command: git diff --check
+# started: 2026-09-30 17:20:07 +08:00
+# finished: 2026-09-30 17:20:07 +08:00
+# duration-seconds: 0
+# exit-code: 0
+
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/audit-postgres/tests/chain_pg.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/check-architecture.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/main.rs', LF will be replaced by CRLF the next time Git touches it

@@ -23,8 +23,13 @@ async fn setup_pool() -> sqlx::PgPool {
 }
 
 /// Helper: run migrations to ensure schema is up to date.
+///
+/// The catalog comes from `runtime_migration::MIGRATOR`, the single embed point of the
+/// shared baseline: a second `sqlx::migrate!("../../migrations")` here would embed a
+/// second copy of the same catalog (PLAN-0014 Wave 5B design §11.2 item 11, review
+/// `2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md` P-4).
 async fn run_migrations(pool: &sqlx::PgPool) {
-    sqlx::migrate!("../../migrations")
+    runtime_migration::MIGRATOR
         .run(pool)
         .await
         .expect("failed to run migrations");

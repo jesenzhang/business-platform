@@ -1,0 +1,103 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_persistence_contracts-1j29hgh7kutqn\s-hmp9ecwd0y-031st9m-working`
+
+warning: `document-persistence-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-27dmxy0o7abtw\s-hmp7951tz6-01o70tx-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-30uavfeydrbyt\s-hmp79527xa-12h16ak-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\content_reference-1klhnblx8hyin\s-hmpf1596i0-0jw7v3h-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\tenant_fence-2b75ad5jh0te5\s-hmpf159etd-1d8dhnw-working`
+
+warning: `document-sqlite` (test "content_reference") generated 1 warning
+warning: `document-sqlite` (test "tenant_fence") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.13s
+     Running unittests src\lib.rs (target\debug\deps\document_persistence_contracts-b03e6e40bf813f67.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\document_sqlite-52f059ab8bd48088.exe)
+
+running 2 tests
+test tests::sqlite_pool_size_is_positive_and_bounded ... ok
+test mapper::tests::query_mapper_fails_closed_for_invalid_stored_values ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\audit_chain.rs (target\debug\deps\audit_chain-fe03a2b1eca5d94a.exe)
+
+running 7 tests
+test standalone_document_catalog_supports_create_and_replay ... ok
+test old_document_only_rows_remain_unverified_after_upgrade ... ok
+test old_composed_catalog_upgrade_preserves_verified_rows ... ok
+test legacy_null_chain_rows_stay_readable_and_are_counted_as_legacy ... ok
+test document_created_audit_row_is_chain_verifiable_and_readable ... ok
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ok
+test contradictory_chain_metadata_is_rejected_without_legacy_downgrade ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests\concurrency.rs (target\debug\deps\concurrency-8537817e42ab6aa4.exe)
+
+running 2 tests
+test concurrent_different_fingerprints_have_one_conflict_and_one_side_effect ... ok
+test concurrent_same_key_is_one_create_and_nine_replays ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests\content_reference.rs (target\debug\deps\content_reference-c942ba7f0d4b5af0.exe)
+
+running 2 tests
+test revision_rows_are_append_only ... ok
+test new_write_persists_the_revision_scoped_content_reference ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests\contracts.rs (target\debug\deps\contracts-99f549b68251dcc2.exe)
+
+running 2 tests
+test sqlite_rolls_back_the_document_when_atomic_side_effect_fails ... ok
+test sqlite_satisfies_shared_document_persistence_contract ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\operational.rs (target\debug\deps\operational-20c8dd0ac2d2d80d.exe)
+
+running 1 test
+test file_database_uses_wal_and_busy_timeout_and_survives_reopen ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests\revision_history.rs (target\debug\deps\revision_history-cd18e82a2a208440.exe)
+
+running 1 test
+test saving_a_new_revision_keeps_r1_and_updates_current_revision_atomically ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\tenant_fence.rs (target\debug\deps\tenant_fence-467d6222d516457a.exe)
+
+running 2 tests
+test same_tenant_replay_still_returns_the_original_document ... ok
+test replay_never_returns_a_foreign_tenants_document ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+   Doc-tests document_persistence_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

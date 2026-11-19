@@ -252,3 +252,139 @@ Runbook 是架构的操作实现，不得修改 Baseline 语义。
 
 - [`templates/ADR_TEMPLATE.md`](templates/ADR_TEMPLATE.md)
 - [`templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md`](templates/REFERENCE_CONFORMANCE_REVIEW_TEMPLATE.md)：成熟模块 Reference Conformance Review 与 R2 admission 固定模板。
+
+## PLAN-0014 Wave 3 repair and proposals (2026-09-27)
+
+- [Round 2 repair and evidence scope](reviews/2026-09-27-wave3-round2-repair.md).
+- [Round 2 candidate gates — commit 81640e7](reviews/2026-09-27-wave3-round2-gates/README.md).
+- [PostgreSQL lanes, first real run and root causes](reviews/2026-09-27-wave3-round2-gates/pg-discovery/README.md).
+- [Final candidate gates incl. real PostgreSQL lanes — commit 2f9976e](reviews/2026-09-27-wave3-round2-final-candidate-gates/README.md).
+- [Round 2c audit timestamp precision repair (R1/R2 regressions)](reviews/2026-09-27-wave3-round2c-repair.md).
+- [Round 2c gates incl. re-run PostgreSQL lanes — commit 8946e46](reviews/2026-09-27-wave3-round2c-gates/README.md).
+- [ADR-0027 Pipeline version pinning — Proposed](adr/ADR-0027-processing-pipeline-version-pinning.md).
+- [ADR-0028 Event envelope evolution — Proposed](adr/ADR-0028-processing-event-envelope-evolution.md).
+
+## PLAN-0014 Wave 4 reference conformance (2026-09-28)
+
+- [Wave 4 baseline — capability table + fixed references](reviews/2026-09-28-wave4-baseline.md).
+- [Document / Object Storage conformance review](reviews/2026-09-28-saas-align-document-storage.md).
+- [Observability conformance review](reviews/2026-09-28-saas-align-observability.md).
+- [Notification conformance review](reviews/2026-09-28-saas-align-notification.md).
+- [Wave 4 gates incl. real PostgreSQL lane — code commit 6fb9487](reviews/2026-09-28-wave4-gates/README.md).
+- [Real S3-compatible provider lane (RustFS) and teardown](reviews/2026-09-28-wave4-storage-lane/README.md).
+- ADR-0027 / ADR-0028 remain Proposed, NOT ACCEPTED; Wave 4 records them as R2 dependencies and invents no event envelope.
+
+## PLAN-0014 Wave 5A — local module release candidates (2026-09-29)
+
+- [Wave 5A implementation record — pilot choice, artifact format, normalization rules, results](reviews/2026-09-29-wave5a-implementation-record.md).
+- [Wave 5A gates, artifact digests and out-of-workspace consumer evidence — code commit 8036bc6](reviews/2026-09-29-wave5a-gates/README.md).
+- [Assembly and verification step log (30 steps, `scripts/plan0014-wave5a.ps1`)](reviews/2026-09-29-wave5a-gates/assembly-log.md).
+- Status: LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED. Nothing was pushed, merged, tagged,
+  published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED, and a successful
+  artifact build is not an R2 claim. PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.
+
+## PLAN-0014 Wave 5A Repair 1 — the verification chain itself fixed (2026-09-29)
+
+- [Wave 5A independent review — NEEDS REPAIR / NOT PUBLISHED, findings F1–F5 and the repair instruction](reviews/2026-09-29-wave5a-independent-review.md).
+- [Repair 1 evidence — gates, pre-fix red run, per-case negative records, F1–F5 closure table, code candidate 69d9a6b](reviews/2026-09-29-wave5a-repair1-gates/README.md).
+- [F1–F5 closure table: fix location, regression, command, log, observed result](reviews/2026-09-29-wave5a-repair1-gates/F1-F5-closure.md).
+- [What the 70 ignored tests actually are (correcting "all PostgreSQL lanes")](reviews/2026-09-29-wave5a-repair1-gates/ignored-tests-classified.md).
+- The implementation record gained a dated §16 closeout; the earlier Wave 5A section above stays as written,
+  and the two statements this round disproved are annotated there and listed in the new README §6.
+- Status: WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED. Still nothing pushed, merged,
+  tagged, published or deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED;
+  G-01 / G-02 / G-201..G-203 stay open; PostgreSQL execution, publish/install and scans stay NOT RUN / BLOCKED.
+
+## PLAN-0014 Wave 5A Repair 2 — candidates come from the pinned commit, not from the checkout (2026-09-30)
+
+- [Wave 5A Repair 1 independent review — NEEDS REPAIR, findings F1-A / F1-B and the repair instruction](reviews/2026-09-30-wave5a-repair1-independent-review.md).
+- [Repair 2 evidence — RED/GREEN pair, gates, script regressions, pilot at the candidate SHA, 19 negative cases, code candidate c22939f](reviews/2026-09-30-wave5a-repair2-gates/README.md).
+- [F1-A / F1-B closure table, the three provenance comparisons, the gate table and the item-by-item NOT RUN list](reviews/2026-09-30-wave5a-repair2-gates/F1-closure.md).
+- What was wrong: Repair 1 made `source_revision` a real commit, but the candidate's bytes still came off
+  the working tree. A packed `Cargo.toml` with its dependency pin rewritten to a version that does not
+  exist verified once the integrity record was recomputed around it, and a checkout missing one committed
+  source file generated a 20-member artifact that no commit contains.
+- What fixes it: one commit is the only source of a candidate. Members are listed with `git ls-tree -r -z`,
+  copied members compared blob for blob, derived members (packed `Cargo.toml`, shipped manifest, contract
+  surface, migration mapping) recomputed from that commit and compared in whole, and generation refuses a
+  checkout that disagrees with the commit before it creates any output directory. Symlinks and submodule
+  gitlinks are refused rather than packed. Four digests and both member counts are unchanged.
+- Status: WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED. Nothing pushed, merged, tagged, published or
+  deployed; `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED; G-01 / G-02 / G-201..G-203 stay
+  open; the outside-repository consumer lane, PostgreSQL execution, publish/install and scans stay NOT RUN,
+  and `cargo test --workspace` in the default build directory is blocked by two binaries another process
+  holds (the same code was run in an isolated build directory instead, both logs archived).
+
+## PLAN-0014 Wave 5A Repair 2 reviewed + Wave 5B-0 migration isolation design (2026-09-30)
+
+- [Wave 5A Repair 2 independent review — PASS for the bounded repair, NOT INTEGRATED, and the Wave 5B-0 instruction](reviews/2026-09-30-wave5a-repair2-independent-review.md).
+- [R2 admission matrix — G-01/G-201, G-02, G-202, G-203, A-01..A-12, per-module C0/C1 and the open Wave 4 items, each with its verbatim original closure condition, pinned SHA, evidence path and date, executed scope, status, remaining action and owner](reviews/2026-09-30-wave5b-r2-admission-matrix.md).
+- [Wave 5B-0 migration isolation design package — Proposed, design only, no code and no database work](plans/current/PLAN-0014-wave5b-migration-isolation-design.md).
+- [ADR-0029 module-namespaced migration catalogs and platform migration ledger — Proposed, not accepted](adr/ADR-0029-module-namespaced-migration-catalogs-and-ledger.md).
+- The independent verdict on Repair 2 is **PASS (Wave 5A Repair 2 bounded repair) / NOT INTEGRATED** over
+  `7180eec7..c73955e`. It covers that bounded repair only: it is not the PLAN-0014 acceptance and not an R2
+  admission, so `identity` and `policy` stay R1 / R2 BLOCKED / NOT CLAIMED. The evidence README now carries a
+  pointer to that verdict instead of `<pending>`; its NOT RUN / BLOCKED rows and every number are untouched.
+- Admission counts stay at **10 PASS + 1 PARTIAL + 1 NOT RUN** with **0 of 12 acceptance items closed this
+  round**; G-01 and G-201 are one lineage rather than two successes, the two foundation crates are one
+  module and not two pilots, and Wave 2's formal Step F verdict is still `<pending>` because it was never
+  filled in.
+- The design package proposes freezing `migrations/001..019` plus `_sqlx_migrations` as an immutable host
+  baseline, putting new module revisions in `migrations/modules/<namespace>/` with a per-namespace
+  `MANIFEST.sha256`, and recording execution in one platform-owned append-only ledger
+  `platform_module_migrations` written by a single runner with advisory locking and fail-closed checksum,
+  orphan and revision-gap rejection. It separates three different meanings of "namespace": the catalog
+  directory, the ledger key, and a real PostgreSQL schema — the last one is explicitly out of scope.
+- It also states plainly what the smaller scheme cannot do: `identity` still cannot be cold-installed alone on
+  PostgreSQL, because all 13 existing IAM tables come from the shared `019`, which also renames tables that
+  `001` created. The proposal is therefore to split G-203 into G-203a (namespace isolation plus independent
+  future install/upgrade, closable in Wave 5B) and G-203b (physical schema separation and true single-module
+  cold install, irreversible and separately authorized). G-203 stays open and no closure is claimed here.
+- Recorded, not fixed: `apps/business-api/src/composition.rs` and `apps/governance-worker/src/main.rs` apply
+  migrations at process start, which contradicts the persistence baseline rule that the formal API process
+  does not migrate, and the repository sets no `search_path` anywhere.
+- Not run this round: the Rust workspace gates (no product code changed) and every real PostgreSQL acceptance
+  item in the design package, all `BLOCKED` without database authorization.
+- Status: WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED; WAVE 5B-0 DESIGN READY FOR REVIEW; R2 BLOCKED.
+
+## PLAN-0014 Wave 5B-0 design package Revision 1 (2026-09-30)
+
+- [Wave 5B-0 design independent review — NEEDS REPAIR (design package), B1/B2/B3 and the single next implementation package](reviews/2026-09-30-wave5b-design-independent-review.md).
+- [Wave 5B-0 Revision 1 closeout — B1/B2/B3 original finding → repaired clause → static reasoning → future test mapping, with every unfinished item left OPEN](reviews/2026-09-30-wave5b-design-revision1-closeout.md).
+- [Wave 5B-0 migration isolation design package — Revision 1](plans/current/PLAN-0014-wave5b-migration-isolation-design.md),
+  [ADR-0029](adr/ADR-0029-module-namespaced-migration-catalogs-and-ledger.md) and the
+  [R2 admission matrix](reviews/2026-09-30-wave5b-r2-admission-matrix.md) were updated in the same round;
+  ADR-0029 stays **Proposed / NOT ACCEPTED**.
+- Lock model (B1): creating the shared `platform_module_migrations` ledger is now protected by one
+  **platform bootstrap lock keyed independently of any namespace**, separate from the per-namespace lock. Both
+  are transaction-scoped `pg_advisory_xact_lock` (matching the eight existing uses in the repo) with disjoint key
+  domains, one fixed acquisition order (baseline → bootstrap → one namespace at a time) and no path that takes the
+  bootstrap lock while holding a namespace lock. `CREATE TABLE IF NOT EXISTS` was dropped in favour of
+  check-and-create plus a structural validation and a post-commit read-back inside the lock; read-only
+  `verify` / `status` never run DDL. The single concurrency check became three: V8a same namespace, V8b two
+  different namespaces bootstrapping concurrently, V8c a killed lock holder followed by recovery. All still NOT RUN.
+- Criteria (B2): the Revision 0 claim that scheme B delivers single-module cold install is **withdrawn**. Scheme
+  B moves where existing tables live; an empty database still needs host baseline 1..19, so physical isolation and
+  independent cold install are now two separately-accounted goals and **neither has any evidence today**. Scheme B
+  is demoted to an unfinished research proposal and removed from the executable Wave 5B steps (its expand-2 step
+  pointed a compatibility view at a table that did not exist yet while the old name was still taken); §6.4 keeps a
+  corrected candidate ordering with an intermediate object-existence table and §6.5 lists seven OPEN items. G-203 is
+  accounted in four sub-items, all Proposed / OPEN, and the original G-203 / G-202 / A-12 denominators are unchanged.
+- Commands and fixtures (B3): `MIGRATION__DATABASE__URL` and `DATABASE_URL` are mutually exclusive
+  (`apps/migration/src/config.rs:17-21`), so the two lanes now have separate PowerShell scopes that restore each
+  variable's prior presence and value. A per-suite inventory records which database each ignored test really
+  touches — `apps/migration/tests/migration_test.rs` discards the supplied database name and creates
+  `plan2_<uuid>` siblings cleaned up only on success, and several suites silently fall back to inconsistent
+  hard-coded development databases. V14 is now incremental reconciliation rather than a fixed 864 / 191 / 70, and
+  `--namespace` / `verify` are labelled as not yet implemented.
+- No database was contacted, no product code changed, no S1/S2/S3 slice implemented, nothing pushed or merged.
+- Status: WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW; WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED; R2 BLOCKED.
+
+## 2026-09-30 Wave 5B-S1 offline catalog gate (implementation round)
+
+- Started from `6decf1ad9ea05233d66dd3539594ff210afd99f2`; local candidate `b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`, not integrated. The executed package is section 3 of `docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md`, including its section 2 C1 rule for historical digests.
+- `tools/module-release-tool/src/catalog.rs` adds `catalog-check` with four selectable checks; the default set is `module-catalog`, `pinned-baseline-history` and `baseline-embed`, while `baseline-candidate-freeze` only runs when asked for explicitly with `--only` — ADR-0029 is still Proposed, so the freeze is not made a default policy. `scripts/check-architecture.ps1` now runs the default checks and adds a canonical-LF-only assertion for namespace manifests, deliberately not reusing the historical manifest tolerance. `scripts/test-plan0014-wave5b.ps1` and `tools/module-release-tool/tests/wave5b_catalog.rs` are two readers of one shared `EXPECTATIONS.json`.
+- Architectural fact: `migrations/modules/{identity-management,policy}` exist and report **RESERVED with zero revisions** — a reservation, not an ability to install independently and not a claim that `migrations/modules` is an installed catalog. Exactly one file embeds the host baseline catalog (`crates/runtime-migration/src/lib.rs`); the two PostgreSQL test suites now apply it through `runtime_migration::MIGRATOR`. No historical migration and no historical manifest line was rewritten: the seven C1 entries keep their CRLF-only compatibility while each file is additionally pinned by its blob digest.
+- A static gate is not an isolation proof: the owner scan is a SQL-text fitness function and does not establish database role/grant boundaries. G-203's four accounted sub-items, G-01 / G-02 / G-201 / G-202 / G-203 and Wave 4's C1 items all stay open; no admission-matrix denominator was lowered.
+- Gates: per-command logs with exit codes in `docs/reviews/2026-09-30-wave5b-s1-gates/`, reconciliation in `docs/reviews/2026-09-30-wave5b-s1-closeout.md`. PostgreSQL suites are NOT RUN (no database authorization); the file-symlink path case is BLOCKED (creating a symlink needs privilege and the repository volume is exFAT, which holds no reparse points).
+- Status: WAVE 5B-S1 READY FOR INDEPENDENT REVIEW / NOT INTEGRATED; R2 BLOCKED. ADR-0029 stays Proposed, S2 (runner/ledger/runtime wiring) is not implemented, no database was contacted, `main` is untouched, nothing was pushed, merged, tagged, published or deployed, and the archived Wave 5A Repair 2 evidence is unchanged.

@@ -1,0 +1,44 @@
+[
+  {
+    "Finding": "F1",
+    "Counterexample": "both identity records claim 0000…0000 as source_revision",
+    "Command": "module-release verify (pre-fix)",
+    "Observed": "exit 0",
+    "Verdict": "RED CONFIRMED (verified)"
+  },
+  {
+    "Finding": "F2",
+    "Counterexample": "one packed source byte changed on the right side only",
+    "Command": "module-release compare (pre-fix)",
+    "Observed": "exit 0",
+    "Verdict": "RED CONFIRMED (declared identical)"
+  },
+  {
+    "Finding": "F2",
+    "Counterexample": "the same damage, through verify",
+    "Command": "module-release verify (pre-fix)",
+    "Observed": "exit 1",
+    "Verdict": "control: verify caught it, compare did not"
+  },
+  {
+    "Finding": "F3",
+    "Counterexample": "artifact_integrity_algorithm replaced by an algorithm nobody implements",
+    "Command": "module-release verify (pre-fix)",
+    "Observed": "exit 0",
+    "Verdict": "RED CONFIRMED (verified)"
+  },
+  {
+    "Finding": "F3",
+    "Counterexample": "artifact-manifest.json claims a module_version release.json does not",
+    "Command": "module-release verify (pre-fix)",
+    "Observed": "exit 0",
+    "Verdict": "RED CONFIRMED (verified)"
+  },
+  {
+    "Finding": "F3",
+    "Counterexample": "release-bundle.json binds crate version 9.9.9 while the packed Cargo.toml says 0.1.0-rc.1",
+    "Command": "module-release verify (pre-fix)",
+    "Observed": "exit 0",
+    "Verdict": "RED CONFIRMED (verified)"
+  }
+]

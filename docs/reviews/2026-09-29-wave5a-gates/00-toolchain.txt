@@ -1,0 +1,19 @@
+generated-at (utc) : 2026-09-29T02:49:00Z
+repository          : F:\Workspace\business-platform
+source-revision     : 8036bc65ba7c77666e48afaa6439911ba7c083d7
+branch              : codex/plan-0014-wave5a-local-release-pilot
+working-tree-dirty  : 1 entries
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+rustc 1.94.1 (e408947bf 2026-03-25)
+
+[toolchain]
+channel = "1.94.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+
+
+ProductName        : Windows 10 Home China
+DisplayVersion     : 22H2
+CurrentBuildNumber : 19045
+
+

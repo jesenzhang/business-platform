@@ -1,0 +1,11 @@
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/operational.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/notification/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/object-storage/tests/log_hygiene.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/object-storage/tests/s3_contract_lane.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/observability/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-28-saas-align-document-storage.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-28-saas-align-observability.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-28-wave4-baseline.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-28-wave4-gates/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-28-wave4-storage-lane/README.md', LF will be replaced by CRLF the next time Git touches it

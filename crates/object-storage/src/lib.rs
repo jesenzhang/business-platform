@@ -12,6 +12,7 @@ pub mod key;
 
 pub use client::{
     LocalStorageClient, ObjectMetadata, ObjectStorageClient, ObjectStream, S3Client, StoredObject,
+    MAX_PRESIGN_EXPIRES_SECS, MIN_PRESIGN_EXPIRES_SECS,
 };
 pub use error::StorageError;
 pub use key::{ObjectKey, ObjectKeyError};

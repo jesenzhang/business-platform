@@ -1,0 +1,12 @@
+title      : repeat-build consistency for policy (payload bytes and declaration digests of both sides)
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe compare --left F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-a\policy-0.1.0-rc.1 --right F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-b\policy-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T033036Z
+status=identical
+left=F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-a\policy-0.1.0-rc.1
+right=F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-b\policy-0.1.0-rc.1
+left_digest=f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243
+right_digest=f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243
+scope=23 payload member(s) re-read from both sides and re-hashed, plus the contract, package and integrity digests and the packaging transforms each side records; verification.json and the source_revision claim are out of scope
+
+exit code : 0 (expected 0)

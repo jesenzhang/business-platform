@@ -1,0 +1,28 @@
+== cleanup: drop the task-specific databases created by Round 2c ==
+Only plan0014_wave3_* databases are matched; no shared database is touched.
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-32ayjsvkvf7bh\s-hmp78kgxk1-0744o7b-working`
+
+warning: `audit-postgres` (lib) generated 1 warning
+   Compiling audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.90s
+     Running tests\wave3c_cleanup.rs (target\debug\deps\wave3c_cleanup-7783ee4729f94a43.exe)
+
+running 1 test
+test drop_round_2c_task_databases ... TASK_DATABASES_BEFORE=plan0014_wave3_final,plan0014_wave3_r2,plan0014_wave3_r2c,plan0014_wave3_r2final,plan0014_wave3_test
+DROP plan0014_wave3_final ok=true
+DROP plan0014_wave3_r2 ok=true
+DROP plan0014_wave3_r2c ok=true
+DROP plan0014_wave3_r2final ok=true
+DROP plan0014_wave3_test ok=true
+TASK_DATABASES_AFTER=0
+TOTAL_DATABASES_REMAINING=11
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.93s
+
+
+EXIT_CODE=0
+

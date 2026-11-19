@@ -1,0 +1,2157 @@
+# gate: 37b-test-workspace-isolated-target
+# command: rtk proxy cargo test --workspace --all-features --target-dir F:\Workspace\business-platform\target\gate-target
+# started: 2026-09-30 18:02:03 +08:00
+# finished: 2026-09-30 18:06:40 +08:00
+# duration-seconds: 277
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+   Compiling module-release-tool v0.1.0 (F:\Workspace\business-platform\tools\module-release-tool)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\module_release_tool-2dp5fn8f8ubie\s-hmrsy5b2sj-01pp1ib-working`
+
+   Compiling messaging v0.1.0 (F:\Workspace\business-platform\crates\messaging)
+   Compiling audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\module_release_tool-10kd7nuip3j2i\s-hmrsy8yam0-0e91zxp-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\outbox_reliability-0xljil4ihqdm0\s-hmrsy8xr30-0bj2awv-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\module_release_tool-16syugqwry8gn\s-hmrsyca81j-1qwz9pg-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\provenance-1feh6yuq57eh3\s-hmrsyc8r6o-0y6qhs1-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\canonical-0ceq38myapu4t\s-hmrsyca7wk-1y0xksy-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\compatibility-0h2c8g67ar5ki\s-hmrsyc98jt-1t7cmie-working`
+
+warning: `module-release-tool` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\module_release_tool-0rlv5060m0nvc\s-hmrsyca82m-1ph4u4h-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\packaging-2mwny8owsmgmy\s-hmrsyc87ql-0b63yse-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\isolation-3rry53498ysxm\s-hmrsyc88ty-1wxeivj-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\pilot_candidates-0h1v86dkozu3r\s-hmrsyc98k1-0p32gir-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\verification_guards-1etp2miqghvws\s-hmrsyca843-0tcyib7-working`
+
+warning: `module-release-tool` (bin "module-release-tool" test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\gate-target\debug\incremental\source_derivation-136iv6pno3n7p\s-hmrsyc98k3-0chnayr-working`
+
+warning: `messaging` (test "outbox_reliability") generated 1 warning
+warning: `module-release-tool` (test "provenance") generated 1 warning
+warning: `module-release-tool` (test "canonical") generated 1 warning
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+warning: `module-release-tool` (test "isolation") generated 1 warning
+warning: `module-release-tool` (test "compatibility") generated 1 warning
+warning: `module-release-tool` (test "packaging") generated 1 warning
+warning: `module-release-tool` (test "verification_guards") generated 1 warning
+warning: `module-release-tool` (test "pilot_candidates") generated 1 warning
+warning: `module-release-tool` (test "source_derivation") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.28s
+     Running unittests src\main.rs (target\gate-target\debug\deps\agent_adapter-28a0e3d7409d55ab.exe)
+
+running 8 tests
+test tests::api_5xx_is_reported_as_upstream_unavailable ... ok
+test tests::malformed_arguments_and_forged_tenant_inputs_fail_closed ... ok
+test tests::missing_or_wrong_bearer_token_is_rejected ... ok
+test tests::tools_list_is_the_read_only_allow_list ... ok
+test tests::connection_closed_before_response_is_reported_without_fake_business_data ... ok
+test tests::protocol_error_is_reported_without_fake_business_data ... ok
+test tests::healthy_upstream_response_passes_through ... ok
+test tests::upstream_5xx_is_reported_without_fake_business_data ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\agent_integration-ffb4e49025c920a4.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\ai_application-3d79f8dba4090eec.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\ai_worker-93860db7cc5a5b3b.exe)
+
+running 32 tests
+test extractor::tests::real_provider_smoke_extracts_candidate ... ignored, requires a reachable intranet model provider; run manually with --ignored
+test extractor::tests::err_kind_maps_protocol_to_invalid_response ... ok
+test extractor::tests::err_kind_maps_authentication_to_permanent_rejection ... ok
+test extractor::tests::err_kind_preserves_rate_limit_retry_after_hint ... ok
+test config::tests::production_requires_metrics_addr ... ok
+test config::tests::production_requires_json_log_format ... ok
+test extractor::tests::err_kind_maps_invalid_request_to_invalid_response ... ok
+test extractor::tests::err_kind_maps_rate_limit_to_rate_limited_without_hint ... ok
+test extractor::tests::from_config_still_rejects_unknown_api ... ok
+test metrics::tests::outcome_and_disposition_labels_are_bounded ... ok
+test retry::tests::credential_rejection_and_invalid_requests_are_permanent ... ok
+test retry::tests::rate_limited_hint_is_clamped_to_the_platform_cap ... ok
+test retry::tests::rate_limited_with_hint_uses_capped_provider_retry_after ... ok
+test retry::tests::rate_limited_without_hint_falls_back_to_the_platform_ladder ... ok
+test retry::tests::sub_second_hint_is_never_zero ... ok
+test retry::tests::unavailable_uses_the_platform_ladder ... ok
+test extractor::tests::provider_abort_is_mapped_to_cancelled ... ok
+test extractor::tests::provider_authentication_end_to_end_is_permanent_rejection ... ok
+test retry::tests::timeout_provider_error_retries_on_the_platform_ladder ... ok
+test extractor::tests::refuses_non_json_provider_output ... ok
+test retry::tests::authentication_provider_error_fails_permanently ... ok
+test extractor::tests::provider_rate_limit_end_to_end_preserves_retry_after_hint ... ok
+test retry::tests::invalid_request_provider_error_fails_permanently ... ok
+test retry::tests::rate_limited_provider_error_retries_with_server_hint ... ok
+test extractor::tests::provider_unavailable_error_is_mapped ... ok
+test extractor::tests::from_config_rejects_plaintext_private_http_by_default ... ok
+test extractor::tests::from_config_accepts_private_http_with_explicit_opt_in ... ok
+test extractor::tests::extracts_candidate_from_valid_json ... ok
+test tests::reaps_completed_and_panicked_tasks_without_accumulation ... ok
+test tests::completion_outcome::completion_persistence_failure_records_failed_without_lease_loss ... ok
+test tests::completion_outcome::durable_completion_records_exactly_one_succeeded_outcome ... ok
+test tests::completion_outcome::fenced_completion_records_exactly_one_lease_unproven_outcome ... ok
+
+test result: ok. 31 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\approval-b8e0a2be74c79f1b.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\architecture_check-a882a2add4ebdeaf.exe)
+
+running 7 tests
+test tests::accepts_dev_dependency_edge_for_an_adapter ... ok
+test tests::rejects_forbidden_core_dependency ... ok
+test tests::rejects_core_dependency_on_application ... ok
+test tests::rejects_iam_dependency_on_business_modules ... ok
+test tests::rejects_jwt_dependency_in_core_layers ... ok
+test tests::rejects_database_adapter_dependency_on_an_unrelated_core_crate ... ok
+test tests::accepts_legal_core_graph ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\architecture_check-b62eaec6b18f6b77.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\audit-c0e9bb448ddbede5.exe)
+
+running 8 tests
+test tests::canonical_timestamp_truncates_without_leaving_the_representable_range ... ok
+test tests::validates_and_redacts_sensitive_details ... ok
+test tests::legacy_details_are_redacted_for_readers ... ok
+test tests::re_signing_a_historical_row_leaves_no_nanosecond_hashed_input ... ok
+test tests::append_sequence_is_independent_of_business_time ... ok
+test tests::rehydrate_preserves_historical_nanosecond_signed_content ... ok
+test tests::hash_chain_detects_payload_change ... ok
+test tests::hash_inputs_survive_a_microsecond_persistence_round_trip ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\audit_postgres-36717f7a21363cc8.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\chain_pg.rs (target\gate-target\debug\deps\chain_pg-28995577903cf2e1.exe)
+
+running 4 tests
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ignored, requires running PostgreSQL
+test concurrent_appends_form_one_verified_tenant_chain ... ignored, requires running PostgreSQL
+test legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them ... ignored, requires running PostgreSQL
+test nanosecond_input_verifies_after_a_postgres_precision_round_trip ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\audit_sqlite-bb3ac8565784ca24.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\historical_chain.rs (target\gate-target\debug\deps\historical_chain-5696db86cac92de9.exe)
+
+running 2 tests
+test repository_reverifies_a_historical_nanosecond_row ... ok
+test tampering_with_the_historical_row_breaks_verification ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\business_api-07676f868b36158e.exe)
+
+running 22 tests
+test config::tests::compat_bridge_flag_defaults_to_true ... ok
+test config::tests::development_allows_wildcard_cors_default ... ok
+test config::tests::api_configuration_does_not_require_storage_or_messaging ... ok
+test auth::tests::client_permission_header_cannot_grant_access ... ok
+test config::tests::production_rejects_wildcard_scheme_audience_only_issuer_with_https ... ok
+test config::tests::production_auth_passes_with_https_and_audience ... ok
+test config::tests::sqlite_pool_limit_is_fail_closed ... ok
+test config::tests::production_rejects_sqlite_before_connecting ... ok
+test config::tests::production_rejects_plaintext_issuer_url ... ok
+test config::tests::bootstrap_requires_https_issuer_and_explicit_targets_when_enabled ... ok
+test config::tests::production_rejects_development_auth_and_wildcard_cors_without_secret_leakage ... ok
+test config::tests::production_rejects_missing_or_blank_audience ... ok
+test config::tests::production_rejects_plaintext_jwks_url ... ok
+test config::tests::production_requires_json_log_format ... ok
+test config::tests::production_rejects_blank_jwks_url ... ok
+test config::tests::bootstrap_requires_non_nil_tenant_non_blank_subject_and_positive_version ... ok
+test metrics::tests::extension_methods_collapse_to_other ... ok
+test metrics::tests::known_methods_map_to_their_names ... ok
+test routes::admin::tests::unknown_audit_filters_fail_closed ... ok
+test routes::documents::tests::cursor_is_an_opaque_versioned_token ... ok
+test routes::documents::tests::cursor_rejects_malformed_or_unknown_versions ... ok
+test metrics::tests::duration_metrics_render_as_bucketed_histograms ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\business_api-2f2b4a799a1ed762.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\dev_auth_bootstrap.rs (target\gate-target\debug\deps\dev_auth_bootstrap-151bea28d9d52b75.exe)
+
+running 2 tests
+test dev_auth_bootstrap_validation_is_dev_scoped ... ok
+test dev_auth_bootstrap_runs_with_the_locked_dev_issuer_and_converges ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\documents.rs (target\gate-target\debug\deps\documents-9f78d8640d6c9f67.exe)
+
+running 10 tests
+test unauthenticated_document_list_is_rejected ... ok
+test overview_fails_closed_when_processing_service_is_unavailable ... ok
+test invalid_or_legacy_http_cursors_are_rejected ... ok
+test create_is_idempotent_and_returns_trace_id_on_error ... ok
+test document_http_responses_never_expose_storage_locations ... ok
+test upload_rejects_unsupported_content_type_before_persistence ... ok
+test cross_tenant_get_is_not_found ... ok
+test fake_idempotency_is_scoped_by_tenant_and_fingerprint ... ok
+test upload_compensates_object_storage_when_document_persistence_fails ... ok
+test multipart_upload_is_idempotent_and_does_not_expose_object_key ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\documents_postgres.rs (target\gate-target\debug\deps\documents_postgres-0b6b1da281a69a96.exe)
+
+running 1 test
+test document_http_flow_is_atomic_idempotent_and_tenant_scoped ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\e2e_admin_bootstrap_postgres.rs (target\gate-target\debug\deps\e2e_admin_bootstrap_postgres-78c2a215c46c4d99.exe)
+
+running 2 tests
+test bootstrap_admin_grant_suspend_reactivate_revoke_chain_postgres ... ignored, requires running PostgreSQL (DATABASE_URL)
+test no_bootstrap_leaves_the_api_adminless_postgres ... ignored, requires running PostgreSQL (DATABASE_URL)
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\e2e_admin_bootstrap_sqlite.rs (target\gate-target\debug\deps\e2e_admin_bootstrap_sqlite-caefb615f9864d09.exe)
+
+running 3 tests
+test anonymous_and_wrong_audience_tokens_are_rejected ... ok
+test bootstrap_admin_grant_suspend_reactivate_revoke_chain ... ok
+test no_bootstrap_means_no_admin_and_no_http_bootstrap_surface ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests\iam_admin_api.rs (target\gate-target\debug\deps\iam_admin_api-0aa1be043d930100.exe)
+
+running 22 tests
+test self_binding_escalation_is_rejected ... ok
+test permissions_catalog_lists_known_keys ... ok
+test role_binding_with_retired_catalog_permission_denies_route ... ok
+test self_membership_reactivation_is_rejected ... ok
+test invalid_cursor_and_limit_are_400 ... ok
+test stale_expected_version_is_conflict ... ok
+test foreign_tenant_role_is_not_found ... ok
+test explain_reports_bounded_decision_for_target_user ... ok
+test bind_role_to_other_user_and_list_bindings ... ok
+test replay_same_key_returns_original_without_double_mutation ... ok
+test system_role_mutation_is_rejected ... ok
+test create_role_then_list_and_get ... ok
+test membership_create_list_suspend_reactivate ... ok
+test organization_unit_crud_and_move ... ok
+test unauthenticated_read_is_401 ... ok
+test unauthenticated_write_is_401 ... ok
+test unknown_permission_in_explain_denies_boundedly ... ok
+test write_without_idempotency_key_is_400 ... ok
+test user_manage_grant_cannot_create_memberships ... ok
+test unit_member_add_list_remove ... ok
+test granted_permission_matrix_allows_every_surface ... ok
+test every_iam_route_denies_without_grant ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\iam_adversarial_sqlite.rs (target\gate-target\debug\deps\iam_adversarial_sqlite-4f18a5a844e62a9f.exe)
+
+running 6 tests
+test roles_claim_alone_unlocks_nothing ... ok
+test foreign_user_id_claim_fails_closed ... ok
+test claim_widening_stops_at_the_compat_bridge_boundary ... ok
+test header_spoofing_is_inert_under_oidc ... ok
+test self_escalation_trio_denied ... ok
+test cross_tenant_probes_fail_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests\oidc_auth.rs (target\gate-target\debug\deps\oidc_auth-65dac91d71038b52.exe)
+
+running 17 tests
+test algorithm_none_is_rejected ... ok
+test missing_bearer_token_is_rejected ... ok
+test claim_mapping_populates_tenant_user_and_permissions ... ok
+test user_id_falls_back_to_sub_when_uuid ... ok
+test jwks_outage_fails_closed ... ok
+test valid_oidc_token_passes_authentication ... ok
+test unknown_kid_is_rejected ... ok
+test nil_tenant_claim_is_rejected ... ok
+test expired_token_is_rejected ... ok
+test missing_tenant_claim_is_rejected ... ok
+test tampered_signature_is_rejected ... ok
+test oidc_principal_cannot_read_foreign_tenant_document ... ok
+test wrong_issuer_is_rejected ... ok
+test production_transport_policy_rejects_plaintext_jwks_transport ... ok
+test metrics_endpoint_is_public_and_counts_requests ... ok
+test wrong_audience_is_rejected ... ok
+test jwks_redirect_is_never_followed ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests\plan_0008_postgres_minio.rs (target\gate-target\debug\deps\plan_0008_postgres_minio-54cb93a3382e36ee.exe)
+
+running 2 tests
+test plan_0008_postgres_minio_multipart_upload_is_idempotent ... ignored, requires real PostgreSQL, PLAN-0008 migrations, and MinIO
+test plan_0008_postgres_minio_revision_evidence_contract ... ignored, requires real PostgreSQL, PLAN-0008 migrations, and MinIO
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\security.rs (target\gate-target\debug\deps\security-a0dd7a8475e6b005.exe)
+
+running 16 tests
+test dev_auth_with_wrong_token_is_rejected ... ok
+test unauthenticated_api_request_is_rejected ... ok
+test production_mode_is_fail_closed ... ok
+test dev_auth_with_valid_token_and_tenant_passes_auth ... ok
+test liveness_is_public ... ok
+test suspended_membership_overrides_claim_grant ... ok
+test compat_flag_off_denies_claim_only_grant ... ok
+test forged_permission_header_cannot_read_integrity_findings ... ok
+test disabled_user_overrides_claim_grant ... ok
+test server_granted_integrity_read_reaches_governance_boundary ... ok
+test dev_auth_without_client_tenant_header_uses_trusted_principal ... ok
+test retired_permission_denies_claim_grant ... ok
+test compat_claim_grant_passes_guard_when_bridge_enabled ... ok
+test role_binding_grant_works_with_compat_flag_off ... ok
+test readiness_is_public ... ok
+test execute_permission_cannot_approve_repair ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\business_api_client-d9d90663be5e2262.exe)
+
+running 2 tests
+test tests::proxy_environment_is_restored_after_the_client_construction_window ... ok
+test tests::requests_never_route_through_environment_proxies ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\business_application_compiler-d44653a58fd81ccc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\compiler.rs (target\gate-target\debug\deps\compiler-4874371acc098071.exe)
+
+running 18 tests
+test tests::rejects_foreign_and_non_namespaced_legacy_contribution_ids ... ok
+test tests::rejects_legacy_and_typed_contribution_identity_collision ... ok
+test tests::rejects_duplicate_and_cross_owner_contexts ... ok
+test tests::extension_contribution_ids_share_the_manifest_collision_domain ... ok
+test tests::rejects_unknown_incompatible_cyclic_and_downgrade_dependencies ... ok
+test tests::accepts_standard_semver_ranges_and_rejects_invalid_versions ... ok
+test tests::accepts_cross_package_public_target_from_compiled_catalog ... ok
+test tests::required_platform_capabilities_resolve_against_explicit_evidence ... ok
+test tests::typed_ui_can_target_a_published_capability ... ok
+test tests::permutations_have_identical_model_bytes_and_digest ... ok
+test tests::accepts_public_capability_dependency_and_compiles_deterministically ... ok
+test tests::all_package_vector_permutations_have_identical_digest ... ok
+test tests::deserializing_unknown_top_level_field_fails_closed ... ok
+test tests::deserializing_tampered_package_digest_fails_closed ... ok
+test tests::deserializing_invalid_package_payload_fails_closed ... ok
+test tests::serialized_compiled_manifest_preserves_resolved_capability_evidence ... ok
+test tests::deserializing_non_canonical_payload_with_recomputed_digest_fails_closed ... ok
+test tests::serialized_compiled_manifest_rebuilds_canonical_bytes ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning.rs (target\gate-target\debug\deps\planning-afd91375846cf4b4.exe)
+
+running 26 tests
+test duplicate_current_module_is_rejected ... ok
+test planning_declarations_reject_unknown_external_extension_point ... ok
+test planning_incompatible_dependency_is_a_structured_conflict ... ok
+test package_metadata_changes_do_not_update_untouched_contributions ... ok
+test dropping_dependency_allows_provider_removal_from_incoming_graph ... ok
+test adding_dependency_blocks_provider_removal_from_incoming_graph ... ok
+test only_changed_contribution_gets_an_update_digest ... ok
+test dropping_public_capability_reference_allows_provider_removal ... ok
+test owner_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test owner_removal_with_active_extension_consumer_is_blocked ... ok
+test module_adds_use_independent_package_digests ... ok
+test desired_disabled_state_emits_disable_module ... ok
+test extension_point_removal_with_active_extension_consumer_is_blocked ... ok
+test planning_ownership_collision_is_a_structured_conflict ... ok
+test add_upgrade_remove_and_retention_are_explicit ... ok
+test extension_point_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test permutations_produce_identical_plan_and_diagnostics ... ok
+test planning_unknown_dependency_is_a_structured_conflict ... ok
+test contribution_and_extension_point_changes_are_diffed ... ok
+test provider_removal_is_allowed_without_live_public_capability_consumer ... ok
+test tampered_incoming_manifest_is_rejected_before_planning ... ok
+test retained_public_capability_consumer_blocks_provider_removal ... ok
+test typed_requirement_changes_are_planned_as_contribution_updates ... ok
+test live_dependency_and_active_extension_consumer_block_removal ... ok
+test public_capability_removal_planning_is_deterministic ... ok
+test retained_public_target_consumers_block_target_removal ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\release_surface_digest.rs (target\gate-target\debug\deps\release_surface_digest-a698fb6aec14afab.exe)
+
+running 17 tests
+test contract_digest_ignores_input_order_of_the_same_contract_surface ... ok
+test contract_digest_is_stable_across_repeated_invocations ... ok
+test contract_digest_changes_when_a_public_agent_capability_id_or_version_changes ... ok
+test contract_digest_changes_when_a_published_contract_or_extension_version_changes ... ok
+test verify_release_identity_rejects_identity_failing_shape_validation ... ok
+test verify_release_identity_rejects_pinned_module_version_mismatch ... ok
+test verify_release_identity_rejects_pinned_manifest_schema_version_mismatch ... ok
+test verify_release_identity_accepts_stateless_identity_without_migration_revision ... ok
+test verify_release_identity_rejects_pinned_package_digest_mismatch ... ok
+test verify_release_identity_rejects_pinned_contract_digest_mismatch ... ok
+test verify_release_identity_rejects_pinned_module_id_not_in_evidence ... ok
+test verify_release_identity_rejects_pinned_migration_namespace_mismatch ... ok
+test package_fingerprint_matches_the_planner_per_module_digest ... ok
+test release_identity_and_bundle_assemble_from_compiled_evidence ... ok
+test verify_release_identity_accepts_identity_recomputed_from_compiled_evidence ... ok
+test contract_digest_ignores_release_metadata_but_package_digest_covers_it ... ok
+test contract_digest_ignores_consumer_side_contributions_but_package_digest_covers_them ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\synthetic_fixtures.rs (target\gate-target\debug\deps\synthetic_fixtures-37617be55aaaa200.exe)
+
+running 6 tests
+test removal_plan_never_purges_business_data ... ok
+test extension_fixture_requires_a_published_public_point ... ok
+test removing_extension_fixture_does_not_change_owner_package ... ok
+test synthetic_modules_can_compile_independently_and_with_public_dependency ... ok
+test module_removals_block_on_live_dependency_or_extension_consumer ... ok
+test synthetic_permutations_have_identical_compilation_and_plan ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\business_cli-3b8d251aa2a46966.exe)
+
+running 2 tests
+test tests::invalid_command_and_content_type_fail_closed ... ok
+test tests::public_commands_parse_with_stable_remote_shape ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\business_module_contracts-cdfe9a08433f66e6.exe)
+
+running 24 tests
+test manifest::tests::extension_point_rejects_malformed_catalog_entry_before_matching ... ok
+test manifest::tests::legacy_ui_and_agent_ids_require_owner_namespaced_identity ... ok
+test manifest::tests::extension_point_accepts_resolvable_typed_public_dependency ... ok
+test manifest::tests::extension_point_rejects_unknown_and_private_dependencies ... ok
+test release::tests::bundle_requires_semver_crate_versions ... ok
+test manifest::tests::extension_removal_without_consumer_is_allowed_and_owner_is_unchanged ... ok
+test manifest::tests::extension_validation_fails_closed_for_private_wrong_version_and_kind ... ok
+test manifest::tests::manifest_rejects_duplicate_required_capabilities ... ok
+test manifest::tests::requirement_rejects_forged_policy_and_capability_ownership ... ok
+test manifest::tests::requirement_rejects_malformed_policy_and_capability_ids ... ok
+test release::tests::build_toolchain_rejects_empty_identifier_and_invalid_versions ... ok
+test release::tests::bundle_requires_non_empty_unique_crate_mapping ... ok
+test manifest::tests::extension_point_rejects_malformed_public_dependency_reference ... ok
+test manifest::tests::module_id_rejects_uppercase_and_repeated_separators ... ok
+test manifest::tests::manifest_rejects_unknown_schema_version ... ok
+test manifest::tests::published_extension_point_accepts_valid_consumer_and_blocks_live_removal ... ok
+test release::tests::digests_reject_uppercase_and_wrong_length_hex ... ok
+test release::tests::identity_rejects_unknown_schema_version ... ok
+test release::tests::identity_validates_and_round_trips_serde ... ok
+test release::tests::migration_revision_pins_manifest_namespace_grammar ... ok
+test release::tests::release_contracts_reject_unknown_fields_and_bad_digest_bytes ... ok
+test release::tests::release_identity_requires_semver_module_version ... ok
+test release::tests::stateless_module_identity_pins_no_migration_revision ... ok
+test release::tests::source_revision_requires_full_lower_case_commit_sha ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\extension_points.rs (target\gate-target\debug\deps\extension_points-275975c16f46fc31.exe)
+
+running 2 tests
+test contribution_namespaced_to_consumer_is_valid ... ok
+test forged_contribution_namespace_is_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\platform_core_isolation.rs (target\gate-target\debug\deps\platform_core_isolation-933efc99d47f9923.exe)
+
+running 1 test
+test platform_core_does_not_reference_fixture_business_modules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\stable_identity.rs (target\gate-target\debug\deps\stable_identity-be17fbe9d63d4000.exe)
+
+running 7 tests
+test invalid_id_errors_identify_the_typed_identity ... ok
+test labels_and_paths_do_not_change_stable_identity ... ok
+test namespaced_ids_round_trip_and_expose_parts ... ok
+test serde_rejects_invalid_typed_identity ... ok
+test typed_identities_share_namespace_rules_but_not_identity_types ... ok
+test package_digest_requires_lowercase_sha256_hex ... ok
+test malformed_namespaced_id_is_rejected ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\typed_contributions.rs (target\gate-target\debug\deps\typed_contributions-fd174a75563716da.exe)
+
+running 12 tests
+test malformed_catalog_target_is_rejected_before_matching ... ok
+test forged_typed_contribution_namespace_is_rejected ... ok
+test duplicate_requirement_descriptors_are_rejected ... ok
+test duplicate_and_wrong_owner_are_rejected ... ok
+test malformed_public_target_version_is_rejected ... ok
+test dangling_requirement_references_are_rejected ... ok
+test malformed_incoming_public_target_is_rejected ... ok
+test declaration_does_not_grant_authorization ... ok
+test module_a_and_module_b_can_declare_independent_typed_contributions ... ok
+test unknown_public_target_rejected_but_cross_module_public_target_is_allowed ... ok
+test descriptors_reject_unknown_fields ... ok
+test ui_and_agent_target_surfaces_are_closed_and_capability_targets_are_published ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\business_worker-0fe1f38e24b14202.exe)
+
+running 6 tests
+test config::tests::production_requires_json_log_format ... ok
+test config::tests::production_requires_metrics_addr ... ok
+test config::tests::sqlite_rejects_separate_ai_and_parallelism ... ok
+test metrics::tests::outcome_and_disposition_labels_are_bounded ... ok
+test tests::missing_object_boundary::metadata_without_object_fails_as_source_not_found ... ok
+test tests::reaps_completed_and_panicked_tasks_without_accumulation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\postgres_minio_processing.rs (target\gate-target\debug\deps\postgres_minio_processing-96444105bc39b85c.exe)
+
+running 1 test
+test postgres_minio_processing_adapter_round_trip ... ignored, requires PostgreSQL, migrations, and MinIO
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\contract-a022c468603b3c78.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\customer-f8affc3ba98b0bae.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\data_integrity-0de77b5b83d27104.exe)
+
+running 5 tests
+test tests::finding_deduplication_increments_occurrence ... ok
+test tests::invalid_lifecycle_is_rejected ... ok
+test tests::resolved_finding_reopens_as_a_new_episode_on_recurrence ... ok
+test tests::processing_state_matrix_reports_multiple_inconsistencies ... ok
+test tests::waiting_for_review_accepts_owner_pending_projection ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\data_repair-6b16ae37795b037b.exe)
+
+running 1 test
+test tests::medium_risk_approval_is_separated ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document-5e71c0c1c28b2de7.exe)
+
+running 21 tests
+test domain::entity::tests::create_with_negative_size_fails ... ok
+test domain::entity::tests::create_with_blank_filename_fails ... ok
+test domain::entity::tests::create_with_empty_filename_fails ... ok
+test domain::entity::tests::create_with_empty_object_key_fails ... ok
+test domain::entity::tests::create_with_valid_data_succeeds ... ok
+test domain::entity::tests::create_with_path_traversal_object_key_fails ... ok
+test domain::entity::tests::lifecycle_version_does_not_change_content_revision ... ok
+test application::create::tests::fingerprint_distinguishes_missing_size_from_zero_size ... ok
+test domain::entity::tests::lifecycle_transitions_are_versioned_and_terminal_delete_is_enforced ... ok
+test domain::entity::tests::rehydrate_rejects_invalid_persisted_state ... ok
+test application::create::tests::create_rejects_missing_idempotency_key_before_port_call ... ok
+test domain::entity::tests::status_round_trip ... ok
+test application::create::tests::create_uses_application_port_without_database_types ... ok
+test domain::entity::tests::unknown_database_status_is_not_accepted_as_active ... ok
+test domain::entity::tests::deterministic_constructor_preserves_timestamp_and_revision_key ... ok
+test domain::entity::tests::create_with_empty_content_type_fails ... ok
+test domain::object_key::tests::storage_key_rejects_wrong_owners_and_unsafe_paths ... ok
+test domain::link::tests::deterministic_identity_is_preserved_by_domain_validation ... ok
+test domain::object_key::tests::storage_key_round_trips_with_expected_ownership ... ok
+test domain::version::tests::versions_reject_non_positive_values_and_increment ... ok
+test query::model::tests::like_literals_escape_all_pattern_metacharacters ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\revision_contract.rs (target\gate-target\debug\deps\revision_contract-af8c623573f4d0a2.exe)
+
+running 5 tests
+test archive_trash_restore_are_independent_from_content_revision ... ok
+test first_revision_is_r1_and_uses_revision_scoped_source_key ... ok
+test new_revision_does_not_mutate_r1_and_stale_current_is_rejected ... ok
+test purge_requires_retention_reference_and_hold_preconditions ... ok
+test revision_identity_is_not_a_storage_provider_version ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_persistence_contracts-d11dcf952298c8c2.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_postgres-25d62fe84e59547f.exe)
+
+running 1 test
+test query_mapper::tests::query_mapper_fails_closed_for_invalid_stored_values ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\query_contracts.rs (target\gate-target\debug\deps\query_contracts-d5da4b0c433d305a.exe)
+
+running 1 test
+test postgres_satisfies_shared_document_persistence_contract ... ignored, requires PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\tenant_fence_pg.rs (target\gate-target\debug\deps\tenant_fence_pg-7c4a93ba143ec622.exe)
+
+running 1 test
+test replay_never_returns_a_foreign_tenants_document ... ignored, requires PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_processing-346fa5c00067f11b.exe)
+
+running 11 tests
+test domain::candidate::tests::candidate_evidence_is_revision_and_line_bounded ... ok
+test domain::artifact::tests::deterministic_id_constructors_keep_immutable_lineage ... ok
+test domain::artifact::tests::run_artifact_and_evidence_are_bound_to_one_revision ... ok
+test domain::job::tests::archive_like_state_does_not_change_content_revision_equivalent ... ok
+test domain::job::tests::state_machine_advances_and_terminal_cannot_resume ... ok
+test domain::job::tests::fixed_pipeline_has_no_runtime_reordering ... ok
+test domain::job::tests::cancellation_wins_release_and_expiry_reclaim ... ok
+test domain::job::tests::stale_fence_is_rejected_after_expiry_reclaim ... ok
+test domain::job::tests::transient_retry_respects_limit_and_cancellation ... ok
+test domain::pipeline::tests::source_reader_supports_only_declared_text_types_and_strict_utf8 ... ok
+test domain::pipeline::tests::deterministic_extractor_is_truthful_and_evidence_bounded ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_processing_contracts-bc5454aa26825d0f.exe)
+
+running 1 test
+test tests::failure_projection_is_allow_listed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_processing_postgres-e7a631d21ddf1c77.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\cancel_factuality_pg.rs (target\gate-target\debug\deps\cancel_factuality_pg-955ba1b340ca21c0.exe)
+
+running 5 tests
+test cancel_fact_lands_exactly_once_at_the_step_boundary ... ignored, requires PostgreSQL and migrations
+test cancelled_failure_disposition_audits_the_fact ... ignored, requires PostgreSQL and migrations
+test cooperative_cancel_is_intent_only ... ignored, requires PostgreSQL and migrations
+test reclaim_of_cancelled_expired_job_publishes_the_fact ... ignored, requires PostgreSQL and migrations
+test waiting_for_ai_cancel_publishes_fact_once ... ignored, requires PostgreSQL and migrations
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contracts.rs (target\gate-target\debug\deps\contracts-43700bef088ef3df.exe)
+
+running 3 tests
+test postgres_processing_contract_claims_and_restarts ... ignored, requires PostgreSQL and migrations
+test postgres_processing_contract_reclaims_expired_ai_task ... ignored, requires PostgreSQL and migrations
+test postgres_processing_revision_one_uow_is_atomic_and_replayable ... ignored, requires PostgreSQL and migrations
+
+test result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_processing_sqlite-f15fbc6823c03151.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\cancel_factuality.rs (target\gate-target\debug\deps\cancel_factuality-11e877e037583d8d.exe)
+
+running 7 tests
+test cancel_fact_lands_exactly_once_at_the_step_boundary ... ok
+test cooperative_cancel_is_intent_only ... ok
+test reclaim_of_cancelled_expired_job_publishes_the_fact ... ok
+test cancelled_failure_disposition_audits_the_fact ... ok
+test waiting_for_ai_cancel_publishes_fact_once ... ok
+test queued_and_review_wait_cancel_are_immediate_and_idempotent ... ok
+test cancellation_boundaries_rollback_and_survive_file_reopen ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests\contracts.rs (target\gate-target\debug\deps\contracts-7e1b77bb9ae2c721.exe)
+
+running 1 test
+test create_replay_claim_and_tenant_scoped_query_are_durable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\lease_fence.rs (target\gate-target\debug\deps\lease_fence-918584f28d378015.exe)
+
+running 4 tests
+test heartbeat_after_lease_expiry_fails_closed ... ok
+test active_lease_is_neither_reclaimed_nor_double_dispatched ... ok
+test successor_can_progress_after_reclaim ... ok
+test stale_fence_is_rejected_everywhere_without_evidence ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests\revision1.rs (target\gate-target\debug\deps\revision1-204475f8b97d1007.exe)
+
+running 1 test
+test revision_one_uow_commits_fixed_pipeline_and_review_atomically ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\document_sqlite-911a3f0d6afe9b69.exe)
+
+running 2 tests
+test tests::sqlite_pool_size_is_positive_and_bounded ... ok
+test mapper::tests::query_mapper_fails_closed_for_invalid_stored_values ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\audit_chain.rs (target\gate-target\debug\deps\audit_chain-efe9846cbb08c4c6.exe)
+
+running 7 tests
+test standalone_document_catalog_supports_create_and_replay ... ok
+test old_document_only_rows_remain_unverified_after_upgrade ... ok
+test old_composed_catalog_upgrade_preserves_verified_rows ... ok
+test legacy_null_chain_rows_stay_readable_and_are_counted_as_legacy ... ok
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ok
+test document_created_audit_row_is_chain_verifiable_and_readable ... ok
+test contradictory_chain_metadata_is_rejected_without_legacy_downgrade ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests\concurrency.rs (target\gate-target\debug\deps\concurrency-4b0e5b8621f36e7b.exe)
+
+running 2 tests
+test concurrent_different_fingerprints_have_one_conflict_and_one_side_effect ... ok
+test concurrent_same_key_is_one_create_and_nine_replays ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests\content_reference.rs (target\gate-target\debug\deps\content_reference-dcc9fc9259d30ca1.exe)
+
+running 2 tests
+test new_write_persists_the_revision_scoped_content_reference ... ok
+test revision_rows_are_append_only ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests\contracts.rs (target\gate-target\debug\deps\contracts-c716433449e9067a.exe)
+
+running 2 tests
+test sqlite_rolls_back_the_document_when_atomic_side_effect_fails ... ok
+test sqlite_satisfies_shared_document_persistence_contract ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\operational.rs (target\gate-target\debug\deps\operational-ba5e0f7aaffa3aa6.exe)
+
+running 1 test
+test file_database_uses_wal_and_busy_timeout_and_survives_reopen ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\revision_history.rs (target\gate-target\debug\deps\revision_history-ff8a82a5ea0090ed.exe)
+
+running 1 test
+test saving_a_new_revision_keeps_r1_and_updates_current_revision_atomically ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\tenant_fence.rs (target\gate-target\debug\deps\tenant_fence-3f7a161762bf3c57.exe)
+
+running 2 tests
+test same_tenant_replay_still_returns_the_original_document ... ok
+test replay_never_returns_a_foreign_tenants_document ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\finance-ef274d7edd176e99.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\governance_worker-9d1c7e37db9222f7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\governance_worker-d4d6eddb5bd4b374.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\postgres_governance.rs (target\gate-target\debug\deps\postgres_governance-788108062d2fb643.exe)
+
+running 1 test
+test postgres_scan_and_requeue_repair_are_durable ... ignored, requires CI PostgreSQL and the shared migration catalog
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\repair_worker.rs (target\gate-target\debug\deps\repair_worker-7c47d1c112985bdc.exe)
+
+running 2 tests
+test repair_worker_executes_once_and_records_ledger ... ok
+test transient_post_claim_load_failure_is_requeued ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\sqlite_governance.rs (target\gate-target\debug\deps\sqlite_governance-47526aacca471a1f.exe)
+
+running 1 test
+test sqlite_scan_and_requeue_repair_are_durable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\identity-cde945866c12f306.exe)
+
+running 24 tests
+test domain::membership::tests::join_rejects_nil_identifiers ... ok
+test application::bootstrap::tests::rejects_malformed_configuration ... ok
+test application::access::tests::access_matrix_no_membership_suspended_disabled_active ... ok
+test application::bootstrap::tests::failure_is_ledgered_and_retryable_with_same_digest ... ok
+test application::membership::tests::create_membership_validates_and_persists ... ok
+test application::membership::tests::status_changes_enforce_version_and_self_reaction_guard ... ok
+test application::bootstrap::tests::suspended_membership_is_reactivated_by_a_deliberate_bump ... ok
+test application::resolve::tests::rejects_blank_or_oversized_keys_and_nil_claim ... ok
+test application::resolve::tests::first_contact_provisions_and_repeat_requests_converge ... ok
+test application::bootstrap::tests::older_or_drifted_configuration_fails_closed ... ok
+test domain::external_identity::tests::link_accepts_well_formed_key ... ok
+test application::bootstrap::tests::cold_start_provisions_member_and_binds_then_noops ... ok
+test domain::external_identity::tests::rejects_nil_identities ... ok
+test application::bootstrap::tests::disabled_configuration_is_inert ... ok
+test domain::membership::tests::rehydrate_normalizes_status_timestamp_consistency ... ok
+test application::resolve::tests::claimed_user_id_is_honored_and_conflicting_claim_denies ... ok
+test domain::external_identity::tests::rejects_blank_nul_and_oversized_components ... ok
+test domain::user::tests::disable_and_enable_toggle_status_and_increment_version ... ok
+test domain::user::tests::rehydrate_rejects_inverted_timestamps ... ok
+test domain::membership::tests::suspend_reactivate_cycle_with_version_and_timestamps ... ok
+test domain::user::tests::rejects_nil_identity_and_non_positive_versions ... ok
+test domain::version::tests::versions_reject_non_positive_values_and_increment ... ok
+test testing::tests::membership_keyset_pages_without_overlap ... ok
+test testing::tests::resolve_conflict_same_user_different_claim_denies ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract_semantics.rs (target\gate-target\debug\deps\contract_semantics-4a0c283c3350266f.exe)
+
+running 9 tests
+test store_unavailable_maps_to_retryable_unavailable ... ok
+test tenant_reads_are_invisible_across_tenant_boundaries ... ok
+test find_user_by_external_identity_matches_exact_key_only ... ok
+test page_size_cap_is_enforced ... ok
+test membership_create_rejects_control_characters_in_reason ... ok
+test suspend_then_next_access_denies_and_audits ... ok
+test adoption_links_an_existing_unlinked_user_by_trusted_claim ... ok
+test change_user_status_enforces_versions_replays_and_noops ... ok
+test membership_by_subject_converges_with_later_login_resolution ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\identity_authorization_contracts-e8c30cc96e7b3067.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\identity_postgres-4af51ce471c400cc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-5ac3909963a2ddba.exe)
+
+running 1 test
+test postgres_identity_contract_suite_passes ... ignored, requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\perf_resolve.rs (target\gate-target\debug\deps\perf_resolve-896036ad81b5e996.exe)
+
+running 1 test
+test resolve_hot_path_percentiles_on_postgres ... ignored, requires PostgreSQL (set DATABASE_URL; perf evidence harness, run with --ignored --nocapture)
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\identity_sqlite-3dd33a807a0fa8ff.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-98cd82cfb53a58db.exe)
+
+running 1 test
+test sqlite_identity_contract_suite_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\jarvis_model_provider-6884c9e89467a9b1.exe)
+
+running 79 tests
+test budget::tests::missing_metadata_is_explicitly_unknown ... ok
+test auth::tests::credential_debug_redacts_all_token_material ... ok
+test budget::tests::explicit_output_budget_respects_model_maximum ... ok
+test budget::tests::caller_estimator_can_publish_exact_budget_precision ... ok
+test auth::tests::credential_revoke_and_reauth_are_atomic_store_operations ... ok
+test budget::tests::known_context_overflow_is_rejected_but_unknown_context_is_not ... ok
+test budget::tests::reasoning_budget_is_a_subledger_of_output ... ok
+test budget::tests::model_maximum_is_a_safety_reservation_when_request_limit_is_missing ... ok
+test budget::tests::default_estimate_counts_system_tools_and_images ... ok
+test auth::tests::legacy_store_default_does_not_perform_unsafe_oauth_refresh ... ok
+test history::tests::redacted_reasoning_is_dropped_for_chat_completions ... ok
+test auth::tests::api_key_environment_fallback_survives_oauth_refresh_failure ... ok
+test auth::tests::revoke_blocks_environment_fallback_until_reauthentication ... ok
+test auth::tests::oauth_without_refresh_token_can_use_an_application_refresh_strategy ... ok
+test auth::tests::failed_oauth_refresh_keeps_old_credential_and_redacts_refresh_token ... ok
+test continuation::tests::assistant_anchor_uses_full_history_prefix ... ok
+test history::tests::redacted_summary_is_opaque_only_for_all_targets ... ok
+test auth::tests::revoke_during_refresh_cannot_republish_the_revoked_credential ... ok
+test continuation::tests::responses_reasoning_must_bind_to_a_reasoning_replay_item ... ok
+test constraints::tests::ordinary_tool_schema_is_subject_to_size_and_depth_bounds ... ok
+test history::tests::request_preview_matches_capability_aware_dispatch_preparation ... ok
+test continuation::tests::continuation_debug_redacts_provider_native_payloads ... ok
+test auth::tests::expired_oauth_refresh_is_deduplicated_and_published_atomically ... ok
+test history::tests::signed_reasoning_is_summary_when_targeting_responses ... ok
+test continuation::tests::history_identity_is_sequence_sensitive_not_content_only ... ok
+test history::tests::unsigned_reasoning_is_text_when_targeting_anthropic ... ok
+test continuation::tests::anthropic_replay_resolution_is_reference_bound_not_positional ... ok
+test continuation::tests::scope_validates_exact_non_system_prefix ... ok
+test models::tests::connect_with_api_rejects_profile_api_conflicts ... ok
+test models::tests::aborted_refresh_does_not_call_the_source_or_publish ... ok
+test models::tests::failed_refresh_keeps_the_previous_profile ... ok
+test models::tests::published_profile_is_a_synchronous_last_known_snapshot ... ok
+test models::tests::newer_started_refresh_supersedes_a_late_older_refresh ... ok
+test models::tests::equal_cross_process_revisions_cannot_overwrite_newer_stored_facts ... ok
+test models::tests::required_profile_auth_fails_before_refresh_source ... ok
+test models::tests::refresh_publishes_a_complete_catalog_and_preserves_compatibility ... ok
+test providers::anthropic::tests::ambiguous_transport_timeout_is_unknown ... ok
+test models::tests::store_failure_keeps_the_visible_profile_unchanged ... ok
+test providers::anthropic::tests::connection_failure_is_retryable_before_dispatch ... ok
+test models::tests::superseded_refresh_cannot_clobber_a_new_profile ... ok
+test models::tests::shared_store_restores_offline_without_calling_the_source ... ok
+test providers::openai::tests::ambiguous_transport_timeout_is_unknown ... ok
+test providers::openai::tests::connection_failure_is_retryable_before_dispatch ... ok
+test models::tests::generic_profile_connection_retains_trusted_private_http_policy ... ok
+test stream::tests::empty_text_and_reasoning_blocks_consume_structure_budget ... ok
+test stream::tests::fixed_stop_reason_does_not_consume_variable_byte_budget ... ok
+test stream::tests::completion_just_below_both_accumulation_limits_succeeds ... ok
+test models::tests::unauthenticated_profiles_reject_request_credentials_for_all_transports ... ok
+test stream::tests::interrupted_reasoning_partial_message_has_no_replay_reference ... ok
+test stream::tests::many_small_text_deltas_share_one_byte_budget ... ok
+test stream::tests::minimal_tool_blocks_consume_structure_budget ... ok
+test stream::tests::provider_bound_reasoning_requires_a_completed_reference_and_sidecar ... ok
+test stream::tests::reasoning_payloads_share_one_byte_budget ... ok
+test stream::tests::provider_bound_stream_reference_is_preserved_and_validated ... ok
+test stream::tests::stop_reason_other_at_remaining_boundary_succeeds ... ok
+test stream::tests::stop_reason_other_shares_completion_byte_budget ... ok
+test stream::tests::stream_continuation_must_precede_done_and_debug_is_redacted ... ok
+test stream::tests::stream_rejects_duplicate_reasoning_reference_across_blocks ... ok
+test stream::tests::text_reasoning_and_tool_payloads_share_one_byte_budget ... ok
+test tests::accumulator_exposes_partial_history_for_abort_continuation ... ok
+test tests::accumulator_preserves_interleaved_tool_identity_and_order ... ok
+test tests::accumulator_rejects_data_after_done ... ok
+test tests::accumulator_preserves_wire_content_order ... ok
+test tests::accumulator_tracks_elapsed_without_sleeping ... ok
+test tests::collector_rejects_incomplete_tool_call ... ok
+test tests::collector_rejects_missing_terminal_done ... ok
+test tests::legacy_reasoning_payload_deserialization_fails_closed ... ok
+test tests::credential_material_never_enters_profile_or_catalog_serialization ... ok
+test tests::provider_configuration_debug_redacts_credentials ... ok
+test tests::provider_id_is_open_ended_and_validated ... ok
+test tests::collector_assembles_text_reasoning_and_multiple_tools ... ok
+test tests::normalized_message_round_trips ... ok
+test models::tests::models_connection_ignores_chat_compatibility_for_anthropic ... ok
+test models::tests::models_connection_applies_combined_openai_compatibility ... ok
+test models::tests::http_refresh_reads_remote_models_and_keeps_known_compatibility ... ok
+test models::tests::models_connection_without_compatibility_keeps_default_payload ... ok
+test models::tests::models_connection_ignores_chat_compatibility_for_responses ... ok
+test models::tests::profile_connection_uses_profile_endpoint_and_auth_contract ... ok
+test models::tests::trusted_private_http_catalog_rejects_redirects ... ok
+
+test result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests\m72_replay_identity.rs (target\gate-target\debug\deps\m72_replay_identity-1038f2ef312274fa.exe)
+
+running 23 tests
+test h3_edit_before_changes_downstream_identity ... ok
+test h4_insert_before_changes_downstream_identity ... ok
+test h5_delete_before_changes_downstream_identity ... ok
+test h6_reorder_changes_downstream_identity ... ok
+test h1_identical_assistants_at_different_positions_get_distinct_ids ... ok
+test history_identity_survives_serialization_round_trip ... ok
+test h2_same_history_reconstructed_twice_yields_equal_ids ... ok
+test h7_repeated_user_assistant_pattern_gets_correct_chain_identities ... ok
+test replay_item_debug_reports_metadata_only ... ok
+test p3_malformed_deserialized_continuation_fails_validation ... ok
+test o5_projection_mismatch_fails_closed ... ok
+test r4_inserted_message_invalidates_downstream_segment ... ok
+test r3_swapped_history_positions_fail_closed ... ok
+test p1_missing_segment_for_provider_bound_reasoning_errors_without_panic ... ok
+test p2_stale_anchor_errors_without_panic ... ok
+test o4_function_call_only_stays_consistent ... ok
+test o2_mixed_output_preserves_exact_order ... ok
+test stateful_mode_remains_on_previous_response_id_path ... ok
+test o3_portable_reasoning_only_is_replayed ... ok
+test o1_portable_reasoning_and_message_are_both_replayed ... ok
+test s2_stream_and_complete_parity_portable_reasoning_plus_message ... ok
+test s1_stream_and_complete_parity_encrypted_reasoning_plus_tool ... ok
+test r1_r2_identical_outputs_resolve_their_own_segments_in_any_storage_order ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\providers.rs (target\gate-target\debug\deps\providers-837d40e503ba03c8.exe)
+
+running 120 tests
+test anthropic_non_strict_structured_output_fails_before_dispatch ... ok
+test anthropic_manual_thinking_rejects_forced_tool_choice_before_dispatch ... ok
+test abort_before_dispatch_does_not_need_a_live_server ... ok
+test anthropic_unknown_sse_event_fails_closed ... ok
+test anthropic_non_stream_completion_uses_normalized_response ... ok
+test anthropic_http_408_is_timeout_after_dispatch ... ok
+test aborted_stream_partial_history_can_continue_on_another_protocol ... ok
+test anthropic_structured_output_constraint_is_serialized ... ok
+test anthropic_strict_tool_schema_is_serialized ... ok
+test anthropic_image_input_uses_base64_source ... ok
+test anthropic_stream_preserves_usage_cache_tokens ... ok
+test anthropic_thinking_and_auto_tool_choice_are_serialized ... ok
+test anthropic_extra_headers_override_defaults_without_duplicates ... ok
+test anthropic_native_reasoning_history_preserves_signature_and_redaction ... ok
+test anthropic_normalizes_content_blocks_and_usage ... ok
+test builtin_catalog_lists_openai_and_anthropic ... ok
+test catalog_cost_matches_usage ... ok
+test constraint_capability_matrix_matches_the_three_wire_protocols ... ok
+test grammar_constraints_fail_before_dispatch_for_all_supported_protocols ... ok
+test known_model_strict_tool_schema_does_not_require_final_output_metadata ... ok
+test anthropic_stream_preserves_thinking_signature_redaction_and_tools ... ok
+test image_generation_rejects_empty_prompt_before_dispatch ... ok
+test known_model_without_structured_output_fails_before_dispatch ... ok
+test legacy_model_spec_without_compatibility_metadata_deserializes ... ok
+test m71_stateless_extra_segment_fails_closed ... ok
+test legacy_redacted_anthropic_reasoning_fails_closed_without_continuation ... ok
+test m71_stateless_missing_segment_fails_closed ... ok
+test anthropic_unsigned_thinking_history_is_downgraded_before_dispatch ... ok
+test m71_stateless_edited_anchor_fails_closed ... ok
+test anthropic_stream_rejects_missing_thinking_integrity_fields ... ok
+test m71_stateless_segment_association_is_anchor_based ... ok
+test image_generation_redacts_api_key_in_provider_errors ... ok
+test known_non_reasoning_model_uses_capability_aware_history_downgrade ... ok
+test models_connect_id_uses_builtin_responses_api_without_dispatch ... ok
+test models_available_requires_credential ... ok
+test models_connect_non_completions_api_bypasses_chat_compatibility ... ok
+test models_get_then_connect_keeps_builtin_catalog_behavior ... ok
+test openai_compatibility_defaults_system_role_for_legacy_metadata ... ok
+test anthropic_multi_turn_reasoning_replay_keeps_each_reference_bound ... ok
+test models_connect_image_uses_profile_authority_and_bearer_auth ... ok
+test models_refreshes_oauth_and_uses_anthropic_bearer_auth ... ok
+test openai_ambiguous_missing_index_and_id_fails_closed ... ok
+test openai_compatible_normalizes_sse_and_usage ... ok
+test openai_extra_headers_protect_configured_authorization ... ok
+test models_uses_oauth_bearer_for_openai_responses ... ok
+test openai_image_generation_honors_abort_before_dispatch ... ok
+test mixed_reasoning_and_tools_keep_order_for_anthropic_and_responses ... ok
+test openai_http_408_is_timeout_after_dispatch ... ok
+test m71_stateless_portable_assistant_encodes_normally ... ok
+test m71_stateless_replay_retains_original_user_input ... ok
+test m71_stream_and_complete_produce_equivalent_continuations ... ok
+test openai_image_generation_serializes_options_and_decodes_images ... ok
+test openai_image_generation_uses_images_generations_endpoint ... ok
+test openai_max_output_can_use_max_completion_tokens ... ok
+test openai_max_output_defaults_to_max_tokens ... ok
+test openai_image_input_uses_data_url_parts ... ok
+test openai_missing_index_matches_existing_provider_call_id ... ok
+test openai_missing_index_uses_the_only_existing_non_zero_call ... ok
+test openai_non_function_streamed_tool_type_fails_closed ... ok
+test openai_missing_index_with_new_id_allocates_next_index ... ok
+test openai_qwen_chat_template_dialect_serializes_chat_template_kwargs ... ok
+test openai_omits_max_output_fields_without_a_limit ... ok
+test openai_qwen_dialect_omits_toggle_without_reasoning ... ok
+test openai_qwen_chat_template_dialect_serializes_enabled_thinking ... ok
+test m71_stateless_two_segments_preserve_conversation_order ... ok
+test openai_qwen_dialect_serializes_disabled_thinking ... ok
+test openai_qwen_dialect_works_for_streaming ... ok
+test openai_qwen_dialect_serializes_enable_thinking_and_budget ... ok
+test openai_qwen_reasoning_response_preserves_content_and_usage ... ok
+test openai_qwen_reasoning_stream_preserves_content_and_usage ... ok
+test openai_qwen_usage_preserves_explicit_zero_reasoning_tokens ... ok
+test openai_rate_limit_captures_retry_after ... ok
+test openai_reasoning_effort_can_be_omitted_for_enabled_reasoning ... ok
+test openai_reasoning_effort_is_omitted_without_reasoning_config ... ok
+test openai_reasoning_effort_defaults_to_none_when_disabled ... ok
+test openai_qwen_reasoning_history_round_trips_as_reasoning_content ... ok
+test openai_reasoning_effort_opt_out_omits_disabled_reasoning ... ok
+test openai_reasoning_effort_opt_out_works_for_streaming ... ok
+test openai_stream_can_use_developer_system_role ... ok
+test openai_stream_can_use_max_completion_tokens ... ok
+test openai_stream_rejects_tool_call_name_change ... ok
+test openai_structured_output_constraint_is_serialized ... ok
+test openai_stream_rejects_tool_call_id_change ... ok
+test openai_system_role_can_use_developer ... ok
+test openai_thinking_object_dialect_serializes_disabled_reasoning ... ok
+test openai_thinking_object_dialect_serializes_enabled_reasoning ... ok
+test openai_thinking_object_dialect_works_for_streaming ... ok
+test openai_together_dialect_serializes_disabled_reasoning ... ok
+test openai_together_dialect_serializes_reasoning_toggle ... ok
+test openai_together_dialect_works_for_streaming ... ok
+test prepared_request_semantics_match_direct_profile_and_credential_paths ... ok
+test openai_tool_choice_and_reasoning_are_serialized ... ok
+test openai_usage_preserves_cached_tokens ... ok
+test provider_factory_builds_standalone_image_generator ... ok
+test provider_factory_can_apply_combined_openai_compatibility ... ok
+test provider_factory_can_select_max_completion_tokens ... ok
+test responses_extra_headers_protect_configured_authorization ... ok
+test scripted_events_are_available_without_http ... ok
+test scripted_provider_normalizes_history_before_capability_validation ... ok
+test stateless_responses_continuation_requires_encrypted_replay_state ... ok
+test responses_non_stream_normalizes_text_reasoning_and_tool_identity ... ok
+test stateless_responses_rejects_server_coverage_claims ... ok
+test responses_stream_normalizes_text_usage_and_terminal_event ... ok
+test structured_output_rejects_ambiguous_tool_choice_before_dispatch ... ok
+test usage_accounting_keeps_cache_and_reasoning_as_subledgers ... ok
+test responses_strict_tool_schema_is_serialized_with_reasoning_and_choice ... ok
+test usage_cost_uses_uncached_input_and_rejects_malformed_subdivisions ... ok
+test unauthenticated_image_profile_rejects_caller_credential_headers ... ok
+test responses_structured_output_constraint_is_serialized ... ok
+test signed_anthropic_reasoning_replays_as_responses_summary_with_tool_identity ... ok
+test streamed_responses_completion_exposes_encrypted_continuation_sidecar ... ok
+test oversized_schema_fails_before_dispatch ... ok
+test stateful_responses_continuation_uses_previous_response_id ... ok
+test responses_redacted_summary_replay_is_opaque_only ... ok
+test responses_continuation_is_typed_and_replayed_without_message_pollution ... ok
+test caller_credentials_are_allowed_when_provider_key_is_empty ... ok
+test anthropic_send_timeout_remains_ambiguous ... ok
+test openai_send_timeout_remains_ambiguous ... ok
+test known_context_overflow_fails_before_dispatch_for_all_protocols ... ok
+test model_binding_rejects_before_network_dispatch ... ok
+
+test result: ok. 120 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\legacy_migration_rehearsal-35dd1963369bd9d8.exe)
+
+running 8 tests
+test tests::rehearsal_selection_is_sorted_distinct_and_exactly_120 ... ok
+test tests::rehearsal_selection_fails_closed_when_source_is_too_small ... ok
+test tests::accepts_disjoint_target_inside_isolation ... ok
+test tests::rejects_target_outside_isolation ... ok
+test tests::rejects_production_mode_before_path_access ... ok
+test tests::rejects_target_inside_source ... ok
+test tests::source_handle_opens_existing_file_without_write_api ... ok
+test tests::protects_multiple_disjoint_source_roots ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\messaging-414b1be25a3590d5.exe)
+
+running 2 tests
+test outbox::tests::backoff_caps_at_five_minutes ... ok
+test outbox::tests::status_display_is_stable ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\inbox_idempotency.rs (target\gate-target\debug\deps\inbox_idempotency-47e4a36ba94f4808.exe)
+
+running 4 tests
+test concurrent_duplicate_commits_one_side_effect ... ignored, requires running PostgreSQL
+test consumers_have_independent_idempotency_scopes ... ignored, requires running PostgreSQL
+test rollback_releases_marker_and_side_effect ... ignored, requires running PostgreSQL
+test sequential_duplicate_commits_one_side_effect ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\outbox_reliability.rs (target\gate-target\debug\deps\outbox_reliability-bbcff000ff8b249e.exe)
+
+running 7 tests
+test concurrent_claim_100_has_unique_ownership ... ignored, requires running PostgreSQL
+test concurrent_claim_no_duplicates ... ignored, requires running PostgreSQL
+test deterministic_claim_order ... ignored, requires running PostgreSQL
+test expired_lease_recovery ... ignored, requires running PostgreSQL
+test failure_schedules_retry ... ignored, requires running PostgreSQL
+test max_attempts_reached ... ignored, requires running PostgreSQL
+test stale_worker_cannot_publish_or_fail ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\migration-2d5f2b62c0a417e8.exe)
+
+running 2 tests
+test tests::only_missing_catalog_errors_are_suppressed ... ok
+test tests::requires_explicit_backend ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\migration_test.rs (target\gate-target\debug\deps\migration_test-455daa1454a8e011.exe)
+
+running 8 tests
+test apply_migrations_from_empty ... ignored, requires running PostgreSQL
+test document_integrity_upgrade_fails_closed_for_invalid_legacy_rows ... ignored, requires running PostgreSQL
+test document_integrity_upgrade_preserves_legal_legacy_rows_and_enforces_constraints ... ignored, requires running PostgreSQL
+test migrations_are_idempotent ... ignored, requires running PostgreSQL
+test content_revision_migration_is_forward_only_and_constrained ... ok
+test outbox_reconciliation_migration_is_forward_only_and_fenced ... ok
+test migrations_are_valid ... ok
+test sqlite_processing_catalog_is_independent_from_document_catalog ... ok
+
+test result: ok. 4 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\module_release_tool-a80f5db454500bba.exe)
+
+running 4 tests
+test canonical::tests::crlf_and_lone_cr_fold_to_single_lf ... ok
+test canonical::tests::member_paths_reject_host_and_traversal_forms ... ok
+test canonical::tests::digest_changes_when_a_path_or_a_byte_changes ... ok
+test canonical::tests::migration_set_digest_is_backend_ordered_and_namespace_bound ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\module_release_tool-573b560d965ed002.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\canonical.rs (target\gate-target\debug\deps\canonical-882331b1641e1171.exe)
+
+running 5 tests
+test member_paths_must_be_relative_posix_paths_without_dot_components ... ok
+test normalisation_rejects_binary_content_and_strips_a_byte_order_mark ... ok
+test digest_reacts_to_one_content_byte_and_to_a_path_change ... ok
+test digest_ignores_line_endings_and_a_missing_trailing_newline ... ok
+test inventory_is_ordered_by_path_bytes_and_not_by_walk_order ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests\compatibility.rs (target\gate-target\debug\deps\compatibility-3f651ce055a973ff.exe)
+
+running 8 tests
+test the_caret_range_a_reader_would_reach_for_does_not_cover_this_prerelease ... ok
+test a_platform_outside_the_declared_window_is_refused ... ok
+test a_downgrade_is_refused ... ok
+test an_unknown_dependency_is_refused ... ok
+test a_fresh_installation_of_the_candidate_plans_add_module_with_the_pinned_digest ... ok
+test an_earlier_revision_of_the_same_contract_upgrades_in_place ... ok
+test an_unsatisfiable_dependency_range_is_refused ... ok
+test only_a_change_to_the_published_contract_moves_the_contract_digest ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests\isolation.rs (target\gate-target\debug\deps\isolation-0902d8bc0a408697.exe)
+
+running 8 tests
+test a_path_dependency_into_the_source_repository_is_refused ... ok
+test a_relative_path_escaping_into_the_repository_is_refused ... ok
+test a_transitive_path_dependency_into_the_repository_is_refused ... ok
+test a_path_that_cannot_be_resolved_is_refused_rather_than_assumed_safe ... ok
+test a_consumer_that_resolves_only_into_itself_and_the_artifact_passes ... ok
+test a_consumer_building_inside_another_workspace_is_refused ... ok
+test a_local_package_outside_every_declared_root_is_refused ... ok
+test containment_is_decided_on_a_path_boundary_not_a_string_prefix ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+
+     Running tests\packaging.rs (target\gate-target\debug\deps\packaging-a8226d1ddeb7041f.exe)
+
+running 3 tests
+test payload_carries_no_host_path_host_identity_or_generation_timestamp ... ok
+test members_outside_the_digest_are_declared_not_silently_ignored ... ok
+test regenerating_into_two_directories_yields_identical_candidates ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.98s
+
+     Running tests\pilot_candidates.rs (target\gate-target\debug\deps\pilot_candidates-722c62636db21271.exe)
+
+running 10 tests
+test a_stateless_module_pins_no_migration_revision ... ok
+test the_migration_mapping_equals_the_formal_catalog ... ok
+test a_migration_claim_that_the_catalog_does_not_support_is_refused ... ok
+test a_wrong_module_id_in_the_pinned_identity_is_refused ... ok
+test a_wrong_module_version_in_the_pinned_identity_is_refused ... ok
+test changing_one_packed_source_breaks_the_artifact ... ok
+test removing_one_payload_member_breaks_the_artifact ... ok
+test a_tampered_migration_mapping_is_refused ... ok
+test the_identity_consistency_gate_refuses_every_single_field_mismatch ... ok
+test every_pilot_candidate_verifies_against_the_repository_and_traces_its_revision ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.38s
+
+     Running tests\provenance.rs (target\gate-target\debug\deps\provenance-e3397c2e3df053fd.exe)
+
+running 6 tests
+test a_pinned_revision_must_be_a_real_commit_object ... ok
+test an_input_modified_but_never_committed_is_refused ... ok
+test an_input_the_pinned_commit_does_not_contain_is_refused ... ok
+test a_blob_is_committed_content_not_working_tree_content ... ok
+test committed_inputs_match_and_the_check_reports_what_it_compared ... ok
+test a_detached_head_and_a_linked_worktree_mean_the_same_commit_as_git ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.39s
+
+     Running tests\source_derivation.rs (target\gate-target\debug\deps\source_derivation-48e4a940e0a75e43.exe)
+
+running 9 tests
+test generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused ... ok
+test generating_from_a_checkout_with_an_uncommitted_source_file_is_refused ... ok
+test a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback ... ok
+test a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move ... ok
+test a_candidate_missing_a_committed_source_member_is_refused_after_rehashing ... ok
+test a_candidate_with_an_extra_source_member_is_refused_after_rehashing ... ok
+test a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent ... ok
+test a_packed_manifest_the_pinned_commit_cannot_produce_is_refused ... ok
+test a_packed_dependency_bump_is_refused_for_every_pilot_module ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.10s
+
+     Running tests\verification_guards.rs (target\gate-target\debug\deps\verification_guards-ca242dfb62b87f6d.exe)
+
+running 8 tests
+test a_pinned_source_revision_that_is_not_a_real_commit_is_refused ... ok
+test the_pinned_revision_must_actually_contain_the_inputs_it_claims ... ok
+test compare_reads_the_real_payload_of_the_right_side ... ok
+test compare_reads_the_real_payload_of_the_left_side ... ok
+test two_independent_candidates_still_compare_identical ... ok
+test an_unknown_artifact_record_schema_or_algorithm_is_refused ... ok
+test the_bundle_crate_bindings_must_match_the_packed_cargo_manifests ... ok
+test the_descriptive_records_must_describe_one_module_and_version has been running for over 60 seconds
+test the_descriptive_records_must_describe_one_module_and_version ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 75.05s
+
+     Running tests\wave5b_catalog.rs (target\gate-target\debug\deps\wave5b_catalog-0a058be70d699368.exe)
+
+running 19 tests
+test dependency_grammar_is_fixed_and_does_not_guess ... ok
+test host_table_ownership_is_unique_and_inside_the_authoritative_contexts ... ok
+test the_default_gate_excludes_the_candidate_freeze ... ok
+test unattributable_sql_forms_are_refused_by_name ... ok
+test the_attribution_table_is_migration_019_itself ... ok
+test the_embedded_pinned_table_is_the_checked_in_fixture ... ok
+test migration_019_is_not_a_module_catalog ... ok
+test the_conformance_tests_do_not_embed_a_second_baseline ... ok
+test no_fixture_directory_is_left_uncovered ... ok
+test the_freeze_only_counts_the_flat_baseline ... ok
+test a_new_namespace_digest_is_canonical_lf_only ... ok
+warning: in the working copy of 'migrations/001_initial.sql', LF will be replaced by CRLF the next time Git touches it
+test a_git_object_id_is_never_a_content_digest ... ok
+test a_repository_without_the_pinned_commit_is_refused_without_a_fallback ... ok
+test exactly_one_file_embeds_the_host_baseline_catalog ... ok
+test every_shared_fixture_case_produces_the_recorded_verdict ... ok
+test the_seven_c1_entries_are_pinned_by_blob_even_though_the_manifest_is_crlf ... ok
+test every_pinned_entry_is_the_blob_of_the_pinned_commit ... ok
+test head_and_index_still_hold_the_pinned_baseline ... ok
+test the_repository_itself_passes_the_default_checks ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.28s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\notification-6449d556c8ca7c36.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\object_storage-4a378ac11680837b.exe)
+
+running 17 tests
+test key::tests::rejects_empty ... ok
+test client::tests::presign_expiry_bounds_are_enforced_by_the_platform ... ok
+test key::tests::rejects_absolute_paths ... ok
+test key::tests::rejects_empty_segments ... ok
+test key::tests::rejects_path_traversal ... ok
+test key::tests::rejects_too_long ... ok
+test key::tests::rejects_unc_paths ... ok
+test key::tests::rejects_windows_drive ... ok
+test key::tests::rejects_nul ... ok
+test key::tests::valid_keys ... ok
+test client::tests::local_storage_refuses_presign_instead_of_exposing_a_path ... ok
+test client::tests::local_storage_rejects_symlink_escape_when_supported ... ok
+test client::tests::presign_rejects_out_of_range_expiry_without_calling_the_provider ... ok
+test client::tests::local_storage_failed_stream_does_not_publish_partial_object ... ok
+test client::tests::the_offline_transport_is_the_client_transport ... ok
+test client::tests::a_transport_failure_is_not_mistaken_for_a_missing_object ... ok
+test client::tests::local_storage_streams_and_deletes ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\log_hygiene.rs (target\gate-target\debug\deps\log_hygiene-6aa12bf246d485a7.exe)
+
+running 1 test
+test storage_references_never_enter_the_log_stream ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+     Running tests\minio_contract.rs (target\gate-target\debug\deps\minio_contract-e2aa78e3021d4ad1.exe)
+
+running 10 tests
+test content_type_is_preserved ... ignored, requires running MinIO (docker compose up)
+test delete_is_idempotent ... ignored, requires running MinIO (docker compose up)
+test delete_removes_object ... ignored, requires running MinIO (docker compose up)
+test exists_returns_false_for_missing ... ignored, requires running MinIO (docker compose up)
+test get_missing_returns_not_found ... ignored, requires running MinIO (docker compose up)
+test large_object_is_streamed_without_small_object_buffering ... ignored, requires running MinIO (docker compose up)
+test presigned_url_is_valid ... ignored, requires running MinIO (docker compose up)
+test put_and_get_roundtrip ... ignored, requires running MinIO (docker compose up)
+test special_character_keys ... ignored, requires running MinIO (docker compose up)
+test user_metadata_is_preserved ... ignored, requires running MinIO (docker compose up)
+
+test result: ok. 0 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_contract_lane.rs (target\gate-target\debug\deps\s3_contract_lane-d3a7086ac2ad7822.exe)
+
+running 6 tests
+test contract_step_reports_its_scope ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_delete_of_absent_object_is_idempotent ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_presigned_url_is_key_scoped_and_expires ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_records_provider_capabilities ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_reports_missing_object_as_not_found ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_round_trips_object_metadata_and_payload ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_cleanup.rs (target\gate-target\debug\deps\s3_lane_cleanup-433f48040314f045.exe)
+
+running 7 tests
+test a_cleanup_failure_fails_the_step_and_is_not_reported_as_success ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test child_final_cleanup_step ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_leaves_objects_outside_the_run_prefix_untouched ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_never_deletes_a_protected_bucket ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_refuses_to_run_without_a_run_id ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test final_cleanup_leaves_no_objects_and_no_incomplete_uploads ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test report_the_cleanup_scope ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_fault_injection.rs (target\gate-target\debug\deps\s3_lane_fault_injection-9ce15a81ebd840c6.exe)
+
+running 5 tests
+test a_failed_contract_run_is_still_cleaned_up ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test a_failure_and_its_cleanup_leave_other_prefixes_untouched ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test an_interrupted_multipart_upload_is_found_and_aborted ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test child_entry_point ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test many_incomplete_uploads_on_one_key_are_all_found_and_aborted ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_pagination.rs (target\gate-target\debug\deps\s3_lane_pagination-c75acb47c401470b.exe)
+
+running 19 tests
+test a_child_that_reported_nothing_cannot_produce_a_pass ... ok
+test a_different_upload_in_the_listing_is_not_discovery_of_the_created_one ... ok
+test a_provider_that_lists_nothing_does_not_verify_upload_discovery ... ok
+test a_record_sharing_a_line_with_the_harness_still_parses ... ok
+test created_upload_records_are_structured_and_garbage_is_reported ... ok
+test the_pair_is_matched_on_both_halves ... ok
+test a_failed_listing_is_never_reported_as_a_clean_scope ... ok
+test objects_truncated_with_an_empty_token_is_an_error ... ok
+test a_truncated_upload_page_without_a_cursor_is_an_error ... ok
+test objects_truncated_without_a_token_is_an_error_not_a_full_listing ... ok
+test an_objects_page_that_does_not_answer_is_truncated_is_an_error ... ok
+test uploads_spread_over_several_keys_are_listed_exactly_once ... ok
+test a_repeated_cursor_pair_is_an_error_not_a_complete_listing ... ok
+test an_objects_listing_ends_on_is_truncated_false_after_every_page ... ok
+test a_truncated_upload_page_with_only_half_a_cursor_is_an_error ... ok
+test seven_uploads_on_one_key_are_all_listed_across_three_pages ... ok
+test a_cycling_cursor_pair_is_an_error_not_a_complete_listing ... ok
+test objects_with_a_repeated_or_cycling_token_are_an_error ... ok
+test an_upload_listing_that_never_terminates_fails_on_the_page_bound ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests\sdk_log_hygiene.rs (target\gate-target\debug\deps\sdk_log_hygiene-94d78d047dccc268.exe)
+
+running 4 tests
+test child_entry_point ... ok
+test sentinels_do_not_contain_each_other ... ok
+test turning_every_provider_target_to_trace_does_not_leak ... ok
+test every_configured_case_keeps_storage_references_out_of_the_log_stream ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.32s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\observability-d3fa1e1708ec6980.exe)
+
+running 12 tests
+test tests::log_format_parse_is_case_insensitive_and_rejects_unknown ... ok
+test tests::suppression_matches_targets_on_module_boundaries ... ok
+test tests::only_debug_and_trace_are_within_the_boundary ... ok
+test tests::default_directives_keep_the_requested_service_level ... ok
+test tests::provider_spans_are_never_constructed ... ok
+test tests::boundary_holds_against_the_most_permissive_env_filter ... ok
+test tests::provider_debug_events_are_pinned_while_platform_debug_survives ... ok
+test tests::boundary_holds_against_more_specific_subtarget_directives ... ok
+test tests::boundary_holds_whatever_order_the_layers_are_installed_in ... ok
+test tests::without_the_boundary_a_permissive_filter_leaks ... ok
+test metrics::tests::install_is_idempotent_and_render_exposes_prometheus_text ... ok
+test metrics::tests::duration_histograms_render_as_bucketed_prometheus_histograms ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests\provider_log_safety.rs (target\gate-target\debug\deps\provider_log_safety-663bea104dd7122f.exe)
+
+running 12 tests
+test child_entry_point ... ok
+test child_processes_actually_emit_the_application_records ... ok
+test more_specific_provider_subtarget_directives_do_not_leak ... ok
+test provider_span_directives_do_not_leak ... ok
+test rust_log_debug_does_not_leak ... ok
+test rust_log_trace_does_not_leak ... ok
+test otlp_branch_keeps_the_same_boundary_for_span_output ... ok
+test rust_log_unset_debug_service_level_does_not_leak ... ok
+test json_format_does_not_change_the_boundary ... ok
+test no_case_loses_the_application_own_debug_output ... ok
+test no_case_leaks_provider_debug_or_trace_material ... ok
+test no_case_silences_provider_warn_diagnostics ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\organization-fdc03724de7be339.exe)
+
+running 10 tests
+test domain::membership::tests::membership_kind_is_immutable_per_row ... ok
+test domain::membership::tests::join_deactivate_reactivate_cycle ... ok
+test domain::membership::tests::rehydrate_enforces_status_timestamp_consistency ... ok
+test domain::unit::tests::create_rejects_nil_self_parent_and_bad_names ... ok
+test domain::version::tests::versions_reject_non_positive_values_and_increment ... ok
+test domain::unit::tests::update_and_reparent_increment_versions_and_revalidate ... ok
+test application::units::tests::disable_unit_then_new_members_are_rejected ... ok
+test application::units::tests::tree_rules_reject_cross_tenant_self_and_cycle_placement ... ok
+test application::members::tests::add_requires_active_tenant_membership_then_converges_on_readd ... ok
+test domain::unit::tests::placement_rejects_cycles_unknown_parents_and_depth ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract_semantics.rs (target\gate-target\debug\deps\contract_semantics-661ce25fa3c3e0d7.exe)
+
+running 12 tests
+test store_side_placement_revalidation ... ok
+test queries_are_tenant_isolated ... ok
+test store_side_move_validation_and_replay ... ok
+test update_with_identical_values_converges_without_bump_or_audit ... ok
+test cross_tenant_operations_are_not_expressible ... ok
+test membership_add_remove_convergence_at_store ... ok
+test membership_remove_readd_convergence_at_store ... ok
+test create_unit_idempotency_covers_caller_chosen_id ... ok
+test disabled_unit_rejects_membership_add_and_removal_converges ... ok
+test poisoned_store_maps_to_unavailable_on_every_port ... ok
+test version_conflict_and_idempotent_update_semantics ... ok
+test tenant_resource_cap_is_enforced_store_side ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.72s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\organization_postgres-18d8ece515fa3c48.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-1f52399a6153abf0.exe)
+
+running 1 test
+test postgres_organization_contract_suite_passes ... ignored, requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\organization_sqlite-9616eaea4c136266.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-ce7721c17e72ab7c.exe)
+
+running 1 test
+test sqlite_organization_contract_suite_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\plan_0009_rehearsal-db7f417e5b1f6fb6.exe)
+
+running 13 tests
+test stage4::tests::replay_and_interrupted_recovery_require_equal_target_state ... ok
+test tests::classification_count_order_is_the_manifest_order ... ok
+test stage4::tests::partial_target_requires_rejection_and_zero_facts ... ok
+test stage4::tests::validator_covers_all_cases_without_materialization ... ok
+test stage3::tests::requested_real_sample_coverage_is_explicit_and_stable ... ok
+test tests::env_parser_reads_only_key_value_pairs_and_strips_quotes ... ok
+test tests::evidence_path_metadata_does_not_return_raw_path ... ok
+test tests::candidate_paths_reject_absolute_and_parent_escape ... ok
+test stage2::tests::mapping_digest_excludes_only_its_embedded_digest ... ok
+test stage2::tests::candidate_ids_are_stable_and_classification_is_fail_closed ... ok
+test tests::app_selector_prioritizes_coverage_before_id_order ... ok
+test tests::manifest_and_replay_audit_fail_closed_on_corruption ... ok
+test tests::file_digest_handles_large_inputs_without_stack_allocation ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src\main.rs (target\gate-target\debug\deps\plan_0009_rehearsal-776fc53b085495d6.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\policy-e64424037cd4df7c.exe)
+
+running 12 tests
+test application::authorize::tests::compat_grant_parsing_is_bounded ... ok
+test domain::version::tests::versions_reject_non_positive_values_and_increment ... ok
+test catalog::tests::catalog_keys_all_parse_and_are_unique ... ok
+test domain::permission::tests::key_grammar_accepts_catalog_and_rejects_injection_shapes ... ok
+test domain::binding::tests::validity_window_and_revocation_semantics ... ok
+test domain::scope::tests::resource_kind_grammar ... ok
+test catalog::tests::iam_management_subset_is_within_the_iam_list ... ok
+test application::authorize::tests::deny_rank_prefers_structural_causes ... ok
+test domain::role::tests::system_roles_reject_mutation_and_rehydrate_proves_consistency ... ok
+test domain::scope::tests::constructors_reject_nil ... ok
+test domain::role::tests::tenant_role_lifecycle_and_key_grammar ... ok
+test catalog::tests::system_role_set_excludes_reserved ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\binding_and_role_semantics.rs (target\gate-target\debug\deps\binding_and_role_semantics-1852588a0b8cb9fd.exe)
+
+running 16 tests
+test idempotency_conflicts_are_scoped_per_operation ... ok
+test self_dos_revocation_is_allowed_and_audited ... ok
+test binding_convergence_and_revoke_versions_at_store ... ok
+test store_side_caps_are_authoritative ... ok
+test self_bind_idempotent_rebind_converges ... ok
+test bind_requires_active_membership_visible_role_and_active_target ... ok
+test self_bind_to_iam_role_is_denied ... ok
+test self_bind_with_wider_scope_or_window_is_denied ... ok
+test system_roles_reject_every_mutation_surface ... ok
+test set_permissions_guard_ignores_out_of_window_bindings ... ok
+test role_creation_enforces_unique_keys_and_chosen_ids ... ok
+test bootstrap_source_carveout_lives_and_dies_with_the_system_binding ... ok
+test set_permissions_iam_addition_requires_unbound_actor ... ok
+test permission_set_replace_validates_catalog_and_caps ... ok
+test role_budget_counts_tenant_rows_not_system_roles ... ok
+test tenant_binding_listing_and_write_caps_bind_at_the_store ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\contract_authorization_fixture.rs (target\gate-target\debug\deps\contract_authorization_fixture-d0f0b175a052092e.exe)
+
+running 5 tests
+test reserved_contract_key_is_unreachable_through_compat_claims ... ok
+test cross_tenant_binding_fixture_fails_closed ... ok
+test resource_scoped_binding_authorizes_only_the_exact_contract ... ok
+test resource_type_binding_authorizes_contract_reads_in_tenant ... ok
+test revocation_stops_authorization_on_the_next_decision ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\decision_matrix.rs (target\gate-target\debug\deps\decision_matrix-8b062b9553ee10cf.exe)
+
+running 17 tests
+test tenant_role_binding_grants_within_tenant ... ok
+test subtree_scope_fails_closed_when_bound_or_host_unit_disabled ... ok
+test foreign_roles_are_invisible_and_never_grant ... ok
+test default_deny_without_any_binding ... ok
+test store_failures_deny_internally_never_allow ... ok
+test compat_bridge_is_governance_only ... ok
+test subject_status_overrides_every_grant_path ... ok
+test explain_reports_every_candidate_in_binding_id_order ... ok
+test disabled_role_denies_existing_bindings ... ok
+test unknown_and_malformed_permissions_deny ... ok
+test retired_permission_denies_as_unknown ... ok
+test org_scope_exact_and_subtree_semantics ... ok
+test resource_and_kind_scopes_require_trusted_metadata ... ok
+test role_without_the_permission_does_not_grant ... ok
+test validity_windows_are_enforced_per_decision ... ok
+test worst_deny_reason_wins_when_nothing_grants ... ok
+test mid_evaluation_store_failures_deny_internally ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\policy_postgres-d9c304b975e177bc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-acaee32c8edca602.exe)
+
+running 1 test
+test postgres_policy_contract_suite_passes ... ignored, requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\perf_authorize.rs (target\gate-target\debug\deps\perf_authorize-54dc16d48b253d23.exe)
+
+running 1 test
+test authorize_hot_path_percentiles_on_postgres ... ignored, requires PostgreSQL (set DATABASE_URL; perf evidence harness, run with --ignored --nocapture)
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\policy_sqlite-737b934de2619d8f.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\contract.rs (target\gate-target\debug\deps\contract-21d2b1dd80c19979.exe)
+
+running 1 test
+test sqlite_policy_contract_suite_passes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\project-f30dfa31e6788fa9.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\public_api_contracts-d59079bf8553e391.exe)
+
+running 3 tests
+test iam::tests::iam_dto_json_never_names_internal_fields ... ok
+test iam::tests::scope_uses_a_bounded_tagged_shape ... ok
+test tests::contract_round_trips_without_internal_storage_fields ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\runtime_config-a2ebf2b7ac1aaf4c.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\secret_url.rs (target\gate-target\debug\deps\secret_url-3002d8d885ca347d.exe)
+
+running 3 tests
+test invalid_input_never_appears_in_errors_or_rendering ... ok
+test database_credentials_are_redacted_in_display_and_debug ... ok
+test nats_and_sensitive_query_parameters_are_redacted_case_insensitively ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\runtime_governance-47c6e3e4650c1bf1.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\runtime_governance_postgres-0661010556021072.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\runtime_governance_sqlite-b994501fb6655d21.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\runtime_migration-11a9d84ad8772f6f.exe)
+
+running 1 test
+test tests::classifies_empty_behind_equal_and_ahead ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\semantic_contract-a99a4975783729b7.exe)
+
+running 15 tests
+test compiler::tests::duplicate_module_id_is_rejected ... ok
+test compiler::tests::illegal_platform_dependency_is_rejected ... ok
+test compiler::tests::required_platform_capability_must_match ... ok
+test compiler::tests::cyclic_module_dependency_is_rejected ... ok
+test compiler::tests::incompatible_module_version_is_rejected ... ok
+test compiler::tests::missing_module_dependency_is_rejected ... ok
+test compiler::tests::undeclared_semantic_object_is_rejected ... ok
+test compiler::tests::semantic_owner_mismatch_is_rejected ... ok
+test compiler::tests::duplicate_semantic_id_is_rejected ... ok
+test compiler::tests::cross_module_private_relationship_is_rejected ... ok
+test compiler::tests::unknown_relationship_endpoint_is_rejected ... ok
+test compiler::tests::duplicate_metric_owner_is_rejected ... ok
+test compiler::tests::semantic_namespaces_are_unique_across_modules ... ok
+test compiler::tests::removing_one_fixture_module_leaves_the_other_manifest_unchanged ... ok
+test compiler::tests::compilation_is_deterministic_when_input_order_changes ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\shared_kernel-8ef241bf86ce2a10.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\gate-target\debug\deps\workflow-8f86d169b92a5f56.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests agent_integration
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ai_application
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests approval
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests architecture_check
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests audit
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests audit_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests audit_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_api
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_api_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_application_compiler
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_module_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests contract
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests customer
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests data_integrity
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests data_repair
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_persistence_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_processing
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_processing_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_processing_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_processing_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests document_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests finance
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests governance_worker
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests identity
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests identity_authorization_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests identity_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests identity_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests jarvis_model_provider
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests legacy_migration_rehearsal
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests messaging
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests module_release_tool
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests notification
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests object_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests observability
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests organization
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests organization_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests organization_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests plan_0009_rehearsal
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests policy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests policy_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests policy_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests project
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests public_api_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests runtime_config
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests runtime_governance
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests runtime_governance_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests runtime_governance_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests runtime_migration
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests semantic_contract
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shared_kernel
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests workflow
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -267,7 +267,18 @@ pub async fn upload_document(
                 .into_response())
         }
         Err(error) => {
-            let _ = storage.objects.delete(&object_key).await;
+            // Gap ST-W4-05: this compensation delete used to be fire-and-forget,
+            // so an object left behind by a failed metadata transaction was
+            // completely invisible. The provider error text stays out of the log
+            // (AGENTS §10); the bounded signal is what operations need. The
+            // metadata/object reconciliation scan that would repair such an
+            // orphan is tracked as a separate gap.
+            if storage.objects.delete(&object_key).await.is_err() {
+                tracing::warn!(
+                    compensation = "upload_compensation_delete",
+                    "upload compensation delete failed; an object may be orphaned"
+                );
+            }
             Err(trace(ApiError::from(error), &headers))
         }
     }

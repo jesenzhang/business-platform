@@ -1,0 +1,492 @@
+[
+  {
+    "Package": "ai-worker",
+    "Target": "unittests src\\main.rs",
+    "Test": "extractor::tests::real_provider_smoke_extracts_candidate",
+    "Category": "external model provider",
+    "Reason": "requires a reachable intranet model provider; run manually with --ignored"
+  },
+  {
+    "Package": "audit-postgres",
+    "Target": "tests\\chain_pg.rs",
+    "Test": "chain_detects_mutation_and_interior_deletion_but_not_tail_truncation",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "audit-postgres",
+    "Target": "tests\\chain_pg.rs",
+    "Test": "concurrent_appends_form_one_verified_tenant_chain",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "audit-postgres",
+    "Target": "tests\\chain_pg.rs",
+    "Test": "legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "audit-postgres",
+    "Target": "tests\\chain_pg.rs",
+    "Test": "nanosecond_input_verifies_after_a_postgres_precision_round_trip",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "business-api",
+    "Target": "tests\\documents_postgres.rs",
+    "Test": "document_http_flow_is_atomic_idempotent_and_tenant_scoped",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "business-api",
+    "Target": "tests\\e2e_admin_bootstrap_postgres.rs",
+    "Test": "bootstrap_admin_grant_suspend_reactivate_revoke_chain_postgres",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL (DATABASE_URL)"
+  },
+  {
+    "Package": "business-api",
+    "Target": "tests\\e2e_admin_bootstrap_postgres.rs",
+    "Test": "no_bootstrap_leaves_the_api_adminless_postgres",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL (DATABASE_URL)"
+  },
+  {
+    "Package": "business-api",
+    "Target": "tests\\plan_0008_postgres_minio.rs",
+    "Test": "plan_0008_postgres_minio_multipart_upload_is_idempotent",
+    "Category": "PostgreSQL + object storage",
+    "Reason": "requires real PostgreSQL, PLAN-0008 migrations, and MinIO"
+  },
+  {
+    "Package": "business-api",
+    "Target": "tests\\plan_0008_postgres_minio.rs",
+    "Test": "plan_0008_postgres_minio_revision_evidence_contract",
+    "Category": "PostgreSQL + object storage",
+    "Reason": "requires real PostgreSQL, PLAN-0008 migrations, and MinIO"
+  },
+  {
+    "Package": "business-worker",
+    "Target": "tests\\postgres_minio_processing.rs",
+    "Test": "postgres_minio_processing_adapter_round_trip",
+    "Category": "PostgreSQL + object storage",
+    "Reason": "requires PostgreSQL, migrations, and MinIO"
+  },
+  {
+    "Package": "document-postgres",
+    "Target": "tests\\query_contracts.rs",
+    "Test": "postgres_satisfies_shared_document_persistence_contract",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL"
+  },
+  {
+    "Package": "document-postgres",
+    "Target": "tests\\tenant_fence_pg.rs",
+    "Test": "replay_never_returns_a_foreign_tenants_document",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL"
+  },
+  {
+    "Package": "document-processing-postgres",
+    "Target": "tests\\cancel_factuality_pg.rs",
+    "Test": "cancel_fact_lands_exactly_once_at_the_step_boundary",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres",
+    "Target": "tests\\cancel_factuality_pg.rs",
+    "Test": "cancelled_failure_disposition_audits_the_fact",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres",
+    "Target": "tests\\cancel_factuality_pg.rs",
+    "Test": "cooperative_cancel_is_intent_only",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres",
+    "Target": "tests\\cancel_factuality_pg.rs",
+    "Test": "reclaim_of_cancelled_expired_job_publishes_the_fact",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres",
+    "Target": "tests\\cancel_factuality_pg.rs",
+    "Test": "waiting_for_ai_cancel_publishes_fact_once",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres / document-processing-sqlite / document-sqlite",
+    "Target": "tests\\contracts.rs",
+    "Test": "postgres_processing_contract_claims_and_restarts",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres / document-processing-sqlite / document-sqlite",
+    "Target": "tests\\contracts.rs",
+    "Test": "postgres_processing_contract_reclaims_expired_ai_task",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "document-processing-postgres / document-processing-sqlite / document-sqlite",
+    "Target": "tests\\contracts.rs",
+    "Test": "postgres_processing_revision_one_uow_is_atomic_and_replayable",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL and migrations"
+  },
+  {
+    "Package": "governance-worker",
+    "Target": "tests\\postgres_governance.rs",
+    "Test": "postgres_scan_and_requeue_repair_are_durable",
+    "Category": "PostgreSQL",
+    "Reason": "requires CI PostgreSQL and the shared migration catalog"
+  },
+  {
+    "Package": "identity-postgres / identity-sqlite / organization-postgres / organization-sqlite / policy-postgres / policy-sqlite",
+    "Target": "tests\\contract.rs",
+    "Test": "postgres_identity_contract_suite_passes",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)"
+  },
+  {
+    "Package": "identity-postgres",
+    "Target": "tests\\perf_resolve.rs",
+    "Test": "resolve_hot_path_percentiles_on_postgres",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL (set DATABASE_URL; perf evidence harness, run with --ignored --nocapture)"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\inbox_idempotency.rs",
+    "Test": "concurrent_duplicate_commits_one_side_effect",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\inbox_idempotency.rs",
+    "Test": "consumers_have_independent_idempotency_scopes",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\inbox_idempotency.rs",
+    "Test": "rollback_releases_marker_and_side_effect",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\inbox_idempotency.rs",
+    "Test": "sequential_duplicate_commits_one_side_effect",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "concurrent_claim_100_has_unique_ownership",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "concurrent_claim_no_duplicates",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "deterministic_claim_order",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "expired_lease_recovery",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "failure_schedules_retry",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "max_attempts_reached",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "messaging",
+    "Target": "tests\\outbox_reliability.rs",
+    "Test": "stale_worker_cannot_publish_or_fail",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "migration",
+    "Target": "tests\\migration_test.rs",
+    "Test": "apply_migrations_from_empty",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "migration",
+    "Target": "tests\\migration_test.rs",
+    "Test": "document_integrity_upgrade_fails_closed_for_invalid_legacy_rows",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "migration",
+    "Target": "tests\\migration_test.rs",
+    "Test": "document_integrity_upgrade_preserves_legal_legacy_rows_and_enforces_constraints",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "migration",
+    "Target": "tests\\migration_test.rs",
+    "Test": "migrations_are_idempotent",
+    "Category": "PostgreSQL",
+    "Reason": "requires running PostgreSQL"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "content_type_is_preserved",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "delete_is_idempotent",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "delete_removes_object",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "exists_returns_false_for_missing",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "get_missing_returns_not_found",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "large_object_is_streamed_without_small_object_buffering",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "presigned_url_is_valid",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "put_and_get_roundtrip",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "special_character_keys",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\minio_contract.rs",
+    "Test": "user_metadata_is_preserved",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires running MinIO (docker compose up)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "contract_step_reports_its_scope",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "lane_delete_of_absent_object_is_idempotent",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "lane_presigned_url_is_key_scoped_and_expires",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "lane_records_provider_capabilities",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "lane_reports_missing_object_as_not_found",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_contract_lane.rs",
+    "Test": "lane_round_trips_object_metadata_and_payload",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "a_cleanup_failure_fails_the_step_and_is_not_reported_as_success",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "child_final_cleanup_step",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "cleanup_leaves_objects_outside_the_run_prefix_untouched",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "cleanup_never_deletes_a_protected_bucket",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "cleanup_refuses_to_run_without_a_run_id",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "final_cleanup_leaves_no_objects_and_no_incomplete_uploads",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_cleanup.rs",
+    "Test": "report_the_cleanup_scope",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_fault_injection.rs",
+    "Test": "a_failed_contract_run_is_still_cleaned_up",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_fault_injection.rs",
+    "Test": "a_failure_and_its_cleanup_leave_other_prefixes_untouched",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_fault_injection.rs",
+    "Test": "an_interrupted_multipart_upload_is_found_and_aborted",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_fault_injection.rs",
+    "Test": "child_entry_point",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "object-storage",
+    "Target": "tests\\s3_lane_fault_injection.rs",
+    "Test": "many_incomplete_uploads_on_one_key_are_all_found_and_aborted",
+    "Category": "object storage (S3 / MinIO)",
+    "Reason": "requires a running S3-compatible provider (WAVE4_S3_* environment)"
+  },
+  {
+    "Package": "identity-postgres / identity-sqlite / organization-postgres / organization-sqlite / policy-postgres / policy-sqlite",
+    "Target": "tests\\contract.rs",
+    "Test": "postgres_organization_contract_suite_passes",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)"
+  },
+  {
+    "Package": "identity-postgres / identity-sqlite / organization-postgres / organization-sqlite / policy-postgres / policy-sqlite",
+    "Target": "tests\\contract.rs",
+    "Test": "postgres_policy_contract_suite_passes",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL (set DATABASE_URL; CI runs --include-ignored)"
+  },
+  {
+    "Package": "policy-postgres",
+    "Target": "tests\\perf_authorize.rs",
+    "Test": "authorize_hot_path_percentiles_on_postgres",
+    "Category": "PostgreSQL",
+    "Reason": "requires PostgreSQL (set DATABASE_URL; perf evidence harness, run with --ignored --nocapture)"
+  }
+]

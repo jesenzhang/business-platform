@@ -1,0 +1,54 @@
+== cargo test -p document-processing-postgres --test cancel_factuality_pg --all-features -- --include-ignored --test-threads=1 ==
+   Compiling document-processing-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-processing-postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.51s
+     Running tests\cancel_factuality_pg.rs (target\debug\deps\cancel_factuality_pg-bd0607ff235a2e64.exe)
+
+running 5 tests
+test cancel_fact_lands_exactly_once_at_the_step_boundary ... FAILED
+test cancelled_failure_disposition_audits_the_fact ... FAILED
+test cooperative_cancel_is_intent_only ... FAILED
+test reclaim_of_cancelled_expired_job_publishes_the_fact ... FAILED
+test waiting_for_ai_cancel_publishes_fact_once ... FAILED
+
+failures:
+
+---- cancel_fact_lands_exactly_once_at_the_step_boundary stdout ----
+
+thread 'cancel_fact_lands_exactly_once_at_the_step_boundary' (36688) panicked at crates\document-processing-postgres\tests\cancel_factuality_pg.rs:159:6:
+outbox count: Database(PgDatabaseError { severity: Error, code: "42883", message: "操作符不存在: character varying = uuid", detail: None, hint: Some("没有匹配指定名称和参数类型的操作符. 您也许需要增加明确的类型转换."), position: Some(Original(52)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_oper.c"), line: Some(644), routine: Some("op_error") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- cancelled_failure_disposition_audits_the_fact stdout ----
+
+thread 'cancelled_failure_disposition_audits_the_fact' (42336) panicked at crates\document-processing-postgres\tests\cancel_factuality_pg.rs:159:6:
+outbox count: Database(PgDatabaseError { severity: Error, code: "42883", message: "操作符不存在: character varying = uuid", detail: None, hint: Some("没有匹配指定名称和参数类型的操作符. 您也许需要增加明确的类型转换."), position: Some(Original(52)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_oper.c"), line: Some(644), routine: Some("op_error") })
+
+---- cooperative_cancel_is_intent_only stdout ----
+
+thread 'cooperative_cancel_is_intent_only' (43612) panicked at crates\document-processing-postgres\tests\cancel_factuality_pg.rs:159:6:
+outbox count: Database(PgDatabaseError { severity: Error, code: "42883", message: "操作符不存在: character varying = uuid", detail: None, hint: Some("没有匹配指定名称和参数类型的操作符. 您也许需要增加明确的类型转换."), position: Some(Original(52)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_oper.c"), line: Some(644), routine: Some("op_error") })
+
+---- reclaim_of_cancelled_expired_job_publishes_the_fact stdout ----
+
+thread 'reclaim_of_cancelled_expired_job_publishes_the_fact' (28124) panicked at crates\document-processing-postgres\tests\cancel_factuality_pg.rs:159:6:
+outbox count: Database(PgDatabaseError { severity: Error, code: "42883", message: "操作符不存在: character varying = uuid", detail: None, hint: Some("没有匹配指定名称和参数类型的操作符. 您也许需要增加明确的类型转换."), position: Some(Original(52)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_oper.c"), line: Some(644), routine: Some("op_error") })
+
+---- waiting_for_ai_cancel_publishes_fact_once stdout ----
+
+thread 'waiting_for_ai_cancel_publishes_fact_once' (15324) panicked at crates\document-processing-postgres\tests\cancel_factuality_pg.rs:159:6:
+outbox count: Database(PgDatabaseError { severity: Error, code: "42883", message: "操作符不存在: character varying = uuid", detail: None, hint: Some("没有匹配指定名称和参数类型的操作符. 您也许需要增加明确的类型转换."), position: Some(Original(52)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_oper.c"), line: Some(644), routine: Some("op_error") })
+
+
+failures:
+    cancel_fact_lands_exactly_once_at_the_step_boundary
+    cancelled_failure_disposition_audits_the_fact
+    cooperative_cancel_is_intent_only
+    reclaim_of_cancelled_expired_job_publishes_the_fact
+    waiting_for_ai_cancel_publishes_fact_once
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+error: test failed, to rerun pass `-p document-processing-postgres --test cancel_factuality_pg`
+
+EXIT_CODE=101
+

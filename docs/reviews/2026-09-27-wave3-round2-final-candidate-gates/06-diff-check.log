@@ -1,0 +1,7 @@
+== git diff --check ==
+warning: in the working copy of 'crates/audit/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-processing-postgres/tests/cancel_factuality_pg.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/operational.rs', LF will be replaced by CRLF the next time Git touches it
+
+EXIT_CODE=0
+

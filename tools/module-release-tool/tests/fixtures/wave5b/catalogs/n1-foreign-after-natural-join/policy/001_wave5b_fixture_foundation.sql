@@ -1,0 +1,1 @@
+INSERT INTO roles (role_id) SELECT r.id FROM roles r NATURAL JOIN platform_users;

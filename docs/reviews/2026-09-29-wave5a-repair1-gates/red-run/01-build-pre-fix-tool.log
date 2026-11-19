@@ -1,0 +1,32 @@
+
+=== 01-build-pre-fix-tool ===
+$ cargo build -p module-release-tool
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling version_check v0.9.5
+   Compiling serde_core v1.0.229
+   Compiling typenum v1.20.1
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.20
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling semver v1.0.28
+   Compiling itoa v1.0.18
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.2.17
+   Compiling generic-array v0.14.9
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling syn v3.0.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling thiserror-impl v2.0.20
+   Compiling serde_derive v1.0.229
+   Compiling business-module-contracts v0.1.0 (F:\wave5a-red-8036bc65\crates\business-module-contracts)
+   Compiling business-application-compiler v0.1.0 (F:\wave5a-red-8036bc65\crates\business-application-compiler)
+   Compiling module-release-tool v0.1.0 (F:\wave5a-red-8036bc65\tools\module-release-tool)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.98s
+exit code : 0
+  |    Compiling module-release-tool v0.1.0 (F:\wave5a-red-8036bc65\tools\module-release-tool)

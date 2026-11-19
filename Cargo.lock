@@ -291,8 +291,10 @@ dependencies = [
  "async-trait",
  "audit",
  "chrono",
+ "runtime-migration",
  "serde_json",
  "sqlx",
+ "tokio",
  "uuid",
 ]
 
@@ -303,8 +305,10 @@ dependencies = [
  "async-trait",
  "audit",
  "chrono",
+ "document-sqlite",
  "serde_json",
  "sqlx",
+ "tokio",
  "uuid",
 ]
 
@@ -946,6 +950,7 @@ dependencies = [
 name = "business-module-contracts"
 version = "0.1.0"
 dependencies = [
+ "semver",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -1579,12 +1584,15 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "audit",
+ "audit-sqlite",
  "chrono",
  "document",
  "document-persistence-contracts",
+ "document-processing-sqlite",
  "serde_json",
  "sqlx",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -1968,6 +1976,7 @@ dependencies = [
  "document-processing-postgres",
  "document-processing-sqlite",
  "document-sqlite",
+ "observability",
  "runtime-governance",
  "runtime-governance-postgres",
  "runtime-governance-sqlite",
@@ -2840,6 +2849,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "module-release-tool"
+version = "0.1.0"
+dependencies = [
+ "business-application-compiler",
+ "business-module-contracts",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "multer"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2985,6 +3007,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
+ "aws-smithy-runtime-api",
  "aws-smithy-types",
  "bytes",
  "chrono",
@@ -2992,6 +3015,7 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "observability",
  "reqwest",
  "serde",
  "serde_json",
@@ -3001,6 +3025,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

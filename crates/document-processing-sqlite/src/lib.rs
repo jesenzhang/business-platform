@@ -2118,6 +2118,15 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
                 now,
             )
             .await?;
+            insert_processing_audit(
+                &mut connection,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"step": completed_step.as_str()}),
+                now,
+            )
+            .await?;
             commit_immediate(&mut connection).await?;
             return Ok(job);
         }
@@ -2258,6 +2267,17 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
+        if job.status() == ProcessingJobStatus::Cancelled {
+            insert_processing_audit(
+                &mut connection,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"step": step.as_str()}),
+                now,
+            )
+            .await?;
+        }
         commit_immediate(&mut connection).await?;
         Ok(job)
     }
@@ -2557,6 +2577,17 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
             now,
         )
         .await?;
+        if status == "cancelled" {
+            insert_processing_audit(
+                &mut connection,
+                &job,
+                "processing_cancelled",
+                None,
+                serde_json::json!({"task_id": task_id}),
+                now,
+            )
+            .await?;
+        }
         let updated = load_ai_task_for_update(&mut connection, tenant_id, task_id)
             .await?
             .ok_or(ProcessingRepositoryError::NotFound)?;
@@ -2808,23 +2839,39 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
                 .map_err(map_sql_error)?;
         }
         save_job_without_fence(&mut connection, &job, expected).await?;
-        insert_processing_outbox(
-            &mut connection,
-            &job,
-            "document.processing.cancelled.v1",
-            serde_json::json!({"requested_by": requested_by}),
-            now,
-        )
-        .await?;
+        // Cancellation is cooperative: the request is an intent and must only
+        // be audited (AGENTS.md §9, WORKFLOW baseline §13). The cancelled.v1
+        // fact event and fact audit are written only when this call is the
+        // transition into Cancelled; every other path (step boundary,
+        // cancelled disposition, reclaim, AI failure) owns that emission.
         insert_processing_audit(
             &mut connection,
             &job,
-            "processing_cancelled",
+            "processing_cancel_requested",
             Some(requested_by),
             serde_json::json!({}),
             now,
         )
         .await?;
+        if job.status() == ProcessingJobStatus::Cancelled {
+            insert_processing_outbox(
+                &mut connection,
+                &job,
+                "document.processing.cancelled.v1",
+                serde_json::json!({"requested_by": requested_by}),
+                now,
+            )
+            .await?;
+            insert_processing_audit(
+                &mut connection,
+                &job,
+                "processing_cancelled",
+                Some(requested_by),
+                serde_json::json!({}),
+                now,
+            )
+            .await?;
+        }
         commit_immediate(&mut connection).await?;
         Ok(job)
     }
@@ -2936,6 +2983,28 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
                     now,
                 )
                 .await?;
+                // Cancel-priority reclaim lands the job in Cancelled; that
+                // transition is a fact and must not stay silent (baseline
+                // §13 and §18 recovery scan).
+                if job.status() == ProcessingJobStatus::Cancelled {
+                    insert_processing_outbox(
+                        &mut connection,
+                        &job,
+                        "document.processing.cancelled.v1",
+                        serde_json::json!({}),
+                        now,
+                    )
+                    .await?;
+                    insert_processing_audit(
+                        &mut connection,
+                        &job,
+                        "processing_cancelled",
+                        None,
+                        serde_json::json!({}),
+                        now,
+                    )
+                    .await?;
+                }
                 reclaimed = reclaimed.saturating_add(1);
             }
         }

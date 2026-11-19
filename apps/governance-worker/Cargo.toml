@@ -16,6 +16,7 @@ audit-sqlite = { workspace = true }
 chrono = { workspace = true }
 data-integrity = { workspace = true }
 data-repair = { workspace = true }
+observability = { workspace = true }
 document-processing-sqlite = { workspace = true }
 document-processing-postgres = { workspace = true }
 runtime-governance = { workspace = true }

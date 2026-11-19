@@ -1,0 +1,212 @@
+# gate: 34-test-module-release-tool
+# command: rtk proxy cargo test -p module-release-tool --all-features
+# started: 2026-09-30 17:22:25 +08:00
+# finished: 2026-09-30 17:27:46 +08:00
+# duration-seconds: 322
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrrqhotii-0v9iaik-working`
+
+   Compiling module-release-tool v0.1.0 (F:\Workspace\business-platform\tools\module-release-tool)
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrrqk9djc-0l20r6z-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\wave5b_catalog-21k64cmnijcwc\s-hmrrr2dfzt-1vq5exd-working`
+
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+warning: `module-release-tool` (test "wave5b_catalog") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-3qt5uabwus0qo\s-hmrruque66-09xnpww-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\provenance-19s15hxt0gako\s-hmrruqrp63-138f80f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\canonical-01a8lqkws19ng\s-hmrruqttiz-1bfifgj-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\compatibility-1yf2svvphpepe\s-hmrruqu3eq-0l08yuo-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\pilot_candidates-17morry0j3icf\s-hmrruqrp5p-17sw3c8-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\packaging-06j01hx90jg34\s-hmrruque5d-1p9y3mt-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-14l42orqvxurs\s-hmrruqouq7-0352y88-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\isolation-0imtupn5t8b97\s-hmrruque6n-1xwb0pi-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\verification_guards-3g46w1n7hwqdh\s-hmrruque78-1dryvhu-working`
+
+warning: `module-release-tool` (bin "module-release-tool" test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\source_derivation-0dr5t41vrrxik\s-hmrruqsnnt-170q97j-working`
+
+warning: `module-release-tool` (test "provenance") generated 1 warning
+warning: `module-release-tool` (test "canonical") generated 1 warning
+warning: `module-release-tool` (test "compatibility") generated 1 warning
+warning: `module-release-tool` (test "packaging") generated 1 warning
+warning: `module-release-tool` (test "isolation") generated 1 warning
+warning: `module-release-tool` (test "pilot_candidates") generated 1 warning
+warning: `module-release-tool` (test "verification_guards") generated 1 warning
+warning: `module-release-tool` (lib test) generated 1 warning
+warning: `module-release-tool` (test "source_derivation") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.51s
+     Running unittests src\lib.rs (target\debug\deps\module_release_tool-a5af253f8e365c0c.exe)
+
+running 4 tests
+test canonical::tests::crlf_and_lone_cr_fold_to_single_lf ... ok
+test canonical::tests::member_paths_reject_host_and_traversal_forms ... ok
+test canonical::tests::digest_changes_when_a_path_or_a_byte_changes ... ok
+test canonical::tests::migration_set_digest_is_backend_ordered_and_namespace_bound ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\module_release_tool-cd59f6545d27a8b9.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\canonical.rs (target\debug\deps\canonical-14d95af3bf465612.exe)
+
+running 5 tests
+test member_paths_must_be_relative_posix_paths_without_dot_components ... ok
+test normalisation_rejects_binary_content_and_strips_a_byte_order_mark ... ok
+test digest_reacts_to_one_content_byte_and_to_a_path_change ... ok
+test digest_ignores_line_endings_and_a_missing_trailing_newline ... ok
+test inventory_is_ordered_by_path_bytes_and_not_by_walk_order ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests\compatibility.rs (target\debug\deps\compatibility-2cafe3db0109e842.exe)
+
+running 8 tests
+test the_caret_range_a_reader_would_reach_for_does_not_cover_this_prerelease ... ok
+test an_unknown_dependency_is_refused ... ok
+test a_platform_outside_the_declared_window_is_refused ... ok
+test a_downgrade_is_refused ... ok
+test a_fresh_installation_of_the_candidate_plans_add_module_with_the_pinned_digest ... ok
+test an_earlier_revision_of_the_same_contract_upgrades_in_place ... ok
+test an_unsatisfiable_dependency_range_is_refused ... ok
+test only_a_change_to_the_published_contract_moves_the_contract_digest ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+
+     Running tests\isolation.rs (target\debug\deps\isolation-2ef354a68bf72633.exe)
+
+running 8 tests
+test a_transitive_path_dependency_into_the_repository_is_refused ... ok
+test a_consumer_building_inside_another_workspace_is_refused ... ok
+test a_consumer_that_resolves_only_into_itself_and_the_artifact_passes ... ok
+test a_path_dependency_into_the_source_repository_is_refused ... ok
+test a_relative_path_escaping_into_the_repository_is_refused ... ok
+test a_path_that_cannot_be_resolved_is_refused_rather_than_assumed_safe ... ok
+test a_local_package_outside_every_declared_root_is_refused ... ok
+test containment_is_decided_on_a_path_boundary_not_a_string_prefix ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s
+
+     Running tests\packaging.rs (target\debug\deps\packaging-d2da3f164f7ab7b6.exe)
+
+running 3 tests
+test payload_carries_no_host_path_host_identity_or_generation_timestamp ... ok
+test members_outside_the_digest_are_declared_not_silently_ignored ... ok
+test regenerating_into_two_directories_yields_identical_candidates ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 50.93s
+
+     Running tests\pilot_candidates.rs (target\debug\deps\pilot_candidates-b3f04738aab911e7.exe)
+
+running 10 tests
+test a_stateless_module_pins_no_migration_revision ... ok
+test a_migration_claim_that_the_catalog_does_not_support_is_refused ... ok
+test the_migration_mapping_equals_the_formal_catalog ... ok
+test a_wrong_module_id_in_the_pinned_identity_is_refused ... ok
+test a_wrong_module_version_in_the_pinned_identity_is_refused ... ok
+test removing_one_payload_member_breaks_the_artifact ... ok
+test changing_one_packed_source_breaks_the_artifact ... ok
+test a_tampered_migration_mapping_is_refused ... ok
+test the_identity_consistency_gate_refuses_every_single_field_mismatch ... ok
+test every_pilot_candidate_verifies_against_the_repository_and_traces_its_revision ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 50.51s
+
+     Running tests\provenance.rs (target\debug\deps\provenance-b8032fc7a325910d.exe)
+
+running 6 tests
+test a_pinned_revision_must_be_a_real_commit_object ... ok
+test an_input_the_pinned_commit_does_not_contain_is_refused ... ok
+test a_blob_is_committed_content_not_working_tree_content ... ok
+test an_input_modified_but_never_committed_is_refused ... ok
+test committed_inputs_match_and_the_check_reports_what_it_compared ... ok
+test a_detached_head_and_a_linked_worktree_mean_the_same_commit_as_git ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.65s
+
+     Running tests\source_derivation.rs (target\debug\deps\source_derivation-1366d6016d00281e.exe)
+
+running 9 tests
+test generating_from_a_checkout_with_an_uncommitted_source_file_is_refused ... ok
+test generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused ... ok
+test a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback ... ok
+test a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move ... ok
+test a_candidate_missing_a_committed_source_member_is_refused_after_rehashing ... ok
+test a_candidate_with_an_extra_source_member_is_refused_after_rehashing ... ok
+test a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent ... ok
+test a_packed_dependency_bump_is_refused_for_every_pilot_module has been running for over 60 seconds
+test a_packed_manifest_the_pinned_commit_cannot_produce_is_refused has been running for over 60 seconds
+test a_packed_manifest_the_pinned_commit_cannot_produce_is_refused ... ok
+test a_packed_dependency_bump_is_refused_for_every_pilot_module ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 74.95s
+
+     Running tests\verification_guards.rs (target\debug\deps\verification_guards-16769f1209b6d5b7.exe)
+
+running 8 tests
+test a_pinned_source_revision_that_is_not_a_real_commit_is_refused ... ok
+test the_pinned_revision_must_actually_contain_the_inputs_it_claims ... ok
+test compare_reads_the_real_payload_of_the_left_side ... ok
+test compare_reads_the_real_payload_of_the_right_side ... ok
+test two_independent_candidates_still_compare_identical ... ok
+test an_unknown_artifact_record_schema_or_algorithm_is_refused has been running for over 60 seconds
+test the_bundle_crate_bindings_must_match_the_packed_cargo_manifests has been running for over 60 seconds
+test the_descriptive_records_must_describe_one_module_and_version has been running for over 60 seconds
+test the_bundle_crate_bindings_must_match_the_packed_cargo_manifests ... ok
+test an_unknown_artifact_record_schema_or_algorithm_is_refused ... ok
+test the_descriptive_records_must_describe_one_module_and_version ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 114.83s
+
+     Running tests\wave5b_catalog.rs (target\debug\deps\wave5b_catalog-bdd8b303089467b9.exe)
+
+running 19 tests
+test dependency_grammar_is_fixed_and_does_not_guess ... ok
+test host_table_ownership_is_unique_and_inside_the_authoritative_contexts ... ok
+test the_default_gate_excludes_the_candidate_freeze ... ok
+test unattributable_sql_forms_are_refused_by_name ... ok
+test migration_019_is_not_a_module_catalog ... ok
+test the_attribution_table_is_migration_019_itself ... ok
+test the_embedded_pinned_table_is_the_checked_in_fixture ... ok
+test the_conformance_tests_do_not_embed_a_second_baseline ... ok
+test no_fixture_directory_is_left_uncovered ... ok
+test the_freeze_only_counts_the_flat_baseline ... ok
+test a_new_namespace_digest_is_canonical_lf_only ... ok
+test a_git_object_id_is_never_a_content_digest ... ok
+warning: in the working copy of 'migrations/001_initial.sql', LF will be replaced by CRLF the next time Git touches it
+test a_repository_without_the_pinned_commit_is_refused_without_a_fallback ... ok
+test exactly_one_file_embeds_the_host_baseline_catalog ... ok
+test every_shared_fixture_case_produces_the_recorded_verdict ... ok
+test the_seven_c1_entries_are_pinned_by_blob_even_though_the_manifest_is_crlf ... ok
+test every_pinned_entry_is_the_blob_of_the_pinned_commit ... ok
+test head_and_index_still_hold_the_pinned_baseline ... ok
+test the_repository_itself_passes_the_default_checks ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.20s
+
+   Doc-tests module_release_tool
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

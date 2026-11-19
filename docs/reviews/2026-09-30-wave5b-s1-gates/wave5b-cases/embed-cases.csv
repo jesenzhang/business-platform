@@ -1,0 +1,8 @@
+"Case","Expect","Actual","Verdict","Detail"
+"E1-working-tree","pass","pass","MATCH","embed scanned_rs_files=261 baseline_embed_points=1 crate_relative_embeds=2"
+"E2-second-baseline-embed","fail","fail","MATCH","module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/messaging/src/second_embed.rs':1, 'crates/runtime-migration/src/lib.rs':6); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'"
+"E3-non-literal-argument","fail","fail","MATCH","module-release: refused by the [baseline-embed] check: the 'migrate' macro in 'crates/messaging/src/second_embed.rs:1' does not have a plain string literal as its only argument"
+"E4-embed-leaves-owning-crate","fail","fail","MATCH","module-release: refused by the [baseline-embed] check: the embed at 'crates/runtime-migration/src/lib.rs:6' names '../document-sqlite/migrations', which resolves to '\\?\F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree\crates\document-sqlite\migrations' and leaves the owning crate '\\?\F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree\crates\runtime-migration'; only the host baseline and a crate's own migration directory may be embedded"
+"E4b-baseline-embed-missing","fail","fail","MATCH","module-release: refused by the [baseline-embed] check: no file embeds the host baseline catalog; the single embed point 'crates/runtime-migration/src/lib.rs' is missing, so the platform would silently lose its migrations"
+"E5-outbox_reliability.rs","pass","pass","MATCH","applies the baseline through runtime_migration::MIGRATOR"
+"E5-chain_pg.rs","pass","pass","MATCH","applies the baseline through runtime_migration::MIGRATOR"

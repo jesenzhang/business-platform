@@ -1,0 +1,1 @@
+DELETE FROM public.wave5b_fixture_policy_t1;

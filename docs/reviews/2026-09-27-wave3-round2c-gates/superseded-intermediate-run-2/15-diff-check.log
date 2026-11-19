@@ -1,0 +1,10 @@
+== git diff --check ==
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/audit-postgres/tests/chain_pg.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'crates/document-sqlite/tests/operational.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture/ARCHITECTURE_STATUS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/plans/current/PLAN-0014-reference-conformance-and-r2-module-readiness.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/reviews/2026-09-27-saas-align-audit-messaging.md', LF will be replaced by CRLF the next time Git touches it
+
+EXIT_CODE=0
+

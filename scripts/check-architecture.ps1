@@ -242,6 +242,210 @@ foreach ($field in $requiredManifestFields) {
     }
 }
 
+# PLAN-0014 Wave 2: the canonical module release identity contract must stay
+# pinned to the SAAS_MODULE_STANDARD release identity surface, and the generic
+# compiler must expose the canonical contract digest seam used to assemble it.
+$requiredReleaseIdentityMembers = @(
+    "ModuleReleaseIdentity", "MODULE_RELEASE_IDENTITY_SCHEMA_VERSION",
+    "module_id", "module_version", "manifest_schema_version",
+    "source_revision", "contract_digest", "package_digest",
+    "migration_revision", "build_toolchain",
+    "ModuleReleaseBundle", "crate_versions"
+)
+foreach ($member in $requiredReleaseIdentityMembers) {
+    if ($moduleManifestSource -notmatch [regex]::Escape($member)) {
+        throw "Module release identity member is missing: $member"
+    }
+}
+if ($businessApplicationCompilerSource -notmatch 'pub fn contract_digest') {
+    throw "business-application-compiler must expose the canonical contract digest seam"
+}
+if ($businessApplicationCompilerSource -notmatch 'pub fn package_fingerprint') {
+    throw "business-application-compiler must expose the compiled package fingerprint seam"
+}
+if ($businessApplicationCompilerSource -notmatch 'pub fn verify_release_identity') {
+    throw "business-application-compiler must expose the release identity consistency verification seam"
+}
+
+# PLAN-0014 Wave 5A boundaries. The release-candidate tool assembles and verifies
+# local artifacts; it must do that by reusing the pure seams above, never by
+# widening them, reaching into business crates / adapters / applications, or
+# letting the host environment into a digest.
+$releaseToolCargo = Get-Content -Raw (Join-Path $root "tools/module-release-tool/Cargo.toml")
+foreach ($forbidden in @(
+    "apps/", "runtime-migration", "identity-sqlite", "policy-sqlite",
+    "document", "sqlx", "axum", "tokio", "reqwest", "tracing", "object-storage"
+)) {
+    if ($releaseToolCargo -match [regex]::Escape($forbidden)) {
+        throw "module-release-tool must not depend on '$forbidden'"
+    }
+}
+foreach ($required in @("business-module-contracts", "business-application-compiler")) {
+    if ($releaseToolCargo -notmatch [regex]::Escape($required)) {
+        throw "module-release-tool must reuse the '$required' seam instead of re-deriving digests"
+    }
+}
+Assert-NotContains "tools/module-release-tool/src" @(
+    "SystemTime",
+    "Instant::now",
+    "chrono",
+    "COMPUTERNAME",
+    "gethostname",
+    "localtime"
+) "module release tool host-dependency violation (a release digest may not depend on the clock, the host or a subprocess)"
+# Deliberate, narrowed exception (PLAN-0014 Wave 5A repair 1, review F1): source
+# provenance has to be answered by Git, not by re-implementing `.git/HEAD`,
+# `refs/` and `packed-refs`, because a hand-written reader silently disagrees with
+# Git for a linked worktree, a detached HEAD or a ref store it does not know.
+# So exactly one file may spawn anything, it may spawn exactly one program, and it
+# may only pass arguments as an array — never a shell command line.
+foreach ($toolSource in Get-ChildItem -Path (Join-Path $root "tools/module-release-tool/src") -Filter '*.rs' -File) {
+    $text = Get-Content -Raw $toolSource.FullName
+    if (($text -match 'std::process::Command' -or $text -match 'Command::new\(') -and $toolSource.Name -ne 'git.rs') {
+        throw "only tools/module-release-tool/src/git.rs may spawn a process; '$($toolSource.Name)' does"
+    }
+    if ($text -match 'std::fs::remove_dir_all' -and $toolSource.Name -ne 'tempdir.rs') {
+        throw "only the tempdir helper may delete a directory tree; '$($toolSource.Name)' does"
+    }
+}
+$gitSource = Get-Content -Raw (Join-Path $root "tools/module-release-tool/src/git.rs")
+foreach ($spawned in @('Command::new("cmd")', 'Command::new("powershell")', 'Command::new("pwsh")', 'Command::new("sh")')) {
+    if ($gitSource -match [regex]::Escape($spawned)) {
+        throw "provenance must not invoke a shell: '$spawned'"
+    }
+}
+if ($gitSource -notmatch 'Command::new\("git"\)') {
+    throw 'provenance may only spawn git, as Command::new("git")'
+}
+if ($gitSource -notmatch 'args\(' -or $gitSource -notmatch '--no-optional-locks') {
+    throw "the git invocation must pass an argument array and --no-optional-locks (read-only, no lock files)"
+}
+if ($gitSource -notmatch 'fn blob' -or $gitSource -notmatch 'cat-file') {
+    throw "provenance must read committed content through git (`cat-file blob`), not through the working tree"
+}
+# Repair 2 (review §5.3.1/§5.4.4): the member set has to come from the commit tree,
+# so the listing is a Git call too — `ls-tree -r -z`, where `-z` is what keeps a path
+# containing whitespace from being re-parsed into two members. `git show` is refused
+# on purpose: it fuses "which path" with "what bytes" into a human-readable dump and
+# has no way to say which of the two it is answering.
+if ($gitSource -notmatch 'ls-tree' -or $gitSource -notmatch '"-r"' -or $gitSource -notmatch '"-z"') {
+    throw "the committed member set must be listed by git (`ls-tree -r -z`), not by walking a directory"
+}
+if ($gitSource -match '"show"' -or $gitSource -match "'show'") {
+    throw "git show mixes the member listing and the blob into one dump; use ls-tree for members and cat-file for bytes"
+}
+# Repair 2: a candidate's inputs are read through one type, and a tree entry that is
+# not a plain file — a symlink (120000) or a submodule gitlink (160000) — has to be
+# refused there rather than packed.
+$commitSourcePath = Join-Path $root "tools/module-release-tool/src/commit.rs"
+if (-not (Test-Path -LiteralPath $commitSourcePath)) {
+    throw 'tools/module-release-tool/src/commit.rs must own the fixed-commit input view'
+}
+$commitSource = Get-Content -Raw $commitSourcePath
+foreach ($mode in @('120000', '160000')) {
+    if ($commitSource -notmatch $mode) {
+        throw "the commit input view must refuse mode $mode entries (symbolic link or submodule) instead of packing them"
+    }
+}
+# The wave must not have made the pure crates impure in the direction of this
+# repository: they may not learn the tool's name, spawn processes or read time.
+foreach ($pureCrate in @("crates/business-module-contracts/src", "crates/business-application-compiler/src")) {
+    Assert-NotContains $pureCrate @(
+        "module-release-tool",
+        "std::process",
+        "SystemTime",
+        "Instant::now"
+    ) "PLAN-0014 Wave 5A purity violation in $pureCrate"
+}
+# The consumer templates are deliberately outside the workspace member set, and
+# may only ever point at an artifact directory substituted by the script.
+$workspaceCargo = Get-Content -Raw (Join-Path $root "Cargo.toml")
+if ($workspaceCargo -notmatch 'tools/module-release-tool/consumers') {
+    throw "the workspace must exclude tools/module-release-tool/consumers from its member set"
+}
+foreach ($pilotModule in @("identity", "policy")) {
+    $consumerManifestPath = Join-Path $root "tools/module-release-tool/consumers/$pilotModule/Cargo.toml"
+    if (-not (Test-Path $consumerManifestPath)) {
+        throw "Missing Wave 5A consumer template for '$pilotModule'"
+    }
+    $consumerManifest = Get-Content -Raw $consumerManifestPath
+    if ($consumerManifest -notmatch '(?m)^\[workspace\]') {
+        throw "Wave 5A consumer '$pilotModule' must carry its own empty [workspace] table"
+    }
+    if ($consumerManifest -match '\.\./') {
+        throw "Wave 5A consumer '$pilotModule' must not use a relative path into the workspace"
+    }
+    $pathLines = @($consumerManifest -split "`n" | Where-Object { $_ -match 'path\s*=' })
+    if ($pathLines.Count -ne 1 -or $pathLines[0] -notmatch '__ARTIFACT_CRATE_DIR__') {
+        throw "Wave 5A consumer '$pilotModule' must depend on exactly the artifact directory placeholder"
+    }
+    $consumerTest = Join-Path $root "tools/module-release-tool/consumers/$pilotModule/tests/public_contract.rs"
+    if (-not (Test-Path $consumerTest)) {
+        throw "Wave 5A consumer '$pilotModule' must actually call a published contract"
+    }
+}
+# Consumer isolation is decided by the resolved dependency graph, in exactly one
+# place: `module-release guard` (tools/module-release-tool/src/isolation.rs), fed
+# by `cargo metadata`. A PowerShell-side approximation — searching a manifest or a
+# lock file for a path — was the Wave 5A defect (review F4): it missed a
+# forward-slash path, a relative path and any transitive path dependency. The
+# orchestration script therefore has to delegate, and may not keep its own rule.
+$wave5aScriptFiles = @(
+    "scripts/plan0014-wave5a.ps1",
+    "scripts/lib/plan0014-wave5a-lib.ps1",
+    "scripts/test-plan0014-wave5a.ps1"
+)
+foreach ($wave5aScriptFile in $wave5aScriptFiles) {
+    $wave5aScriptPath = Join-Path $root $wave5aScriptFile
+    if (-not (Test-Path $wave5aScriptPath)) {
+        throw "Missing Wave 5A orchestration file: $wave5aScriptFile"
+    }
+}
+$wave5aScript = ''
+foreach ($wave5aScriptFile in @("scripts/plan0014-wave5a.ps1", "scripts/lib/plan0014-wave5a-lib.ps1")) {
+    $wave5aScript += Get-Content -Raw (Join-Path $root $wave5aScriptFile)
+}
+if ($wave5aScript -notmatch "'metadata'" -or $wave5aScript -notmatch "'--format-version'" -or $wave5aScript -notmatch "'--locked'" -or $wave5aScript -notmatch "'--offline'") {
+    throw "the Wave 5A orchestration must resolve the consumer graph with cargo metadata (--format-version 1 --locked --offline)"
+}
+if ($wave5aScript -notmatch "'guard'" -or $wave5aScript -notmatch "'--metadata'") {
+    throw "the Wave 5A orchestration must judge isolation through 'module-release guard --metadata …'"
+}
+foreach ($ownRule in @('-like\s*"\$\{?repo', '\.StartsWith\(', 'Select-String.*Cargo\.lock')) {
+    if ($wave5aScript -match $ownRule) {
+        throw "the Wave 5A orchestration re-implements path containment ('/$ownRule'); isolation belongs in tools/module-release-tool/src/isolation.rs"
+    }
+}
+# Pilot declarations: one file per module, ids that agree with the file name, a
+# module version of its own (never the platform version), and persistence that
+# agrees with the migration sets it declares.
+$platformVersion = $null
+if ($workspaceCargo -match '(?ms)\[workspace\.package\].*?^version\s*=\s*"([^"]+)"') {
+    $platformVersion = $Matches[1]
+}
+if (-not $platformVersion) {
+    throw "Architecture fitness could not read the platform version from the workspace manifest"
+}
+foreach ($pilotModule in @("identity", "policy")) {
+    $specPath = Join-Path $root "tools/module-release-tool/specs/$pilotModule.json"
+    if (-not (Test-Path $specPath)) {
+        throw "Missing Wave 5A release declaration: tools/module-release-tool/specs/$pilotModule.json"
+    }
+    $declaration = Get-Content -Raw $specPath | ConvertFrom-Json
+    if ($declaration.module_id -ne $pilotModule) {
+        throw "Release declaration '$pilotModule' declares module_id '$($declaration.module_id)'"
+    }
+    if ($declaration.module_version -eq $platformVersion) {
+        throw "Release declaration '$pilotModule' must carry its own version, not the platform version"
+    }
+    if ([bool]$declaration.persistent -ne ($declaration.migration_sets.Count -gt 0)) {
+        throw "Release declaration '$pilotModule' claims persistence without migration sets, or the reverse"
+    }
+    if ($declaration.persistent -and -not $declaration.migration_namespace) {
+        throw "Release declaration '$pilotModule' is persistent but declares no migration namespace"
+    }
+}
+
 $semanticSource = @(Get-ChildItem (Join-Path $root "crates/semantic-contract/src") -Recurse -File | ForEach-Object {
     Get-Content -Raw $_.FullName
 }) -join [Environment]::NewLine
@@ -569,6 +773,78 @@ Assert-SourceScan -Label "Authorization-server scan" `
 Assert-SourceScan -Label "Policy DSL scan" `
     -Directories @("crates/policy/src") `
     -Patterns @("parse_expression", "evaluate_expression", "Expression\s*\{")
+
+# PLAN-0014 Wave 5B-S1 (review §3.8): the offline catalog gate is an
+# architecture assertion, not a release step. `catalog-check` with its default
+# checks (module catalog, pinned baseline history, single baseline embed point)
+# reads nothing but this checkout and never opens a database. The candidate
+# freeze is deliberately excluded until ADR-0029 is accepted.
+Push-Location $root
+try {
+    cargo run -q -p module-release-tool -- catalog-check --repo $root
+    if ($LASTEXITCODE -ne 0) {
+        throw "Wave 5B-S1 offline catalog gate failed (exit $LASTEXITCODE)"
+    }
+} finally {
+    Pop-Location
+}
+
+# A new namespace manifest records exactly one digest: SHA-256 over the file
+# with CRLF folded to LF. The historical baseline keeps its three-form
+# compatibility through the migration-manifest assertion above; that tolerance
+# must not leak into a module catalog (review §2 C1). This is a separate
+# assertion on purpose — the historical rule is never reused for new catalogs.
+function Assert-ModuleManifestCanonicalLf([string]$RelativeDirectory) {
+    $directory = Join-Path $root $RelativeDirectory
+    if (-not (Test-Path -LiteralPath $directory)) {
+        throw "Wave 5B manifest scan: $RelativeDirectory is missing"
+    }
+    Get-ChildItem -LiteralPath $directory -Directory | ForEach-Object {
+        $namespace = $_.Name
+        $manifestPath = Join-Path $_.FullName 'MANIFEST.sha256'
+        if (-not (Test-Path -LiteralPath $manifestPath)) {
+            Write-Output "  namespace ${namespace}: 0 migrations (RESERVED)"
+            return
+        }
+        $manifestBytes = [System.IO.File]::ReadAllBytes($manifestPath)
+        if ($manifestBytes -contains 0x0D) {
+            throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/MANIFEST.sha256 holds a CR byte; a namespace manifest is LF-only"
+        }
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            foreach ($line in [System.Text.Encoding]::UTF8.GetString($manifestBytes) -split "`n") {
+                if ([string]::IsNullOrWhiteSpace($line)) {
+                    continue
+                }
+                $fields = -split $line
+                if ($fields.Count -ne 2) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/MANIFEST.sha256 line '$line' is not '<digest>  <file>'"
+                }
+                $sqlPath = Join-Path $_.FullName $fields[1]
+                if (-not (Test-Path -LiteralPath $sqlPath)) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/$($fields[1]) is listed but missing"
+                }
+                $sqlBytes = [System.IO.File]::ReadAllBytes($sqlPath)
+                $lfBytes = [System.Collections.Generic.List[byte]]::new()
+                for ($index = 0; $index -lt $sqlBytes.Length; $index++) {
+                    if ($sqlBytes[$index] -eq 0x0D -and $index + 1 -lt $sqlBytes.Length -and $sqlBytes[$index + 1] -eq 0x0A) {
+                        continue
+                    }
+                    $lfBytes.Add($sqlBytes[$index])
+                }
+                $actual = ([System.BitConverter]::ToString($sha.ComputeHash([byte[]]$lfBytes.ToArray())) -replace '-', '').ToLowerInvariant()
+                if ($actual -ne $fields[0]) {
+                    throw "Wave 5B manifest scan: $RelativeDirectory/$namespace/$($fields[1]) digest mismatch; a namespace manifest records the canonical LF digest only (no CRLF fallback)"
+                }
+            }
+        } finally {
+            $sha.Dispose()
+        }
+        Write-Output "  namespace ${namespace}: manifest verified against the canonical LF digests"
+    }
+}
+
+Assert-ModuleManifestCanonicalLf 'migrations/modules'
 
 Write-Output "Architecture fitness: PASS"
 exit 0

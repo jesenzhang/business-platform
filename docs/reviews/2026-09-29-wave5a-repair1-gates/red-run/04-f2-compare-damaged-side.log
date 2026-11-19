@@ -1,0 +1,9 @@
+
+=== 04-f2-compare-damaged-side ===
+$ F:\wave5a-red-8036bc65\target\debug\module-release-tool.exe compare --left F:\wave5a-red-8036bc65\red-out\identity-0.1.0-rc.1 --right F:\Workspace\business-platform\docs\reviews\2026-09-29-wave5a-repair1-gates\red-run\cases\f2-damaged-right
+status=identical
+left=F:\wave5a-red-8036bc65\red-out\identity-0.1.0-rc.1
+right=F:\Workspace\business-platform\docs\reviews\2026-09-29-wave5a-repair1-gates\red-run\cases\f2-damaged-right
+left_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+right_digest=68deba81c942aaf624f599cd191ef6b09855438b99035cca7010ae4b7d9cc700
+exit code : 0

@@ -1,0 +1,7 @@
+title      : release-bundle.json binds a crate the payload does not ship
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n08-bundle-crate-name\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075939Z
+module-release: artifact verification failed [packed-crate-bindings]: release-bundle.json binds crate 'identity-renamed' at version '0.1.0-rc.1' but the payload ships no such crate manifest
+
+exit code : 1 (expected 1)

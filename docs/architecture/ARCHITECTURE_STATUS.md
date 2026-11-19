@@ -1,7 +1,7 @@
 # 架构实施状态
 
 > 文档类型：Living Document
-> 最后更新：2026-09-23
+> 最后更新：2026-09-27
 > 当前阶段：Enterprise AI SaaS Platform Baseline 已对齐；PLAN-0014 Reference Conformance / R2 Readiness Active；Contract 真实垂直切片仍是下一主要业务实现
 > 当前计划：PLAN-0014 Reference Conformance / R2 Readiness Active（review-first，2026-09-23→2026-10-23）；Contract Business Vertical Slice 仍是下一主要业务代码计划；PLAN-0006 Revision 1 Proposed / BLOCKED
 > 集成方式：GitHub PR merge
@@ -603,3 +603,405 @@ Revision/Evidence、Business Application Contract 和 Business Console 的真实
 > 分离；外部 SaaS 基础设施只通过 Port/Contract 作为 provider。Backend Manifest、Server Architecture、
 > Bounded Context Map、Business Application Platform、Code Architecture、Deployment Architecture 与
 > Architecture Fitness 已同步。本轮 docs-only，不修改 Rust、migration、OpenAPI、数据库或运行拓扑。
+
+> 2026-09-23: PLAN-0014 Wave 0/1 在分支
+> `feat/PLAN-0014-wave1-iam-policy-reference-conformance` 基于同步后的
+> `8365de0211390a6a3367b536c5ceaa5256bbb5cf` 完成 Identity / Organization / Policy
+> 的源码、测试、migration、API 与架构基线重建，以及固定版本的外部参考对齐。审阅记录见
+> `docs/reviews/2026-09-23-plan-0014-wave0-iam-policy-baseline.md` 与
+> `docs/reviews/2026-09-23-saas-align-identity-organization-policy.md`。当前实现判定为
+> R1 foundation；本轮未发现 C0，C1 以 R2 独立发布证据与真实 PostgreSQL/发布闭环不足为阻断，
+> 过期/撤销生命周期、service identity 与通用 ReBAC 保留为 C2/C3。SQLite shared contract
+> 验证已通过；完整 Business API、PostgreSQL、workspace 与独立 reviewer 状态以 formal review
+> 的逐项证据为准。本轮仍为 docs-only，不修改 Rust、migration、OpenAPI、provider runtime，
+> 不启动 Wave 2。
+
+> 2026-09-24 closeout: PLAN-0014 Wave 1 独立只读审阅对 Base
+> `8365de0211390a6a3367b536c5ceaa5256bbb5cf` → Candidate
+> `c7dc3d142a526b47e9ba8e472b82346ffdaed221` 给出 `PASS WITH C2/C3`，未发现证据支持的
+> C0/C1 correctness 或 tenant-isolation blocker。审阅确认的 C2 已记录为 G-09：组织成员
+> roster 移除不能单独证明另一条 Policy RoleBinding 已撤销。Identity / Organization /
+> Policy 继续为 R1 foundation；R2 因独立发布契约及当前 PostgreSQL 证据不足保持 BLOCKED。
+> 详见 formal review；本次只更新审阅状态文档。
+
+> 2026-09-24: PLAN-0014 Wave 2 Business Module Packaging reference conformance 在分支
+> `feat/PLAN-0014-wave2-business-module-packaging-conformance`（Base
+> `5d3d2eb5cfe93aad6f8c5fe4d023d386d0a08b04`，未 push、未合并）完成：固定 ABP 10.6.1、
+> Frappe v16.35.0、ERPNext v16.36.0、Odoo 19.0、Twenty v2.9.0 的 commit 级参考并按源码
+> 取证（Round 2 校准：`TwentyCoreModule`/`serverVersionRange`/`ApplicationActivation`
+> 从未出现在 ADR-0021 原文，NOT FOUND 仅为本记录自身取证的标识校准；ADR-0021 的
+> "required server version range" 兼容窗口结论经 v2.9.0 证据证实仍成立，Accepted ADR
+> 未修改）。canonical
+> module release identity（`module-release.identity.v1` 八字段 + `ModuleReleaseBundle`）
+> 与 compiler canonical `contract_digest` seam 落地为纯值契约并有测试与 fitness 守卫；
+> 复用 `BusinessModuleManifest` 为唯一声明，未建第二 manifest、未新增运行时或部署单元。
+> R2 packaging acceptance 12 条均有可执行入口（本轮可运行 9 条 PASS；PostgreSQL lane、
+> release 工件构建、workspace 外独立消费者构建记 NOT RUN，归 Wave 5 fixture）。Wave 2
+> 三个 exit 判定 MET。gap registry：C0=0；C1×3（G-201 契约层已关闭；G-202 独立发布工件
+> 与外部消费者证据缺失 = R2 BLOCKER；G-203 迁移命名空间未落物理隔离）；C2×3（含继承
+> Wave 1 的 G-09 原样保留）。`business-module-contracts`/`business-application-compiler`
+> 与 Identity/Organization/Policy 一律维持 R1 / R2 BLOCKED / NOT CLAIMED。审阅记录
+> `docs/reviews/2026-09-24-saas-align-module-packaging.md`。
+> Round 2 修复（同分支，2026-09-24）：Round 1 候选独立审阅发现 A-09 实为 shape 校验
+> 非一致性验证、`contract_digest` 遗漏已登记 public target 的 agent capability、
+> `package_digest` 被误述为工件内容摘要、focused 计数 "79" 誊写错误。修复：compiler
+> 边界新增 `verify_release_identity`（重算双 digest + 单字段错配负向）并明确
+> `ModuleReleaseIdentity::validate` 仅字段形状校验；agent 公开契约面纳入摘要；release 层
+> `module_version`/bundle `crate_version` 强制 SemVer；`package_digest` 语义修正为
+> compiled declaration fingerprint（声明摘要 ≠ 发布工件字节，工件完整性 digest 维持
+> Wave 5 NOT RUN）。focused 更正为 113；Wave 2 exit 第一项经 NOT MET 降级后以新证据
+> 恢复 MET（review §12/§16）。G-202/G-203 关闭条件不变；两个 crate 仍维持
+> R1 / R2 BLOCKED / NOT CLAIMED。当前状态 READY FOR INDEPENDENT RE-REVIEW /
+> NOT INTEGRATED，独立 reviewer 复审 verdict 待回填。
+
+> 2026-09-27 closeout（docs-only）: PLAN-0014 Wave 2 外部复审已记录（review §14）——
+> Codex 独立只读复审 Reviewed HEAD `93b18ab67c0426e6e5efc4f065260d7068995f38`（审阅修复
+> 范围 `50b6ae95a3e6f8db8f51586cf1e5bce5d0662f7f` → Reviewed HEAD）：代码修复通过；文档
+> 兼容性表述不确——review §5 规则 3 原"contract_digest 不变 ⇒ 兼容面不变"高估摘要语义，
+> 已改为"contract_digest 相同仅表示纳入摘要的公开声明面相同；compatibility、dependencies、
+> module_version 等仍须通过 compile/dry_plan 的独立兼容性校验，不能据摘要相同推断可互换"。
+> 复审独立执行 focused 113 passed / 12 suites、Architecture Fitness PASS、
+> `git diff --check` PASS，closeout 在 Reviewed HEAD 复测同值；全 workspace 四项门禁与
+> 外部参考取证未独立重跑。验收分项校准为 12 条 = 10 PASS（A-01..A-09、A-11；A-09 验证
+> 范围为声明一致性，非真实工件/外部消费者）+ 1 PARTIAL（A-10 workspace 内部分）+
+> 1 NOT RUN（A-12）。Round 1/2 历史未改写。Wave 2 当前状态 `Wave 2 implementation
+> reviewed / documentation corrected / NOT INTEGRATED`；外部复审不构成 R2 admission PASS，
+> Step F formal verdict 未回填；R1 / R2 BLOCKED / NOT CLAIMED 维持；G-201 真实工件组装
+> 残项、G-202、G-203、G-09 保留。
+
+> 2026-09-27: PLAN-0014 Wave 3 Durable Task Execution / Audit / Messaging
+> reference conformance 在分支
+> `feat/PLAN-0014-wave3-durable-audit-messaging-conformance`（Base `443a11c`＝Wave 2
+> closeout，未 push、未合并）完成：固定 Temporal v1.32.0、Restate v1.7.12、
+> Trigger.dev 3.3.17+v4.6.4、jarvis-rs vendored、ZITADEL v4.18.0、immudb v1.11.2、
+> Infisical 0.165.16、Debezium v3.6.3.Final、NATS v2.15.0、Kafka 4.3.1 的 tag→SHA
+> 参考并源码取证（BSL/AGPL/EE 仅读语义；AgentOS NOT FOUND、Quarkus outbox seq 列
+> NOT FOUND 均如实记录）。修复（failing-first）：D-G01 取消事实事件/审计在全部转换
+> 路径恰好一次（意图 `processing_cancel_requested` 与事实 `cancelled.v1`+`processing_cancelled`
+> 分离，SQLite 5 测试绿 + PG 镜像 ignored 接入 CI）；A-G01 document-sqlite 审计链写入
+> 静默断裂（17 列 legacy INSERT 改为 20 列 v1 链，3 测试绿 + PG `chain_pg` 镜像）；
+> D-G02 适配层 stale-fence/reclaim 负向直测补齐（4 测试）。注册未修：D-G03 pipeline
+> version 列、D-G04 Attempt/provider 关联、D-G05 legacy claim-port seam、A-G03 无外部
+> 反截断 checkpoint、A-G08 黑名单式 redaction 等 C2；D-G06/A-G07 事件 envelope
+> correlation/causation 为 C1-by-standard，因属公开契约变更走独立设计提案（显式
+> blocker）。门禁本地全绿（fmt/check/clippy/test/architecture/diff-check exit 0，
+> 735 passed / 50 ignored，原始日志存 `docs/reviews/2026-09-27-wave3-gates/`）；全部
+> PostgreSQL lane 本地 BLOCKED（原因与专用库复跑命令见 gates/07），8 个新增 PG 测试
+> 从未在本会话执行，不得记为通过。tamper-evidence 措辞经六个参考校准无 overclaim，
+> 尾部截断不可检测以测试断言固化。当前状态 `Wave 3 implementation reviewed /
+> self-verified / READY FOR INDEPENDENT REVIEW / NOT INTEGRATED`；R1 foundation，
+> 非 R2 admission，独立 reviewer verdict 待回填；未启动 Wave 4/5，未激活
+> PLAN-0015/PLAN-0006。审阅记录
+> `docs/reviews/2026-09-27-saas-align-durable-execution.md`、
+> `docs/reviews/2026-09-27-saas-align-audit-messaging.md`。
+
+## 2026-09-27 Wave 3 Round 2 correction
+
+Round 1 HEAD `6b324ea76986640a3f1baef7ecebdb2c53fbd2c6` independent verdict: FAIL / NEEDS REPAIR. Document-only SQLite migration and audit legacy downgrade regressions are repaired with failing-first tests; acceptance matrices no longer substitute audit ordering/replay for messaging or crash recovery. D-G03 and D-G06/A-G07 remain open C1 with ADR-0027/0028 Proposed, NOT ACCEPTED. Historical C2-only/closed summaries above are superseded on these points. R1 / R2 BLOCKED; Wave 4/5 not started. Details: `docs/reviews/2026-09-27-wave3-round2-repair.md`; current gates are separate from Round 1 evidence.
+
+## 2026-09-27 Wave 3 Round 2b 固化与真实 PostgreSQL 验证
+
+- Round 2 修复已固化为本地 commit `81640e79147128925d10efb0f6ff30a0c568ec33`。入库前 `code-snapshot.json`
+  十个哈希逐一与工作区字节一致；因仓库 `core.autocrlf=true` 且无 `.gitattributes`，其中 6 个 blob 以 CRLF 形式入库，
+  换行归一化后与工作区文本逐字符等价（字节差恰为 CR 个数），无语义差异。`crates/document-sqlite/tests/operational.rs`
+  为既有 EOL/stat 脏标记，工作区字节与 HEAD blob 相同，未 staged、未 reset/checkout/clean，也不计入本轮修复。
+- 数据库授权：仅按操作者明确授权在共享 :5432 服务上**新建专用库**；未使用 `TEST_POSTGRESQL_URL` /
+  `TEST_POSTGRESQL_RESTORED_URL` 指向的 `contract_management_*` 库（属另一项目 contract harness），
+  未修改共享服务或认证配置，未猜测密码，日志全量脱敏。
+- 环境：PostgreSQL 18.4，专用库 `plan0014_wave3_r2`，`cargo run -p migration -- --backend postgres up` 退出码 0，
+  迁移 1–19，43 张 public 表。五条 lane 均 `--all-features -- --include-ignored --test-threads=1`：
+  contracts 3 / cancel_factuality_pg 5 / chain_pg 3 / outbox_reliability 7 / inbox_idempotency 4，
+  合计 **22 passed / 0 failed / 0 ignored**。
+- 首次真实执行暴露两个只有 PostgreSQL 才能发现的缺陷，已在最终候选 `2f9976e1faa8a1262cf1aab6cd6554a38c7fc03a` 修复：
+  1. **产品缺陷（新 C1，A-G09）**：`record_hash` 覆盖纳秒精度的 `occurred_at`/`recorded_at`，而 `TIMESTAMPTZ` 只存微秒，
+     导致 PostgreSQL 上刚写入的审计行即无法自验，生产后端防篡改能力失效，而 741 个 SQLite/单元测试全绿。
+     修复为 `audit::canonical_timestamp` 在签名时对齐微秒；`rehydrate` 不做归一化，历史行不重签名。
+     修复前已写入 PostgreSQL 的行仍不可验证，属需另行评审的运维事项，不做自动重签名。
+  2. **仅测试 fixture**：`cancel_factuality_pg` 向 `outbox_events.tenant_id`（migration 001 遗留 `VARCHAR(100)`）
+     绑定 `Uuid`，PostgreSQL 以 SQLSTATE 42883 拒绝，SQLite 静默接受；生产写入方本就绑定文本。
+- 重跑硬性前提：lane 需**初始为空的专用库**。`claim_next`/`claim_batch` 是全局队列，复用被中断残留数据污染的库会使
+  `contracts`、`outbox_reliability` 失败；此为 fixture 隔离限制，已记录不掩盖。
+- 最终候选重跑六项门禁全部退出码 0：`cargo test --workspace --all-features` 为 **742 passed / 0 failed / 50 ignored**，
+  Architecture Fitness PASS。50 个 ignored 仍不计为已执行；CI 接线不等于本候选已通过 CI。
+- 仍未执行/仍为 BLOCKED：进程级 kill 崩溃恢复（D04/D07 保持 PARTIAL，文件重开不等于进程杀死）、真实 provider 副作用与外部
+  source pin、消息乱序与事件 Schema 演进（A04 仍 NOT PROVEN）、多进程多节点与滚动升级（D10 仅 PARTIAL）。
+  D-G03 与 D-G06/A-G07 仍为未关闭 C1，ADR-0027/ADR-0028 仍 **Proposed / NOT ACCEPTED**。
+- 状态：**READY FOR INDEPENDENT RE-REVIEW / NOT INTEGRATED**（PG BLOCKED 已解除）。实现者不自填独立 PASS；
+  两份正式评审的独立记录仍为 `<pending>`。R1 仅在独立复审通过后成立，**R2 BLOCKED**；Wave 4/5 未启动，
+  PLAN-0015 / PLAN-0006 未激活。
+
+## 2026-09-27 Wave 3 Round 2c 审计时间精度回归修复
+
+- 起点 HEAD `0ac031af1344af4a8fa4d91c314cf3563065e1bf`（Round 2b closeout）。本轮只处理审计时间规范化、历史恢复与相应回归证据。
+- **R1（产品缺陷，Round 2b 引入的回归）**：`AuditEvent::rehydrate` 通过 `Self::new` 做校验，而 `new` 会规范化 `occurred_at`；
+  `rehydrate` 只回写 `recorded_at`，未回写原始 `occurred_at`。SQLite 以 RFC 3339 文本存储时间，历史行可带纳秒尾数，
+  读取时被截断导致 `hash_record` 不再等于库中 `record_hash`，`verify_chain` 把完好的历史链判为损坏。
+  Round 2b 的记录与持久化架构文档当时写的是“`rehydrate` 不做归一化”，**代码与文档不一致**——文档描述的是应有行为，代码未实现。
+  修复：`rehydrate` 在 `new` 完成全部领域校验后，按存储值原样回写 `occurred_at` 与 `recorded_at`。
+- **R2（产品缺陷）**：`canonical_timestamp` 用 `Utc.timestamp_nanos(timestamp_micros() * 1_000)` 重建时刻；
+  epoch 微秒数 ×1000 在公元 2262-04-11 之后超出 `i64` 纳秒范围，debug 下 panic、release 下回绕后进入签名。
+  修复：只原位截断亚秒部分（`with_nanosecond(timestamp_subsec_nanos() / 1_000 * 1_000)`），不做 epoch 级乘法，
+  任意可表示时刻的日期与整秒均不变（含 1970 年以前）。
+- **顺带加固**：`with_chain_metadata` 原先只规范化 `recorded_at`。它是“即将写入并签名”的转换点，
+  若事件经 `rehydrate` 携带历史纳秒精度再签名，会在 PostgreSQL 上重现不可验证行缺陷；现同时规范化 `occurred_at`。
+- 未改变哈希算法、canonical payload、`chain_version` 语义、genesis、排序或历史签名；未重签名任何历史记录；无迁移触碰历史时间戳。
+- 失败先行证据：`docs/reviews/2026-09-27-wave3-round2c-gates/`。`00` 为两项修复同时回退时的失败复现
+  （溢出 panic + `occurred_at` 未按存储值恢复），`01` 为仅回退 R1 时 SQLite 真实 repository 层失败，
+  `superseded-intermediate-run/` 保留被加固改动超越的中间一次 lane 运行及其原因。
+  历史 `record_hash` 期望值 `12b8823d…f815` 为按修复前历史算法冻结、并在本 crate 之外独立重算校验的常量，不由被测构造路径生成。
+- 测试：audit 单测新增历史恢复、边界范围、重签名三类；`crates/audit-sqlite/tests/historical_chain.rs`
+  经真实 `SqliteAuditStore` + 真实迁移目录验证纳秒历史行读回后摘要复现、链校验通过，且新的微秒精度写入可链入其后并含篡改负例；
+  `chain_pg.rs` 新增真实 PostgreSQL 精度往返测试。
+- 验证：`cargo test -p audit -p audit-sqlite -p document-sqlite --all-features` 25 passed / 0 failed；
+  任务专用空库 `plan0014_wave3_r2final`（PostgreSQL 18.4，`occurred_at`/`recorded_at` 实测 `datetime_precision = 6`）
+  上迁移 CLI 退出码 0，五条 lane **23 passed / 0 failed / 0 ignored**（contracts 3、cancel_factuality_pg 5、chain_pg 4、
+  outbox_reliability 7、inbox_idempotency 4）。六项完整门禁结果见同一目录 `10`–`15`。
+- **Round 2b 的 22 项 PostgreSQL 通过不覆盖本次历史恢复缺陷**：PostgreSQL 存储即微秒，无纳秒尾数可被读回破坏；
+  只有 SQLite 文本存储能保存会被错误归一化的历史，而当时没有测试读回这类行。
+- 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**。实现者不自填独立 PASS；两份 Wave 3 评审的独立记录仍为 `<pending>`。
+  R1 声明仍需独立复审；**R2 BLOCKED**；Wave 4/5 未启动；ADR-0027/ADR-0028 仍 Proposed / NOT ACCEPTED。
+  修复前写入 PostgreSQL 的不可验证行仍属需另行评审的运维事项，本轮不枚举、不重签名。
+
+## 2026-09-28 PLAN-0014 Wave 4 — Document / Object Storage / Observability / Notification reference conformance
+
+> Wave 4 在分支 `codex/plan-0014-wave4-reference-conformance`（Base `a4c2f74b`，未 push、未合并，`main`
+> 未改动）完成，代码候选 `6fb9487d045108c70efd41c88ccc95f0861ba603`。上一轮结论原文照录且未扩大：
+> 「Round 2c 修复通过；Wave 3 保持 R1 / NOT INTEGRATED；R2 阻塞项继续有效」。
+> 评审：`docs/reviews/2026-09-28-wave4-baseline.md`（Step A 能力基线 + Step B 固定参考）、
+> `docs/reviews/2026-09-28-saas-align-document-storage.md`、
+> `docs/reviews/2026-09-28-saas-align-observability.md`、
+> `docs/reviews/2026-09-28-saas-align-notification.md`；
+> 证据：`docs/reviews/2026-09-28-wave4-gates/`、`docs/reviews/2026-09-28-wave4-storage-lane/`。
+
+- 固定参考到 tag→SHA（Paperless-ngx v3.2.1、Documenso v2.18.0、Open Contracts v3.1.1、OTel spec
+  v1.61.0、Collector v0.161.0、RustFS 1.0.1-preview.11）；Novu 与 Mayan EDMS 在本环境无法固定，
+  按 BLOCKED 记录且不引用其行为结论。
+- 修复（failing-first）：幂等重放租户围栏 D-W4-01（SQLite+PG）；对象键/桶名进入日志与驱动错误文本
+  ST-W4-02；本地适配器伪 presign ST-W4-03；presign 过期无界 ST-W4-04；governance-worker 无 subscriber
+  OBS-W4-01；business-api 自建指标与客户端摘要 OBS-W4-03；provider 噪声 OBS-W4-02；`count()` 零覆盖
+  D-W4-05；notification 文档虚报。
+- 注册未修 C1：D-W4-02 复合外键、D-W4-06 文档资源无授权路径、D-W4-08/ST-W4-05 无元数据↔对象一致性扫描、
+  D-W4-09 PostgreSQL 缺 evidence↔revision/artifact 绑定触发器、D-W4-11 `document_links` 无 revision 绑定、
+  OBS-W4-05 无服务端关联身份（依赖 ADR-0028）、OBS-W4-06 exporter BLOCKED、OBS-W4-07 日志无脱敏、
+  N-G05 outbox relay 未接线。多数属 schema/公开契约变更 → 需设计提案，本轮未实现。
+- 真实通道：PostgreSQL 18.4 专用库 `plan0014_wave4`（3 target 全绿，结束后仅 DROP `plan0014_wave4%`）；
+  真实 S3-compatible 改用 RustFS（MinIO 开源二进制 `dl.min.io` → HTTP 410 已停发），专用桶+前缀，
+  lane 7/7、前缀 0 残留、桶已删、进程已停；`minio_contract.rs` 仍 BLOCKED/NOT RUN。
+- 门禁全绿：fmt / check / clippy `-D warnings` / workspace 测试 **759 passed / 0 failed / 59 ignored** /
+  architecture fitness PASS / `git diff --check`。59 ignored 不计为已执行。
+- 状态：**READY FOR INDEPENDENT REVIEW / NOT INTEGRATED**；R1 foundation，独立 verdict 待回填；
+  C1 未清零 ⇒ **R2 BLOCKED**；Wave 5 / PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。
+
+> 2026-09-29 Wave 5A（本地发布候选，未发布）在分支 `codex/plan-0014-wave5a-local-release-pilot`
+> （Base `9b05ccddb4964b363b0c9ae001c4303c1b7393db`，未 push、未 merge、未打正式发布 tag、未部署）
+> 完成。上一轮结论原文照录且未扩大：「Round 3 修复通过；Wave 4 有界收口；既有 C1、R2 阻塞与
+> 未执行项继续有效」。
+
+- 试点：`identity` 与 `policy` **两个模块**（PLAN-0014 §6 候选前两项）。`business-module-contracts`
+  与 `business-application-compiler` 同属一个 foundation，若日后登记只是**一个**模块
+  （`ModuleReleaseBundle.crate_versions` 映射两个 crate），本轮不用 bundle 凑模块数。
+- 新增 workspace 成员 `tools/module-release-tool`（`generate` / `verify` / `compare`）：复用
+  `contract_digest` / `package_fingerprint` / `verify_release_identity` seam，未修改两个纯 crate；
+  工具侧新增的物理工件摘要 `artifact_integrity_digest` **不并入** `ModuleReleaseIdentity`。
+- 工件：`identity-0.1.0-rc.1` / `policy-0.1.0-rc.1`，含 module id + 独立版本、manifest、公开契约
+  工件（`contract/contract-surface.json` 逐字节等于编译器哈希前镜像）、迁移映射、changelog、
+  L2 identity/bundle、L3 验证索引；四类摘要分列见 `docs/reviews/2026-09-29-wave5a-implementation-record.md`
+  §4.3 与 §13.2；`source_revision` 钉在代码候选提交 `8036bc65ba7c77666e48afaa6439911ba7c083d7`。
+- 确定性：两目录生成 + `compare` 零差异；宿主绝对路径 / 机器名 / 用户名 / 时间戳 / `target/`
+  不出现在 payload；release identity 不含随机 UUID、当前时间或机器名。
+- 真实构建：packed crate 在 payload 之外以自身为 workspace root 构建成功且构建后工件复验仍 PASS；
+  两个 workspace 外消费者（无 path 依赖回本仓库、无 DB adapter、无 `apps/*`）实际编译并调用公开契约
+  （identity 1 例、policy 2 例，均默认拒绝方向），缓存预热后 `--locked --offline` 复建通过。
+- 门禁全绿：fmt / check / clippy `-D warnings` / workspace 测试 **833 passed / 0 failed / 70 ignored**
+  （187 suites）/ architecture fitness PASS（新增 Wave 5A 边界，做过注入式反向验证）/
+  `git diff --check`；定向 `module-release-tool` 30 passed。70 ignored 未执行、不计为已执行
+  （当时写的是「全部 PostgreSQL lane」，同日 Repair 1 已按测试清单更正分类，见下方 Repair 1 记录）。
+- 未执行 / BLOCKED：PostgreSQL 迁移执行与单模块独立安装/升级（无数据库授权；identity 与 policy 与
+  organization 共享 `019_identity_authorization_foundation.sql`、同 `public` schema、被
+  `runtime-migration` 全量 embed）；publish / 注册 / install / upgrade / rollback；push / merge /
+  tag / 部署；漏洞、许可证、镜像扫描；CI。SQLite 与离线证据不替代 PostgreSQL 结论。
+- gap registry 不变：G-01 / G-02（Wave 1）、G-201 / G-202 / G-203（Wave 2）与 Wave 4 的
+  D-W4-02 / 06 / 08 / 09 / 11、OBS-W4-05 / 06 / 07、N-G05 继续有效。本轮证据只覆盖
+  「可打包、可校验、可脱离 workspace 被真实调用」，**不**关闭 G-202（缺授权数据库上的独立安装/升级
+  与运维回滚证据），亦不改写 `2026-09-24-saas-align-module-packaging.md` 的历史结论（该文档只追加带日期指针）。
+- 状态：**LOCAL RELEASE CANDIDATES READY FOR REVIEW / NOT PUBLISHED**；`identity` / `policy` /
+  两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；打包成功**不等于** R2；Wave 5 剩余项与
+  PLAN-0006 未启动；ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED。
+  评审与证据：`docs/reviews/2026-09-29-wave5a-implementation-record.md`、
+  `docs/reviews/2026-09-29-wave5a-gates/`（独立审阅栏留空）。
+
+> 2026-09-29 Wave 5A Repair 1（修复验证链，未发布）在同一分支完成，代码候选
+> `69d9a6b01184db7d9f3d4aa3b688fb569387b2fc`。上一轮结论原文照录且未扩大：「Round 3 修复通过；
+> Wave 4 有界收口；既有 C1、R2 阻塞与未执行项继续有效」；Wave 5A 独立审阅结论为
+> **NEEDS REPAIR / NOT PUBLISHED**，本轮是其 §4 指令的实现。
+
+- 修的是**验证链**，不是工件：四类摘要与成员数与上一轮逐字相同（`identity` `3fed976b…` /
+  `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，21 成员；`policy` `52e788ff…` / `37e95a19…` /
+  `f8add9e0…` / `1a5a43f8…`，23 成员），唯一随提交变化的字段是 `source_revision`。
+- **来源绑定成为真检查**：`source_revision` 现在必须是真提交对象，且工件的每个输入
+  （changelog、各 crate 源文件、workspace manifest / lock、`rust-toolchain.toml`、spec、映射
+  点名的迁移）都要能在该提交里以相同字节取到；40 个 0 的 revision 与不含所声称输入的更早提交
+  都被拒。工具内只有 `src/git.rs` 可以起子进程，且只跑 `git`（参数数组，无 shell）。
+- **隔离由完整解析图判定**：`module-release guard` 读 `cargo metadata --format-version 1` 的
+  全部包，要求每个本地包规范化后落在消费者目录或声明的工件目录内；正/反斜杠、`..`、verbatim
+  前缀、传递性 path 泄漏与不可解析路径都有回归。Wave 5A 编排脚本不再含自有路径规则——
+  架构门禁禁止。
+- 验证索引由 5 项增至 10 项（新增记录格式、记录一致性、packed 绑定、来源两项、声明检查改名），
+  `compare` 现在两侧各自重算 payload 后才比较。工具链一项在明细里自述**只验声明**，构建来源
+  由运行日志外部佐证，不互相冒充。
+- 更正上一条记录的两处表述：70 个 `#[ignore]` 不是「全部 PostgreSQL lane」（实为 PostgreSQL
+  38 + PostgreSQL 且对象存储 3 + 仅对象存储 28 + 内网模型 provider 1，均未执行）；旧「错误
+  module_id 被具名检查拒绝」不成立，当时拒在 `[bundle-identity]` 且是上一例残留损坏。
+- 门禁（本候选）：fmt / check / clippy `-D warnings` / workspace 测试 **855 passed / 0 failed /
+  70 ignored**（190 suites）/ 架构 fitness PASS / `git diff --check` 0；定向
+  `module-release-tool` **52 passed**、两个纯 crate **113 passed**（源码零改动）；新增
+  `scripts/test-plan0014-wave5a.ps1` 脚本回归入口 9 条 PASS。
+- 证据：`docs/reviews/2026-09-29-wave5a-repair1-gates/`（`F1-F5-closure.md` 逐项闭环表、
+  `red-run/` 修复前反例复现、`negatives/` 逐例注入说明与原始日志、`gates/` 逐条门禁）。
+  旧 `2026-09-29-wave5a-gates/` 原样保留，被替代的结论在其 README §6 逐项列出。
+- 状态：**WAVE 5A REPAIR 1 READY FOR INDEPENDENT REVIEW / NOT PUBLISHED**；`identity` /
+  `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署，
+  未启动 Wave 5B 或 PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 观察项继续有效；
+  ADR-0027 / ADR-0028 仍 Proposed / NOT ACCEPTED；独立审阅栏留空。
+
+> 2026-09-30 Wave 5A Repair 2（候选的来源绑定补实，未发布）在同一分支完成，代码候选
+> `c22939f0a51e3c7fa2ec424f3819c6e7113a9b66`。承前结论原文照录且未扩大：「Round 3 修复通过；Wave 4
+> 有界收口；既有 C1、R2 阻塞与未执行项继续有效」；Repair 1 的独立审阅结论为 **NEEDS REPAIR**
+> （F1-A / F1-B），本轮是其 §5 指令的实现。
+
+- 上一轮把 `source_revision` 变成「真提交」，但**候选的字节仍来自磁盘工作树**：packed `Cargo.toml`
+  从未按该提交重算（改写依赖版本 pin 并重算完整性摘要后 `verify` 仍通过），成员集合来自磁盘目录扫描
+  （checkout 少一个已提交源文件时仍能生成 20 成员工件，解包后 `cargo check` 报 E0583）。
+- 本轮把候选的**唯一来源**改成固定提交：成员列举用 `git ls-tree -r -z --full-name`，逐字成员用
+  `git cat-file blob`，派生成员（packed `Cargo.toml`、`module.manifest.json`、契约面、迁移映射）由
+  该提交重算后**整份**比较；`generate` 在创建输出目录之前先要求 checkout 与提交一致，符号链接
+  （`120000`）与 submodule gitlink（`160000`）一律拒绝。工具内唯一子进程出口仍是 `src/git.rs`，
+  架构门禁新增「成员列举必须是 `ls-tree -r -z`、禁止 `git show`、`src/commit.rs` 含 120000/160000」。
+- 验证侧把一句话拆成三类可核对事实（成员集合 ↔ Git 树 / 逐字成员 ↔ Git blob / 派生成员 ↔ 重算），
+  各自独立检查 ID：`source-member-set-matches-revision`、`source-inputs-match-revision`、
+  `derived-members-match-revision`；物理完整性摘要保持独立标识，二者不得互相顶替（共 12 项检查，
+  顺序固定并由测试断言）。
+- 工件与四类摘要**未变**（`identity` `3fed976b…` / `b9dfa42c…` / `68deba81…` / `ef43cfa9…`，21 成员；
+  `policy` `52e788ff…` / `37e95a19…` / `f8add9e0…` / `1a5a43f8…`，23 成员）；`digest_form` 的匹配顺序
+  改为先试规范 LF 折叠摘要，使其不再取决于检查者如何 checkout 文件；协议本身
+  （`plan-0014.artifact-integrity.v1`、`plan-0014.migration-set.v1`、`normalize_text_bytes`）一字未改。
+- 门禁（本候选）：fmt / check / clippy `-D warnings` / 架构 fitness PASS / `git diff --check` 0；
+  定向 `module-release-tool` **61 passed**；脚本回归 **14 条 PASS**（新增自实现摘要口径对齐 `R7a`、
+  重算后仍被拒 `R7b`、隔离 checkout 三例 `R8a-c`）；pilot **exit 0**、19 负例全部按被断言的检查被拒。
+  `cargo test --workspace --all-features` 在默认构建目录因两个 bin 被会话外进程占用而**环境阻塞**，
+  同一代码在独立 `--target-dir` 下重跑，两份日志均归档。
+- 未执行 / NOT RUN（逐项，见证据 §7）：仓库外消费者 lane（本轮按审阅指令跳过）、PostgreSQL 迁移执行
+  与单模块安装 / 升级 / 回滚、70 个 `#[ignore]`（PostgreSQL 38 / PostgreSQL 且对象存储 3 / 仅对象存储
+  28 / 内网模型 provider 1）、publish / 注册 / install / deploy、漏洞 / 许可证 / Secret / 镜像扫描、CI。
+- 证据：`docs/reviews/2026-09-30-wave5a-repair2-gates/`（`F1-closure.md` 逐项闭环表、`red/` 与
+  `green/` 同命令对照、`gates/` 逐条门禁、`pilot/negatives/` 逐例注入说明）。Repair 1 归档原样保留。
+- 状态：**WAVE 5A REPAIR 2 READY FOR REVIEW / NOT INTEGRATED**；`identity` / `policy` / 两个纯 crate
+  维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署 / 改 main，未启动 Wave 5B 或
+  PLAN-0006；G-01 / G-02 / G-201 / G-202 / G-203 继续有效；ADR-0027 / ADR-0028 仍 Proposed /
+  NOT ACCEPTED；独立审阅栏留空。
+
+> 2026-09-30 Wave 5A Repair 2 独立审阅结论落账 + Wave 5B-0 迁移隔离设计（**纯文档轮**，未发布、
+> 未连库）在同一分支完成，文档基线 `c73955ec30f46d839ff33d44776cef142b7d6d77`。承前结论原文照录且未扩大：
+> 「Round 3 修复通过；Wave 4 有界收口；既有 C1、R2 阻塞与未执行项继续有效」。
+
+- 独立审阅结论：**PASS（Wave 5A Repair 2 有界修复） / NOT INTEGRATED**
+  （`docs/reviews/2026-09-30-wave5a-repair2-independent-review.md`，审阅范围 `7180eec7..c73955e`）。
+  该 PASS 仅覆盖这次有界修复，**不改写** G-01 / G-02 / G-201 / G-202 / G-203 的原边界，
+  也不是 PLAN-0014 总验收或 R2 admission；证据目录的「审阅结论」栏改为指针，NOT RUN / BLOCKED 行与
+  全部数字未动。
+- **准入台账建立**：`docs/reviews/2026-09-30-wave5b-r2-admission-matrix.md` 以原编号逐行登记
+  G-01（→ G-201 承接，记一条 lineage 不记两个成功模块）、G-02、G-202、G-203、A-01..A-12、
+  两模块 C0/C1 与 Wave 4 开放项（D-W4-02/06/08/09/11、OBS-W4-05/06/07、N-G05）：原关闭条件逐字、
+  固定 SHA、证据路径、证据年代、实际执行范围、状态、剩余动作、owner。计数沿用既有校准
+  **10 PASS + 1 PARTIAL（A-10 外部消费者）+ 1 NOT RUN（A-12），本轮关闭数 0/12**；
+  Wave 2 的 formal Step F verdict 仍 `<pending>`（从未填写），如实登记不外推。
+- **迁移隔离设计交付**：`docs/plans/current/PLAN-0014-wave5b-migration-isolation-design.md`
+  （Proposed / DESIGN READY FOR REVIEW）。核心决策：把 `migrations/001..019` 冻结为 host baseline
+  （历史、`MANIFEST.sha256` 与 `_sqlx_migrations` 一字不动），模块新迁移落
+  `migrations/modules/<namespace>/` + per-namespace `MANIFEST.sha256`，执行事实写一张平台 ledger
+  `platform_module_migrations(namespace, revision, …)`（owner 显式为 Platform Runtime，append-only，
+  checksum 存 LF 折叠 SHA-256 并运行时回读），由 `apps/migration` 单一 writer 按 namespace 拓扑序应用，
+  namespace 级 `pg_advisory_lock` 在 ledger DDL 之前获取，checksum 漂移 / 孤儿 revision / revision 缺口
+  三类一律 fail-closed，回滚按 forward-fix 且**不默认删除任何业务数据**。区分三类 namespace：
+  目录 namespace、ledger namespace、真实 PostgreSQL schema（本轮**不做** schema 隔离）。
+- **G-203 判据核对（判定权在独立审阅）**：上述最小方案满足
+  `docs/reviews/2026-09-24-saas-align-module-packaging.md:316-320` 的五个字面子句，但**不**满足
+  「identity 可在 PostgreSQL 上单独冷安装」的强读法——identity / organization / policy 的既有 13 张表
+  由同一个 `019` 创建，`019:21-24` 还重命名了 `001` 建的 v0 demo 表，故任一段落都无法独立执行。
+  据此提出拆分提案 **G-203a**（namespace catalog / manifest / ledger / runner 隔离 + 模块未来 revision
+  独立安装升级，Wave 5B 可关闭）与 **G-203b**（既有共享表物理隔离与单模块冷安装，不可逆搬迁，
+  需独立 ADR 与运维授权）。**未**把较小方案写成闭环；G-203 维持 OPEN，R2 维持 BLOCKED。
+- **盘点暴露的 Baseline 偏差（登记不修）**：`apps/business-api/src/composition.rs:126` 与
+  `apps/governance-worker/src/main.rs:50` 在启动时执行 `MIGRATOR.run`，与
+  `PERSISTENCE_QUERY_AND_MULTI_DATABASE_ARCHITECTURE.md:96-98`「正式 API 进程不自动迁移」及
+  `SECURITY_ARCHITECTURE.md:251-260`「禁止运行时应用拥有随意 DDL 权限」冲突；全仓 repository SQL
+  均为裸表名、**零** `search_path` 设置（grep 口径 280 处命中，IAM 三适配器 73 处），故最小方案的 SQL
+  影响面为零，物理 schema 隔离的影响面则全部落在这里。
+- 新登记：`ADR-0029`（**Proposed**，未自填 Accepted）+ `docs/adr/README.md` 索引行；范围仅到
+  catalog 布局 / 平台 ledger / 单一 writer，不授权 schema 搬迁或任何 `DROP`。
+- 本轮门禁：Rust workspace 门禁 **本轮未运行，产品代码无改动**（沿用 `c73955e` 记录，不冒充本轮执行）；
+  设计包 §9.2 的真实 PostgreSQL 验收矩阵（V1..V14）除需构建的 V13/V14 外全部
+  **BLOCKED（无数据库授权）**，V5 / V10 / V13 / V14 记 **NOT RUN**。
+- 状态：**WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；WAVE 5B-0 DESIGN READY FOR REVIEW；R2 BLOCKED**；
+  `identity` / `policy` 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；未 push / merge / tag / 部署 / 改 main，
+  未启动 PLAN-0006；Wave 5B-1 实施需独立审阅放行 G-203a 判据并取得数据库授权后才能开始。
+
+> 2026-09-30 Wave 5B-0 设计包 **Revision 1**（按 `docs/reviews/2026-09-30-wave5b-design-independent-review.md`
+> §3 执行；**纯文档轮**，未连库、未改代码、未发布）在同一分支完成，起点
+> `5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601`。该审阅对 Revision 0 设计包的判定是
+> **NEEDS REPAIR（设计包）**（B1 共享 ledger 首次创建的锁保护、B2 搬迁时间线不可执行且混淆两类判据、
+> B3 验收命令与 fixture 范围）；上一段的历史结论与数字照录未改。
+
+- **锁模型更正（B1）**：设计包新增 §5.9。共享 ledger 表 `platform_module_migrations` 的**首次创建**改由
+  **所有 namespace 共用的固定 bootstrap 锁**保护，与 namespace 锁职责分离；两把锁都是**事务级**
+  `pg_advisory_xact_lock`（与仓内既有 8 处实现同形），公共锁用单 bigint 固定键、namespace 锁用
+  `(classid, objid)` 二元组键，两种锁标签在 PostgreSQL 中键域不相交。统一锁序：host baseline →
+  bootstrap 单元（锁内"存在性检查 + 创建 + 结构校验 + 提交后回读"，COMMIT 即释放）→ 按 `depends_on` 拓扑序
+  **一次一把** namespace 锁；**禁止**持有 namespace 锁时再取公共锁，锁序倒置型死锁被结构排除。
+  `CREATE TABLE IF NOT EXISTS` 被去掉（`crates/messaging/tests/inbox_idempotency.rs:18-22` 已记录该写法在
+  PG 下并发不安全，且它会静默接受形状不同的既存对象）。持锁连接即事务连接本身，锁随 COMMIT / ROLLBACK /
+  断开自动释放；应用级取消不等于断开（须显式 ROLLBACK 并弃用该连接）；等锁用 `lock_timeout` fail closed，
+  不设 `statement_timeout`。`verify` / `status` **不执行 DDL**，表缺失只返回 `Empty`/`Pending`，
+  权限 / 形状 / checksum 漂移一律 fail closed。并发验收由单条 V8 拆为 **V8a / V8b / V8c**
+  （V8b 专门覆盖"不同 namespace 首次并发 bootstrap"，状态仍 NOT RUN）。
+- **判据更正（B2）**：**撤销** Revision 0 "方案 B 单模块冷安装 = 是"的断言。方案 B 改变的是**既有表的位置与
+  授权边界**；空库上没有既有表可搬，搬迁后冷安装仍须先跑 host baseline `1..19`。因此设计包 §6.6 把
+  **既有库物理隔离**与**空库单模块冷安装**列为两个独立验收目标，**当前证据均为零**。方案 B 因原 expand 时间线
+  不可执行（视图指向尚未创建的表、旧名仍被旧表占用）而**降为未完成的研究方案并从 Wave 5B 可执行步骤中移除**；
+  §6.4 只保留修正后的候选事务顺序（同一事务内先移动表、后建旧名视图）与中间态对象存在性表，§6.5 记录 7 项
+  OPEN（兼容视图上的 `ON CONFLICT` 写语义未证明、`search_path` 基线缺失、角色矩阵未设计、锁窗口未测量等）。
+  G-203 的四个**记账子项**（目录隔离 / ledger 隔离 / 既有库升级 / 独立冷安装）全部 Proposed / OPEN，
+  且**不改变 G-203 / G-202 / A-12 的原分母**。
+- **验收命令与 fixture（B3）**：`apps/migration/src/config.rs:17-21` 在两个 URL 环境变量同时存在时直接
+  `ConfigLoadError`（值相同也拒绝），故 Revision 0 的同时设置写法在连接前即失败；设计包 §9.2 改为两条**互斥**
+  环境作用域（CLI lane 只设 `MIGRATION__DATABASE__URL`、测试 lane 只设 `DATABASE_URL`），try/finally 恢复
+  变量原有的"存在/不存在及值"，日志脱敏。§9.1.2 逐 suite 盘点实际数据库范围：`migration_test.rs:11-19`
+  丢弃给定库名并新建 `plan2_<uuid>` sibling 库（清理仅在成功路径），另有套件直接改动给定库不清理，
+  以及多条套件在变量缺失时静默回落到互不一致的硬编码库；因此"same target"不作为范围证明。
+  V14 改为**增量对账**（`864 + N` / `191 + M` / `70 + K` 逐条对到测试名），禁止机械固定 70 或 864/191。
+  `--namespace` / `verify` 明确标注尚未实现，V13 不再声称能验证新 mapping。
+- **S1 规格与 S4 历史兼容**：设计包 §11 收窄 S1 为"离线 catalog 验证 + 静态门禁"（显式 `schema_version` 且
+  未知字段/版本拒绝、路径逃逸与符号链接拒绝、manifest ↔ SQL 双向集合、重复/缺口/未知依赖/环/checksum、
+  空目录只表示 `RESERVED`、历史保护同时覆盖文件集合与**钉定 blob 内容摘要**并写明 Windows EOL 以 git blob
+  字节为准；owner 白名单只是静态 fitness 且给出同 owner 新表的授权扩展机制）；S1 不建平台表、不接 CLI、
+  不改启动迁移、不升 release spec。§5.7 HC-1..HC-5 要求 schema 版本**分派**而非替换常量
+  （`tools/module-release-tool/src/spec.rs:215`、`src/packaging.rs:1583` 现为单一常量比较），否则 `c22939f`
+  固定候选会失去 verify 能力；未知版本拒绝 + 固定候选重验回归。两项均只设计不实现。
+- **同步与门禁**：`ADR-0029` 保持 **Proposed / NOT ACCEPTED**（同步锁模型、范围边界与两条新增非目标）；
+  准入矩阵新增"记账子项"与"真实执行范围边界"两节；`PLAN-0014` 与 `docs/README.md` 追加状态与指针；
+  新增 `docs/reviews/2026-09-30-wave5b-design-revision1-closeout.md`。Rust workspace 门禁 **本轮未运行，
+  产品代码无改动**（沿用 `c22939f0` / `c73955e` 记录，不冒充本轮执行，不借用 Wave 5A 数字）；
+  设计包 §9 全部数据库项 **NOT RUN / BLOCKED（无数据库授权）**。
+- 状态：**WAVE 5B-0 REVISION 1 READY FOR DESIGN RE-REVIEW；WAVE 5A REPAIR 2 REVIEWED / NOT INTEGRATED；
+  R2 BLOCKED**；`identity` / `policy` / 两个纯 crate 维持 **R1 / R2 BLOCKED / NOT CLAIMED**；
+  G-01 / G-02 / G-201 / G-202 / G-203 与 Wave 4 的 C1 一律未关闭；未自判 ADR-0029 Accepted；未实施 S1/S2/S3；
+  未连接数据库；未 push / merge / tag / 部署 / 改 main；未重开 Wave 5A Repair 2。
+
+## 2026-09-30 Wave 5B-S1 离线 catalog 门禁（实施轮）
+
+- 起点 `6decf1ad9ea05233d66dd3539594ff210afd99f2`，本地候选 `b25e2d4a9b455b776934495b8f3dfd2b71a13fe2`（未集成）。执行包为 `docs/reviews/2026-09-30-wave5b-revision1-independent-review-and-s1-instructions.md` §3，并落实其 §2 C1 历史摘要兼容规则。
+- 新增 `tools/module-release-tool/src/catalog.rs`：`catalog-check` 四个 check，默认集合为 `module-catalog` + `pinned-baseline-history` + `baseline-embed`，`baseline-candidate-freeze` **仅在显式 `--only` 时生效**（ADR-0029 未 Accepted 前不作为默认策略）。`scripts/check-architecture.ps1` 调用默认 check，并另加 namespace manifest 的 canonical-LF-only 断言（不复用历史 manifest 的三形容错）。`scripts/test-plan0014-wave5b.ps1` 与 `tools/module-release-tool/tests/wave5b_catalog.rs` 是同一张 `EXPECTATIONS.json` 的两个读取者。
+- 架构事实变化：`migrations/modules/{identity-management,policy}` 两份 catalog 存在且状态为 **RESERVED（0 revision）**——这是预留，不是"可独立安装"，更不构成"`migrations/modules` 是已安装 catalog"的声明。baseline embed 点收敛为唯一一处 `crates/runtime-migration/src/lib.rs`；两处 PostgreSQL 测试改用 `runtime_migration::MIGRATOR`（修 P-4）。历史 baseline 文件与历史 `MANIFEST.sha256` **一字未改**：C1 的 7 条 CRLF-only 摘要继续按原样被接受，但每个历史文件另被其 blob 摘要钉住。
+- 静态门禁不等于隔离证明：owner 扫描只是 SQL 文本 fitness function，不证明数据库层角色/grant 隔离（设计包 §11.2 #10 的诚实边界）。G-203 的四个记账子项与 G-01 / G-02 / G-201 / G-202 / G-203、Wave 4 的 C1 **一律未关闭**，准入矩阵分母未降。
+- 门禁：逐条命令与退出码见 `docs/reviews/2026-09-30-wave5b-s1-gates/`，对账见 `docs/reviews/2026-09-30-wave5b-s1-closeout.md`。PostgreSQL 相关 suite 因无数据库授权 **NOT RUN**；文件 symlink 路径用例 **BLOCKED**（创建符号链接需管理员权限，且仓库卷为 exFAT，不持有 reparse point）。
+- 状态：**WAVE 5B-S1 READY FOR INDEPENDENT REVIEW / NOT INTEGRATED；R2 BLOCKED**。未自判 ADR-0029 Accepted（仍 Proposed）；未实施 S2（runner / ledger / 运行时接线）；未连接数据库；未改 `main`；未 push / merge / tag / publish / 部署；未重开 Wave 5A Repair 2，其归档证据未改。

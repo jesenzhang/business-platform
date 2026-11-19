@@ -1,0 +1,16 @@
+rustfs 1.0.1-preview.11
+build time   : 2026-09-24 10:16:46 +00:00
+build profile: release
+build os     : windows-x86_64
+rust version : rustc 1.98.1 (48a229cea 2026-09-01)
+rust channel : stable-x86_64-pc-windows-msvc
+git branch   :
+git commit   : 0913686b12845eefc69a2f4ed4ee6a8161e25742
+git tag      : 1.0.1-preview.11
+git status   :
+
+health: 200
+bucket=plan0014-wave4-bucket  page_size=3  run_id=r3-20260928-155500
+archive sha256 = cae2628159a8759118d8a68cd043c389a05ee9a6a13ceb9e188e9414578453d5
+same build and digest as Round 1 / Round 2 provider; loopback-only credentials, not committed
+normalisation: captured lines keep their content; per-line trailing whitespace and line endings normalised only

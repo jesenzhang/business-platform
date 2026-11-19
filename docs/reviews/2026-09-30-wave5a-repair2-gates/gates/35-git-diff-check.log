@@ -1,0 +1,20 @@
+title      : git diff --check
+command    : rtk proxy git diff --check
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-30 02:56:05Z
+--- output ------------------------------------------------------------------------
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: in the working copy of 'scripts/check-architecture.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/lib/plan0014-wave5a-lib.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/plan0014-wave5a.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/test-plan0014-wave5a.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/git.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/migrations.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/packaging.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/provenance.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/repo.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/src/spec.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/module-release-tool/tests/pilot_candidates.rs', LF will be replaced by CRLF the next time Git touches it
+
+exit code  : 0

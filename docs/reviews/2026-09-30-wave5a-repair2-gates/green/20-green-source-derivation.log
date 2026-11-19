@@ -1,0 +1,39 @@
+title      : cargo test -p module-release-tool --test source_derivation --all-features -- --test-threads=1 (the RED command, after the fix)
+command    : rtk proxy cargo test -p module-release-tool --test source_derivation --all-features -- --test-threads=1
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-30 03:34:41Z
+--- output ------------------------------------------------------------------------
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrh80mx9m-11fgcdu-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrhnnv3c1-0gme1ke-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\source_derivation-0dr5t41vrrxik\s-hmrh84rbg2-1fls1wm-working`
+
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+warning: `module-release-tool` (test "source_derivation") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running tests\source_derivation.rs (target\debug\deps\source_derivation-1366d6016d00281e.exe)
+
+running 9 tests
+test a_candidate_missing_a_committed_source_member_is_refused_after_rehashing ... ok
+test a_candidate_whose_commit_object_is_absent_is_refused_without_a_disk_fallback ... ok
+test a_candidate_with_an_extra_source_member_is_refused_after_rehashing ... ok
+test a_manifest_compiled_from_a_different_spec_is_refused_even_when_self_consistent ... ok
+test a_packed_dependency_bump_is_refused_for_every_pilot_module ... ok
+test a_packed_manifest_the_pinned_commit_cannot_produce_is_refused ... ok
+test a_pinned_candidate_still_verifies_after_the_working_tree_inputs_move ... ok
+test generating_from_a_checkout_that_dropped_a_committed_source_file_is_refused ... ok
+test generating_from_a_checkout_with_an_uncommitted_source_file_is_refused ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 215.47s
+
+
+exit code  : 0

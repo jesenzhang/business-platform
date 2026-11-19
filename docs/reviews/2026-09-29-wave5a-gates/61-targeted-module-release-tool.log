@@ -1,0 +1,21 @@
+Running unittests src\lib.rs (target\debug\deps\module_release_tool-a5af253f8e365c0c.exe)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Running unittests src\main.rs (target\debug\deps\module_release_tool-cd59f6545d27a8b9.exe)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Running tests\canonical.rs (target\debug\deps\canonical-14d95af3bf465612.exe)
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+Running tests\compatibility.rs (target\debug\deps\compatibility-2cafe3db0109e842.exe)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+Running tests\packaging.rs (target\debug\deps\packaging-d2da3f164f7ab7b6.exe)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+Running tests\pilot_candidates.rs (target\debug\deps\pilot_candidates-b3f04738aab911e7.exe)
+running 10 tests
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s
+Doc-tests module_release_tool
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

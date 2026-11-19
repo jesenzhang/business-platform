@@ -1,0 +1,34 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpg8knlbu-09dlko3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpg8kndrf-0695kl3-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_cleanup-1kiyexoazgmss\s-hmpva540de-1otp4ll-working`
+
+warning: `object-storage` (test "s3_lane_cleanup") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.39s
+     Running tests\s3_lane_cleanup.rs (target\debug\deps\s3_lane_cleanup-85fade33b75d896c.exe)
+
+running 7 tests
+test a_cleanup_failure_fails_the_step_and_is_not_reported_as_success ... ok
+test child_final_cleanup_step ... CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=1 upload_pages=1
+CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=0 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=1 upload_pages=1
+CLEANUP bucket deletion not requested (WAVE4_S3_DELETE_BUCKET != true)
+ok
+test cleanup_leaves_objects_outside_the_run_prefix_untouched ... CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=2 upload_pages=1
+CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=2 upload_pages=1
+CLEANUP bucket deletion not requested (WAVE4_S3_DELETE_BUCKET != true)
+ok
+test cleanup_never_deletes_a_protected_bucket ... ok
+test cleanup_refuses_to_run_without_a_run_id ... ok
+test final_cleanup_leaves_no_objects_and_no_incomplete_uploads ... CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=2 upload_pages=1
+CLEANUP prefix=plan0014-wave4/r3-20260928-155500/ objects_deleted=6 uploads_aborted=0 remaining_objects=0 remaining_uploads=0 errors=0 object_pages=2 upload_pages=1
+CLEANUP bucket deletion not requested (WAVE4_S3_DELETE_BUCKET != true)
+ok
+test report_the_cleanup_scope ... CLEANUP SCOPE bucket=plan0014-wave4-bucket prefix=plan0014-wave4/r3-20260928-155500/ page_size=3 endpoint=http://127.0.0.1:19100
+CLEANUP SCOPE run_id=r3-20260928-155500
+CLEANUP SCOPE key_under_prefix_example=plan0014-wave4/r3-20260928-155500/example.bin
+ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.54s

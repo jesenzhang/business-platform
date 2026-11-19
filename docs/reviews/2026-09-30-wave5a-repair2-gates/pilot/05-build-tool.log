@@ -1,0 +1,19 @@
+title      : build the release tool
+command    : cargo build -p module-release-tool
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T032943Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrh80mx9m-11fgcdu-working`
+
+warning: `module-release-tool` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrhnnv3c1-0gme1ke-working`
+
+warning: `module-release-tool` (bin "module-release-tool") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.76s
+
+exit code : 0 (expected 0)

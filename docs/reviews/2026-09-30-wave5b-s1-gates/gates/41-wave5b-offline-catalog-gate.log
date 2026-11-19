@@ -1,0 +1,225 @@
+# gate: 41-wave5b-offline-catalog-gate
+# command: rtk proxy pwsh -NoProfile -File scripts/test-plan0014-wave5b.ps1 -EvidenceDir docs/reviews/2026-09-30-wave5b-s1-gates/wave5b-cases
+# started: 2026-09-30 17:29:47 +08:00
+# finished: 2026-09-30 17:33:07 +08:00
+# duration-seconds: 200
+# exit-code: 1
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+wave5b-s1 offline catalog gate
+repo=F:\Workspace\business-platform
+$ git -C F:\Workspace\business-platform rev-parse HEAD -> exit=0
+repository head=b25e2d4a9b455b776934495b8f3dfd2b71a13fe2
+$ git --version -> exit=0
+git=git version 2.50.1.windows.1
+pwsh=7.6.6
+scratch=F:\Workspace\business-platform\target\tmp\plan0014-wave5b
+evidence=F:\Workspace\business-platform\docs\reviews\2026-09-30-wave5b-s1-gates\wave5b-cases
+repository index and work tree are never written by this script
+$ cargo build -q -p module-release-tool -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-reserved --only module-catalog -> exit=0
+[catalog-cases] case=reserved expect=pass actual=pass verdict=MATCH detail=status=RESERVED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-validated --only module-catalog -> exit=0
+[catalog-cases] case=validated expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-crlf-checkout-validated --only module-catalog -> exit=0
+[catalog-cases] case=crlf-checkout-validated expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-unknown-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-field expect=fail actual=fail verdict=MATCH detail=matched-substring='table_prefix'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-missing-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-missing-field expect=fail actual=fail verdict=MATCH detail=matched-substring='ledger'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-duplicate-field --only module-catalog -> exit=1
+[catalog-cases] case=catalog-duplicate-field expect=fail actual=fail verdict=MATCH detail=matched-substring='declared twice'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-wrong-type --only module-catalog -> exit=1
+[catalog-cases] case=catalog-wrong-type expect=fail actual=fail verdict=MATCH detail=matched-substring='invalid type'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-unknown-schema --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-schema expect=fail actual=fail verdict=MATCH detail=matched-substring='plan-0014.wave5b.catalog.v2'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-owner-mismatch --only module-catalog -> exit=1
+[catalog-cases] case=catalog-owner-mismatch expect=fail actual=fail verdict=MATCH detail=matched-substring='does not equal namespace'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-directory-mismatch --only module-catalog -> exit=1
+[catalog-cases] case=catalog-directory-mismatch expect=fail actual=fail verdict=MATCH detail=matched-substring='does not equal the directory name'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-unknown-context --only module-catalog -> exit=1
+[catalog-cases] case=catalog-unknown-context expect=fail actual=fail verdict=MATCH detail=matched-substring='authoritative contexts'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-bad-ledger --only module-catalog -> exit=1
+[catalog-cases] case=catalog-bad-ledger expect=fail actual=fail verdict=MATCH detail=matched-substring='platform_module_migrations'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-bad-sql-schema --only module-catalog -> exit=1
+[catalog-cases] case=catalog-bad-sql-schema expect=fail actual=fail verdict=MATCH detail=matched-substring='sql_schema'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-catalog-not-a-directory --only module-catalog -> exit=1
+[catalog-cases] case=catalog-not-a-directory expect=fail actual=fail verdict=MATCH detail=matched-substring='is not a namespace directory'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-path-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-path-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-absolute-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-absolute-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-parent-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-parent-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-backslash-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-backslash-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-dot-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-dot-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='plain 'NNN_lower_name.sql' basename'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-ghost-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-ghost-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='no such file is in'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-missing-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-missing-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='absent from'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-duplicate-entry --only module-catalog -> exit=1
+[catalog-cases] case=manifest-duplicate-entry expect=fail actual=fail verdict=MATCH detail=matched-substring='lists '001_wave5b_fixture_foundation.sql' twice'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-revision-duplicate --only module-catalog -> exit=1
+[catalog-cases] case=revision-duplicate expect=fail actual=fail verdict=MATCH detail=matched-substring='revision 001 is used by more than one file'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-revision-gap --only module-catalog -> exit=1
+[catalog-cases] case=revision-gap expect=fail actual=fail verdict=MATCH detail=matched-substring='leaves a gap'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-non-canonical-digest --only module-catalog -> exit=1
+[catalog-cases] case=manifest-non-canonical-digest expect=fail actual=fail verdict=MATCH detail=matched-substring='canonical LF digest'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-empty-not-zero-bytes --only module-catalog -> exit=1
+[catalog-cases] case=manifest-empty-not-zero-bytes expect=fail actual=fail verdict=MATCH detail=matched-substring='blank line'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-manifest-unknown-digest --only module-catalog -> exit=1
+[catalog-cases] case=manifest-unknown-digest expect=fail actual=fail verdict=MATCH detail=matched-substring='canonical LF digest'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-unknown-namespace --only module-catalog -> exit=1
+[catalog-cases] case=dependency-unknown-namespace expect=fail actual=fail verdict=MATCH detail=matched-substring='unknown namespace 'acme''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-baseline-zero --only module-catalog -> exit=1
+[catalog-cases] case=dependency-baseline-zero expect=fail actual=fail verdict=MATCH detail=matched-substring='positive revision'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-baseline-unavailable --only module-catalog -> exit=1
+[catalog-cases] case=dependency-baseline-unavailable expect=fail actual=fail verdict=MATCH detail=matched-substring='pinned baseline provides 19'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-without-revision --only module-catalog -> exit=1
+[catalog-cases] case=dependency-without-revision expect=fail actual=fail verdict=MATCH detail=matched-substring=''<name>@<revision>''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-self --only module-catalog -> exit=1
+[catalog-cases] case=dependency-self expect=fail actual=fail verdict=MATCH detail=matched-substring='depends on itself'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-duplicate --only module-catalog -> exit=1
+[catalog-cases] case=dependency-duplicate expect=fail actual=fail verdict=MATCH detail=matched-substring='more than once'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-cycle --only module-catalog -> exit=1
+[catalog-cases] case=dependency-cycle expect=fail actual=fail verdict=MATCH detail=matched-substring='form a cycle'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-revision-unavailable --only module-catalog -> exit=1
+[catalog-cases] case=dependency-revision-unavailable expect=fail actual=fail verdict=MATCH detail=matched-substring='requires revision 1 of 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-dependency-same-target-twice --only module-catalog -> exit=1
+[catalog-cases] case=dependency-same-target-twice expect=fail actual=fail verdict=MATCH detail=matched-substring='more than once'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-renames-whole-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-renames-whole-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''RENAME TO' renames the whole table'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-likes-other-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-likes-other-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''LIKE <table>' copies another table's definition'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-partitions-of-host-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-partitions-of-host-table expect=fail actual=fail verdict=MATCH detail=matched-substring=''PARTITION OF' inherits a parent table'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-drops-host-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-drops-host-table expect=fail actual=fail verdict=MATCH detail=matched-substring='may not destroy it, even as its owner'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-drops-own-revision-table --only module-catalog -> exit=0
+[catalog-cases] case=sql-drops-own-revision-table expect=pass actual=pass verdict=MATCH detail=status=VALIDATED
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-references-other-owner --only module-catalog -> exit=1
+[catalog-cases] case=sql-references-other-owner expect=fail actual=fail verdict=MATCH detail=matched-substring='gives to owner 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-creates-other-owner-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-creates-other-owner-table expect=fail actual=fail verdict=MATCH detail=matched-substring='host baseline table owned by 'identity-management''
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-references-platform-ledger --only module-catalog -> exit=1
+[catalog-cases] case=sql-references-platform-ledger expect=fail actual=fail verdict=MATCH detail=matched-substring='platform ledger'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-undeclared-new-table --only module-catalog -> exit=1
+[catalog-cases] case=sql-undeclared-new-table expect=fail actual=fail verdict=MATCH detail=matched-substring='without an '@bp-owned: wave5b_fixture_policy_t4' declaration'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-declared-not-created --only module-catalog -> exit=1
+[catalog-cases] case=sql-declared-not-created expect=fail actual=fail verdict=MATCH detail=matched-substring='never creates it'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-dynamic-sql --only module-catalog -> exit=1
+[catalog-cases] case=sql-dynamic-sql expect=fail actual=fail verdict=MATCH detail=matched-substring='dollar-quoted'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-qualified-reference --only module-catalog -> exit=1
+[catalog-cases] case=sql-qualified-reference expect=fail actual=fail verdict=MATCH detail=matched-substring='schema-qualified'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-sql-unsupported-statement --only module-catalog -> exit=1
+[catalog-cases] case=sql-unsupported-statement expect=fail actual=fail verdict=MATCH detail=matched-substring='is outside the supported SQL subset'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-table-name-conflict --only module-catalog -> exit=1
+[catalog-cases] case=table-name-conflict expect=fail actual=fail verdict=MATCH detail=matched-substring='two namespaces may not create the same table'
+$ git clone --quiet --no-checkout F:\Workspace\business-platform F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo -> exit=0
+$ git -C F:\Workspace\business-platform rev-parse HEAD -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=0
+[history-cases] case=H1-clean-clone expect=pass actual=pass verdict=MATCH detail=history[5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601] baseline_revision=19 blob_entries_verified=40 working_tree_entries_verified=20 legacy_manifest_form_entries=7
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=1
+[history-cases] case=H2-worktree-drift expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: the working tree file 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo\migrations\009_document_content_revision.sql' differs from the pinned baseline beyond line endings (working tree 'cca074fcd66b421f6213b3d5a8e794f90bfa23befc2727ccc79f43e8c56b2c68', pinned 'dd7eb2a49e40424fc90eebd3721727face042d4a5c35034870ccdd1281f2af8d')
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=0
+[history-cases] case=H3-worktree-line-endings-only expect=pass actual=pass verdict=MATCH detail=CRLF checkout of the pinned LF blob
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo add -- migrations/013_runtime_governance_revision1.sql -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=1
+[history-cases] case=H4-staged-drift expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: the index stores '897d572b790833271eff4811b28db90830cc698f9b1acc47ed6e0f3c8351c8fd' for 'migrations/013_runtime_governance_revision1.sql' but the pinned commit stores '75db3032e1b7a6982d114655093961bb038571a6fa87ff744e1f26500bb6eaaf'; a historical baseline file has been staged
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo add -- migrations/013_runtime_governance_revision1.sql -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo -c user.email=wave5b@example.invalid -c user.name=wave5b commit -q -m wave5b negative: rewrite a historical migration -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=1
+[history-cases] case=H5-committed-drift expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: 'HEAD:migrations/013_runtime_governance_revision1.sql' hashes to '94749d88a3dcca24a3f6f378149489c5e1f16c6096666506f646ea8091cfe865' but the pinned commit stores '75db3032e1b7a6982d114655093961bb038571a6fa87ff744e1f26500bb6eaaf'; a historical baseline file has been rewritten
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=1
+[history-cases] case=H6-worktree-deleted expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: the working tree no longer contains 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo\migrations\013_runtime_governance_revision1.sql'; a historical baseline file has been deleted
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=0
+[history-cases] case=H7-new-baseline-sql-history expect=pass actual=pass verdict=MATCH detail=immutability covers the pinned 19; the count rule is the explicit freeze
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only baseline-candidate-freeze -> exit=1
+[freeze-cases] case=F2-extra-baseline-sql expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-candidate-freeze] check: the flat baseline directory must hold exactly the 19 pinned SQL files: '020_wave5b_negative.sql' is not part of the pinned baseline
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=1
+[history-cases] case=H8-manifest-extended expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: the working tree file 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo\migrations\MANIFEST.sha256' differs from the pinned baseline beyond line endings (working tree 'a33b46db49b4225029e6459261e660812b8d9fdaa0d41108018a05b61059c0c9', pinned '2dab28ce370eaa12e7e86b1ed84ea5c6fe77fa452938a85077a72270cde40c4c')
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only pinned-baseline-history -> exit=0
+[history-cases] case=H11-manifest-only-drift expect=fail actual=pass verdict=MISMATCH detail=
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+[history-cases] case=H12-manifest-line-removed expect=fail actual=mismatch-detail verdict=MISMATCH detail=the fixture did not find a 001_initial.sql row to remove
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only baseline-candidate-freeze -> exit=0
+[freeze-cases] case=F3-module-sql-not-baseline expect=pass actual=pass verdict=MATCH detail=freeze baseline_sql_files=19 subdirectories=modules
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo --only module-catalog -> exit=0
+[catalog-cases] case=F3-module-sql-catalog expect=pass actual=pass verdict=MATCH detail=namespace=policy owner=policy status=VALIDATED revisions=001+002 depends_on=platform-baseline@19
+$ git init -q F:\Workspace\business-platform\target\tmp\plan0014-wave5b\no-pinned-commit -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\no-pinned-commit add -A -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\no-pinned-commit -c user.email=wave5b@example.invalid -c user.name=wave5b commit -q -m wave5b negative: a history without the pinned commit -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\no-pinned-commit --only pinned-baseline-history -> exit=1
+[history-cases] case=H10-no-pinned-commit expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [pinned-baseline-history] check: pinned commit 5c8355dceba9cf062a63fa6a2b5c6ef1ff41b601 is not present in this repository; the historical baseline cannot be verified and the check does not fall back to HEAD or to any other revision
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo checkout --quiet --force b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo reset --quiet --hard b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 -> exit=0
+$ git -C F:\Workspace\business-platform\target\tmp\plan0014-wave5b\history-repo clean -qfdx -> exit=0
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\freeze-copy --only baseline-candidate-freeze -> exit=0
+[freeze-cases] case=F1-clean-copy expect=pass actual=pass verdict=MATCH detail=freeze baseline_sql_files=19 subdirectories=modules
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\freeze-copy --only baseline-candidate-freeze -> exit=1
+[freeze-cases] case=F4-extra-subdirectory expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-candidate-freeze] check: 'migrations/archive' mixes a subdirectory into the flat baseline; only 'migrations/modules' is allowed there
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\freeze-copy --only baseline-candidate-freeze -> exit=1
+[freeze-cases] case=F5-stray-file expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-candidate-freeze] check: 'migrations/NOTES.txt' is not part of the pinned baseline directory, which holds exactly the 19 pinned SQL files, the pinned manifest and 'migrations/modules'
+embed-tree=F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree (working tree copy of apps/ crates/ migrations/)
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree --only baseline-embed -> exit=0
+[embed-cases] case=E1-working-tree expect=pass actual=pass verdict=MATCH detail=embed scanned_rs_files=261 baseline_embed_points=1 crate_relative_embeds=2
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree --only baseline-embed -> exit=1
+[embed-cases] case=E2-second-baseline-embed expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-embed] check: 2 call sites embed the host baseline catalog ('crates/messaging/src/second_embed.rs':1, 'crates/runtime-migration/src/lib.rs':6); the only allowed baseline embed point is 'crates/runtime-migration/src/lib.rs'
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree --only baseline-embed -> exit=1
+[embed-cases] case=E3-non-literal-argument expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-embed] check: the 'migrate' macro in 'crates/messaging/src/second_embed.rs:1' does not have a plain string literal as its only argument
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree --only baseline-embed -> exit=1
+[embed-cases] case=E4-embed-leaves-owning-crate expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-embed] check: the embed at 'crates/runtime-migration/src/lib.rs:6' names '../document-sqlite/migrations', which resolves to '\\?\F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree\crates\document-sqlite\migrations' and leaves the owning crate '\\?\F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree\crates\runtime-migration'; only the host baseline and a crate's own migration directory may be embedded
+$ cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform\target\tmp\plan0014-wave5b\embed-tree --only baseline-embed -> exit=1
+[embed-cases] case=E4b-baseline-embed-missing expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [baseline-embed] check: no file embeds the host baseline catalog; the single embed point 'crates/runtime-migration/src/lib.rs' is missing, so the platform would silently lose its migrations
+[embed-cases] case=E5-outbox_reliability.rs expect=pass actual=pass verdict=MATCH detail=applies the baseline through runtime_migration::MIGRATOR
+[embed-cases] case=E5-chain_pg.rs expect=pass actual=pass verdict=MATCH detail=applies the baseline through runtime_migration::MIGRATOR
+scratch volume cannot hold reparse points; link cases use C:\Users\admin\AppData\Local\Temp\plan0014-wave5b-links
+link-scratch=C:\Users\admin\AppData\Local\Temp\plan0014-wave5b-links reparse-capable=True
+$ cargo run -q -p module-release-tool -- catalog-check --repo C:\Users\admin\AppData\Local\Temp\plan0014-wave5b-links\link-junction --only module-catalog -> exit=1
+[path-cases] case=P1-namespace-junction expect=fail actual=fail verdict=MATCH detail=module-release: refused by the [module-catalog] check: namespace directory 'C:\Users\admin\AppData\Local\Temp\plan0014-wave5b-links\link-junction\migrations/modules\policy' is a symbolic link or reparse point
+[path-cases] case=P2-catalog-symlink expect=fail actual=not-run verdict=BLOCKED detail=the host refused to create a file symbolic link: 此操作需要管理员权限。 (the repository volume is exFAT, which holds no reparse points)
+summary catalog-cases cases=51 matched=51 blocked=0 mismatched=0
+summary history-cases cases=11 matched=9 blocked=0 mismatched=2
+summary embed-cases cases=7 matched=7 blocked=0 mismatched=0
+summary freeze-cases cases=5 matched=5 blocked=0 mismatched=0
+summary path-cases cases=2 matched=1 blocked=1 mismatched=0
+summary total cases=76 mismatched=2 blocked=1
+BLOCKED (could not run on this platform):
+  blocked [path-cases] P2-catalog-symlink: the host refused to create a file symbolic link: 此操作需要管理员权限。 (the repository volume is exFAT, which holds no reparse points)
+evidence written to F:\Workspace\business-platform\docs\reviews\2026-09-30-wave5b-s1-gates\wave5b-cases
+scratch: F:\Workspace\business-platform\target\tmp\plan0014-wave5b
+警告: scratch 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b' could not be removed: 目录不是空的。 : 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-reserved'.
+MISMATCH [history-cases] H11-manifest-only-drift: expect=fail actual=pass 
+MISMATCH [history-cases] H12-manifest-line-removed: expect=fail actual=mismatch-detail the fixture did not find a 001_initial.sql row to remove
+Exception: F:\Workspace\business-platform\scripts\test-plan0014-wave5b.ps1:810
+Line |
+ 810 |      throw "$($mismatched.Count) Wave 5B-S1 case(s) disagreed with the …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | 2 Wave 5B-S1 case(s) disagreed with their expectation
+警告: scratch 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b' could not be removed: 目录不是空的。 : 'F:\Workspace\business-platform\target\tmp\plan0014-wave5b\catalog-validated'.

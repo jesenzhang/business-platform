@@ -1,0 +1,15 @@
+== cargo test -p document-processing-postgres --test contracts --all-features -- --include-ignored --test-threads=1 ==
+   Compiling document-processing-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-processing-postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.56s
+     Running tests\contracts.rs (target\debug\deps\contracts-1fe666830c26cd41.exe)
+
+running 3 tests
+test postgres_processing_contract_claims_and_restarts ... ok
+test postgres_processing_contract_reclaims_expired_ai_task ... ok
+test postgres_processing_revision_one_uow_is_atomic_and_replayable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+
+
+EXIT_CODE=0
+

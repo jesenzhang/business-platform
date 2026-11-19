@@ -1,0 +1,22 @@
+# gate: 21-catalog-check-only-catalog
+# command: rtk proxy cargo run -q -p module-release-tool -- catalog-check --repo F:\Workspace\business-platform --only module-catalog
+# started: 2026-09-30 17:19:55 +08:00
+# finished: 2026-09-30 17:19:56 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1h7gxbhfw2cy2\s-hmrrqhotii-0v9iaik-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\module_release_tool-1ps0ci96ms36f\s-hmrrqk9djc-0l20r6z-working`
+
+checks=module-catalog
+namespace=identity-management owner=identity-management status=RESERVED revisions= depends_on=platform-baseline@19
+namespace=policy owner=policy status=RESERVED revisions= depends_on=platform-baseline@19
+order=identity-management>policy
+status=ok
+root=F:\Workspace\business-platform

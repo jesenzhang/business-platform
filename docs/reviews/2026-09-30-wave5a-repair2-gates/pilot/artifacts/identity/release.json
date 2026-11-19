@@ -1,0 +1,17 @@
+{
+  "schema_version": "module-release.identity.v1",
+  "module_id": "identity",
+  "module_version": "0.1.0-rc.1",
+  "manifest_schema_version": "business-module.manifest.v1",
+  "source_revision": "c22939f0a51e3c7fa2ec424f3819c6e7113a9b66",
+  "contract_digest": "3fed976b0ac5e040366f696a1c4a7fe6140bd5bc956996fc8b51a141eba31107",
+  "package_digest": "b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70",
+  "migration_revision": {
+    "migration_namespace": "identity-management",
+    "set_digest": "ef43cfa9a90a367bb9b774834f5b9c150ca67cd27bce65e4016b1c82a062ae03"
+  },
+  "build_toolchain": {
+    "toolchain_id": "rust-toolchain-1.94.1",
+    "version": "1.94.1"
+  }
+}

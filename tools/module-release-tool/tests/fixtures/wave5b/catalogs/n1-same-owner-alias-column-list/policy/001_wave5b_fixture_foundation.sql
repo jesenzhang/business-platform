@@ -1,0 +1,1 @@
+INSERT INTO roles (role_id) SELECT r.id FROM roles AS r(role_id), role_permissions rp;

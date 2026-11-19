@@ -14,8 +14,27 @@ use runtime_governance_postgres::PostgresGovernanceStore;
 use sqlx::postgres::PgPoolOptions;
 use tokio::time::Duration;
 
+/// PLAN-0014 Wave 4 gap OBS-W4-01: this process used to install no tracing
+/// subscriber at all, so every `tracing::*` call on the governance scan and
+/// repair path was silently discarded. Logging is initialised first so that
+/// configuration and connection failures are observable too.
+fn init_observability() -> anyhow::Result<observability::TracingGuard> {
+    let log_level = std::env::var("GOVERNANCE_LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    let log_format = observability::LogFormat::parse(
+        &std::env::var("GOVERNANCE_LOG_FORMAT").unwrap_or_else(|_| "text".to_string()),
+    )
+    .ok_or_else(|| anyhow::anyhow!("unsupported GOVERNANCE_LOG_FORMAT"))?;
+    observability::init_tracing(
+        "governance-worker",
+        &log_level,
+        log_format,
+        std::env::var("GOVERNANCE_OTLP_ENDPOINT").ok().as_deref(),
+    )
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _tracing_guard = init_observability()?;
     let backend = std::env::var("GOVERNANCE_DATABASE_BACKEND")
         .context("GOVERNANCE_DATABASE_BACKEND is required")?;
     let url =

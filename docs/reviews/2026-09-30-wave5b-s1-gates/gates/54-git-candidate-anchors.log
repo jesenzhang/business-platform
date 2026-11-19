@@ -1,0 +1,10 @@
+# gate: 54-git-candidate-anchors
+# command: git log --oneline -n 3 --format=%H %ad %s --date=iso-strict
+# started: 2026-09-30 17:38:16 +08:00
+# finished: 2026-09-30 17:38:16 +08:00
+# duration-seconds: 0
+# exit-code: 0
+
+b25e2d4a9b455b776934495b8f3dfd2b71a13fe2 2026-09-30T17:21:22+08:00 feat(plan-0014): add the wave 5b-s1 offline catalog gate
+6decf1ad9ea05233d66dd3539594ff210afd99f2 2026-09-30T15:36:58+08:00 docs(plan-0014): correct the wave 5b-0 revision 1 package against the re-review findings
+7355c99c97a683480ca8ad762d3900b13188bcda 2026-09-30T13:45:50+08:00 docs(plan-0014): revise the wave 5b-0 design package against the B1/B2/B3 findings

@@ -1,0 +1,17 @@
+title      : generate policy (attempt run-a)
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe generate --module policy --out F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-a
+workdir    : F:\Workspace\business-platform
+utc        : 20260930T032956Z
+status=generated
+module_id=policy
+module_version=0.1.0-rc.1
+directory=F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-a\policy-0.1.0-rc.1
+members=23
+contract_digest=52e788ff3187846c4484cc42a3891aa7833f89ff65d666c7b3c7e1af831568c8
+package_digest=37e95a19b45c3dcc00e2f4099d91cc72ed63af71f19d769882412af8b2ddd4b6
+artifact_integrity_digest=f8add9e0ce13f0c1e33a52eb2f28a85f726c649534e8d10584cdaf4ff6ecb243
+source_revision=c22939f0a51e3c7fa2ec424f3819c6e7113a9b66
+toolchain=rust-toolchain-1.94.1 1.94.1
+platform_version=0.1.0
+
+exit code : 0 (expected 0)

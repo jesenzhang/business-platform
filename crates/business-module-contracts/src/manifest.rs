@@ -249,21 +249,7 @@ impl PackageDigest {
     /// Creates a package digest from 64 lower-case hexadecimal characters.
     pub fn new(value: impl Into<String>) -> Result<Self, ModuleContractError> {
         let value = value.into();
-        if value.is_empty() {
-            return Err(ModuleContractError::EmptyValue {
-                kind: "package digest",
-            });
-        }
-        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(ModuleContractError::InvalidCharacters {
-                kind: "package digest",
-            });
-        }
-        if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-            return Err(ModuleContractError::InvalidCharacters {
-                kind: "package digest",
-            });
-        }
+        validate_sha256_hex(&value, "package digest")?;
         Ok(Self(value))
     }
 
@@ -1426,6 +1412,25 @@ pub enum ManifestValidationError {
     InvalidVersionRequirement { requirement: String },
 }
 
+/// Validates a canonical SHA-256 digest string: exactly 64 lower-case
+/// hexadecimal characters. Shared by every digest newtype in this crate so
+/// package, contract and migration-set digests cannot drift apart.
+pub(crate) fn validate_sha256_hex(
+    value: &str,
+    kind: &'static str,
+) -> Result<(), ModuleContractError> {
+    if value.is_empty() {
+        return Err(ModuleContractError::EmptyValue { kind });
+    }
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(ModuleContractError::InvalidCharacters { kind });
+    }
+    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        return Err(ModuleContractError::InvalidCharacters { kind });
+    }
+    Ok(())
+}
+
 fn validate_module_id(value: &str) -> Result<(), ModuleContractError> {
     validate_lower_kebab_id(value, "module ID")
 }
@@ -1485,7 +1490,10 @@ fn with_identity_kind(error: ModuleContractError, kind: &'static str) -> ModuleC
     }
 }
 
-fn validate_version_token(value: &str, kind: &'static str) -> Result<(), ModuleContractError> {
+pub(crate) fn validate_version_token(
+    value: &str,
+    kind: &'static str,
+) -> Result<(), ModuleContractError> {
     validate_length_and_non_empty(value, kind)?;
     if !value
         .chars()
@@ -1521,20 +1529,26 @@ fn validate_non_empty(value: &str, kind: &'static str) -> Result<(), ManifestVal
 
 fn validate_namespace(value: &str) -> Result<(), ManifestValidationError> {
     validate_non_empty(value, "migration namespace")?;
-    if !value.chars().all(|character| {
-        character.is_ascii_lowercase() || character.is_ascii_digit() || ".-_".contains(character)
-    }) || value.starts_with('.')
-        || value.starts_with('-')
-        || value.starts_with('_')
-        || value.ends_with('.')
-        || value.ends_with('-')
-        || value.ends_with('_')
-    {
+    if !is_valid_namespace_characters(value) {
         return Err(ManifestValidationError::InvalidField {
             kind: "migration namespace with valid characters",
         });
     }
     Ok(())
+}
+
+/// Character rules for owner-scoped migration namespaces. Shared with the
+/// release metadata contract so a migration revision pins exactly the same
+/// namespace grammar the module manifest declares.
+pub(crate) fn is_valid_namespace_characters(value: &str) -> bool {
+    value.chars().all(|character| {
+        character.is_ascii_lowercase() || character.is_ascii_digit() || ".-_".contains(character)
+    }) && !value.starts_with('.')
+        && !value.starts_with('-')
+        && !value.starts_with('_')
+        && !value.ends_with('.')
+        && !value.ends_with('-')
+        && !value.ends_with('_')
 }
 
 fn validate_capabilities(

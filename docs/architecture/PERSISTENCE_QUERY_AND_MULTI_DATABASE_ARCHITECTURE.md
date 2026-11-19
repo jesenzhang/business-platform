@@ -114,3 +114,51 @@ Critical queries document indexes, scale assumptions, EXPLAIN evidence, maximum
 rows, timeout, tenant filter and permission filter. Keyset pagination uses a
 stable unique tie-breaker. Read models expose lag/failure metrics. Adapter errors
 are sanitised at core seams; URLs and sensitive row data are not logged.
+
+## PLAN-0014 Wave 3 SQLite audit bootstrap correction (2026-09-27)
+
+Document's SQLite bootstrap already creates the shared audit_events table.
+Migration 006 completes its Audit-owned chain format without requiring the
+Processing catalog. No business or audit semantic ownership is transferred.
+Document-only contract tests and composed-profile tests are separate.
+
+Use document_sqlite::MIGRATOR.run(&pool), including through the migration CLI.
+The exported adapter migrator preserves run(pool)/iter() usage; its concrete
+type is DocumentMigrator. It validates SQLx historical checksums and dirty or
+unknown versions. For 006 it conditionally adopts the three chain columns and
+applies backfill, indexes and SQLx migration registration atomically under
+BEGIN IMMEDIATE. This permits upgrading databases where historical Processing
+004 already supplied those columns. Historical migration SQL is unchanged.
+
+Existing v1 rows retain their hashes. Pre-chain all-NULL metadata is migrated
+to explicit unverified legacy rows; no historical verification is manufactured.
+Explicit version 0 with hashes remains invalid at read time. Back up before
+upgrade; rollback retains additive columns and the audit history. Directly
+executing 006 SQL bypasses its documented conditional-column precondition and
+is not the supported migration entry point.
+
+Evidence and limits: [Wave 3 Round 2 repair](../reviews/2026-09-27-wave3-round2-repair.md).
+
+## Audit hash timestamp precision across backends (2026-09-27)
+
+`record_hash` covers `occurred_at` and `recorded_at`, so a chain is only as
+verifiable as the precision the storage layer preserves for those fields.
+PostgreSQL `TIMESTAMPTZ` stores microseconds; `chrono::Utc::now()` carries
+nanoseconds. SQLite stores RFC 3339 text and round-trips nanoseconds, so the two
+backends do not have the same failure mode.
+
+Contract: every timestamp that enters `record_hash` is aligned to microsecond
+precision by `audit::canonical_timestamp` before signing, at event construction
+and in `with_chain_metadata`. A digest is therefore identical across supported
+backends and stable across a persistence round trip.
+
+`AuditEvent::rehydrate` does not normalize. Verification must compare against
+the bytes a row was signed with, so stored timestamps are preserved exactly,
+history is never reinterpreted and no checksum is rewritten. Rows written to
+PostgreSQL before this contract held are unverifiable and stay an
+operator-visible failure requiring separate reviewed repair, not automatic
+re-signing.
+
+Pinned by `audit::hash_inputs_survive_a_microsecond_persistence_round_trip`,
+which includes a one-nanosecond negative control. Discovery and evidence:
+[pg-discovery](../reviews/2026-09-27-wave3-round2-gates/pg-discovery/README.md).

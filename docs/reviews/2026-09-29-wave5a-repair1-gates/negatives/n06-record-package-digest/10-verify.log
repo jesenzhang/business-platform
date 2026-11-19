@@ -1,0 +1,7 @@
+title      : artifact-manifest.json pins a package digest release.json does not claim
+command    : F:\Workspace\business-platform\target\debug\module-release-tool.exe verify --artifact F:\Workspace\business-platform\target\wave5a-repair1\run-20260929T075734Z\negatives\n06-record-package-digest\identity-0.1.0-rc.1
+workdir    : F:\Workspace\business-platform
+utc        : 20260929T075933Z
+module-release: artifact verification failed [record-consistency]: artifact-manifest.json says package_digest = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' while release.json says 'b9dfa42ccd09190020c39ee8bf412507de2107810fc2414efdc3415761053c70'; one artifact may not describe two releases
+
+exit code : 1 (expected 1)

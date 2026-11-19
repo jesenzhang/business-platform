@@ -1,0 +1,18 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpfs7wuzc-0c386n0-working`
+
+   Compiling observability v0.1.0 (F:\Workspace\business-platform\crates\observability)
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpfy0knmo-1rr1361-working`
+
+warning: `observability` (lib) generated 1 warning
+   Compiling object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.23s
+     Running tests\sdk_log_hygiene.rs (target\debug\deps\sdk_log_hygiene-202c3266b5def5c5.exe)
+
+running 4 tests
+test child_entry_point ... ok
+test sentinels_do_not_contain_each_other ... ok
+test turning_every_provider_target_to_trace_does_not_leak ... ok
+test every_configured_case_keeps_storage_references_out_of_the_log_stream ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.44s

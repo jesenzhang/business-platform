@@ -1,0 +1,70 @@
+== cargo clippy --workspace --all-targets --all-features -- -D warnings ==
+    Checking audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-2cnps1sc9fk0x\s-hmp6yysl6m-0fnsqpj-working`
+
+warning: `audit` (lib) generated 1 warning
+    Checking document-processing-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-processing-sqlite)
+    Checking audit-sqlite v0.1.0 (F:\Workspace\business-platform\crates\audit-sqlite)
+    Checking document-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-sqlite)
+    Checking audit-postgres v0.1.0 (F:\Workspace\business-platform\crates\audit-postgres)
+    Checking document-processing-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-processing-postgres)
+    Checking document-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-0t32hu6950btk\s-hmook1c9zc-19ezb56-working`
+
+warning: `architecture-check` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-1sx9chkktembf\s-hmook1ll61-07iuz3g-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-1h69uvifpgd4x\s-hmook1lc27-1xl67zq-working`
+
+warning: `architecture-check` (bin "architecture-check" test) generated 1 warning
+warning: `architecture-check` (bin "architecture-check") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-0xc744e5gkvtl\s-hmp6yz32ab-1xco7wh-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-2dl19u7lovu03\s-hmp6yz3c7m-0nereo9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-17cddvrb6001r\s-hmp6yz3c87-1eh47cf-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-1psicng3976rq\s-hmp6yz3tzu-1tilxqx-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-37kq18mklmghq\s-hmp6yz3e3k-08sdw82-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-350jy0cltfkxm\s-hmp6yz3e3m-189kady-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-1lrfcj8de8isv\s-hmook1k023-116uwqi-working`
+
+warning: `architecture-check` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-11e76sjjmuhbn\s-hmp6yzapvc-07o1gs9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-21h0sdiqery2p\s-hmp6yzasef-0iffkwa-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-2ymo8c0ax0e54\s-hmp6yzau1b-082z00z-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-2nskzqs8q5a9n\s-hmp6yzapv5-1hbkbrj-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-1dnjaxl2n4w4j\s-hmp6yzf6ve-1agm7fs-working`
+
+error: unused variable: `tenant`
+   --> crates\audit\src\lib.rs:866:13
+    |
+866 |         let tenant = historical.tenant_id();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_tenant`
+    |
+    = note: `-D unused-variables` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+warning: `audit` (lib test) generated 1 warning
+error: could not compile `audit` (lib test) due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `audit-postgres` (lib test) generated 1 warning
+warning: `document-postgres` (lib) generated 1 warning
+warning: `audit-postgres` (lib) generated 1 warning
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-postgres` (lib test) generated 1 warning
+warning: `document-sqlite` (lib) generated 1 warning
+warning: `document-processing-postgres` (lib test) generated 1 warning
+warning: `document-processing-postgres` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib test) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+
+EXIT_CODE=101
+

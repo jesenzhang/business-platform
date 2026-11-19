@@ -1,0 +1,6 @@
+gate : git-diff-check
+cmd  : git diff --check
+utc  : 
+2026-09-29T02:44:53Z
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+exit code : 0

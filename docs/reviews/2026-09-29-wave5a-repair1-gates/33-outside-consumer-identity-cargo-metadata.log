@@ -1,0 +1,11 @@
+title      : 33-outside-consumer-identity : resolve the consumer dependency graph (cargo metadata, full graph)
+command    : cargo metadata --format-version 1 --locked --offline --filter-platform x86_64-pc-windows-msvc
+workdir    : F:\wave5a-repair1-outside\20260929T075734Z\consumers\identity
+utc        : 20260929T075914Z
+
+The cargo metadata document this step printed is kept beside this log as
+`34-outside-consumer-identity-cargo-metadata.json`, and that file is exactly what
+`module-release guard --metadata` was handed; its body is omitted here so the evidence
+directory stays small.
+
+exit code : 0 (expected 0)

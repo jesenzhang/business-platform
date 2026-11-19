@@ -1,0 +1,26 @@
+[package]
+name = "module-release-tool"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "PLAN-0014 Wave 5A local release-candidate assembler: pins a real module declaration into a verifiable, reproducible candidate artifact. Local pilot tooling only; it does not publish, register, install or deploy."
+
+[package.metadata.architecture]
+context = "platform-tooling"
+bounded_context = "platform-tooling"
+layer = "tooling"
+role = "release-candidate-tool"
+data_owner = "platform-foundation"
+
+[dependencies]
+business-application-compiler = { workspace = true }
+business-module-contracts = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

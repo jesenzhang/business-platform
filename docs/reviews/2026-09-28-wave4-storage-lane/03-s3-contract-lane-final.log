@@ -1,0 +1,77 @@
+RUN_ID=run-20260928-110319 (protocol: full run, then cleanup-only run, then bucket delete)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2ug1dniy2ana3\s-hmp9zk5hi9-1v50vvn-working`
+
+warning: `object-storage` (lib) generated 1 warning
+   Compiling object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-3kcj04cd9itf3\s-hmpa0saowx-1xxp4ub-working`
+
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.61s
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-b22bc35cd7d139ae.exe)
+
+running 7 tests
+test lane_delete_of_absent_object_is_idempotent ... LANE created dedicated bucket plan0014-wave4-bucket
+ok
+test lane_deletes_the_dedicated_bucket_when_requested ... LANE bucket deletion skipped (WAVE4_S3_DELETE_BUCKET != true)
+ok
+test lane_leaves_no_objects_under_the_run_prefix ... LANE created dedicated bucket plan0014-wave4-bucket
+LANE cleanup removed 0 objects, remaining under plan0014-wave4/run-20260928-110319/: 0
+ok
+test lane_presigned_url_is_key_scoped_and_expires ... LANE created dedicated bucket plan0014-wave4-bucket
+ok
+test lane_records_provider_capabilities ... LANE created dedicated bucket plan0014-wave4-bucket
+CAPABILITY multipart upload_part error: service error
+CAPABILITY multipart upload_part_5mib: false
+CAPABILITY multipart complete_multipart_upload: false
+CAPABILITY multipart abort_multipart_upload: true
+CAPABILITY multipart explicit_outcome: true
+LANE created dedicated bucket plan0014-wave4-bucket
+CAPABILITY conditional_read if_match: true
+CAPABILITY conditional_read stale_etag_rejected: true
+CAPABILITY object_checksums put_with_sdk_crc32: true
+CAPABILITY object_checksums write_echoed=Some("xjIjIw==") head_returns_checksum=true
+CAPABILITY object_versioning status: Ok("unconfigured")
+ok
+test lane_reports_missing_object_as_not_found ... LANE created dedicated bucket plan0014-wave4-bucket
+ok
+test lane_round_trips_object_metadata_and_payload ... LANE created dedicated bucket plan0014-wave4-bucket
+ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.31s
+
+main_run_exit=0
+--- second invocation: cleanup only ---
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2ug1dniy2ana3\s-hmp9zk5hi9-1v50vvn-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-3kcj04cd9itf3\s-hmpa0saowx-1xxp4ub-working`
+
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.24s
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-b22bc35cd7d139ae.exe)
+
+running 1 test
+test lane_leaves_no_objects_under_the_run_prefix ... LANE created dedicated bucket plan0014-wave4-bucket
+LANE cleanup removed 0 objects, remaining under plan0014-wave4/run-20260928-110319/: 0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.03s
+
+cleanup_run_exit=0
+--- third invocation: delete the dedicated bucket ---
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2ug1dniy2ana3\s-hmp9zk5hi9-1v50vvn-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-3kcj04cd9itf3\s-hmpa0saowx-1xxp4ub-working`
+
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.79s
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-b22bc35cd7d139ae.exe)
+
+running 1 test
+test lane_deletes_the_dedicated_bucket_when_requested ... LANE deleted dedicated bucket plan0014-wave4-bucket
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.17s
+
+bucket_delete_exit=0

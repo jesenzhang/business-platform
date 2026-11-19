@@ -1,0 +1,42 @@
+== cargo test -p audit-postgres --test chain_pg --all-features -- --include-ignored --test-threads=1 ==
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\chain_pg-2fv2p0by4gdbj\s-hmonw06780-1xg0tst-working`
+
+warning: `audit-postgres` (test "chain_pg") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running tests\chain_pg.rs (target\debug\deps\chain_pg-846e36de7caa8f3a.exe)
+
+running 3 tests
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... FAILED
+test concurrent_appends_form_one_verified_tenant_chain ... FAILED
+test legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them ... FAILED
+
+failures:
+
+---- chain_detects_mutation_and_interior_deletion_but_not_tail_truncation stdout ----
+
+thread 'chain_detects_mutation_and_interior_deletion_but_not_tail_truncation' (36580) panicked at crates\audit-postgres\tests\chain_pg.rs:198:5:
+assertion failed: verification.valid && verification.verified_count == 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- concurrent_appends_form_one_verified_tenant_chain stdout ----
+
+thread 'concurrent_appends_form_one_verified_tenant_chain' (30672) panicked at crates\audit-postgres\tests\chain_pg.rs:156:5:
+concurrent appends must form one contiguous verified chain: AuditChainVerification { checked: 0, legacy_count: 0, verified_count: 0, valid: false, first_broken_id: Some(01a0e36b-3f00-7f80-94d5-0a32cdcc5074), chain_version: 1 }
+
+---- legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them stdout ----
+
+thread 'legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them' (40968) panicked at crates\audit-postgres\tests\chain_pg.rs:280:5:
+legacy rows are an explicit unverified boundary, new rows protected: AuditChainVerification { checked: 0, legacy_count: 1, verified_count: 0, valid: false, first_broken_id: Some(01a0e36b-414b-7c30-8299-e6e9f6015b4d), chain_version: 1 }
+
+
+failures:
+    chain_detects_mutation_and_interior_deletion_but_not_tail_truncation
+    concurrent_appends_form_one_verified_tenant_chain
+    legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+error: test failed, to rerun pass `-p audit-postgres --test chain_pg`
+
+EXIT_CODE=101
+

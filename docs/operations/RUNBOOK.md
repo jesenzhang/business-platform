@@ -2,7 +2,7 @@
 
 > 文档类型：Operations Runbook
 > 状态：Draft（PLAN-0012 T4.5）
-> 最后更新：2026-09-02
+> 最后更新：2026-10-22（新增构建产物与临时文件清理）
 > 适用范围：business-api、business-worker、ai-worker、governance-worker、agent-adapter、business-console、PostgreSQL、对象存储（S3/MinIO）
 
 ## 1. 部署拓扑与进程
@@ -75,4 +75,13 @@
 - 备份/恢复演练已在 CI `integration` job 的真实 PostgreSQL/MinIO service containers 上执行（pinned `mc` + checksum 校验，2026-09-02 起）；真实预生产栈上的演练与 Prometheus/Grafana 抓取、dashboard、标签基数验证待预生产首跑（配置在 `deploy/observability/`）；
 - 预生产验收（20 并发性能 smoke、真实 IdP/model-provider 全链路、v0.1 tag）见 `docs/reports/PLAN-0012-COMPLETION-AUDIT.md`：因当前环境无 staging/真实凭据，标记 BLOCKED/NOT RUN；
 - IdP demo compose 与 console 登录流程（T3.3）后置；
-- 性能/容量基线（M5 T5.1）尚未建立。
+- 性能/容量基线（M5 T5.1）尚未建立；
+- `scripts/test-plan0014-wave5b.ps1` 在 `target/tmp` 不存在时拒绝启动（干净工作区无法直接跑门禁），待后续补丁修复；临时绕过见 §9。
+
+## 9. 构建产物与临时文件清理
+
+- 工具：`scripts/clean-target.ps1`。默认删除 `target/` 下全部内容（含各测试轮次遗留的 `wave5b-*` scratch build 目录）；`-KeepRelease` 保留 `target/release`；`-DryRun` 只打印不删除。脚本拒绝在 `cargo`/`rustc` 运行期间执行，对 junction/symlink 只删链接、不递归目标。
+- 原则：`target/` 完全可重建，不是交付物。完整 debug 构建实测约 26–28 GB；清理后工作区（不含 `.git`）约 0.2 GB。
+- 测试临时目录：门禁驱动默认写 `target/tmp/<run>` 并在退出时自行清理；`%TEMP%` 下应只出现以 `wave5b-*`、`w5b-*` 命名的短生命周期目录。
+- 不要删除：`docs/reviews/**/` 的 gate 证据（untracked 不代表可丢弃，独立复评要用）、`~/.cargo` 与 `~/.rustup`（共享缓存，不属于本项目临时产物）、`Cargo.lock`。
+- 清理后首次构建明显变慢（预计 15–30 分钟），属于预期代价；不要在评审窗口内清理并立即声称门禁通过。

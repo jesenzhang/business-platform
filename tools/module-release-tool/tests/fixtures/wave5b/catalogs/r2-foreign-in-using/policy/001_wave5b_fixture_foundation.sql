@@ -1,0 +1,1 @@
+DELETE FROM roles USING roles r, platform_users p;

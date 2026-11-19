@@ -57,6 +57,14 @@ members = [
     "crates/messaging",
     "crates/observability",
     "crates/legacy-migration-rehearsal",
+    "tools/module-release-tool",
+]
+
+# Out-of-workspace release-candidate consumers. They must never become workspace
+# members: proving that a published artifact builds on its own requires that the
+# workspace does not resolve them (PLAN-0014 Wave 2 review G-202).
+exclude = [
+    "tools/module-release-tool/consumers",
 ]
 
 [workspace.package]

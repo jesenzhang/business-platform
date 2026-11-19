@@ -1,0 +1,61 @@
+== REPRODUCTION: cargo test -p audit-sqlite --all-features with the rehydrate occurred_at restore removed ==
+Shows the repository-level consequence of defect R1: an intact historical 
+nanosecond row is reported as a broken chain by the real SqliteAuditStore.
+
+   Compiling audit v0.1.0 (F:\Workspace\business-platform\crates\audit)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp6t9j8en-0lzvbds-working`
+
+   Compiling document-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-sqlite)
+   Compiling audit-sqlite v0.1.0 (F:\Workspace\business-platform\crates\audit-sqlite)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-27dmxy0o7abtw\s-hmp6ta2wrm-10uhu6k-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_sqlite-1vunrzvq93s8g\s-hmp6ta3ni7-0za8tsm-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-sqlite` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-0sb02p7jaeo3i\s-hmp6tcl5u8-1pac1du-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\historical_chain-3cf75gro544pu\s-hmp6tclckt-0ev1kth-working`
+
+warning: `audit-sqlite` (lib test) generated 1 warning
+warning: `audit-sqlite` (test "historical_chain") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.22s
+     Running unittests src\lib.rs (target\debug\deps\audit_sqlite-07c97d0eec057dbb.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\historical_chain.rs (target\debug\deps\historical_chain-fefac43bc2790907.exe)
+
+running 2 tests
+test tampering_with_the_historical_row_breaks_verification ... FAILED
+test repository_reverifies_a_historical_nanosecond_row ... FAILED
+
+failures:
+
+---- tampering_with_the_historical_row_breaks_verification stdout ----
+
+thread 'tampering_with_the_historical_row_breaks_verification' (40780) panicked at crates\audit-sqlite\tests\historical_chain.rs:245:5:
+AuditChainVerification { checked: 0, legacy_count: 0, verified_count: 0, valid: false, first_broken_id: Some(49ed89fe-7a4a-4c82-9b6a-3f1c2d5e6a01), chain_version: 1 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- repository_reverifies_a_historical_nanosecond_row stdout ----
+
+thread 'repository_reverifies_a_historical_nanosecond_row' (39236) panicked at crates\audit-sqlite\tests\historical_chain.rs:164:5:
+assertion `left == right` failed: the repository must hand back the stored occurred_at unchanged
+  left: 2026-09-26T12:00:00.123456Z
+ right: 2026-09-26T12:00:00.123456789Z
+
+
+failures:
+    repository_reverifies_a_historical_nanosecond_row
+    tampering_with_the_historical_row_breaks_verification
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p audit-sqlite --test historical_chain`
+
+EXIT_CODE=101
+

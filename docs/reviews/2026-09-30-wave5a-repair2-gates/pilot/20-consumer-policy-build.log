@@ -1,0 +1,31 @@
+title      : build the out-of-workspace policy consumer against the released artifact
+command    : cargo build --manifest-path F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\policy\Cargo.toml --all-features
+workdir    : F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\policy
+utc        : 20260930T033143Z
+    Updating crates.io index
+     Locking 50 packages to latest compatible versions
+      Adding thiserror v2.0.20 (available: v2.0.21)
+      Adding thiserror-impl v2.0.20 (available: v2.0.21)
+      Adding uuid v1.26.0 (available: v1.26.1)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling autocfg v1.5.1
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling thiserror v2.0.20
+   Compiling cfg-if v1.0.5
+   Compiling windows-link v0.2.1
+   Compiling sha1_smol v1.0.1
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.6
+   Compiling uuid v1.26.0
+   Compiling chrono v0.4.45
+   Compiling thiserror-impl v2.0.20
+   Compiling async-trait v0.1.92
+   Compiling policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\run-a\policy-0.1.0-rc.1\package\contract\packages\policy)
+   Compiling wave5a-consumer-policy v0.1.0-rc.1 (F:\Workspace\business-platform\target\wave5a-repair2\pilot\run-20260930T032942Z\consumers\policy)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.71s
+
+exit code : 0 (expected 0)

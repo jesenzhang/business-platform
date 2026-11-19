@@ -1,0 +1,5 @@
+gate : fmt
+cmd  : cargo fmt --all -- --check
+utc  : 
+2026-09-29T02:44:49Z
+exit code : 0

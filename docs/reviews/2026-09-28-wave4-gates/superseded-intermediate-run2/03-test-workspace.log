@@ -1,0 +1,731 @@
+workspace test start 2026-09-28T10:57:22.0925373+08:00
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-1pfq9bbrk8nb6\s-hmp7a51tay-0a1id0m-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_sqlite-09uzxej2rv2qy\s-hmp7a5y4qw-0fb1uhx-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-219kpsqz83qin\s-hmp7a61ap2-1ags9pp-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-1a5gb7x21si9x\s-hmp7a5y4q5-1hn46e3-working`
+
+warning: `audit-sqlite` (lib) generated 1 warning
+warning: `document-processing-sqlite` (lib) generated 1 warning
+warning: `audit-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-0qsa29bm3of8s\s-hmp7a618ti-1e963hl-working`
+
+warning: `document-processing-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1k6oqbd9g4wp8\s-hmp9ka18r2-0oanout-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_sqlite-0q94k6yfethx5\s-hmp7a9soay-1uhhgp8-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_postgres-35t0ptlipccew\s-hmp7a9r84u-1cwrhaw-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-2o3tdm8s24sky\s-hmp9ieetsa-1k53d4s-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-27f2r4gtxllpw\s-hmp7ae7eav-0rn3rm9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-2jrndt2ai2x4d\s-hmp7ac5nec-1xtoo8u-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-1tkmruu0hw7i5\s-hmp7afo45q-0acucw3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_postgres-2qic3q1nq11mp\s-hmp7a9r865-1bi6zpw-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_postgres-2m7e21kasp8u9\s-hmp7a9r5ah-0yujdqu-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_postgres-1hjjsd2a5m7ke\s-hmp7a9so7a-0vxiiko-working`
+
+warning: `runtime-governance-sqlite` (lib) generated 1 warning
+warning: `runtime-governance-postgres` (lib) generated 1 warning
+warning: `document-postgres` (lib) generated 1 warning
+warning: `identity-sqlite` (lib) generated 1 warning
+warning: `organization-sqlite` (lib) generated 1 warning
+warning: `policy-sqlite` (lib) generated 1 warning
+warning: `policy-postgres` (lib) generated 1 warning
+warning: `identity-postgres` (lib) generated 1 warning
+warning: `organization-postgres` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_persistence_contracts-27vfn8qxngnk9\s-hmp9ieh2q3-0i6ljpt-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\governance_worker-05kcwudx12fxn\s-hmp9kig978-0wkyxtc-working`
+
+warning: `document-persistence-contracts` (lib) generated 1 warning
+warning: `governance-worker` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-2waoz5hqilzon\s-hmp9ka2j25-1nlt206-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-243otz5jul0ip\s-hmonwee1yk-1blvg1s-working`
+
+warning: `object-storage` (lib) generated 1 warning
+warning: `architecture-check` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_api-0yr49airsp1f5\s-hmp9kin6rg-07mx9wa-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\notification-0e9z4tihmkrnx\s-hmp9iejlis-1s6k9hn-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-0ifdos6joqdft\s-hmonwhlyfe-0vhxheo-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_worker-289a408s9vdbv\s-hmp9ko0ybz-0cdjsh2-working`
+
+   Compiling object-storage v0.1.0 (F:\Workspace\business-platform\crates\object-storage)
+warning: `business-api` (lib) generated 1 warning
+warning: `notification` (lib) generated 1 warning
+warning: `architecture-check` (bin "architecture-check" test) generated 1 warning
+warning: `business-worker` (bin "business-worker" test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\log_hygiene-1xlqgqvy18qyx\s-hmp9ux2l9y-1vn9maa-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\postgres_minio_processing-3nqsxz2y0s9do\s-hmp9knniuy-1680zjo-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\ai_worker-3jds39tj0l3ze\s-hmp9kni2ho-056ur2g-working`
+
+warning: `business-worker` (test "postgres_minio_processing") generated 1 warning
+warning: `ai-worker` (bin "ai-worker" test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\minio_contract-2q8t0u82chjnz\s-hmp9ki4z9y-1tgms28-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\agent_adapter-0s7zq6tpt0kzq\s-hmp9knk3e1-0qhqbk8-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_postgres-1x2etxtah42gk\s-hmp9igxqfv-1re3wcc-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\query_contracts-0zn8poz3w8447\s-hmp9ik8461-1l9b5bm-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-34qr4m42cfto1\s-hmp9ka6k02-0y4gq0q-working`
+
+warning: `object-storage` (test "minio_contract") generated 1 warning
+warning: `agent-adapter` (bin "agent-adapter" test) generated 1 warning
+warning: `document-postgres` (lib test) generated 1 warning
+warning: `document-postgres` (test "query_contracts") generated 1 warning
+warning: `object-storage` (lib test) generated 1 warning
+   Compiling document-sqlite v0.1.0 (F:\Workspace\business-platform\crates\document-sqlite)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\sqlite_governance-2ormbpmugekpr\s-hmp9knk3j6-0ql4jvo-working`
+
+warning: `governance-worker` (test "sqlite_governance") generated 1 warning
+   Compiling document-postgres v0.1.0 (F:\Workspace\business-platform\crates\document-postgres)
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-2ve7lniu5etwi\s-hmp7asiwdv-089v46i-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\perf_resolve-3afhklb4sav1x\s-hmp7akbju2-1hvb5gl-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-0zilejxgnundx\s-hmp7amdln7-0bzgwcd-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\perf_authorize-2mwinuw241hnp\s-hmp7alb4yc-0nkj7f2-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\governance_worker-0q3cep86ubj77\s-hmp9ktn9f8-1dub3aj-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-0lnwg24yssawd\s-hmp7amvpgx-1jhhlq1-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-0fe1hu5a77pas\s-hmp7an55hy-14e5brs-working`
+
+warning: `policy-sqlite` (test "contract") generated 1 warning
+warning: `identity-postgres` (test "perf_resolve") generated 1 warning
+warning: `organization-sqlite` (test "contract") generated 1 warning
+warning: `policy-postgres` (test "perf_authorize") generated 1 warning
+warning: `governance-worker` (lib test) generated 1 warning
+warning: `policy-postgres` (test "contract") generated 1 warning
+warning: `identity-sqlite` (test "contract") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-2y3resvfkw19o\s-hmp7al7tdn-1lga2x5-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contract-1b5xw5p9s0yx3\s-hmp7akos6q-15azdx5-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\cancel_factuality-0wanvvytpdfed\s-hmp7aihwly-01a8d75-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\cancel_factuality_pg-0nptqzbedy3d3\s-hmp7bfn92b-0cb56r6-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_sqlite-1duvwwoulxkb7\s-hmp7a7d9co-04toefj-working`
+
+warning: `identity-postgres` (test "contract") generated 1 warning
+warning: `organization-postgres` (test "contract") generated 1 warning
+warning: `document-processing-sqlite` (test "cancel_factuality") generated 1 warning
+warning: `document-processing-postgres` (test "cancel_factuality_pg") generated 1 warning
+warning: `document-processing-sqlite` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contracts-1caonekdflg2w\s-hmp7b6y5qn-0z6s5zj-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_processing_postgres-0hna49f14qp3o\s-hmp7a7cqb5-1kq958m-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\lease_fence-3tj4nlmn42ghq\s-hmp7bdtfax-15g0g1w-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\contracts-0ochu5tit5qdg\s-hmp7ai0bko-1p7hvry-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\revision1-1lthgbvtadi6u\s-hmp7b2g6a8-10jvp7n-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-3tx2tk5lobctc\s-hmp9kaanm5-0hfpoux-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_postgres-3h5hcu2schg7e\s-hmp7ccnbqj-1fjw32b-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\policy_sqlite-1nz5vseap6nmu\s-hmp7bygp91-1ickg2c-working`
+
+warning: `document-processing-sqlite` (test "contracts") generated 1 warning
+warning: `document-processing-postgres` (lib test) generated 1 warning
+warning: `document-processing-sqlite` (test "lease_fence") generated 1 warning
+warning: `document-processing-postgres` (test "contracts") generated 1 warning
+warning: `document-processing-sqlite` (test "revision1") generated 1 warning
+warning: `observability` (lib test) generated 1 warning
+warning: `policy-postgres` (lib test) generated 1 warning
+warning: `policy-sqlite` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_postgres-2i0opm0zaxs0f\s-hmp7c82k83-0k5hwt5-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\identity_sqlite-2t63i8oh4uq7p\s-hmp7bugl9x-12zf0j6-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_postgres-3f1vfh16xgduo\s-hmp7cak6qb-12ud14k-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\organization_sqlite-1mx9au35vf92z\s-hmp7buyeq5-12qbjc1-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_postgres-14ed0ff73ayya\s-hmp7c3v0nq-1ygitee-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\chain_pg-1nrlaada6ii9o\s-hmp7c7scnj-1pk9c3m-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\runtime_governance_sqlite-134p5ebn0pvgc\s-hmp7ag5a9s-1ftjpc1-working`
+
+warning: `identity-postgres` (lib test) generated 1 warning
+warning: `identity-sqlite` (lib test) generated 1 warning
+warning: `organization-postgres` (lib test) generated 1 warning
+warning: `organization-sqlite` (lib test) generated 1 warning
+warning: `runtime-governance-postgres` (lib test) generated 1 warning
+warning: `audit-postgres` (test "chain_pg") generated 1 warning
+warning: `runtime-governance-sqlite` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-27vrx689r6pcz\s-hmp7a7c6gg-03lseez-working`
+
+warning: `audit-postgres` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\document_persistence_contracts-0bzqubecyksuy\s-hmp9ieuvbt-1v0k08l-working`
+
+warning: `document-persistence-contracts` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-0tlq5mnjjikkl\s-hmp7a5j4ft-09uoren-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\notification-12j3w1yq3gx3j\s-hmp9iex4xa-1mmwmub-working`
+
+warning: `audit` (lib test) generated 1 warning
+warning: `notification` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\architecture_check-0q5owfpc09awe\s-hmonwhhzrr-0v8rrf5-working`
+
+warning: `architecture-check` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\content_reference-3sw2kpkxvsl57\s-hmp9uzl3hp-1epv8ai-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-3rvyl2x46jck0\s-hmp9uzil7w-0t2oqgu-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\tenant_fence_pg-1hlpejqm1s3vm\s-hmp9v085o1-17vj9bi-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\tenant_fence-3g964qw722tlu\s-hmp9v085o7-0t3r74j-working`
+
+warning: `object-storage` (test "log_hygiene") generated 1 warning
+warning: `document-postgres` (test "tenant_fence_pg") generated 1 warning
+warning: `document-sqlite` (test "content_reference") generated 1 warning
+warning: `document-sqlite` (test "tenant_fence") generated 1 warning
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 20.12s
+     Running unittests src\main.rs (target\debug\deps\agent_adapter-28a0e3d7409d55ab.exe)
+
+running 8 tests
+test tests::api_5xx_is_reported_as_upstream_unavailable ... ok
+test tests::missing_or_wrong_bearer_token_is_rejected ... ok
+test tests::malformed_arguments_and_forged_tenant_inputs_fail_closed ... ok
+test tests::tools_list_is_the_read_only_allow_list ... ok
+test tests::connection_closed_before_response_is_reported_without_fake_business_data ... ok
+test tests::protocol_error_is_reported_without_fake_business_data ... ok
+test tests::healthy_upstream_response_passes_through ... ok
+test tests::upstream_5xx_is_reported_without_fake_business_data ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src\lib.rs (target\debug\deps\agent_integration-ffb4e49025c920a4.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\ai_application-3d79f8dba4090eec.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\ai_worker-93860db7cc5a5b3b.exe)
+
+running 32 tests
+test extractor::tests::real_provider_smoke_extracts_candidate ... ignored, requires a reachable intranet model provider; run manually with --ignored
+test extractor::tests::err_kind_maps_invalid_request_to_invalid_response ... ok
+test config::tests::production_requires_metrics_addr ... ok
+test config::tests::production_requires_json_log_format ... ok
+test extractor::tests::err_kind_maps_authentication_to_permanent_rejection ... ok
+test extractor::tests::err_kind_maps_protocol_to_invalid_response ... ok
+test extractor::tests::err_kind_maps_rate_limit_to_rate_limited_without_hint ... ok
+test extractor::tests::err_kind_preserves_rate_limit_retry_after_hint ... ok
+test extractor::tests::from_config_still_rejects_unknown_api ... ok
+test extractor::tests::provider_rate_limit_end_to_end_preserves_retry_after_hint ... ok
+test extractor::tests::provider_abort_is_mapped_to_cancelled ... ok
+test metrics::tests::outcome_and_disposition_labels_are_bounded ... ok
+test extractor::tests::from_config_accepts_private_http_with_explicit_opt_in ... ok
+test extractor::tests::from_config_rejects_plaintext_private_http_by_default ... ok
+test extractor::tests::provider_authentication_end_to_end_is_permanent_rejection ... ok
+test extractor::tests::provider_unavailable_error_is_mapped ... ok
+test extractor::tests::refuses_non_json_provider_output ... ok
+test retry::tests::credential_rejection_and_invalid_requests_are_permanent ... ok
+test retry::tests::authentication_provider_error_fails_permanently ... ok
+test retry::tests::rate_limited_hint_is_clamped_to_the_platform_cap ... ok
+test extractor::tests::extracts_candidate_from_valid_json ... ok
+test retry::tests::invalid_request_provider_error_fails_permanently ... ok
+test retry::tests::rate_limited_with_hint_uses_capped_provider_retry_after ... ok
+test retry::tests::rate_limited_provider_error_retries_with_server_hint ... ok
+test retry::tests::rate_limited_without_hint_falls_back_to_the_platform_ladder ... ok
+test retry::tests::sub_second_hint_is_never_zero ... ok
+test retry::tests::unavailable_uses_the_platform_ladder ... ok
+test retry::tests::timeout_provider_error_retries_on_the_platform_ladder ... ok
+test tests::reaps_completed_and_panicked_tasks_without_accumulation ... ok
+test tests::completion_outcome::completion_persistence_failure_records_failed_without_lease_loss ... ok
+test tests::completion_outcome::fenced_completion_records_exactly_one_lease_unproven_outcome ... ok
+test tests::completion_outcome::durable_completion_records_exactly_one_succeeded_outcome ... ok
+
+test result: ok. 31 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src\lib.rs (target\debug\deps\approval-b8e0a2be74c79f1b.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\architecture_check-a882a2add4ebdeaf.exe)
+
+running 7 tests
+test tests::accepts_legal_core_graph ... ok
+test tests::accepts_dev_dependency_edge_for_an_adapter ... ok
+test tests::rejects_core_dependency_on_application ... ok
+test tests::rejects_database_adapter_dependency_on_an_unrelated_core_crate ... ok
+test tests::rejects_forbidden_core_dependency ... ok
+test tests::rejects_iam_dependency_on_business_modules ... ok
+test tests::rejects_jwt_dependency_in_core_layers ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\architecture_check-b62eaec6b18f6b77.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\audit-c0e9bb448ddbede5.exe)
+
+running 8 tests
+test tests::canonical_timestamp_truncates_without_leaving_the_representable_range ... ok
+test tests::legacy_details_are_redacted_for_readers ... ok
+test tests::re_signing_a_historical_row_leaves_no_nanosecond_hashed_input ... ok
+test tests::hash_inputs_survive_a_microsecond_persistence_round_trip ... ok
+test tests::validates_and_redacts_sensitive_details ... ok
+test tests::append_sequence_is_independent_of_business_time ... ok
+test tests::hash_chain_detects_payload_change ... ok
+test tests::rehydrate_preserves_historical_nanosecond_signed_content ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\audit_postgres-3d9f8532279b2c00.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\chain_pg.rs (target\debug\deps\chain_pg-62b7e80457472b2c.exe)
+
+running 4 tests
+test chain_detects_mutation_and_interior_deletion_but_not_tail_truncation ... ignored, requires running PostgreSQL
+test concurrent_appends_form_one_verified_tenant_chain ... ignored, requires running PostgreSQL
+test legacy_boundary_rows_stay_readable_and_new_chain_continues_after_them ... ignored, requires running PostgreSQL
+test nanosecond_input_verifies_after_a_postgres_precision_round_trip ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\audit_sqlite-bb3ac8565784ca24.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\historical_chain.rs (target\debug\deps\historical_chain-5696db86cac92de9.exe)
+
+running 2 tests
+test repository_reverifies_a_historical_nanosecond_row ... ok
+test tampering_with_the_historical_row_breaks_verification ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src\lib.rs (target\debug\deps\business_api-07676f868b36158e.exe)
+
+running 22 tests
+test config::tests::api_configuration_does_not_require_storage_or_messaging ... ok
+test config::tests::sqlite_pool_limit_is_fail_closed ... ok
+test auth::tests::client_permission_header_cannot_grant_access ... ok
+test config::tests::bootstrap_requires_non_nil_tenant_non_blank_subject_and_positive_version ... ok
+test config::tests::compat_bridge_flag_defaults_to_true ... ok
+test config::tests::development_allows_wildcard_cors_default ... ok
+test config::tests::production_rejects_blank_jwks_url ... ok
+test config::tests::production_rejects_development_auth_and_wildcard_cors_without_secret_leakage ... ok
+test config::tests::production_rejects_plaintext_jwks_url ... ok
+test config::tests::production_rejects_missing_or_blank_audience ... ok
+test config::tests::production_rejects_sqlite_before_connecting ... ok
+test config::tests::production_rejects_wildcard_scheme_audience_only_issuer_with_https ... ok
+test config::tests::production_requires_json_log_format ... ok
+test config::tests::production_rejects_plaintext_issuer_url ... ok
+test config::tests::production_auth_passes_with_https_and_audience ... ok
+test config::tests::bootstrap_requires_https_issuer_and_explicit_targets_when_enabled ... ok
+test metrics::tests::extension_methods_collapse_to_other ... ok
+test metrics::tests::known_methods_map_to_their_names ... ok
+test routes::admin::tests::unknown_audit_filters_fail_closed ... ok
+test routes::documents::tests::cursor_is_an_opaque_versioned_token ... ok
+test routes::documents::tests::cursor_rejects_malformed_or_unknown_versions ... ok
+test metrics::tests::duration_metrics_render_as_bucketed_histograms ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running unittests src\main.rs (target\debug\deps\business_api-2f2b4a799a1ed762.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\dev_auth_bootstrap.rs (target\debug\deps\dev_auth_bootstrap-151bea28d9d52b75.exe)
+
+running 2 tests
+test dev_auth_bootstrap_validation_is_dev_scoped ... ok
+test dev_auth_bootstrap_runs_with_the_locked_dev_issuer_and_converges ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\documents.rs (target\debug\deps\documents-9f78d8640d6c9f67.exe)
+
+running 10 tests
+test overview_fails_closed_when_processing_service_is_unavailable ... ok
+test unauthenticated_document_list_is_rejected ... ok
+test invalid_or_legacy_http_cursors_are_rejected ... ok
+test create_is_idempotent_and_returns_trace_id_on_error ... ok
+test document_http_responses_never_expose_storage_locations ... ok
+test upload_rejects_unsupported_content_type_before_persistence ... ok
+test cross_tenant_get_is_not_found ... ok
+test fake_idempotency_is_scoped_by_tenant_and_fingerprint ... ok
+test upload_compensates_object_storage_when_document_persistence_fails ... ok
+test multipart_upload_is_idempotent_and_does_not_expose_object_key ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\documents_postgres.rs (target\debug\deps\documents_postgres-0b6b1da281a69a96.exe)
+
+running 1 test
+test document_http_flow_is_atomic_idempotent_and_tenant_scoped ... ignored, requires running PostgreSQL
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\e2e_admin_bootstrap_postgres.rs (target\debug\deps\e2e_admin_bootstrap_postgres-78c2a215c46c4d99.exe)
+
+running 2 tests
+test bootstrap_admin_grant_suspend_reactivate_revoke_chain_postgres ... ignored, requires running PostgreSQL (DATABASE_URL)
+test no_bootstrap_leaves_the_api_adminless_postgres ... ignored, requires running PostgreSQL (DATABASE_URL)
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\e2e_admin_bootstrap_sqlite.rs (target\debug\deps\e2e_admin_bootstrap_sqlite-caefb615f9864d09.exe)
+
+running 3 tests
+test no_bootstrap_means_no_admin_and_no_http_bootstrap_surface ... ok
+test anonymous_and_wrong_audience_tokens_are_rejected ... ok
+test bootstrap_admin_grant_suspend_reactivate_revoke_chain ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+     Running tests\iam_admin_api.rs (target\debug\deps\iam_admin_api-0aa1be043d930100.exe)
+
+running 22 tests
+test self_binding_escalation_is_rejected ... ok
+test role_binding_with_retired_catalog_permission_denies_route ... ok
+test explain_reports_bounded_decision_for_target_user ... ok
+test self_membership_reactivation_is_rejected ... ok
+test invalid_cursor_and_limit_are_400 ... ok
+test stale_expected_version_is_conflict ... ok
+test replay_same_key_returns_original_without_double_mutation ... ok
+test permissions_catalog_lists_known_keys ... ok
+test foreign_tenant_role_is_not_found ... ok
+test create_role_then_list_and_get ... ok
+test bind_role_to_other_user_and_list_bindings ... ok
+test system_role_mutation_is_rejected ... ok
+test membership_create_list_suspend_reactivate ... ok
+test organization_unit_crud_and_move ... ok
+test unauthenticated_read_is_401 ... ok
+test user_manage_grant_cannot_create_memberships ... ok
+test unauthenticated_write_is_401 ... ok
+test unknown_permission_in_explain_denies_boundedly ... ok
+test unit_member_add_list_remove ... ok
+test write_without_idempotency_key_is_400 ... ok
+test granted_permission_matrix_allows_every_surface ... ok
+test every_iam_route_denies_without_grant ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\iam_adversarial_sqlite.rs (target\debug\deps\iam_adversarial_sqlite-4f18a5a844e62a9f.exe)
+
+running 6 tests
+test foreign_user_id_claim_fails_closed ... ok
+test roles_claim_alone_unlocks_nothing ... ok
+test header_spoofing_is_inert_under_oidc ... ok
+test self_escalation_trio_denied ... ok
+test claim_widening_stops_at_the_compat_bridge_boundary ... ok
+test cross_tenant_probes_fail_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+     Running tests\oidc_auth.rs (target\debug\deps\oidc_auth-65dac91d71038b52.exe)
+
+running 17 tests
+test missing_bearer_token_is_rejected ... ok
+test algorithm_none_is_rejected ... ok
+test metrics_endpoint_is_public_and_counts_requests ... ok
+test user_id_falls_back_to_sub_when_uuid ... ok
+test claim_mapping_populates_tenant_user_and_permissions ... ok
+test jwks_outage_fails_closed ... ok
+test unknown_kid_is_rejected ... ok
+test missing_tenant_claim_is_rejected ... ok
+test wrong_audience_is_rejected ... ok
+test tampered_signature_is_rejected ... ok
+test expired_token_is_rejected ... ok
+test nil_tenant_claim_is_rejected ... ok
+test valid_oidc_token_passes_authentication ... ok
+test oidc_principal_cannot_read_foreign_tenant_document ... ok
+test wrong_issuer_is_rejected ... ok
+test production_transport_policy_rejects_plaintext_jwks_transport ... ok
+test jwks_redirect_is_never_followed ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\plan_0008_postgres_minio.rs (target\debug\deps\plan_0008_postgres_minio-54cb93a3382e36ee.exe)
+
+running 2 tests
+test plan_0008_postgres_minio_multipart_upload_is_idempotent ... ignored, requires real PostgreSQL, PLAN-0008 migrations, and MinIO
+test plan_0008_postgres_minio_revision_evidence_contract ... ignored, requires real PostgreSQL, PLAN-0008 migrations, and MinIO
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\security.rs (target\debug\deps\security-a0dd7a8475e6b005.exe)
+
+running 16 tests
+test liveness_is_public ... ok
+test readiness_is_public ... ok
+test dev_auth_without_client_tenant_header_uses_trusted_principal ... ok
+test role_binding_grant_works_with_compat_flag_off ... ok
+test unauthenticated_api_request_is_rejected ... ok
+test suspended_membership_overrides_claim_grant ... ok
+test execute_permission_cannot_approve_repair ... ok
+test dev_auth_with_wrong_token_is_rejected ... ok
+test disabled_user_overrides_claim_grant ... ok
+test forged_permission_header_cannot_read_integrity_findings ... ok
+test production_mode_is_fail_closed ... ok
+test compat_flag_off_denies_claim_only_grant ... ok
+test server_granted_integrity_read_reaches_governance_boundary ... ok
+test compat_claim_grant_passes_guard_when_bridge_enabled ... ok
+test retired_permission_denies_claim_grant ... ok
+test dev_auth_with_valid_token_and_tenant_passes_auth ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\deps\business_api_client-d9d90663be5e2262.exe)
+
+running 2 tests
+test tests::proxy_environment_is_restored_after_the_client_construction_window ... ok
+test tests::requests_never_route_through_environment_proxies ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\deps\business_application_compiler-d44653a58fd81ccc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\compiler.rs (target\debug\deps\compiler-4874371acc098071.exe)
+
+running 18 tests
+test tests::accepts_standard_semver_ranges_and_rejects_invalid_versions ... ok
+test tests::extension_contribution_ids_share_the_manifest_collision_domain ... ok
+test tests::rejects_foreign_and_non_namespaced_legacy_contribution_ids ... ok
+test tests::accepts_cross_package_public_target_from_compiled_catalog ... ok
+test tests::rejects_legacy_and_typed_contribution_identity_collision ... ok
+test tests::rejects_duplicate_and_cross_owner_contexts ... ok
+test tests::deserializing_unknown_top_level_field_fails_closed ... ok
+test tests::deserializing_tampered_package_digest_fails_closed ... ok
+test tests::permutations_have_identical_model_bytes_and_digest ... ok
+test tests::deserializing_invalid_package_payload_fails_closed ... ok
+test tests::required_platform_capabilities_resolve_against_explicit_evidence ... ok
+test tests::rejects_unknown_incompatible_cyclic_and_downgrade_dependencies ... ok
+test tests::deserializing_non_canonical_payload_with_recomputed_digest_fails_closed ... ok
+test tests::all_package_vector_permutations_have_identical_digest ... ok
+test tests::accepts_public_capability_dependency_and_compiles_deterministically ... ok
+test tests::typed_ui_can_target_a_published_capability ... ok
+test tests::serialized_compiled_manifest_preserves_resolved_capability_evidence ... ok
+test tests::serialized_compiled_manifest_rebuilds_canonical_bytes ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning.rs (target\debug\deps\planning-afd91375846cf4b4.exe)
+
+running 26 tests
+test duplicate_current_module_is_rejected ... ok
+test dropping_dependency_allows_provider_removal_from_incoming_graph ... ok
+test adding_dependency_blocks_provider_removal_from_incoming_graph ... ok
+test dropping_public_capability_reference_allows_provider_removal ... ok
+test planning_declarations_reject_unknown_external_extension_point ... ok
+test module_adds_use_independent_package_digests ... ok
+test owner_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test planning_incompatible_dependency_is_a_structured_conflict ... ok
+test only_changed_contribution_gets_an_update_digest ... ok
+test extension_point_removal_with_active_extension_consumer_is_blocked ... ok
+test owner_removal_with_active_extension_consumer_is_blocked ... ok
+test planning_unknown_dependency_is_a_structured_conflict ... ok
+test package_metadata_changes_do_not_update_untouched_contributions ... ok
+test planning_ownership_collision_is_a_structured_conflict ... ok
+test add_upgrade_remove_and_retention_are_explicit ... ok
+test extension_point_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test contribution_and_extension_point_changes_are_diffed ... ok
+test desired_disabled_state_emits_disable_module ... ok
+test permutations_produce_identical_plan_and_diagnostics ... ok
+test provider_removal_is_allowed_without_live_public_capability_consumer ... ok
+test tampered_incoming_manifest_is_rejected_before_planning ... ok
+test live_dependency_and_active_extension_consumer_block_removal ... ok
+test retained_public_capability_consumer_blocks_provider_removal ... ok
+test typed_requirement_changes_are_planned_as_contribution_updates ... ok
+test public_capability_removal_planning_is_deterministic ... ok
+test retained_public_target_consumers_block_target_removal ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\release_surface_digest.rs (target\debug\deps\release_surface_digest-a698fb6aec14afab.exe)
+
+running 17 tests
+test contract_digest_is_stable_across_repeated_invocations ... ok
+test contract_digest_ignores_input_order_of_the_same_contract_surface ... ok
+test contract_digest_changes_when_a_public_agent_capability_id_or_version_changes ... ok
+test contract_digest_changes_when_a_published_contract_or_extension_version_changes ... ok
+test verify_release_identity_rejects_pinned_manifest_schema_version_mismatch ... ok
+test verify_release_identity_rejects_pinned_module_id_not_in_evidence ... ok
+test verify_release_identity_rejects_identity_failing_shape_validation ... ok
+test verify_release_identity_rejects_pinned_module_version_mismatch ... ok
+test verify_release_identity_rejects_pinned_migration_namespace_mismatch ... ok
+test verify_release_identity_rejects_pinned_contract_digest_mismatch ... ok
+test verify_release_identity_accepts_stateless_identity_without_migration_revision ... ok
+test verify_release_identity_rejects_pinned_package_digest_mismatch ... ok
+test verify_release_identity_accepts_identity_recomputed_from_compiled_evidence ... ok
+test package_fingerprint_matches_the_planner_per_module_digest ... ok
+test release_identity_and_bundle_assemble_from_compiled_evidence ... ok
+test contract_digest_ignores_release_metadata_but_package_digest_covers_it ... ok
+test contract_digest_ignores_consumer_side_contributions_but_package_digest_covers_them ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\synthetic_fixtures.rs (target\debug\deps\synthetic_fixtures-37617be55aaaa200.exe)
+
+running 6 tests
+test removal_plan_never_purges_business_data ... ok
+test extension_fixture_requires_a_published_public_point ... ok
+test synthetic_modules_can_compile_independently_and_with_public_dependency ... ok
+test removing_extension_fixture_does_not_change_owner_package ... ok
+test module_removals_block_on_live_dependency_or_extension_consumer ... ok
+test synthetic_permutations_have_identical_compilation_and_plan ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\main.rs (target\debug\deps\business_cli-3b8d251aa2a46966.exe)
+
+running 2 tests
+test tests::invalid_command_and_content_type_fail_closed ... ok
+test tests::public_commands_parse_with_stable_remote_shape ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\deps\business_module_contracts-cdfe9a08433f66e6.exe)
+
+running 24 tests
+test manifest::tests::module_id_rejects_uppercase_and_repeated_separators ... ok
+test manifest::tests::manifest_rejects_unknown_schema_version ... ok
+test release::tests::build_toolchain_rejects_empty_identifier_and_invalid_versions ... ok
+test release::tests::digests_reject_uppercase_and_wrong_length_hex ... ok
+test release::tests::identity_rejects_unknown_schema_version ... ok
+test release::tests::migration_revision_pins_manifest_namespace_grammar ... ok
+test release::tests::bundle_requires_non_empty_unique_crate_mapping ... ok
+test release::tests::bundle_requires_semver_crate_versions ... ok
+test manifest::tests::extension_removal_without_consumer_is_allowed_and_owner_is_unchanged ... ok
+test manifest::tests::extension_point_rejects_malformed_catalog_entry_before_matching ... ok
+test manifest::tests::extension_point_rejects_malformed_public_dependency_reference ... ok
+test manifest::tests::extension_validation_fails_closed_for_private_wrong_version_and_kind ... ok
+test manifest::tests::published_extension_point_accepts_valid_consumer_and_blocks_live_removal ... ok
+test manifest::tests::extension_point_accepts_resolvable_typed_public_dependency ... ok
+test manifest::tests::extension_point_rejects_unknown_and_private_dependencies ... ok
+test manifest::tests::manifest_rejects_duplicate_required_capabilities ... ok
+test manifest::tests::requirement_rejects_forged_policy_and_capability_ownership ... ok
+test manifest::tests::legacy_ui_and_agent_ids_require_owner_namespaced_identity ... ok
+test release::tests::identity_validates_and_round_trips_serde ... ok
+test manifest::tests::requirement_rejects_malformed_policy_and_capability_ids ... ok
+test release::tests::source_revision_requires_full_lower_case_commit_sha ... ok
+test release::tests::release_contracts_reject_unknown_fields_and_bad_digest_bytes ... ok
+test release::tests::stateless_module_identity_pins_no_migration_revision ... ok
+test release::tests::release_identity_requires_semver_module_version ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\extension_points.rs (target\debug\deps\extension_points-275975c16f46fc31.exe)
+
+running 2 tests
+test forged_contribution_namespace_is_rejected ... ok
+test contribution_namespaced_to_consumer_is_valid ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\platform_core_isolation.rs (target\debug\deps\platform_core_isolation-933efc99d47f9923.exe)
+
+running 1 test
+test platform_core_does_not_reference_fixture_business_modules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\stable_identity.rs (target\debug\deps\stable_identity-be17fbe9d63d4000.exe)
+
+running 7 tests
+test invalid_id_errors_identify_the_typed_identity ... ok
+test labels_and_paths_do_not_change_stable_identity ... ok
+test malformed_namespaced_id_is_rejected ... ok
+test typed_identities_share_namespace_rules_but_not_identity_types ... ok
+test package_digest_requires_lowercase_sha256_hex ... ok
+test namespaced_ids_round_trip_and_expose_parts ... ok
+test serde_rejects_invalid_typed_identity ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\typed_contributions.rs (target\debug\deps\typed_contributions-fd174a75563716da.exe)
+
+running 12 tests
+test malformed_public_target_version_is_rejected ... ok
+test module_a_and_module_b_can_declare_independent_typed_contributions ... ok
+test duplicate_and_wrong_owner_are_rejected ... ok
+test malformed_incoming_public_target_is_rejected ... ok
+test ui_and_agent_target_surfaces_are_closed_and_capability_targets_are_published ... ok
+test unknown_public_target_rejected_but_cross_module_public_target_is_allowed ... ok
+test declaration_does_not_grant_authorization ... ok
+test forged_typed_contribution_namespace_is_rejected ... ok
+test dangling_requirement_references_are_rejected ... ok
+test malformed_catalog_target_is_rejected_before_matching ... ok
+test duplicate_requirement_descriptors_are_rejected ... ok
+test descriptors_reject_unknown_fields ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\business_worker-0fe1f38e24b14202.exe)
+
+running 6 tests
+test config::tests::production_requires_json_log_format ... ok
+test config::tests::production_requires_metrics_addr ... ok
+test config::tests::sqlite_rejects_separate_ai_and_parallelism ... ok
+test metrics::tests::outcome_and_disposition_labels_are_bounded ... ok
+test tests::missing_object_boundary::metadata_without_object_fails_as_source_not_found ... FAILED
+test tests::reaps_completed_and_panicked_tasks_without_accumulation ... ok
+
+failures:
+
+---- tests::missing_object_boundary::metadata_without_object_fails_as_source_not_found stdout ----
+
+thread 'tests::missing_object_boundary::metadata_without_object_fails_as_source_not_found' (21800) panicked at apps\business-worker\src\main.rs:904:17:
+the failure text must not carry a storage reference (source): source object was not found
+
+
+failures:
+    tests::missing_object_boundary::metadata_without_object_fails_as_source_not_found
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p business-worker --bin business-worker`
+test_exit=101

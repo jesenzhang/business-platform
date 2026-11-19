@@ -1,0 +1,23 @@
+[package]
+name = "wave5a-consumer-policy"
+version = "0.1.0-rc.1"
+edition = "2021"
+rust-version = "1.94.1"
+publish = false
+description = "Out-of-workspace consumer of the policy module release candidate. It depends on the packed artifact directory only: no path back into crates/, no database adapter, no application crate. The script copies this directory outside the repository and replaces __ARTIFACT_CRATE_DIR__ with the artifact's crate directory."
+
+[dependencies]
+# Replaced with the artifact's `package/contract/packages/policy` directory by
+# scripts/plan0014-wave5a.ps1. Nothing here may point into the source workspace.
+policy = { path = "__ARTIFACT_CRATE_DIR__", features = ["testing"] }
+# Third-party versions are written by this consumer itself — they are not
+# inherited from the platform workspace. They match the versions the platform
+# already resolved so the locked/offline check is meaningful offline as well.
+uuid = { version = "=1.26.0", features = ["v4", "v7"] }
+
+[dev-dependencies]
+tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread"] }
+
+# This consumer is deliberately not a member of the platform workspace; the
+# empty table makes that explicit instead of relying on where it is unpacked.
+[workspace]

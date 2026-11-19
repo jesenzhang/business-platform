@@ -1,0 +1,1 @@
+DELETE FROM roles USING roles AS r(role_id), role_permissions rp;

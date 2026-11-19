@@ -1,0 +1,226 @@
+cmd  : cargo test -p business-module-contracts -p business-application-compiler --all-features
+utc  : 
+2026-09-29T02:50:59Z
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2ocp75ku3gsr5\s-hml49k7qcy-13crd0f-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_module_contracts-2wb60kc6xl1fa\s-hml49k7yc7-1apqry5-working`
+
+warning: `business-module-contracts` (lib) generated 1 warning
+warning: `business-module-contracts` (lib test) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-0oeryxbm7ww0n\s-hml49kyfj3-1agpfl9-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\extension_points-33jtzcjf2tbgj\s-hml49m27zb-0uihl06-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\typed_contributions-22ges4od97sm1\s-hml49m1zps-1prjgaz-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\platform_core_isolation-0artgzbbrj8j1\s-hml49m1qs2-0751kbn-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\business_application_compiler-2h4afl515ag24\s-hml49m2exx-0jod47u-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\stable_identity-10jieirthc352\s-hml49m1z79-18o4br6-working`
+
+warning: `business-application-compiler` (lib) generated 1 warning
+warning: `business-module-contracts` (test "extension_points") generated 1 warning
+warning: `business-module-contracts` (test "typed_contributions") generated 1 warning
+warning: `business-module-contracts` (test "platform_core_isolation") generated 1 warning
+warning: `business-application-compiler` (lib test) generated 1 warning
+warning: `business-module-contracts` (test "stable_identity") generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\release_surface_digest-0axvyocuf06wu\s-hml49o3flg-1onh1cd-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\synthetic_fixtures-2bc4tmsr7v3aa\s-hml49o30u3-0fyz2m0-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\planning-1lyoailj1u0t7\s-hml49o30r1-0t1wnqb-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\compiler-2h81iq50vyy4o\s-hml49o3fkq-19pt7ow-working`
+
+warning: `business-application-compiler` (test "release_surface_digest") generated 1 warning
+warning: `business-application-compiler` (test "synthetic_fixtures") generated 1 warning
+warning: `business-application-compiler` (test "planning") generated 1 warning
+warning: `business-application-compiler` (test "compiler") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running unittests src\lib.rs (target\debug\deps\business_application_compiler-81e7c1c682482098.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\compiler.rs (target\debug\deps\compiler-b0f074db1efe920f.exe)
+
+running 18 tests
+test tests::rejects_foreign_and_non_namespaced_legacy_contribution_ids ... ok
+test tests::extension_contribution_ids_share_the_manifest_collision_domain ... ok
+test tests::rejects_duplicate_and_cross_owner_contexts ... ok
+test tests::rejects_legacy_and_typed_contribution_identity_collision ... ok
+test tests::rejects_unknown_incompatible_cyclic_and_downgrade_dependencies ... ok
+test tests::accepts_standard_semver_ranges_and_rejects_invalid_versions ... ok
+test tests::required_platform_capabilities_resolve_against_explicit_evidence ... ok
+test tests::accepts_cross_package_public_target_from_compiled_catalog ... ok
+test tests::typed_ui_can_target_a_published_capability ... ok
+test tests::permutations_have_identical_model_bytes_and_digest ... ok
+test tests::all_package_vector_permutations_have_identical_digest ... ok
+test tests::accepts_public_capability_dependency_and_compiles_deterministically ... ok
+test tests::deserializing_unknown_top_level_field_fails_closed ... ok
+test tests::deserializing_tampered_package_digest_fails_closed ... ok
+test tests::deserializing_invalid_package_payload_fails_closed ... ok
+test tests::serialized_compiled_manifest_preserves_resolved_capability_evidence ... ok
+test tests::deserializing_non_canonical_payload_with_recomputed_digest_fails_closed ... ok
+test tests::serialized_compiled_manifest_rebuilds_canonical_bytes ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\planning.rs (target\debug\deps\planning-921f41e3692d6d34.exe)
+
+running 26 tests
+test duplicate_current_module_is_rejected ... ok
+test package_metadata_changes_do_not_update_untouched_contributions ... ok
+test owner_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test dropping_public_capability_reference_allows_provider_removal ... ok
+test owner_removal_with_active_extension_consumer_is_blocked ... ok
+test only_changed_contribution_gets_an_update_digest ... ok
+test module_adds_use_independent_package_digests ... ok
+test extension_point_removal_is_allowed_when_retained_consumer_drops_contribution ... ok
+test planning_declarations_reject_unknown_external_extension_point ... ok
+test extension_point_removal_with_active_extension_consumer_is_blocked ... ok
+test add_upgrade_remove_and_retention_are_explicit ... ok
+test dropping_dependency_allows_provider_removal_from_incoming_graph ... ok
+test permutations_produce_identical_plan_and_diagnostics ... ok
+test planning_ownership_collision_is_a_structured_conflict ... ok
+test adding_dependency_blocks_provider_removal_from_incoming_graph ... ok
+test contribution_and_extension_point_changes_are_diffed ... ok
+test desired_disabled_state_emits_disable_module ... ok
+test planning_incompatible_dependency_is_a_structured_conflict ... ok
+test planning_unknown_dependency_is_a_structured_conflict ... ok
+test provider_removal_is_allowed_without_live_public_capability_consumer ... ok
+test live_dependency_and_active_extension_consumer_block_removal ... ok
+test tampered_incoming_manifest_is_rejected_before_planning ... ok
+test retained_public_capability_consumer_blocks_provider_removal ... ok
+test typed_requirement_changes_are_planned_as_contribution_updates ... ok
+test public_capability_removal_planning_is_deterministic ... ok
+test retained_public_target_consumers_block_target_removal ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\release_surface_digest.rs (target\debug\deps\release_surface_digest-c455c72484bc024a.exe)
+
+running 17 tests
+test contract_digest_is_stable_across_repeated_invocations ... ok
+test contract_digest_ignores_input_order_of_the_same_contract_surface ... ok
+test contract_digest_changes_when_a_public_agent_capability_id_or_version_changes ... ok
+test contract_digest_changes_when_a_published_contract_or_extension_version_changes ... ok
+test verify_release_identity_rejects_pinned_module_id_not_in_evidence ... ok
+test verify_release_identity_rejects_identity_failing_shape_validation ... ok
+test verify_release_identity_rejects_pinned_manifest_schema_version_mismatch ... ok
+test verify_release_identity_rejects_pinned_module_version_mismatch ... ok
+test verify_release_identity_rejects_pinned_contract_digest_mismatch ... ok
+test verify_release_identity_accepts_stateless_identity_without_migration_revision ... ok
+test verify_release_identity_rejects_pinned_migration_namespace_mismatch ... ok
+test package_fingerprint_matches_the_planner_per_module_digest ... ok
+test release_identity_and_bundle_assemble_from_compiled_evidence ... ok
+test verify_release_identity_rejects_pinned_package_digest_mismatch ... ok
+test verify_release_identity_accepts_identity_recomputed_from_compiled_evidence ... ok
+test contract_digest_ignores_release_metadata_but_package_digest_covers_it ... ok
+test contract_digest_ignores_consumer_side_contributions_but_package_digest_covers_them ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\synthetic_fixtures.rs (target\debug\deps\synthetic_fixtures-a5edf720e5c114ee.exe)
+
+running 6 tests
+test removal_plan_never_purges_business_data ... ok
+test extension_fixture_requires_a_published_public_point ... ok
+test removing_extension_fixture_does_not_change_owner_package ... ok
+test synthetic_modules_can_compile_independently_and_with_public_dependency ... ok
+test module_removals_block_on_live_dependency_or_extension_consumer ... ok
+test synthetic_permutations_have_identical_compilation_and_plan ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\business_module_contracts-33bbc73f51d2d027.exe)
+
+running 24 tests
+test manifest::tests::module_id_rejects_uppercase_and_repeated_separators ... ok
+test manifest::tests::extension_removal_without_consumer_is_allowed_and_owner_is_unchanged ... ok
+test manifest::tests::extension_point_rejects_malformed_public_dependency_reference ... ok
+test manifest::tests::extension_point_rejects_unknown_and_private_dependencies ... ok
+test manifest::tests::extension_point_rejects_malformed_catalog_entry_before_matching ... ok
+test manifest::tests::extension_validation_fails_closed_for_private_wrong_version_and_kind ... ok
+test manifest::tests::manifest_rejects_unknown_schema_version ... ok
+test manifest::tests::legacy_ui_and_agent_ids_require_owner_namespaced_identity ... ok
+test manifest::tests::manifest_rejects_duplicate_required_capabilities ... ok
+test manifest::tests::extension_point_accepts_resolvable_typed_public_dependency ... ok
+test manifest::tests::published_extension_point_accepts_valid_consumer_and_blocks_live_removal ... ok
+test manifest::tests::requirement_rejects_malformed_policy_and_capability_ids ... ok
+test release::tests::build_toolchain_rejects_empty_identifier_and_invalid_versions ... ok
+test manifest::tests::requirement_rejects_forged_policy_and_capability_ownership ... ok
+test release::tests::bundle_requires_non_empty_unique_crate_mapping ... ok
+test release::tests::bundle_requires_semver_crate_versions ... ok
+test release::tests::digests_reject_uppercase_and_wrong_length_hex ... ok
+test release::tests::identity_rejects_unknown_schema_version ... ok
+test release::tests::migration_revision_pins_manifest_namespace_grammar ... ok
+test release::tests::source_revision_requires_full_lower_case_commit_sha ... ok
+test release::tests::identity_validates_and_round_trips_serde ... ok
+test release::tests::release_identity_requires_semver_module_version ... ok
+test release::tests::release_contracts_reject_unknown_fields_and_bad_digest_bytes ... ok
+test release::tests::stateless_module_identity_pins_no_migration_revision ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\extension_points.rs (target\debug\deps\extension_points-91841c8e8c9259f1.exe)
+
+running 2 tests
+test forged_contribution_namespace_is_rejected ... ok
+test contribution_namespaced_to_consumer_is_valid ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\platform_core_isolation.rs (target\debug\deps\platform_core_isolation-916d909bfc137ef0.exe)
+
+running 1 test
+test platform_core_does_not_reference_fixture_business_modules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\stable_identity.rs (target\debug\deps\stable_identity-3be4a9b535663d2c.exe)
+
+running 7 tests
+test invalid_id_errors_identify_the_typed_identity ... ok
+test labels_and_paths_do_not_change_stable_identity ... ok
+test package_digest_requires_lowercase_sha256_hex ... ok
+test namespaced_ids_round_trip_and_expose_parts ... ok
+test serde_rejects_invalid_typed_identity ... ok
+test typed_identities_share_namespace_rules_but_not_identity_types ... ok
+test malformed_namespaced_id_is_rejected ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\typed_contributions.rs (target\debug\deps\typed_contributions-6b94278754ac1476.exe)
+
+running 12 tests
+test malformed_public_target_version_is_rejected ... ok
+test forged_typed_contribution_namespace_is_rejected ... ok
+test malformed_incoming_public_target_is_rejected ... ok
+test malformed_catalog_target_is_rejected_before_matching ... ok
+test dangling_requirement_references_are_rejected ... ok
+test unknown_public_target_rejected_but_cross_module_public_target_is_allowed ... ok
+test module_a_and_module_b_can_declare_independent_typed_contributions ... ok
+test duplicate_requirement_descriptors_are_rejected ... ok
+test declaration_does_not_grant_authorization ... ok
+test duplicate_and_wrong_owner_are_rejected ... ok
+test ui_and_agent_target_surfaces_are_closed_and_capability_targets_are_published ... ok
+test descriptors_reject_unknown_fields ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_application_compiler
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests business_module_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0

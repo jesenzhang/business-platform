@@ -1,0 +1,144 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\observability-1mqcwoheczdku\s-hmpg8knlbu-09dlko3-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\object_storage-1ceb9lcps2la5\s-hmpg8kndrf-0695kl3-working`
+
+warning: `observability` (lib) generated 1 warning
+warning: `object-storage` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_cleanup-1kiyexoazgmss\s-hmpva540de-1otp4ll-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\sdk_log_hygiene-3mq953rzoxs3c\s-hmpg8rkbf7-10k68hp-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_pagination-0dvfxqll8zwqe\s-hmpv9xdy2e-0jlirqp-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_lane_fault_injection-1v0hcwgivhcok\s-hmpvasvooe-0xavjmz-working`
+
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\s3_contract_lane-3ti87vujbe8po\s-hmpvairzq1-0t8bfyo-working`
+
+warning: `object-storage` (test "s3_lane_cleanup") generated 1 warning
+warning: `object-storage` (test "sdk_log_hygiene") generated 1 warning
+warning: `object-storage` (test "s3_lane_pagination") generated 1 warning
+warning: `object-storage` (test "s3_lane_fault_injection") generated 1 warning
+warning: `object-storage` (test "s3_contract_lane") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.49s
+     Running unittests src\lib.rs (target\debug\deps\object_storage-3d1983d8ee4dfe8c.exe)
+
+running 17 tests
+test client::tests::presign_expiry_bounds_are_enforced_by_the_platform ... ok
+test key::tests::rejects_nul ... ok
+test key::tests::rejects_absolute_paths ... ok
+test key::tests::rejects_too_long ... ok
+test key::tests::rejects_path_traversal ... ok
+test key::tests::rejects_empty ... ok
+test key::tests::rejects_unc_paths ... ok
+test key::tests::rejects_windows_drive ... ok
+test key::tests::valid_keys ... ok
+test key::tests::rejects_empty_segments ... ok
+test client::tests::local_storage_refuses_presign_instead_of_exposing_a_path ... ok
+test client::tests::presign_rejects_out_of_range_expiry_without_calling_the_provider ... ok
+test client::tests::local_storage_rejects_symlink_escape_when_supported ... ok
+test client::tests::a_transport_failure_is_not_mistaken_for_a_missing_object ... ok
+test client::tests::the_offline_transport_is_the_client_transport ... ok
+test client::tests::local_storage_failed_stream_does_not_publish_partial_object ... ok
+test client::tests::local_storage_streams_and_deletes ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\log_hygiene.rs (target\debug\deps\log_hygiene-bcd679291d299117.exe)
+
+running 1 test
+test storage_references_never_enter_the_log_stream ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+     Running tests\minio_contract.rs (target\debug\deps\minio_contract-c2ef9194bb341dd4.exe)
+
+running 10 tests
+test content_type_is_preserved ... ignored, requires running MinIO (docker compose up)
+test delete_is_idempotent ... ignored, requires running MinIO (docker compose up)
+test delete_removes_object ... ignored, requires running MinIO (docker compose up)
+test exists_returns_false_for_missing ... ignored, requires running MinIO (docker compose up)
+test get_missing_returns_not_found ... ignored, requires running MinIO (docker compose up)
+test large_object_is_streamed_without_small_object_buffering ... ignored, requires running MinIO (docker compose up)
+test presigned_url_is_valid ... ignored, requires running MinIO (docker compose up)
+test put_and_get_roundtrip ... ignored, requires running MinIO (docker compose up)
+test special_character_keys ... ignored, requires running MinIO (docker compose up)
+test user_metadata_is_preserved ... ignored, requires running MinIO (docker compose up)
+
+test result: ok. 0 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_contract_lane.rs (target\debug\deps\s3_contract_lane-b59e9facc6492b72.exe)
+
+running 6 tests
+test contract_step_reports_its_scope ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_delete_of_absent_object_is_idempotent ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_presigned_url_is_key_scoped_and_expires ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_records_provider_capabilities ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_reports_missing_object_as_not_found ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test lane_round_trips_object_metadata_and_payload ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_cleanup.rs (target\debug\deps\s3_lane_cleanup-85fade33b75d896c.exe)
+
+running 7 tests
+test a_cleanup_failure_fails_the_step_and_is_not_reported_as_success ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test child_final_cleanup_step ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_leaves_objects_outside_the_run_prefix_untouched ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_never_deletes_a_protected_bucket ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test cleanup_refuses_to_run_without_a_run_id ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test final_cleanup_leaves_no_objects_and_no_incomplete_uploads ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test report_the_cleanup_scope ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_fault_injection.rs (target\debug\deps\s3_lane_fault_injection-ccc3635f91fdff41.exe)
+
+running 5 tests
+test a_failed_contract_run_is_still_cleaned_up ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test a_failure_and_its_cleanup_leave_other_prefixes_untouched ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test an_interrupted_multipart_upload_is_found_and_aborted ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test child_entry_point ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+test many_incomplete_uploads_on_one_key_are_all_found_and_aborted ... ignored, requires a running S3-compatible provider (WAVE4_S3_* environment)
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\s3_lane_pagination.rs (target\debug\deps\s3_lane_pagination-9160393806e0e044.exe)
+
+running 19 tests
+test a_different_upload_in_the_listing_is_not_discovery_of_the_created_one ... ok
+test a_record_sharing_a_line_with_the_harness_still_parses ... ok
+test a_child_that_reported_nothing_cannot_produce_a_pass ... ok
+test a_failed_listing_is_never_reported_as_a_clean_scope ... ok
+test a_provider_that_lists_nothing_does_not_verify_upload_discovery ... ok
+test created_upload_records_are_structured_and_garbage_is_reported ... ok
+test the_pair_is_matched_on_both_halves ... ok
+test an_objects_page_that_does_not_answer_is_truncated_is_an_error ... ok
+test objects_truncated_without_a_token_is_an_error_not_a_full_listing ... ok
+test objects_truncated_with_an_empty_token_is_an_error ... ok
+test a_truncated_upload_page_without_a_cursor_is_an_error ... ok
+test an_objects_listing_ends_on_is_truncated_false_after_every_page ... ok
+test uploads_spread_over_several_keys_are_listed_exactly_once ... ok
+test a_repeated_cursor_pair_is_an_error_not_a_complete_listing ... ok
+test a_truncated_upload_page_with_only_half_a_cursor_is_an_error ... ok
+test a_cycling_cursor_pair_is_an_error_not_a_complete_listing ... ok
+test seven_uploads_on_one_key_are_all_listed_across_three_pages ... ok
+test objects_with_a_repeated_or_cycling_token_are_an_error ... ok
+test an_upload_listing_that_never_terminates_fails_on_the_page_bound ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests\sdk_log_hygiene.rs (target\debug\deps\sdk_log_hygiene-202c3266b5def5c5.exe)
+
+running 4 tests
+test child_entry_point ... ok
+test sentinels_do_not_contain_each_other ... ok
+test turning_every_provider_target_to_trace_does_not_leak ... ok
+test every_configured_case_keeps_storage_references_out_of_the_log_stream ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.38s
+
+   Doc-tests object_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

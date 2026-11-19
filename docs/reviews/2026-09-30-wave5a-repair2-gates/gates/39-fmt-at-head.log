@@ -1,0 +1,8 @@
+title      : cargo fmt --all -- --check (re-run at the final HEAD a98e45c, after the last orchestrator-script commits)
+command    : rtk proxy cargo fmt --all -- --check
+workdir    : F:\Workspace\business-platform
+utc        : 2026-09-30 04:01:01Z
+--- output ------------------------------------------------------------------------
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+
+exit code  : 0

@@ -1,0 +1,16 @@
+# gate: 36-build-no-run-chain-pg
+# command: rtk proxy cargo test -p audit-postgres --test chain_pg --no-run
+# started: 2026-09-30 17:27:47 +08:00
+# finished: 2026-09-30 17:27:48 +08:00
+# duration-seconds: 1
+# exit-code: 0
+
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit-00y924mrebczh\s-hmp786lgjx-1rpyhtp-working`
+
+warning: `audit` (lib) generated 1 warning
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Workspace\business-platform\target\debug\incremental\audit_postgres-32ayjsvkvf7bh\s-hmp78kgxk1-0744o7b-working`
+
+warning: `audit-postgres` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+  Executable tests\chain_pg.rs (target\debug\deps\chain_pg-d2a565c98adcbc87.exe)
