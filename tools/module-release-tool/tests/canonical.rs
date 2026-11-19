@@ -14,7 +14,10 @@ use module_release_tool::canonical::{
 use module_release_tool::tempdir::TempDir;
 
 fn write(root: &Path, member: &str, bytes: &[u8]) {
-    let path = root.join(member.replace('/', "\\"));
+    // `Path::join` uses the host separator. Replacing '/' with '\\' here
+    // creates literal backslash filenames on Linux, which breaks the
+    // byte-ordered inventory expected by these cases.
+    let path = root.join(member);
     fs::create_dir_all(path.parent().expect("a member has a parent")).expect("create parent");
     fs::write(path, bytes).expect("write member");
 }
