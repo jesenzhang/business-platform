@@ -1,6 +1,9 @@
 # CI MinIO image restore — registry evidence (2026-11-19)
 
-Scope: `.github/workflows/ci.yml` only. Branch `codex/ci-minio-image-restore` (base `e3d7c30`).
+Scope: all active MinIO image references (`.github/workflows/ci.yml`,
+`scripts/test-postgres-minio-multiprocess.sh`, `deploy/docker-compose.yml`,
+`deploy/dev/compose.yml`, `deploy/demo/docker-compose.yml`). Branch
+`codex/ci-minio-image-restore` (base `e3d7c30`).
 Goal: make the `integration` job pull real MinIO server + client images again without
 changing Rust code, Cargo manifests, healthchecks, bucket init, contract tests or E2E.
 
@@ -63,8 +66,8 @@ Its checksum step in `ci.yml` is unchanged.
 
 ## 4. Rollback
 
-Single-file, two-image-string change: `git revert <commit>` (or restore the two image lines
-and comments). No other workspace, branch, lockfile or source file is touched.
+Image-reference-only change: revert the image commit(s) on this branch. No Cargo,
+Rust source, migration or API change is included.
 
 ## 5. NOT RUN / residual risk
 
@@ -77,6 +80,11 @@ and comments). No other workspace, branch, lockfile or source file is touched.
   (2024-12-18) than the current pinned mc binary (2025-08-13); the mc/CI contract surface used
   here (`alias set`, `mb --ignore-existing`, `anonymous set none`, `/minio/health/live`) is
   supported by both. If the mirror is deleted, pin to a digest or build from upstream source.
-- **Out of scope**: `deploy/docker-compose.yml`, `deploy/dev/compose.yml` and
-  `deploy/demo/docker-compose.yml` still reference the dead quay.io tags; they were not
-  modified per task scope.
+- **Follow-up in the same change**: CI validation run `44474318859` proved the
+  service image pulls and all real PostgreSQL + MinIO contract suites pass, but the
+  multiprocess E2E script still pulled the retired `quay.io/minio/mc` tag and
+  failed with the same 401. The script's two client `docker run` calls and all
+  three compose files were moved to the same pinned image; compose healthchecks
+  using `mc ready local` were switched to the verified
+  `curl -f http://localhost:9000/minio/health/ready` endpoint. These are config
+  edits only; compose stack startup is NOT RUN locally.
