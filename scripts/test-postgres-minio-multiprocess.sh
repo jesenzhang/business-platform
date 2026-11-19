@@ -60,8 +60,8 @@ for _ in $(seq 1 250000); do
 done
 source_size="$(wc -c < "$work/source.txt" | tr -d ' ')"
 logical_key="source.txt"
-docker run --network host --rm -v "$work:/work:ro" --entrypoint /bin/sh \
-  quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z -c \
+docker run --network host --rm -v "$work:/work:ro" --entrypoint /usr/bin/sh \
+  openebs/minio:RELEASE.2024-12-18T13-15-44Z -c \
   "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc mb --ignore-existing local/$MINIO_BUCKET >/dev/null"
 
 export BUSINESS_API__ENV=development
@@ -125,8 +125,8 @@ revision_id="$(jq -r '.data.revision_id' <<<"$doc_json")"
 # PLAN-0008 stores the immutable revision source under the revision UUID;
 # the request's logical filename is metadata and is not the object identity.
 key="tenants/$tenant/documents/$document_id/revisions/$revision_id/source"
-docker run --network host --rm -v "$work:/work:ro" --entrypoint /bin/sh \
-  quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z -c \
+docker run --network host --rm -v "$work:/work:ro" --entrypoint /usr/bin/sh \
+  openebs/minio:RELEASE.2024-12-18T13-15-44Z -c \
   "mc alias set local '$MINIO_ENDPOINT' '$MINIO_ACCESS_KEY' '$MINIO_SECRET_KEY' >/dev/null && mc cp /work/source.txt local/$MINIO_BUCKET/$key >/dev/null"
 job_json="$(curl --fail-with-body -sS -X POST "$base/api/v1/documents/$document_id/processing-jobs" "${auth[@]}" -H "Idempotency-Key: job-$RANDOM-$(date +%s)" -H 'Content-Type: application/json' -d '{"content_revision":1}')"
 job_id="$(jq -r '.data.job_id' <<<"$job_json")"
