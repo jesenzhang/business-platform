@@ -5,7 +5,7 @@
 > 状态：**Proposed / NOT ACTIVE / 待独立评审**。本文件是文档计划，不授权编码、依赖安装、API 激活或部署。
 > 日期：2026-11-19
 > 责任模块：Contract Management（正式字段与版本所有者）；协同：Document Management、Document Intelligence（`document-processing`）、Policy/IAM、Audit、Business Console Frontend
-> 计划基线：`codex/contract-vertical-slice-plan` @ `e3d7c30`（基于 main `e3d7c30`）；GitHub main 最近一次 CI `44310190041`（2026-11-18）未全绿
+> 计划基线：main @ e3d7c30（GitHub main HEAD；CI run 44310190041 未全绿）；计划分支 codex/contract-vertical-slice-plan 由该提交分出，本计划文档提交 73c5caa
 > 权威输入（冲突时按 AGENTS.md §1）：`ENTERPRISE_BUSINESS_DOMAIN_ARCHITECTURE.md`（§5 合同领域基线）、`BOUNDED_CONTEXT_MAP.md`（§8/§12/§13）、`DATA_OWNERSHIP_AND_CONSISTENCY.md`、`SERVER_BACKEND_ARCHITECTURE.md`、`CODE_ARCHITECTURE.md`、`SECURITY_ARCHITECTURE.md`、`FRONTEND_DESIGN_SYSTEM_STANDARD.md`、`API_AND_EVENT_CONTRACT_STANDARD.md`、`ARCHITECTURE_FITNESS_FUNCTIONS.md`、`DOCUMENT_MANAGEMENT.md`、ADR-0010/0011/0012/0013/0019/0022/0024/0027
 > 关联计划：PLAN-0014（Active / Review-first，**非本计划准入条件**）、PLAN-0006（Proposed / BLOCKED，等待本切片）、PLAN-0008（已归档，文档修订与证据基础）、[PR #19 前端候选重评估](../../reviews/2026-11-19-pr19-contract-frontend-recheck.md)
 > 编号说明：0017 未占用；已归档的 [PLAN-0016](../archive/2026/PLAN-0016-astryx-frontend-design-system-adoption.md) 属于 Astryx 前端设计系统，编号不可复用
@@ -77,7 +77,7 @@
 - **进程编排**：首个闭环由应用层的 Process Manager / 用例协调（记录流程实例、关联 ContractId/JobId/Document Revision、接收事件、发命令、超时与补偿），不把 Broker 消费端当作业务规则所有者。Durable Task Execution 只提供 lease/fence/retry 机制。
 - **持久化**：PostgreSQL 是多 Worker 生产权威；SQLite 仅本地单进程（`BEGIN IMMEDIATE`），不得用于生产、并行或多 AI 配置。写命令与 Outbox 在同一本地事务提交；消费端按至少一次交付设计。
 - **前端**：仅表现层。PR #19 的前端候选需在 Astryx 基线（ADR-0027 / PLAN-0016 已归档 / STD-FRONTEND-001）下重评估，作为本计划**受门禁的前端工作包**，不单独形成合同 E2E 声明；见配套重评估笔记。
-- **ADR 触发条件**：若评审得出“新增/合并/拆分 Context、变更数据所有权、变更公开 API/事件语义或幂等/版本规则、新增部署单元或基础设施、改变身份/租户/权限/数据分类”，必须先建 ADR，本计划暂不预期产生 ADR。
+- **ADR 触发条件**：若评审得出“新增/合并/拆分 Context、变更数据所有权、变更公开 API/事件语义或幂等/版本规则、新增部署单元或基础设施、改变身份/租户/权限/数据分类”，必须先建 ADR；新增 Contract 公开契约在 Gate-1 冻结时按同一条件核对，若改变已发布契约语义或构成全局策略变化则创建/修订 ADR。当前计划不预期改变既有已发布契约，故暂不预期产生 ADR。
 
 ## 5. 公开 Application API 与事件（草案，评审冻结）
 
@@ -163,7 +163,7 @@
 | 审计追溯 | 每个成功 Apply 可沿 `ContractVersion → Candidate(id/version) → Evidence(content_revision + line) → Reviewer principal → decision → event_id → trace_id` 完整追溯；E2E 样本追溯完整率 = 100%，任一缺失即失败 |
 | 首轮样本与格式 | 脱敏样本：纯文本 / Markdown / JSON 各 ≥ 2 份（含至少 1 份字段缺失或冲突样本），负例含不支持类型、非法 UTF-8、超长内容、`content_revision` 不匹配、证据缺失；PDF/Office/图片标 `NOT RUN` 而非 PASS |
 | 性能/容量（待确认） | 测试环境 1,000 contracts/tenant：List p95 ≤ 300 ms、Detail p95 ≤ 200 ms、Apply 排除处理时间 p95 ≤ 500 ms；超出阈值记录实测值并由 Owner 决定调整，不宣称通过 |
-| 可用性/故障隔离 | DI Worker 停摆时 Contract list/detail/已存版本查询仍可用；ProcessingJob 状态查询不依赖业务写入；故障注入下确认令牌不过期失效、不绕过权限 |
+| 可用性/故障隔离 | DI Worker 停摆时 Contract list/detail/已存版本查询仍可用；ProcessingJob 状态查询不依赖业务写入；故障注入下过期确认令牌仍被拒绝、目标版本变化后确认失效、权限与版本校验不被绕过 |
 | 恢复与 RPO/RTO | 崩溃/重复/重放后 Outbox 事件不丢不重；lease 过期由新 Worker fence 接管；目标为已提交业务事实零丢失，RPO/RTO 数值由运维基线与评审确认 |
 | API/Event 兼容 | 现有端点无破坏性差异；OpenAPI/JSON Schema 差异检测进入 CI；未知事件字段可忽略；历史消息重放测试通过 |
 | 前端（受门禁 WP） | 仅表现层变更；`npm run lint/typecheck/test/build/test:e2e`、`npx astryx doctor`、`tests/styles.test.ts` 通过；附真实 Chromium 截图与交互证据；`src/api.ts`/`src/contracts.ts` 语义零差异 |
@@ -218,10 +218,10 @@
 ### 12.2 完成定义（DoD）
 
 - [ ] Gate-0 主干 CI 全绿且有 run ID 证据；所有 Rust 门禁与架构 Fitness 全绿（无 `NOT RUN`/`BLOCKED` 遗留）。
-- [ ] 固定闭环六步 E2E 通过，首轮脱敏纯文本/Markdown/JSON 样本与负例均有结果记录。
+- [ ] 固定闭环六步 E2E 在 API/服务层通过；首轮脱敏纯文本/Markdown/JSON 样本与负例均有结果记录。
 - [ ] 五项验收（租户隔离、幂等、版本冲突、已签版本保护、审计追溯）有可复现测试与证据。
 - [ ] API/Event、OpenAPI、Schema、错误码、权限键、迁移清单与本文同步；需要 ADR 的变更已接受。
-- [ ] 前端受门禁工作包完成且 Astryx 门禁与 Chromium 证据齐备；或明确标记 `BLOCKED` 且不宣称合同 E2E 完成。
+- [ ] 前端受门禁工作包完成且 Astryx 门禁与 Chromium 证据齐备；若阶段 5 为 `BLOCKED`，则不得宣称含 UI 的合同端到端闭环完成，并在 DoD 中记录 `BLOCKED` 项与 Owner 承诺。
 - [ ] 独立评审者接受，计划状态才可从 Proposed 迁移；**本文件当前不表示已验收、已激活或可合并实现**。
 
 ## 13. 风险与开放问题
@@ -234,6 +234,7 @@
 4. 现有确定性抽取只产出标题/行数等有限字段与行级证据，可能不足以支撑真实合同字段应用；需评审最小字段集与证据阈值。
 5. 前端候选方案早于 Astryx 采纳，若直接合并会与已归档 PLAN-0016 编号冲突并引入重复设计系统依赖。
 6. 首轮样本脱敏质量与代表性不足会削弱 E2E 说服力；不得用伪造数据宣称 PASS。
+7. 威胁建模剩余风险（对应 §7）：跨租户 IDOR（控制：租户约束 Repository + 403/404；验证：§8 租户隔离负向矩阵）、陈旧候选/旧修订提交（控制：candidate_version + content_revision 校验；验证：CANDIDATE_STALE / CONTENT_REVISION_MISMATCH 用例）、确认令牌滥用（控制：nonce + 过期 + 版本绑定；验证：重放/过期用例）、内部 Key 泄漏（控制：DTO 脱敏；验证：§9 负向字段扫描）；冻结后随 Owner 决策更新。
 
 **需要我（lead）或独立评审者回答的开放问题**
 

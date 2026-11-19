@@ -9,7 +9,7 @@
 ## 1. 结论摘要
 
 1. PR #19 是**文档型提案**，其自述与文件清单均表明：只新增/修改 Markdown，无依赖安装、无代码、无公开 API/ADR 变更；其中 `docs/plans/current/PLAN-0016-contract-frontend-p0-validation.md` 明确为 **Proposed / NOT ACTIVE**，不构成实施授权。
-2. 该前端候选子计划占用 **PLAN-0016** 编号，与 2026-11-18 已完成并归档的 **PLAN-0016 Astryx 前端设计系统采纳**冲突。按 `DOCUMENT_MANAGEMENT.md` §6.2/§6.3，编号一经使用不得复用；原提案写于 2026-10-08，早于 Astryx 采纳，必须在当前基线下重评估。
+2. 该前端候选子计划占用 **PLAN-0016** 编号，与 2026-11-18 已完成并归档的 **PLAN-0016 Astryx 前端设计系统采纳**冲突。按 `DOCUMENT_MANAGEMENT.md` §6.2「编号一经使用不得复用」的原则与 §2.4「不静默覆盖历史」（§6.3 仅规定 Plan 命名格式），编号一经使用不得复用；原提案写于 2026-10-08，早于 Astryx 采纳，必须在当前基线下重评估。
 3. 建议：将其**并入 PLAN-0017 作为受门禁的前端工作包**（保留其 WP0/WP1/WP2 的“离线 PoC + 演示层”定位，WP3 保持阻断），或另取一个未占用编号并明确标注 Proposed/NOT ACTIVE 与 Superseded 关系；不得原样以 PLAN-0016 合并。
 4. Astryx 基线下的硬边界：`src/api.ts`、`src/contracts.ts` 语义、请求头、幂等键、乐观锁版本、提交载荷、确认流程、权限要求与数据结构一律不改；不得引入页面级全局 CSS；不得建立第二套主题状态或组件包装层。
 5. PR #19 已如实记录的关键阻断——**Contract Apply 与文档内容预览（Content Read/Preview）API 尚未落地**——在本次复核中仍然成立；相关前端能力必须标记 `BLOCKED / NOT RUN`，不得标 PASS。
