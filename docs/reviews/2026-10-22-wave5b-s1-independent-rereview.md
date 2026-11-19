@@ -288,3 +288,36 @@ pwsh -NoProfile -File docs/reviews/2026-10-22-independent-rereview-gates/probe-a
 - 评审开始前分支已由提交者推送至 `origin`（`325d249`）；本次复评新增的文档更正为
   `50d58a0` 与本报告。
 - 未进行 merge、deploy 或 R2 admission；未接触数据库、对象存储或外部 Provider。
+
+## 13. 2026-11-19 整改回填（对本报告 §10 的回应）
+
+> 由 `plan0014-s1` 在分支 `codex/plan0014-wave5b-s1-cleanup-boundary`（从 `eb53250`
+> 建立，未 push、未 merge、未改主工作区）完成；只改两份 PowerShell 脚本与两份文档，
+> 未改 Rust / Cargo.lock。证据目录（按惯例 untracked）：
+> `docs/reviews/2026-11-19-wave5b-s1-cleanup-boundary-gates/`，含 `RUN-MANIFEST.md`。
+
+| 项 | 处置 |
+| --- | --- |
+| **C-1** | `Remove-Tree` 的 `$unsafeWithin` 每次动作都走到卷根并仍要求经过 walk root；新增 `ast-remove-tree-ancestor-swapped-on-first-enumeration`。**fail-first（原脚本）：外部树 5→1、sentinel 消失、无拒绝、exit 1；修复后：PASS、具名拒绝、外部 SHA 与条目数不变、exit 0**。closeout §6 与函数注释同步。 |
+| **C-2** | 真正修复而非降级：P1-1 在动作时重读子项身份并与枚举快照比较，变化即 retain（已修复初版误 retain 驱动自带 junction 的问题）；P1-2 由 `Remove-RunScratch` 记录所有拒绝，`Assert-NoRetainedScratch` 在 finally 后使门禁非零退出。新增 3 个回归（动态、static、正控）。 |
+| **C-3** | closeout §7 明确 fail-first 来自 `0169d85`（blob `8b3f272`、与最终 `5b2e8a25` 差 42/11），并声明 queued-before-pop 窗口没有最终 harness 的 fail-first；§10 去掉“哈希覆盖所有日志”的过度表述，列出未纳入的 3 个日志；新增 LF/CRLF 哈希口径表；probe 执行副本未保留、数值不可复现保持明示。 |
+| **C-4** | 仅对脚本默认 scratch 自动创建缺失的 `target/tmp`；显式 `-Scratch` 仍拒绝。新增 `entry-c4-default-scratch-from-empty-target`。 |
+
+**整改门禁**（真实计数器见证据目录）：`cargo fmt --all -- --check` exit 0；
+`scripts/check-architecture.ps1` exit 0 / `Architecture fitness: PASS`；
+`scripts/test-plan0014-wave5b.ps1` 113 例 = **112 matched / 1 BLOCKED (`P2-catalog-symlink`) /
+0 mismatched**，exit 0；`scripts/test-plan0014-wave5b-repairs.ps1`
+**`executed=33 skipped=0 failed=0 blocked=0 declared=33`**，exit 0；
+`module-release-tool` **108 passed / 0 failed / 0 ignored**（12 结果块；在独立克隆上复跑，
+因本链接工作树的 `.git` 是文件，`source_derivation` 的 3 例假设它是目录）、
+`runtime-migration` **1 passed / 0 failed / 0 ignored**，exit 0；原始日志与计数见
+`RUN-MANIFEST.md`。本工作树路径过深，独立 driver 用短 `-Scratch`，harness 用进程级
+`GIT_CONFIG_* core.longpaths=true` 环境变量（均不改仓库或全局配置）以绕开 Windows
+MAX_PATH；默认路径由 C-4 场景单独覆盖。
+
+**NOT RUN（不得视为通过）**：全工作区 `cargo check/clippy/test --workspace --all-targets
+--all-features`、`check-openapi.ps1`、70 个外部服务测试、Linux symlink 覆盖、文件符号链接、
+mount point / ReFS / 网络卷、secret / 许可证 / 漏洞扫描、真正的多进程对抗。
+
+**本报告 §10 的判定不变**：CHANGES REQUESTED 已由上述整改回应，但 **R2 admission 仍为
+BLOCKED**；需主会话在合并后补跑完整 CI（含 Linux symlink 覆盖）并重新提交复评。

@@ -48,13 +48,22 @@ $script:Repo = if ([string]::IsNullOrWhiteSpace($Repo)) {
 } else {
     (Resolve-Path $Repo).Path
 }
-$script:Scratch = if ([string]::IsNullOrWhiteSpace($Scratch)) {
+# C4 (rereview): remember whether the caller supplied -Scratch. Only the
+# script's own default under target/ (build output, absent in a clean checkout)
+# may have its missing parent created; a caller's path is their claim and is
+# still refused when its parent does not exist.
+$script:UsingDefaultScratch = [string]::IsNullOrWhiteSpace($Scratch)
+$script:Scratch = if ($script:UsingDefaultScratch) {
     Join-Path $script:Repo 'target/tmp/plan0014-wave5b'
 } else {
     $Scratch
 }
 $script:RunLog = [System.Collections.Generic.List[string]]::new()
 $script:Results = [System.Collections.Generic.List[object]]::new()
+# P1-2 (rereview): retention is a gate failure, not a warning. Remove-RunScratch
+# records every refusal here and Assert-NoRetainedScratch turns any record into
+# a non-zero exit after cleanup has had its chance to run.
+$script:RetainedScratch = [System.Collections.Generic.List[string]]::new()
 
 function Write-Log([string]$Line) {
     $script:RunLog.Add($Line) | Out-Null
@@ -202,11 +211,15 @@ function Remove-Tree {
         not the same as being one when the walk gets to it, because only the
         name was queued. So every directory is proved twice around its
         enumeration - immediately before, and immediately after - by reading its
-        own reparse attribute and that of every component between it and the
-        root of this walk, and again immediately before it is deleted. Every one
-        of those reads is no-follow, and so is every delete: opening a reparse
-        point opens the link, not the target, which is why removing the name of
-        a junction cannot reach through it. A directory whose proof fails is
+        own reparse attribute and that of every component from it all the way to
+        the **volume root**, and again immediately before it is deleted. The
+        walk root is still required to be on that chain, but proof no longer
+        stops there (C1, rereview 2026-10-22): an ancestor above the walk root
+        that is replaced during the walk is now seen by the next proof instead
+        of being trusted from a single check made before the loop. Every one of
+        those reads is no-follow, and so is every delete: opening a reparse point
+        opens the link, not the target, which is why removing the name of a
+        junction cannot reach through it. A directory whose proof fails is
         *retained*, nothing enumerated before the failure is deleted, and the
         whole removal ends in a named refusal instead of a quiet success.
 
@@ -215,8 +228,9 @@ function Remove-Tree {
         pair atomic. What is therefore guaranteed is that the walk never follows
         a link it could see and never deletes content reached through a name that
         changed under it; what is handled by retention is the rest, and retention
-        leaves a scratch directory behind, which this gate treats as a failure
-        the caller has to report. Content outside a run root is never at risk in
+        leaves a scratch directory behind. That is a gate failure now, not a
+        warning: Remove-RunScratch records it and Assert-NoRetainedScratch makes
+        the process exit non-zero. Content outside a run root is never at risk in
         either case. #>
     param([string]$Path, [int]$Attempts = 5)
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -240,20 +254,35 @@ function Remove-Tree {
         would break them. #>
     $unsafeWithin = {
         param([string]$Directory, [string]$WalkRoot)
+        <#  C1 (2026-10-22 independent rereview): this proof has to reach the
+            volume root, not stop at the walk root. The chain above the root was
+            formerly checked only once before the attempt loop, so an ancestor
+            replaced on the first enumeration was invisible to every per-action
+            proof and an external tree was deleted while the call returned
+            success. Walking the same no-follow chain to the volume root on
+            every call sees that replacement as a reparse point on the chain,
+            so the directory is retained and nothing under it is touched. The
+            walk root is still required to be on the chain: a directory that no
+            longer sits under it is not proved by a chain that skipped it. #>
         $cursor = $Directory
+        $sawWalkRoot = $false
         while ($true) {
             if (Test-ReparsePoint $cursor) {
                 return $cursor
             }
             if ($cursor -eq $WalkRoot) {
-                return ''
+                $sawWalkRoot = $true
             }
             $cursorParent = Split-Path -Parent $cursor
             if ([string]::IsNullOrWhiteSpace($cursorParent) -or $cursorParent -eq $cursor) {
-                return ''
+                break
             }
             $cursor = $cursorParent
         }
+        if (-not $sawWalkRoot) {
+            return $Directory
+        }
+        return ''
     }
     $retainedNote = {
         param([string]$Directory, [string]$Unsafe, [switch]$WhileEnumerated)
@@ -301,13 +330,36 @@ function Remove-Tree {
                 $seen.Add($directory) | Out-Null
                 foreach ($child in $children) {
                     try {
-                        if ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                            [void]$child.Delete()
-                        } elseif ($child.PSIsContainer) {
-                            $pending.Push($child.FullName)
+                        <#  P1-1 (rereview): $child is a FileInfo cached when its
+                            parent was enumerated. In the gap between that read
+                            and this action a writer can replace the name with a
+                            link; the cached Attributes/PSIsContainer then still
+                            describe the object that was listed while the delete
+                            acts, by name, on whatever stands there now. Re-read
+                            the identity at the moment of the action and compare
+                            it with the enumeration-time snapshot. A child that
+                            changed is retained and refused. A child that was
+                            already a link when listed is still unlinked as a
+                            name - that is the run's own fixture, and deleting a
+                            reparse point's name never reaches its target. #>
+                        $childPath = $child.FullName
+                        $wasLink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+                        $wasContainer = [bool]$child.PSIsContainer
+                        $childNow = Get-Item -LiteralPath $childPath -Force -ErrorAction Stop
+                        $isLink = ($childNow.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+                        $isContainer = [bool]$childNow.PSIsContainer
+                        if ($wasLink -ne $isLink -or $wasContainer -ne $isContainer) {
+                            $retained.Add(("child '$childPath' changed identity between enumeration and deletion " +
+                                "(link $wasLink -> $isLink, container $wasContainer -> $isContainer)")) | Out-Null
+                            continue
+                        }
+                        if ($isLink) {
+                            [void]$childNow.Delete()
+                        } elseif ($isContainer) {
+                            $pending.Push($childPath)
                         } else {
-                            $child.Attributes = 'Normal'
-                            [void]$child.Delete()
+                            $childNow.Attributes = 'Normal'
+                            [void]$childNow.Delete()
                         }
                     } catch {
                         # A file the OS still holds (antivirus, an open handle) is
@@ -539,7 +591,13 @@ $scratchPath = if ([string]::IsNullOrWhiteSpace($Scratch)) {
 if (-not (Test-Path -LiteralPath $scratchPath)) {
     $scratchParent = Split-Path -Parent $scratchPath
     if (-not (Test-Path -LiteralPath $scratchParent)) {
-        throw "scratch parent '$scratchParent' does not exist; cannot validate scratch path"
+        if (-not $script:UsingDefaultScratch) {
+            throw "scratch parent '$scratchParent' does not exist; cannot validate scratch path"
+        }
+        # C4 (rereview): target/ is build output and a clean checkout has no
+        # target/tmp. Create it for the default path only, so the gate can run
+        # straight from an empty target/ without an out-of-band New-Item.
+        New-Item -ItemType Directory -Force -Path $scratchParent | Out-Null
     }
     $scratchCanonicalParent = Get-CanonicalPath $scratchParent
     $scratchLeaf = Split-Path -Leaf $scratchPath
@@ -662,6 +720,7 @@ function Remove-RunScratch {
             $parentPrefix = $entry.Parent.ToLowerInvariant().TrimEnd('\') + '\'
             if ($lowerRoot -ne $root.ToLowerInvariant() -or
                 -not $lowerRoot.StartsWith($parentPrefix)) {
+                $script:RetainedScratch.Add("'$root' no longer resolves inside its registered parent '$($entry.Parent)'") | Out-Null
                 Write-Warning "refusing to delete '$root': it no longer resolves inside its registered parent '$($entry.Parent)'"
                 continue
             }
@@ -671,6 +730,7 @@ function Remove-RunScratch {
                     (Get-Item -LiteralPath $canonicalPath -Force).Delete()
                     Write-Log "unlinked replaced run root ($($entry.Kind)): '$canonicalPath'; the tree behind the link was left alone"
                 } else {
+                    $script:RetainedScratch.Add("'$root' is reached through the reparse point '$unsafeLink'") | Out-Null
                     Write-Warning "refusing to delete '$root': '$unsafeLink' is a reparse point, so this path no longer names the tree the run created"
                 }
                 continue
@@ -680,6 +740,7 @@ function Remove-RunScratch {
                 $lowerProtected = (Get-CanonicalPath $protected).ToLowerInvariant().TrimEnd('\')
                 if ($lowerRoot -eq $lowerProtected -or
                     $lowerProtected.StartsWith($lowerRoot + '\')) {
+                    $script:RetainedScratch.Add("'$root' is or contains the protected path '$protected'") | Out-Null
                     Write-Warning "refusing to delete '$root': it is or contains the protected path '$protected'"
                     $blocked = $true
                     break
@@ -697,6 +758,7 @@ function Remove-RunScratch {
                 $token = [string]$entry.Token
             }
             if ([string]::IsNullOrWhiteSpace($witness) -or [string]::IsNullOrWhiteSpace($token)) {
+                $script:RetainedScratch.Add("'$root' carries no run ownership witness") | Out-Null
                 Write-Warning "refusing to delete '$root': it carries no run ownership witness, so nothing proves this tree is the one this run created"
                 continue
             }
@@ -710,6 +772,7 @@ function Remove-RunScratch {
                 $witnessText = ''
             }
             if (-not $witnessText.Contains($token)) {
+                $script:RetainedScratch.Add("'$root' has a missing or foreign ownership witness '$witness'") | Out-Null
                 Write-Warning "refusing to delete '$root': its ownership witness '$witness' is missing or names a different run, so this path no longer holds the tree the run created"
                 continue
             }
@@ -728,8 +791,23 @@ function Remove-RunScratch {
                 Remove-Tree -Path $root
             }
         } catch {
+            $script:RetainedScratch.Add("'$root' could not be removed: $($_.Exception.Message)") | Out-Null
             Write-Warning "scratch root '$root' could not be removed: $($_.Exception.Message)"
         }
+    }
+}
+
+function Assert-NoRetainedScratch {
+    <#  P1-2 (rereview): a retained scratch is a failure the gate has to report,
+        not a warning that leaves the exit code at zero. Remove-RunScratch records
+        every refusal while it cleans; this is called after the finally so a
+        normal run and an abnormal exit both end non-zero when anything was kept
+        behind - including a fallback link scratch, which is just another
+        registered root. #>
+    if ($script:RetainedScratch.Count -gt 0) {
+        throw ("retained scratch: {0} cleanup action(s) refused and left content behind: {1}. " -f `
+                $script:RetainedScratch.Count, ($script:RetainedScratch -join '; ')) +
+            'Retention is a gate failure; this run must not report success.'
     }
 }
 
@@ -1282,6 +1360,9 @@ Write-Log "scratch: $scratchRoot"
 } finally {
     Remove-RunScratch
 }
+
+# P1-2 (rereview): any root Remove-RunScratch had to retain now fails the gate.
+Assert-NoRetainedScratch
 
 Write-Log "scratch: $scratchRoot"
 

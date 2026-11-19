@@ -10,6 +10,14 @@ store, provider or network service was contacted; no ADR was accepted. Only Q1�
 worked on: the SQL and Rust parser repairs the review kept (`catalog.rs`, the fixture
 generators, `EXPECTATIONS.json`) were not touched, reopened or re-shaped.
 
+> **2026-11-19 remediation note.** The independent re-review of 2026-10-22
+> (`docs/reviews/2026-10-22-wave5b-s1-independent-rereview.md`) judged this closeout's
+> central safety claim too broad and issued CHANGES REQUESTED with C-1..C-4. Section 11
+> records the bounded follow-up that answers them, including a genuine fail-first
+> regression for C-1, the source correction for section 7, the scope/hash correction for
+> section 10 and the default-scratch fix. The verdict **R2 BLOCKED / NOT CLAIMED is
+> unchanged**; this document does not claim R2 admission or a full-workspace CI pass.
+
 ## 1. Start state, the boundary of the change, and the new fixed candidate
 
 * Start HEAD `0f295731d4cfc5f57cd8638d5a1fd2ca234f0caa` (the N1–N5 closeout docs commit),
@@ -198,7 +206,11 @@ are not proofs:
   attribute read of the name itself, and every delete is either the removal of a reparse point's
   *name* or `[System.IO.Directory]::Delete($dir, $false)` on a directory just proved empty. No
   directory is entered, enumerated or deleted unless its own attribute and that of every
-  component between it and the walk root were read at that moment. A registered root is
+  component from it to the volume root were read at that moment. (Wording corrected after
+  the 2026-10-22 re-review: the original text said "between it and the walk root", which
+  was literally true but stopped exactly where Q1 began. The C-1 fix in section 11 made
+  the stronger statement true in code as well. See the residual-window note below for
+  what a read still cannot prove.) A registered root is
   additionally identified by the *content* of a witness file only that run wrote, and that read
   happens only after the chain has been proved real — `Remove-RunScratch` checks registered-parent
   containment, then the full chain, then the protected paths, then the witness, in that order,
@@ -208,8 +220,11 @@ are not proofs:
   delete that follows still cannot walk through the link — it removes the *name*, and the tree
   behind it is untouched — so the residual cost is one lost directory name inside a tree this
   run created, never external content. Anything the walk *can* see has already been retained
-  and refused. `Remove-Tree`'s own comment carries this limit; the gate treats a retained
-  scratch as a failure rather than a success.
+  and refused. `Remove-Tree`'s own comment carries this limit. At the time this closeout was
+  first written, "the gate treats a retained scratch as a failure" described an intention,
+  not the exit code: `Remove-RunScratch` only issued `Write-Warning`. The C-2 fix in section
+  11 made it literal — every refusal is recorded and `Assert-NoRetainedScratch` makes the
+  process exit non-zero.
 * **Not exercised here.** Creating a *file* symlink needs an elevated token on this host, so
   the driver's `P2-catalog-symlink` case stays **BLOCKED** and is reported as such. Junctions
   work on the host's NTFS volumes, so every link scenario above really creates one; the repo
@@ -223,9 +238,26 @@ current driver text — no stub returns a safe answer. The review's three probes
 origin, and their shapes are preserved: real directories, real junctions, real sentinels,
 external trees this round created under its own scratch.
 
-**Fail-first, against the code under repair.** Two harnesses, both archived with their logs:
+**Fail-first, against the code under repair.** Two harnesses, both archived with their logs.
 
-* Q1 and Q2: the final scenarios, run with `-Repo` pointed at a tree holding
+*Source correction (2026-11-19, prompted by the independent re-review §7).* The Q1/Q2
+fail-first run did **not** use the final harness. It used the harness at
+`0169d85af7cadf36e32fc48ad0ad24cad24aff0d` ("fix(plan-0014): prove the wave 5b-s1 cleanup
+path, not its name"), whose blob is `8b3f272ab43884fcb044b0c173b3beff1d16e373`; the final
+candidate blob is `5b2e8a2536ccdb36b5412fe58b78da0ab636e7ce`. The diff is **42 insertions /
+11 deletions** and lands in the two Q2 scenarios:
+  - `ast-remove-tree-queued-directory-swapped-before-pop`: the watched target changes from
+    the child (`At = $child`) to the parent (`Watch = $run`), with the swapped child kept in
+    its own `Swap = $child` field;
+  - `ast-remove-tree-directory-swapped-after-enumeration`: a sibling positive control
+    (`sibling/mine.txt`) and a scratch-escape guard are added.
+
+  The remaining hunk only expands the Q3 failure message. Therefore the "queued before pop"
+  window has **no fail-first evidence from the final harness** — the archived draft watched
+  the child itself, not the parent. This is a source gap and is not claimed as covered here;
+  the new fail-first evidence produced with the final harness is in section 11.
+
+* Q1 and Q2: the `0169d85` harness above, run with `-Repo` pointed at a tree holding
   `git show 0f29573:scripts/test-plan0014-wave5b.ps1` — the candidate `a90cf32` content,
   SHA-256 `FB56AE7E…`. Result `executed=7 skipped=22 failed=6 blocked=0 declared=29`, exit 1.
   Six failures, each naming the external object that was destroyed: an ancestor link at three
@@ -348,7 +380,7 @@ Under `docs/reviews/2026-10-09-wave5b-s1-rereview-repair-gates/`:
 | `gates-fast/`, `gates-heavy/`, `gates-post/` | the repository gate list, one log per command with command line, start, stop and exit code |
 | `probes/ancestor-link-probe.log`, `probes/queued-directory-link-probe-postfix.log`, `probes/global-scratch-probe.log` | the review's own three probes re-run against the repaired tree |
 | `gate-timeline.log` | every step with its HEAD, command line, duration and exit code |
-| `final-state.json` | final SHA, hashes of both scripts and of every log above |
+| `final-state.json` | final SHA and hashes of both scripts and of the logs that were actually included; **not** `gate-timeline.log`, `git-diff-check.log` or `git-status-short.log` (independent re-review §7). "Hashes of every log above" was an overstatement and is withdrawn. |
 | `repair-before-fix/` | the earlier fail-first capture, kept as history |
 
 The three probe scripts live in `target/wave5b-q123/` (scratch, untracked): two are the
@@ -364,6 +396,109 @@ correct refusal is now a thrown, named refusal under `$ErrorActionPreference = '
 > were not preserved. The §7 probe values therefore cannot be reproduced from the repository
 > alone; the 2026-10-22 independent re-review records this as an evidence gap.
 
-End state: **READY FOR REVIEW / NOT INTEGRATED. R2 BLOCKED / NOT CLAIMED.** No push, no merge,
-no deploy, no integration. Stopping here for the independent re-review.
+### Hash 口径 (unified 2026-11-19)
+
+Every script SHA-256 in this report and in the 2026-10-22 re-review is the hash of the
+**LF-normalized (git blob) bytes**, not of a `core.autocrlf=true` working-tree checkout.
+The two forms of the same candidate content are:
+
+| Candidate blob | LF bytes (the quoted hash) | CRLF checkout (`Get-FileHash`) | `git hash-object` |
+| --- | --- | --- | --- |
+| driver `6bcdd89` | `7B7F209577324697C8BC89B364D23A80CEF42A711451F1A05A825C7D1C842471` | `0E748E10D83802D55704994F5FA65A2AE28D4E21623755DE4850819940CB0BA6` | `71d44b8554ef89b13184ec3ee06bb38e238f99bb` |
+| harness `6bcdd89` | `F235F5F271CFB20EFE6C8496F8A099AE77DF1C01D78823AE297BBF9A97177665` | `897ACB64077D0100C33A20615B56CB9CDA72CD1B9577289B8F49DAD581583BD9` | `5b2e8a2536ccdb36b5412fe58b78da0ab636e7ce` |
+
+The earlier `606CCECE…` / `FB56AE7E…` pair is **not** asserted here to be a line-ending pair:
+the archived evidence does not establish what bytes produced them, and the independent
+re-review flagged the missing explanation. Content identity for the candidate is the
+`git hash-object` column. `Get-FileHash` on a Windows checkout is expected to differ from the
+LF figure and is not by itself evidence that the file changed.
+
+## 11. 2026-11-19 bounded remediation of the CHANGES REQUESTED
+
+Executor: subagent `plan0014-s1` on branch
+`codex/plan0014-wave5b-s1-cleanup-boundary` (created from `eb53250`; no push, no merge,
+main worktree untouched). Authority: `docs/reviews/2026-10-22-wave5b-s1-independent-rereview.md`
+§8–§11. All evidence below is in the untracked-by-convention directory
+`docs/reviews/2026-11-19-wave5b-s1-cleanup-boundary-gates/`, whose `RUN-MANIFEST.md`
+records the exact commands, timestamps and counters. No Rust source or `Cargo.lock` changed.
+
+### C-1 — the per-action chain proof now reaches the volume root
+
+`Remove-Tree`'s local `$unsafeWithin` returned as soon as it reached `$WalkRoot`; the only
+proof above the walk root was one check made before the attempt loop. Replacing that
+ancestor on the first enumeration redirected the rest of the walk into an external tree and
+the call returned success. `$unsafeWithin` now walks to the volume root on **every** call
+and still requires the walk root to be on the chain. Section 6 and the function comment were
+corrected to match.
+
+The new `ast-remove-tree-ancestor-swapped-on-first-enumeration` scenario uses the final
+harness, a real junction and a scoped `Get-ChildItem` shim that parks the ancestor and plants
+the link **before the first enumeration**. It asserts the external sentinel and nested file
+keep their SHA-256, the external item count is unchanged, a named refusal is raised, the
+parked run tree is intact and the planted junction is retained.
+
+| Run | Result |
+| --- | --- |
+| fail-first, unfixed driver (`6bcdd89` bytes) | `FAIL … external tree went from 5 to 1 item(s)); Remove-Tree said: ` (empty); `executed=1 skipped=29 failed=1 blocked=0 declared=30`, exit **1** (`failfirst-c1-stdout.log`) |
+| after fix | `PASS`; `executed=1 skipped=29 failed=0 blocked=0 declared=30`, exit **0** (`positive-c1-stdout.log`), refusal `Remove-Tree retained 1 object(s) … is reached through the reparse point …\anchor while it was being enumerated` |
+
+### C-2 — P1-1 and P1-2 are genuinely repaired, not downgraded
+
+* **P1-1.** Each child is now re-read with `Get-Item -LiteralPath … -Force` at the moment of
+  the action. The fresh identity (link/container) is compared with the enumeration-time
+  `FileInfo`; a child that changed is **retained and refused**, while a child that was
+  already a link when listed is still unlinked as a name (that is the run's own fixture, and
+  unlinking a junction never follows it). The first iteration of this fix treated the
+  driver's legitimate `link-junction/.../policy` fixture as retention and made a clean run
+  exit non-zero; the comparison form above was adopted after that evidence. Both Q2
+  regressions still pass.
+* **P1-2.** `Remove-RunScratch` records every refusal in `$script:RetainedScratch` (including
+  the fallback link scratch, which is just another registered root), and the new
+  `Assert-NoRetainedScratch` is called after the cleanup `finally` so any record makes the
+  process exit non-zero. The intentional internal-evidence retention is not a refusal and is
+  not counted. New scenarios `ast-retention-fails-the-gate` (live imported functions, with an
+  empty-list positive control) and `static-retention-fails-gate` (the call exists and the list
+  is populated) pin this.
+
+### C-3 — source and hash corrections
+
+Section 7 now names the actual fail-first harness (`0169d85`, blob `8b3f272`, **42/11** diff
+against the final `5b2e8a25`) and states that the "queued before pop" window has no fail-first
+evidence from the final harness. Section 10 no longer claims that `final-state.json` hashed
+every log: `gate-timeline.log`, `git-diff-check.log` and `git-status-short.log` are excluded.
+The LF/CRLF 口径 table above gives both byte forms for each candidate script; the probe
+execution copies are explicitly recorded as not preserved and their numbers as not
+reproducible from the repository.
+
+### C-4 — default scratch from an empty `target/`
+
+The driver remembers whether `-Scratch` was supplied. Only its own default
+`target/tmp/plan0014-wave5b` may have a missing parent created; an explicit caller path is
+still refused. The new `entry-c4-default-scratch-from-empty-target` scenario parks any
+existing `target/tmp`, starts the real driver with the default scratch and a fail-fast
+evidence directory, and requires it to pass preflight and create the default parent.
+
+### Gates for this remediation
+
+See `RUN-MANIFEST.md` for raw commands, wall-clock stamps and counters. `cargo fmt --all --
+--check` exit 0, `scripts/check-architecture.ps1` exit 0 (`Architecture fitness: PASS`),
+driver `113 cases / 112 matched / 1 BLOCKED / 0 mismatched` exit 0, repair sweep
+`executed=33 skipped=0 failed=0 blocked=0 declared=33` exit 0, `module-release-tool` **108
+passed / 0 failed / 0 ignored** (12 result blocks, re-run on a standalone clone because this
+linked worktree's `.git` is a file and three `source_derivation` tests assume a directory),
+`runtime-migration` **1 passed / 0 failed / 0 ignored** exit 0. Two driver runs in this deep
+worktree needed support: a short scratch path for the
+standalone gate, and a scoped `GIT_CONFIG_* core.longpaths=true` environment override for
+the harness (the default path exceeds Windows MAX_PATH during the scratch clone). Neither
+changes repository code or configuration. The default-path run is separately covered by the
+C-4 scenario.
+
+NOT RUN here: full-workspace `cargo check/clippy/test --workspace --all-targets
+--all-features`, `check-openapi.ps1`, the 70 ignored external-service tests, Linux symlink
+coverage, file symlinks, mount points, ReFS/network volumes, secret/licence/vulnerability
+scans and a real multi-process adversary. **R2 admission remains BLOCKED**; this section is
+remediation evidence for re-review, not an acceptance claim.
+
+End state: **READY FOR RE-REVIEW / NOT INTEGRATED. R2 BLOCKED / NOT CLAIMED.** No push, no
+merge, no deploy, no integration.
 

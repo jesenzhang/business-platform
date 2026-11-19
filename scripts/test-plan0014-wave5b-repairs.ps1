@@ -301,6 +301,7 @@ $wanted = @(
     'Remove-Tree',
     'Register-RunRoot',
     'Remove-RunScratch',
+    'Assert-NoRetainedScratch',
     'Write-Log'
 )
 $foundNames = [System.Collections.Generic.List[string]]::new()
@@ -320,6 +321,7 @@ Assert-Repair ($missing.Count -eq 0) `
 $script:RunLog = [System.Collections.Generic.List[string]]::new()
 $script:RunRoots = [System.Collections.Generic.List[object]]::new()
 $script:ProtectedPaths = [System.Collections.Generic.List[string]]::new()
+$script:RetainedScratch = [System.Collections.Generic.List[string]]::new()
 $script:InternalEvidence = $false
 $script:EvidenceInsideRun = $null
 $KeepScratch = $false
@@ -329,6 +331,7 @@ Write-RepairLog "imported production cleanup functions from the current driver A
 function Reset-RunHarness {
     $script:RunRoots = [System.Collections.Generic.List[object]]::new()
     $script:ProtectedPaths = [System.Collections.Generic.List[string]]::new()
+    $script:RetainedScratch = [System.Collections.Generic.List[string]]::new()
     $script:RunLog = [System.Collections.Generic.List[string]]::new()
     $script:InternalEvidence = $false
     $script:EvidenceInsideRun = $null
@@ -1091,6 +1094,92 @@ Invoke-RepairScenario 'ast-remove-tree-directory-swapped-after-enumeration' {
 }
 
 # ---------------------------------------------------------------------------
+# rereview C1 - an ancestor ABOVE the walk root replaced on first enumeration
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'ast-remove-tree-ancestor-swapped-on-first-enumeration' {
+    <#  2026-10-22 independent rereview C1: the chain above the walk root was
+        proved once before the attempt loop, and $unsafeWithin stopped at the
+        walk root. A writer that replaces an ancestor on the FIRST enumeration
+        therefore redirected every later path to a tree the run never created,
+        and the walk deleted it while returning success with no warning. The
+        swap below is scheduled before the first real Get-ChildItem of the run
+        root, so the entries cleanup acts on are the external tree's entries -
+        the shape the review reproduced. #>
+    Reset-RunHarness
+    $scratch = Get-ReparseCapableScratch 'ancestormidwalk'
+    $unit = Join-Path $scratch 'unit'
+    $anchor = Join-Path $unit 'anchor'
+    $relative = ('scratch', 'run-owned') -join [System.IO.Path]::DirectorySeparatorChar
+    $run = Join-Path $anchor $relative
+    $outside = Join-Path $unit 'outside-owned'
+    $outsideRun = Join-Path $outside $relative
+    New-Item -ItemType Directory -Force -Path $run, (Join-Path $outsideRun 'nested') | Out-Null
+    $sentinel = Join-Path $outsideRun 'sentinel.txt'
+    $deep = Join-Path $outsideRun 'nested/deep.txt'
+    Set-Content -LiteralPath $sentinel -Value 'outside-owned sentinel' -Encoding utf8
+    Set-Content -LiteralPath $deep -Value 'outside-owned deep' -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $run 'mine.txt') -Value 'run-owned' -Encoding utf8
+    $sentinelSha = Get-FileSha $sentinel
+    $deepSha = Get-FileSha $deep
+    $outsideBefore = Get-TreeItemCount $outside
+
+    $script:SwapShim = [ordered]@{
+        Done   = $false
+        Watch  = $run
+        Anchor = $anchor
+        Parked = (Join-Path $unit 'parked-anchor')
+        Into   = $outside
+    }
+    $script:RealChildItem = Get-Command -CommandType Cmdlet Get-ChildItem
+    function Get-ChildItem {
+        [CmdletBinding()]
+        param([string]$LiteralPath, [switch]$Force)
+        $shim = $script:SwapShim
+        if (-not $shim.Done -and $PSBoundParameters.ContainsKey('LiteralPath') -and
+            $LiteralPath -eq $shim.Watch) {
+            $root = [System.IO.Path]::GetFullPath($scratch) + [System.IO.Path]::DirectorySeparatorChar
+            foreach ($candidate in @($shim.Anchor, $shim.Parked, $shim.Into)) {
+                if (-not [System.IO.Path]::GetFullPath($candidate).StartsWith($root,
+                        [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw 'the scheduled swap would escape the scenario scratch'
+                }
+            }
+            # Swap first: the listing that follows names the external tree.
+            Move-Item -LiteralPath $shim.Anchor -Destination $shim.Parked
+            New-Item -ItemType Junction -Path $shim.Anchor -Target $shim.Into -ErrorAction Stop | Out-Null
+            $shim.Done = $true
+        }
+        $forward = @{ ErrorAction = 'SilentlyContinue' }
+        if ($PSBoundParameters.ContainsKey('LiteralPath')) { $forward['LiteralPath'] = $LiteralPath }
+        if ($Force) { $forward['Force'] = $true }
+        return @(& $script:RealChildItem @forward)
+    }
+
+    $thrown = $null
+    try {
+        Remove-Tree -Path $run
+    } catch {
+        $thrown = $_.Exception.Message
+    }
+    $outsideAfter = Get-TreeItemCount $outside
+    Assert-Repair ($script:SwapShim.Done) 'the scheduled first-enumeration swap never ran; this scenario would prove nothing'
+    Assert-Repair (Test-Path -LiteralPath $sentinel) (
+        'C1: Remove-Tree deleted the external tree reached through an ancestor replaced on the first ' +
+        "enumeration ('$sentinel' is gone; the external tree went from $outsideBefore to $outsideAfter " +
+        "item(s)); Remove-Tree said: $thrown")
+    Assert-Repair ((Get-FileSha $sentinel) -eq $sentinelSha) 'C1: the external sentinel changed bytes'
+    Assert-Repair (Test-Path -LiteralPath $deep) 'C1: nested external content was deleted'
+    Assert-Repair ((Get-FileSha $deep) -eq $deepSha) 'C1: nested external content changed bytes'
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'reparse point|retain') (
+        "C1: Remove-Tree left the external tree alone but never said why it stopped: $thrown")
+    $parkedMine = Join-Path (Join-Path $script:SwapShim.Parked $relative) 'mine.txt'
+    Assert-Repair (Test-Path -LiteralPath $parkedMine) `
+        'C1: the run-owned tree parked during the swap was taken apart'
+    Assert-Repair (Test-Path -LiteralPath $anchor) `
+        'C1: the junction planted during the walk was removed instead of being retained'
+}
+
+# ---------------------------------------------------------------------------
 # review N5 - the scenario filter is a decision, not a silent all-SKIP pass
 # ---------------------------------------------------------------------------
 Invoke-RepairScenario 'filter-unknown-only-refuses-before-executing' {
@@ -1506,6 +1595,107 @@ Invoke-RepairScenario 'wrapper-b8-evidence-not-overwritten' {
     Assert-Repair ((Get-NormalizedOutput $second.Out) -match 'already exists and is not empty') `
         "refusal did not name the evidence rule: $($second.Out)"
     Assert-Repair ((Get-FileSha $logFile) -eq $before) 'an archived gate log changed between runs'
+}
+
+# ---------------------------------------------------------------------------
+# rereview P1-2 - retention must fail the gate, not just warn
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'ast-retention-fails-the-gate' {
+    <#  2026-10-22 rereview P1-2: a retained scratch was only warned about, so
+        the driver exited zero. Remove-RunScratch now records every refusal and
+        Assert-NoRetainedScratch (imported from the production driver's AST)
+        turns any record into a named, non-zero failure. #>
+    Reset-RunHarness
+    $parent = New-ScenarioScratch 'retainfail'
+    $sentinel = Join-Path $parent 'sentinel.txt'
+    Set-Content -LiteralPath $sentinel -Value 'keep' -Encoding utf8
+    $script:RunRoots.Add([pscustomobject]@{
+        Root   = (Get-CanonicalPath $parent)
+        Parent = (Get-CanonicalPath (Split-Path -Parent $parent))
+        Kind   = 'main'
+    }) | Out-Null
+    $script:ProtectedPaths.Add((Get-CanonicalPath $parent))
+
+    $warnings = @(Remove-RunScratch 3>&1 | ForEach-Object { $_.ToString() })
+    Assert-Repair ($script:RetainedScratch.Count -gt 0) `
+        'P1-2: a refused cleanup left no retention record, so the gate cannot fail on it'
+    Assert-Repair (($warnings -join "`n") -match 'protected path') `
+        'the refusal did not name the protected-path rule'
+
+    $thrown = $null
+    try { Assert-NoRetainedScratch } catch { $thrown = $_.Exception.Message }
+    Assert-Repair ($null -ne $thrown -and $thrown -match 'retained scratch|gate failure') `
+        "P1-2: Assert-NoRetainedScratch did not turn retention into a failure: $thrown"
+
+    # A run that retained nothing must still be allowed to finish.
+    $script:RetainedScratch.Clear()
+    $cleanThrown = $null
+    try { Assert-NoRetainedScratch } catch { $cleanThrown = $_.Exception.Message }
+    Assert-Repair ($null -eq $cleanThrown) `
+        "positive control failed: an empty retention list still failed the gate: $cleanThrown"
+}
+
+Invoke-RepairScenario 'static-retention-fails-gate' {
+    <#  The gate-level check is a top-level call after the cleanup finally, and
+        Remove-RunScratch must populate the list it checks - otherwise the
+        assertion could never fire in the real driver. #>
+    $calls = @($driverAst.FindAll(
+        { param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
+                    $n.GetCommandName() -eq 'Assert-NoRetainedScratch' }, $true))
+    Assert-Repair ($calls.Count -ge 1) `
+        'static: the driver never calls Assert-NoRetainedScratch, so retention cannot fail the gate'
+    $cleanup = @($driverAst.FindAll(
+        { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                    $n.Name -eq 'Remove-RunScratch' }, $true))
+    Assert-Repair ($cleanup.Count -eq 1) 'static: Remove-RunScratch is not defined exactly once'
+    $records = @($cleanup[0].FindAll(
+        { param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                    $n.VariablePath.UserPath -match '^(script:)?RetainedScratch$' }, $true)).Count
+    Assert-Repair ($records -gt 0) `
+        'static: Remove-RunScratch never records a retention, so the gate assertion can never fire'
+}
+
+# ---------------------------------------------------------------------------
+# rereview C4 - the default scratch parent is created in a clean checkout
+# ---------------------------------------------------------------------------
+Invoke-RepairScenario 'entry-c4-default-scratch-from-empty-target' {
+    <#  2026-10-22 rereview P2-6/C4: the gate used to throw when target/tmp was
+        absent, so a clean checkout could not run it. Park any existing
+        target/tmp, start the real driver with its default -Scratch and an
+        evidence directory that fails fast, and require it to get past preflight
+        and create the default scratch parent itself. #>
+    $tmp = Join-Path $Repo 'target/tmp'
+    $parked = $null
+    if (Test-Path -LiteralPath $tmp) {
+        $parked = Join-Path $Repo ("target/tmp.c4parked-" + [guid]::NewGuid().ToString('N'))
+        Move-Item -LiteralPath $tmp -Destination $parked
+    }
+    try {
+        $evidence = Join-Path (New-ScenarioScratch 'c4-ev') 'evidence'
+        New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+        Set-Content -LiteralPath (Join-Path $evidence 'sentinel.txt') -Value 'old' -Encoding utf8
+        Assert-Repair (-not (Test-Path -LiteralPath $tmp)) `
+            'the default scratch parent was not removed for this scenario'
+        $output = & pwsh -NoProfile -File $driver -Repo $Repo -EvidenceDir $evidence 2>&1 |
+            ForEach-Object { $_.ToString() }
+        $exit = $LASTEXITCODE
+        $joined = $output -join "`n"
+        Set-Content -LiteralPath (Join-Path $OutDir 'entry-c4-child-output.txt') -Value $joined -Encoding utf8
+        Assert-Repair ($exit -ne 0) 'the driver accepted a non-empty evidence directory'
+        Assert-Repair ($joined -notmatch 'scratch parent') `
+            "the driver still refuses an empty target/: $joined"
+        Assert-Repair ($joined -match 'already holds') `
+            "the driver did not reach the evidence-protection rule: $joined"
+        Assert-Repair (Test-Path -LiteralPath (Join-Path $tmp 'plan0014-wave5b')) `
+            'the driver did not create its default scratch parent under target/tmp'
+    } finally {
+        if (Test-Path -LiteralPath $tmp) {
+            Remove-Tree -Path $tmp
+        }
+        if ($null -ne $parked -and (Test-Path -LiteralPath $parked)) {
+            Move-Item -LiteralPath $parked -Destination $tmp
+        }
+    }
 }
 
 # ---------------------------------------------------------------------------
