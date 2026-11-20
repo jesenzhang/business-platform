@@ -363,7 +363,8 @@ async fn fetch_visible_role(
     let sql = format!(
         "SELECT {ROLE_COLUMNS} FROM roles WHERE role_id = $1 AND (tenant_id = $2 OR tenant_id IS NULL)"
     );
-    let row = sqlx::query_as::<_, RoleRow>(&sql)
+    // SQL-SAFE: only the constant `ROLE_COLUMNS` is interpolated; role/tenant ids are bound.
+    let row = sqlx::query_as::<_, RoleRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(role_id)
         .bind(tenant_id)
         .fetch_optional(&mut *conn)
@@ -390,7 +391,8 @@ async fn fetch_binding(
     let sql = format!(
         "SELECT {BINDING_COLUMNS} FROM role_bindings WHERE binding_id = $1 AND tenant_id = $2"
     );
-    let row = sqlx::query_as::<_, BindingRow>(&sql)
+    // SQL-SAFE: only the constant `BINDING_COLUMNS` is interpolated; binding/tenant ids are bound.
+    let row = sqlx::query_as::<_, BindingRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(binding_id)
         .bind(tenant_id)
         .fetch_optional(&mut *conn)
@@ -808,7 +810,8 @@ async fn set_role_permissions_tx(
             "SELECT COUNT(*) FROM permission_definitions WHERE stable_key IN ({})",
             placeholders.join(",")
         );
-        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        // SQL-SAFE: only generated `$N` placeholders (count bounded by MAX_ROLE_PERMISSIONS) enter the SQL; the permission keys themselves are bound.
+        let mut query = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql.as_str()));
         for key in &sorted {
             query = query.bind(key.clone());
         }
@@ -934,9 +937,10 @@ async fn bind_role_tx(
     // `IS NOT DISTINCT FROM` compares the nullable scope/window columns
     // `NULL`-safely.
     let scope = scope_columns(&command.scope);
-    let existing = sqlx::query_as::<_, BindingRow>(&format!(
+    // SQL-SAFE: `format!` only interpolates the constant `BINDING_COLUMNS`; all ids/scope values are bound.
+    let existing = sqlx::query_as::<_, BindingRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {BINDING_COLUMNS} FROM role_bindings WHERE tenant_id = $1 AND user_id = $2 AND role_id = $3 AND scope_kind = $4 AND scope_org_unit_id IS NOT DISTINCT FROM $5 AND scope_include_subtree = $6 AND scope_resource_kind IS NOT DISTINCT FROM $7 AND scope_resource_id IS NOT DISTINCT FROM $8 AND status = 'active' AND effective_at = $9 AND expires_at IS NOT DISTINCT FROM $10",
-    ))
+    )))
     .bind(command.tenant_id)
     .bind(command.user_id)
     .bind(command.role_id)
@@ -1282,7 +1286,8 @@ impl PolicyQueryPort for PostgresPolicyStore {
             "SELECT {ROLE_COLUMNS} FROM roles WHERE tenant_id = $1 OR tenant_id IS NULL
              ORDER BY stable_key COLLATE \"C\""
         );
-        let rows = sqlx::query_as::<_, RoleRow>(&sql)
+        // SQL-SAFE: only the constant `ROLE_COLUMNS` is interpolated; tenant_id is bound.
+        let rows = sqlx::query_as::<_, RoleRow>(sqlx::AssertSqlSafe(sql.as_str()))
             .bind(tenant_id)
             .fetch_all(&self.pool)
             .await
@@ -1316,7 +1321,8 @@ impl PolicyQueryPort for PostgresPolicyStore {
         let sql = format!(
             "SELECT {BINDING_COLUMNS} FROM role_bindings WHERE tenant_id = $1 AND user_id = $2 ORDER BY binding_id"
         );
-        let rows = sqlx::query_as::<_, BindingRow>(&sql)
+        // SQL-SAFE: only the constant `BINDING_COLUMNS` is interpolated; tenant/user ids are bound.
+        let rows = sqlx::query_as::<_, BindingRow>(sqlx::AssertSqlSafe(sql.as_str()))
             .bind(tenant_id)
             .bind(user_id)
             .fetch_all(&self.pool)
@@ -1333,7 +1339,8 @@ impl PolicyQueryPort for PostgresPolicyStore {
         let sql = format!(
             "SELECT {BINDING_COLUMNS} FROM role_bindings WHERE tenant_id = $1 AND role_id = $2 AND status = 'active' ORDER BY binding_id"
         );
-        let rows = sqlx::query_as::<_, BindingRow>(&sql)
+        // SQL-SAFE: only the constant `BINDING_COLUMNS` is interpolated; tenant/role ids are bound.
+        let rows = sqlx::query_as::<_, BindingRow>(sqlx::AssertSqlSafe(sql.as_str()))
             .bind(tenant_id)
             .bind(role_id)
             .fetch_all(&self.pool)
@@ -1374,7 +1381,9 @@ impl PolicyQueryPort for PostgresPolicyStore {
                 "SELECT {BINDING_COLUMNS} FROM role_bindings WHERE tenant_id = $1 ORDER BY binding_id"
             )
         };
-        let mut query = sqlx::query_as::<_, BindingRow>(&sql).bind(tenant_id);
+        // SQL-SAFE: `sql` selects between two constant fragments over `BINDING_COLUMNS`; tenant/user ids are bound.
+        let mut query =
+            sqlx::query_as::<_, BindingRow>(sqlx::AssertSqlSafe(sql.as_str())).bind(tenant_id);
         if let Some(user_id) = user_filter {
             query = query.bind(user_id);
         }

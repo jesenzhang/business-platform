@@ -350,7 +350,8 @@ async fn fetch_user(
     user_id: Uuid,
 ) -> Result<Option<PlatformUser>, IdentityStoreError> {
     let sql = format!("SELECT {USER_COLUMNS} FROM platform_users WHERE user_id = ?1");
-    let row = sqlx::query_as::<_, UserRow>(&sql)
+    // SQL-SAFE: `sql` only interpolates the constant `USER_COLUMNS`; user_id is a bind parameter.
+    let row = sqlx::query_as::<_, UserRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(user_id.to_string())
         .fetch_optional(&mut *conn)
         .await
@@ -366,7 +367,8 @@ async fn fetch_membership(
     let sql = format!(
         "SELECT {MEMBERSHIP_COLUMNS} FROM tenant_memberships WHERE tenant_id = ?1 AND user_id = ?2"
     );
-    let row = sqlx::query_as::<_, MembershipRow>(&sql)
+    // SQL-SAFE: only the constant `MEMBERSHIP_COLUMNS` is interpolated; tenant/user ids are bound.
+    let row = sqlx::query_as::<_, MembershipRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(tenant_id.to_string())
         .bind(user_id.to_string())
         .fetch_optional(&mut *conn)
@@ -381,7 +383,8 @@ async fn fetch_membership_by_id(
 ) -> Result<TenantMembership, IdentityStoreError> {
     let sql =
         format!("SELECT {MEMBERSHIP_COLUMNS} FROM tenant_memberships WHERE membership_id = ?1");
-    let row = sqlx::query_as::<_, MembershipRow>(&sql)
+    // SQL-SAFE: only the constant `MEMBERSHIP_COLUMNS` is interpolated; membership_id is bound.
+    let row = sqlx::query_as::<_, MembershipRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(membership_id.to_string())
         .fetch_optional(&mut *conn)
         .await
@@ -398,7 +401,8 @@ async fn fetch_link(
     let sql = format!(
         "SELECT {LINK_COLUMNS} FROM external_identities WHERE issuer = ?1 AND subject = ?2"
     );
-    let row = sqlx::query_as::<_, LinkRow>(&sql)
+    // SQL-SAFE: only the constant `LINK_COLUMNS` is interpolated; issuer/subject are bound.
+    let row = sqlx::query_as::<_, LinkRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(issuer)
         .bind(subject)
         .fetch_optional(&mut *conn)
@@ -412,7 +416,8 @@ async fn fetch_link_by_user(
     user_id: Uuid,
 ) -> Result<Option<ExternalIdentity>, IdentityStoreError> {
     let sql = format!("SELECT {LINK_COLUMNS} FROM external_identities WHERE user_id = ?1");
-    let row = sqlx::query_as::<_, LinkRow>(&sql)
+    // SQL-SAFE: only the constant `LINK_COLUMNS` is interpolated; user_id is bound.
+    let row = sqlx::query_as::<_, LinkRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(user_id.to_string())
         .fetch_optional(&mut *conn)
         .await
@@ -1139,7 +1144,9 @@ impl IdentityQueryPort for SqliteIdentityStore {
         } else {
             format!("{select} ORDER BY m.joined_at DESC, m.membership_id DESC LIMIT ?2")
         };
-        let mut query = sqlx::query_as::<_, ListRow>(&sql).bind(tenant_id.to_string());
+        // SQL-SAFE: `sql` selects between two constant fragments over literal `select`; the cursor and limit are bound.
+        let mut query = sqlx::query_as::<_, ListRow>(sqlx::AssertSqlSafe(sql.as_str()))
+            .bind(tenant_id.to_string());
         if let Some(after) = after {
             query = query
                 .bind(after.timestamp.to_rfc3339())
@@ -1224,7 +1231,9 @@ impl IdentityQueryPort for SqliteIdentityStore {
         } else {
             format!("{select} ORDER BY m.joined_at DESC, m.membership_id DESC LIMIT ?2")
         };
-        let mut query = sqlx::query_as::<_, ListRow>(&sql).bind(tenant_id.to_string());
+        // SQL-SAFE: `sql` selects between two constant fragments over literal `select`; the cursor and limit are bound.
+        let mut query = sqlx::query_as::<_, ListRow>(sqlx::AssertSqlSafe(sql.as_str()))
+            .bind(tenant_id.to_string());
         if let Some(after) = after {
             query = query
                 .bind(after.timestamp.to_rfc3339())
