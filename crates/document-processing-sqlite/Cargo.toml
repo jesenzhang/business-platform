@@ -19,6 +19,7 @@ chrono = { workspace = true }
 document-processing = { path = "../document-processing" }
 runtime-governance = { workspace = true }
 sha2 = { workspace = true }
+hex = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 sqlx-core = { workspace = true }

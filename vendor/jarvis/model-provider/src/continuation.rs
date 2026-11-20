@@ -94,7 +94,10 @@ fn chained_history_identity(
     }
     hasher.update((message_bytes.len() as u64).to_le_bytes());
     hasher.update(&message_bytes);
-    Ok(HistoryMessageId(format!("hm:{:x}", hasher.finalize())))
+    Ok(HistoryMessageId(format!(
+        "hm:{}",
+        hex::encode(hasher.finalize())
+    )))
 }
 
 /// Explicit boundary describing the conversation prefix represented by a
@@ -170,7 +173,7 @@ impl ContinuationScope {
 
     fn digest_ids(ids: &[HistoryMessageId]) -> Result<String, String> {
         let bytes = serde_json::to_vec(ids).map_err(|error| error.to_string())?;
-        Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
+        Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
     }
 }
 

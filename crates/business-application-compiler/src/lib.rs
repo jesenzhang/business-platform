@@ -249,7 +249,7 @@ impl<'de> Deserialize<'de> for CompiledBusinessApplicationManifest {
             canonical_json: Vec::new(),
         };
         manifest.canonical_json = canonical_bytes(&manifest).map_err(serde::de::Error::custom)?;
-        let expected_digest = format!("{:x}", Sha256::digest(&manifest.canonical_json));
+        let expected_digest = hex::encode(Sha256::digest(&manifest.canonical_json));
         if manifest.package_digest.as_str() != expected_digest {
             return Err(serde::de::Error::custom(
                 "package digest does not match canonical bytes",
@@ -577,7 +577,7 @@ fn compile_with_context(
         canonical_json: Vec::new(),
     };
     let bytes = canonical_bytes(&compiled)?;
-    let digest = format!("{:x}", Sha256::digest(&bytes));
+    let digest = hex::encode(Sha256::digest(&bytes));
     compiled.package_digest = PackageDigest::new(digest).map_err(|_| CompilationError::Digest)?;
     compiled.canonical_json = bytes;
     Ok(compiled)
@@ -669,7 +669,7 @@ pub fn dry_plan(
             "canonical bytes do not match compiled fields".to_owned(),
         ));
     }
-    let expected_digest = format!("{:x}", Sha256::digest(&expected_canonical));
+    let expected_digest = hex::encode(Sha256::digest(&expected_canonical));
     if incoming.package_digest().as_str() != expected_digest {
         return Err(PlanError::IncomingNotCanonical(
             "package digest does not match canonical bytes".to_owned(),
@@ -1273,7 +1273,7 @@ fn package_digest(package: &BusinessApplicationPackage) -> Result<PackageDigest,
 
 fn digest_json<T: Serialize>(value: &T) -> Result<PackageDigest, PlanError> {
     let bytes = serde_json::to_vec(value)?;
-    PackageDigest::new(format!("{:x}", Sha256::digest(bytes))).map_err(|_| PlanError::Digest)
+    PackageDigest::new(hex::encode(Sha256::digest(bytes))).map_err(|_| PlanError::Digest)
 }
 fn component_fingerprints(
     package: &BusinessApplicationPackage,

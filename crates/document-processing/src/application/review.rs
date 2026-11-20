@@ -51,6 +51,6 @@ impl ReviewCandidateCommand {
             &self.patch,
             &self.comment,
         ))?;
-        Ok(format!("{:x}", Sha256::digest(canonical)))
+        Ok(hex::encode(Sha256::digest(canonical)))
     }
 }

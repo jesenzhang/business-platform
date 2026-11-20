@@ -118,7 +118,7 @@ impl SemanticCompiler {
             }
         })?;
         let digest = Sha256::digest(&canonical_json);
-        let sha256 = format!("{digest:x}");
+        let sha256 = hex::encode(digest);
         Ok(SemanticCompilation {
             manifest,
             canonical_json,

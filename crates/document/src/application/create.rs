@@ -174,7 +174,7 @@ fn request_fingerprint(command: &CreateDocumentCommand) -> String {
             update_string(&mut hasher, sha256);
         }
     }
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 fn update_string(hasher: &mut Sha256, value: &str) {

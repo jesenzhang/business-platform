@@ -1125,7 +1125,7 @@ fn scan_object_root(root: &Path) -> Result<(usize, u64, usize, String), Stage4Er
         files.len(),
         total_bytes,
         duplicate_objects,
-        format!("{:x}", digest.finalize()),
+        hex::encode(digest.finalize()),
     ))
 }
 
@@ -1290,7 +1290,7 @@ fn map_inventory_error(_error: InventoryError) -> Stage4Error {
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 #[cfg(test)]

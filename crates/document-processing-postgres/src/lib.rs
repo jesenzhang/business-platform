@@ -137,7 +137,7 @@ pub struct PostgresProcessingStore {
 
 fn state_hash(value: impl AsRef<str>) -> String {
     let digest = Sha256::digest(value.as_ref().as_bytes());
-    format!("{digest:x}")
+    hex::encode(digest)
 }
 
 fn ensure_live_repair_context(context: &RepairExecutionContext) -> Result<(), RepairError> {

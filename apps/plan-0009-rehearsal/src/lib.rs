@@ -1098,7 +1098,7 @@ fn relative_path(root: &Path, path: &Path) -> Result<String, InventoryError> {
 }
 
 fn hash_text(value: &str) -> String {
-    format!("{:x}", Sha256::digest(value.as_bytes()))
+    hex::encode(Sha256::digest(value.as_bytes()))
 }
 
 fn file_digest(path: &Path) -> Result<(u64, String), InventoryError> {
@@ -1123,7 +1123,7 @@ fn file_digest(path: &Path) -> Result<(u64, String), InventoryError> {
             .ok_or(InventoryError::SourceRead)?;
         hasher.update(&buffer[..read]);
     }
-    Ok((bytes, format!("{:x}", hasher.finalize())))
+    Ok((bytes, hex::encode(hasher.finalize())))
 }
 
 fn normalize_hash(value: &str) -> Option<String> {
@@ -1744,7 +1744,7 @@ fn write_audit_file(
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 #[cfg(test)]

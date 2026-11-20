@@ -66,7 +66,7 @@ mod tests {
             .unwrap();
         let mut canonical = encoded[..digest_offset].to_vec();
         canonical.push(b'}');
-        let digest = format!("{:x}", sha2::Sha256::digest(canonical));
+        let digest = hex::encode(sha2::Sha256::digest(canonical));
         let mut value: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
         value["package_digest"] = serde_json::Value::String(digest);
         value
@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(first.canonical_json(), second.canonical_json());
         assert_eq!(
             first.package_digest().as_str(),
-            format!("{:x}", sha2::Sha256::digest(first.canonical_json())).as_str()
+            hex::encode(sha2::Sha256::digest(first.canonical_json())).as_str()
         );
     }
 
