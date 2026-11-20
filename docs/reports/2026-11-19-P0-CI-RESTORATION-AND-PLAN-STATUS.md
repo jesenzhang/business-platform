@@ -31,7 +31,7 @@
 - 门禁：`cargo audit --deny warnings`、fmt、check、clippy 本地通过；CI run `44476988954` 的 Security 作业（audit + gitleaks + trivy）全绿。
 - 回滚：revert `7f7dc0b`；无运行时副作用。
 
-**必须披露的风险接受**：libsqlite3-sys 的 bundled SQLite CVE 是真实本地攻击面，未修复，仅在 `.cargo/audit.toml` 中记录风险接受；已由 [PLAN-0018](../plans/current/PLAN-0018-sqlx-09-migration.md) 承接关闭路径（计划已评审，实现未授权）。
+**风险接受关闭**：libsqlite3-sys 的 bundled SQLite CVE 已由 PLAN-0018 关闭——`sqlx 0.9.1` + `libsqlite3-sys 0.40.0`，且 `.cargo/audit.toml` 中 `RUSTSEC-2026-0459` ignore 已删除；剩余 ignore 仅为 `RUSTSEC-2023-0071`（未编译的 rsa）和 `RUSTSEC-2026-0543`（chrono unmaintained）。
 
 ## 2. P1 — 合同业务垂直切片计划：已编制、已独立评审、已合并（仍 NOT ACTIVE）
 
@@ -55,4 +55,4 @@
 1. PLAN-0017 Gate-1：Owner 冻结字段集、签署语义与权限键、Process Manager 范围、SLO/RPO/RTO；需要改公开契约时先建 ADR。
 2. PR #19 处置：并入 PLAN-0017 前端工作包或另取编号；等待 Contract Apply / Document Preview API Owner 承诺。
 3. PLAN-0014：在分支修复剩余两项 CI 失败并重跑完整 CI，随后在干净态复跑 4 条新场景 + 113 driver；未通过前 S2 与 R2 admission 不启动。
-4. [PLAN-0018 sqlx 0.9 迁移](../plans/current/PLAN-0018-sqlx-09-migration.md)已于 2026-11-20 编制并通过独立评审（PASS WITH COMMENTS，仍 Proposed / NOT ACTIVE）；其目标是在同一 PR 升级 sqlx 0.9.1 与 libsqlite3-sys ≥0.39.0 并删除 `RUSTSEC-2026-0459` ignore。试验已证明审计可在无该 ignore 时退出 0，但迁移实现尚未授权或执行。
+4. [PLAN-0018 sqlx 0.9 迁移](../plans/current/PLAN-0018-sqlx-09-migration.md)已于 2026-11-20 获授权执行：sqlx 0.9.1、libsqlite3-sys 0.40.0、事务 API 与全部动态 SQL 已迁移，`RUSTSEC-2026-0459` ignore 已删除；以最终主干 CI 全绿为验收。

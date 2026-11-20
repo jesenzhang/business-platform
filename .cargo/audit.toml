@@ -19,26 +19,11 @@
 #
 # ---------------------------------------------------------------------------
 # RUSTSEC-2026-0459 (libsqlite3-sys: bundled SQLite CVE-2026-119375)
-#   * Risk acceptance, NOT a claim of no exposure: the bundled SQLite C source
-#     IS compiled here (sqlx 0.8 `sqlite` -> sqlx-sqlite `bundled` ->
-#     libsqlite3-sys `bundled`, verified with `cargo tree -e features -i`).
-#     The advisory is local-attack-only (crafted DB + mismatched -wal file
-#     supplied by a less-trusted party), CVSS 4.0 AV:L/AC:L/PR:N/UI:P, and
-#     needs a process to open those files.
-#   * A version fix exists (libsqlite3-sys >= 0.39.0, SQLite 3.54.0) but is
-#     unreachable on sqlx 0.8: sqlx-sqlite 0.8.6 pins `libsqlite3-sys ^0.30.1`.
-#     Moving to sqlx 0.9 was attempted and REVERTED because it breaks source
-#     compatibility (sqlx::TransactionManager re-export removed; new
-#     SqlSafeStr/AssertSqlSafe requirements on dynamic SQL; transaction API
-#     renames), requiring business-code changes that are out of scope for this
-#     dependency-only commit.
-#   * Re-review and REMOVE this ignore when ANY of the following occurs:
-#       1) a sqlx 0.8.x patch release accepts libsqlite3-sys >= 0.39.0;
-#       2) the planned sqlx 0.9 source migration lands (then bump
-#          libsqlite3-sys to >= 0.39.0 and delete this entry in the same PR);
-#       3) the vulnerability is upgraded to remotely exploitable, or a new
-#          advisory is filed against the locked bundled SQLite copy.
-#   * This entry covers ONLY RUSTSEC-2026-0459. Do not extend it.
+#   * CLOSED 2026-11-20 by PLAN-0018: the workspace now pins sqlx 0.9.1 and
+#     libsqlite3-sys 0.40.0 (advisory patched >= 0.39.0). The previous ignore
+#     has been removed; `cargo audit --deny warnings` must now pass without it.
+#   * Do NOT re-add an ignore for this advisory. If a future lock refresh
+#     regresses libsqlite3-sys below 0.39.0, fail the build and fix the pin.
 #
 # ---------------------------------------------------------------------------
 # RUSTSEC-2026-0543 (chrono: unmaintained) -- informational warning
@@ -61,4 +46,4 @@
 #       3) any new informational or security advisory is filed against the
 #          locked chrono version (do not extend this entry to it).
 [advisories]
-ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0459", "RUSTSEC-2026-0543"]
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0543"]
