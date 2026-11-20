@@ -190,12 +190,12 @@ pub async fn upload_document(
 
     let document_id = deterministic_document_id(tenant_id, idempotency_key);
     let content_sha256 = content_hasher.finalize();
-    let content_sha256_hex = format!("{content_sha256:x}");
+    let content_sha256_hex = hex::encode(content_sha256);
     let revision_id = deterministic_revision_id(tenant_id, idempotency_key, &content_sha256);
     let mut name_digest = Sha256::new();
     name_digest.update(tenant_id.as_bytes());
     name_digest.update(idempotency_key.as_bytes());
-    let logical_path = format!("uploads/{:x}.bin", name_digest.finalize());
+    let logical_path = format!("uploads/{}.bin", hex::encode(name_digest.finalize()));
     let command = document::application::CreateDocumentCommand {
         tenant_id,
         user_id,

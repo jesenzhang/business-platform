@@ -49,7 +49,7 @@ async fn put_content(
     content_type: &str,
 ) -> String {
     let length = u64::try_from(content.len()).unwrap_or(u64::MAX);
-    let sha256 = format!("{:x}", Sha256::digest(content.as_ref()));
+    let sha256 = hex::encode(Sha256::digest(content.as_ref()));
     let mut metadata = BTreeMap::new();
     metadata.insert("sha256".to_string(), sha256.clone());
     storage
@@ -274,7 +274,7 @@ async fn plan_0008_postgres_minio_multipart_upload_is_idempotent() {
     .expect("upload counts must be queryable");
     assert_eq!(counts, (1, 1));
 
-    let expected_sha256 = format!("{:x}", Sha256::digest(content));
+    let expected_sha256 = hex::encode(Sha256::digest(content));
     let source_object_ref: String = sqlx::query_scalar(
         "SELECT source_object_ref FROM document_revisions WHERE tenant_id = $1 AND id = $2",
     )
@@ -324,7 +324,7 @@ async fn plan_0008_postgres_minio_revision_evidence_contract() {
     let document_id = Uuid::now_v7();
     let revision_id = Uuid::now_v7();
     let first_content = Bytes::from_static(b"PLAN-0008 source revision one\n");
-    let first_sha256 = format!("{:x}", Sha256::digest(first_content.as_ref()));
+    let first_sha256 = hex::encode(Sha256::digest(first_content.as_ref()));
     let initial = DocumentMetadata::create_with_revision_id(
         document_id,
         tenant,
@@ -411,7 +411,7 @@ async fn plan_0008_postgres_minio_revision_evidence_contract() {
         .expect("document must exist");
     let expected_version = current.aggregate_version();
     let second_content = Bytes::from_static(b"PLAN-0008 source revision two\n");
-    let second_sha256 = format!("{:x}", Sha256::digest(second_content.as_ref()));
+    let second_sha256 = hex::encode(Sha256::digest(second_content.as_ref()));
     let mut second = current.clone();
     let second_revision = second
         .replace_content_revision_with_sha256(
@@ -474,8 +474,8 @@ async fn plan_0008_postgres_minio_revision_evidence_contract() {
     let expected_stale_version = reloaded.aggregate_version();
     let bytes_a = Bytes::from_static(b"stale candidate A\n");
     let bytes_b = Bytes::from_static(b"stale candidate B\n");
-    let hash_a = format!("{:x}", Sha256::digest(bytes_a.as_ref()));
-    let hash_b = format!("{:x}", Sha256::digest(bytes_b.as_ref()));
+    let hash_a = hex::encode(Sha256::digest(bytes_a.as_ref()));
+    let hash_b = hex::encode(Sha256::digest(bytes_b.as_ref()));
     let mut candidate_a = stale_a;
     let revision_a =
         candidate_a.replace_content_revision_with_sha256("a.txt".to_string(), None, Some(hash_a));

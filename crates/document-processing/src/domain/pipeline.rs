@@ -47,7 +47,7 @@ pub fn extract_text_artifact(
     digest.update(bytes);
     Ok(TextArtifact {
         content_revision,
-        content_hash: format!("{:x}", digest.finalize()),
+        content_hash: hex::encode(digest.finalize()),
         byte_count: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
         line_count,
         character_count,

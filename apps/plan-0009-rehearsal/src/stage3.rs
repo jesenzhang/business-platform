@@ -430,7 +430,7 @@ fn scan_object_root(root: &Path) -> Result<(usize, u64, String), Stage3Error> {
         digest.update(relative.as_bytes());
         digest.update(file_sha256.as_bytes());
     }
-    Ok((files.len(), total_bytes, format!("{:x}", digest.finalize())))
+    Ok((files.len(), total_bytes, hex::encode(digest.finalize())))
 }
 
 fn coverage_matrix(manifest: &FrozenManifest) -> CoverageMatrix {
@@ -561,7 +561,7 @@ fn write_audit(root: &Path, audit: &Stage3Audit) -> Result<(), Stage3Error> {
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 fn map_inventory_error(_error: InventoryError) -> Stage3Error {
