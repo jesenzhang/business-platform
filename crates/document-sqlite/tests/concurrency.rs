@@ -115,7 +115,8 @@ async fn concurrent_same_key_is_one_create_and_nine_replays() {
         "document_idempotency",
     ] {
         let query = format!("SELECT COUNT(*) FROM {table}");
-        let count = sqlx::query_scalar::<_, i64>(&query)
+        // SQL-SAFE: 表名来自测试内硬编码白名单数组，无外部输入进入 SQL 文本。
+        let count = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(query))
             .fetch_one(&pool_a)
             .await;
         assert_eq!(count.ok(), Some(1), "exactly one {table} row expected");
@@ -185,7 +186,8 @@ async fn concurrent_different_fingerprints_have_one_conflict_and_one_side_effect
         "document_idempotency",
     ] {
         let query = format!("SELECT COUNT(*) FROM {table}");
-        let count = sqlx::query_scalar::<_, i64>(&query)
+        // SQL-SAFE: 表名来自测试内硬编码白名单数组，无外部输入进入 SQL 文本。
+        let count = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(query))
             .fetch_one(&pool_a)
             .await;
         assert_eq!(count.ok(), Some(1), "exactly one {table} row expected");

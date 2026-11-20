@@ -28,11 +28,11 @@
 
 说明：quinn-* 是 lock 中的可选/非活动项（`cargo tree -i` 无活动消费者），但仍会被 cargo-audit 扫描；刷新 lock 后同样升到 patched 版本。
 
-### 1.2 风险接受（3 条，逐条带理由与复审触发条件，见 `.cargo/audit.toml`）
+### 1.2 风险接受（2 条，逐条带理由与复审触发条件，见 `.cargo/audit.toml`）
 
 | Advisory | Crate | 处置与理由 |
 | --- | --- | --- |
-| RUSTSEC-2026-0459 (CVE-2026-119375) | libsqlite3-sys 0.30.1 | **已知风险接受**。bundled SQLite 实际被编译（sqlx 0.8 `sqlite` → `bundled`）；修复需 libsqlite3-sys ≥0.39.0，但 sqlx-sqlite 0.8.6 固定 `^0.30.1`。已实测升级 sqlx 0.9 会破坏源码（`TransactionManager` 导出移除、`SqlSafeStr` 动态 SQL 要求、事务 API 改名），超出本依赖专用变更的文件范围，已回退。攻击面为本地 crafted DB+-wal，CVSS 4.0 AV:L。复审触发：sqlx 0.8.x 接受 patched 版本 / sqlx 0.9 源码迁移落地 / 漏洞升级为远程可利用。 |
+| RUSTSEC-2026-0459 (CVE-2026-119375) | libsqlite3-sys | **已关闭（2026-11-20，PLAN-0018）**。工作区已迁移至 `sqlx 0.9.1` 与 `libsqlite3-sys 0.40.0`（advisory patched ≥0.39.0），`.cargo/audit.toml` 中对应 ignore 已删除；`cargo audit --deny warnings` 在无该 ignore 的情况下退出 0。不再属于风险接受。 |
 | RUSTSEC-2026-0543 (unmaintained) | chrono 0.4.45 | advisory 声明「所有版本受影响、无修复版本」，推荐 jiff/time。chrono 被约 40 个 workspace 成员直接使用（含 public-api-contracts、sqlx chrono feature、各聚合公共 DTO），替换会改变公共时间/序列化契约与 OpenAPI/DB 映射，不属于本变更范围。复审触发：发布 patched 版本 / 专门迁移计划落地 / 新增针对锁定版本的安全公告。 |
 | RUSTSEC-2023-0071 | rsa 0.9.10 | 仅经 sqlx 可选 `mysql` feature 进入 lock，工作区只启用 postgres+sqlite，从未编译。rsa 0.9.x 无修复；上游 sqlx 0.8 不接受 rsa ≥0.10。复审触发：sqlx 接受修复版本 / 移除依赖 / 启用 mysql 并实际编译 rsa。 |
 
@@ -40,7 +40,7 @@
 
 - 刷新 150+ 个包到各自 semver 兼容的最新版本；安全相关关键项见第 1.1 节。
 - `p256` 0.13.2 → 0.14.0，并连带 `ecdsa` 0.16.9 → 0.17.0、`elliptic-curve` 0.13.8 → 0.14.3、`crypto-bigint` 0.5.5 → 0.7.11。
-- `pin-utils` 0.1.0 从 lock 中移除；`libsqlite3-sys` 保持 0.30.1（见风险接受）。
+- `pin-utils` 0.1.0 从 lock 中移除；`libsqlite3-sys` 在 PLAN-0018 中进一步提升至 0.40.0。
 - AWS SDK 全家桶（aws-sdk-s3 1.144→1.161 等）、tokio 1.53.1→1.54.1、rustls 栈、hyper/h2、pest、wasm-bindgen 等常规刷新。
 
 ## 3. 源码兼容改动（最小）

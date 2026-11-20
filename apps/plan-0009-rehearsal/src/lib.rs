@@ -1011,7 +1011,9 @@ async fn source_fingerprint(
 async fn futures_table_counts(pool: &SqlitePool) -> Result<Vec<TableCount>, InventoryError> {
     let mut counts = Vec::with_capacity(INVENTORY_TABLES.len());
     for (table, query) in INVENTORY_TABLES {
-        let count = sqlx::query_scalar::<_, i64>(query)
+        // SQL-SAFE: query text comes only from the hardcoded INVENTORY_TABLES
+        // const of &'static str literals; no external value is interpolated.
+        let count = sqlx::query_scalar::<_, i64>(*query)
             .fetch_one(pool)
             .await
             .map_err(InventoryError::Database)?;
