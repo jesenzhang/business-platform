@@ -20,8 +20,15 @@
 2. `libsqlite3-sys` 锁定版本 >= 0.39.0 且 bundled SQLite 实际编译路径仍被验证；
 3. `AGENTS.md` §12 的 fmt/check/clippy/test、架构门禁与 CI 10 作业全绿；
 4. SQLite 单写者语义（`BEGIN IMMEDIATE`）与 PostgreSQL/SQLite 双后端契约、长任务崩溃恢复 E2E 无回归；
-5. 64 处动态 SQL 全部完成逐处处置并留下可审阅的理由与测试；
+5. 全部动态 SQL（至少 65 处，见 §2.2）完成逐处处置并留下可审阅的理由与测试，且以 `cargo check --workspace --all-targets --all-features` 全绿为准；
 6. 独立评审 PASS，且审计说明/风险接受文档同步更新。
+
+## 1.1 非目标
+
+- 不授权任何编码、依赖升级落地、CI 配置修改或审计 ignore 的提前删除（WP6 前）；
+- 不改变 Bounded Context、数据所有权、公开 API/Event/错误码、迁移文件或 OpenAPI；
+- 不借迁移重构领域模型、不引入通用事务框架、不把 SQLite 用作生产多 Worker 权威；
+- 不改变 PLAN-0017 / PLAN-0014 / PLAN-0006 / PLAN-0009 的状态；不 push、不合并。
 
 ## 2. 为什么现在可做（已核实事实）
 
@@ -48,7 +55,7 @@
 - `query*` 的动态字符串需 `SqlSafeStr`/`AssertSqlSafe`（8）；
 - 由上述错误导致的类型推断失败（2）。
 
-工作区静态盘点：**64 处** `sqlx::query*` 调用传入非字面量 SQL，分布在 12 个文件：`document-processing-sqlite` 8、`policy-postgres` 8、`policy-sqlite` 8、`document-processing-postgres` 7、`identity-postgres` 7、`identity-sqlite` 7、`organization-postgres` 7、`organization-sqlite` 7、`document-sqlite/tests/concurrency` 2、`apps/migration` 1、`apps/plan-0009-rehearsal` 1、`runtime-governance-sqlite` 1。
+工作区静态盘点：按 `&String`/`&format!` 形态统计为 **64 处**非字面量 SQL，分布在 12 个文件：`document-processing-sqlite` 8、`policy-postgres` 8、`policy-sqlite` 8、`document-processing-postgres` 7、`identity-postgres` 7、`identity-sqlite` 7、`organization-postgres` 7、`organization-sqlite` 7、`document-sqlite/tests/concurrency` 2、`apps/migration` 1、`apps/plan-0009-rehearsal` 1、`runtime-governance-sqlite` 1。此外 `apps/plan-0009-rehearsal/src/stage4.rs:1056` 以 `&str` 形参传入 `query_scalar`，同样因 `SqlSafeStr` 只接受 `&'static str` 而失败，须一并纳入 WP3 清单；WP3 是否完成以 `cargo check --workspace --all-targets --all-features` 全绿为准，不以逐处数量声明为准。
 
 其他破坏性变更（来自 CHANGELOG，需要在 WP4 逐项核实）：`Migrate` trait 变化、`resolve_blocking()` 转 `#[doc(hidden)]`、`Migrator::set_ignore_missing/set_locking` 返回 `&mut Self`、`RawSql` 增加 `DB` 参数、`derive(Type)` 自动生成 `PgHasArrayType`、`PgConnectOptions::options()` 转义与 `hostaddr` 语义变化、`offline` feature 可选。仓库当前未使用编译期 `query!()` 宏、`RawSql`、`.options()` 或 sqlx-cli 作为构建步骤（已 grep 核实），但仍需编译与契约验证。
 
@@ -70,8 +77,8 @@
 |---|---|---|
 | WP0 | 固定基线：记录当前 `main` SHA、CI run、audit 输出、SQLite 并发与 PG 契约结果 | 基线清单；不写代码 |
 | WP1 | 依赖与 feature：workspace `sqlx 0.9.1`、feature 拆分、`sqlx-core` 直依赖、`libsqlite3-sys 0.40.0`；**暂不删 audit ignore** | `cargo metadata`/`cargo tree` 证明版本；`cargo audit` 显示仅 0459 仍被 ignore |
-| WP2 | 事务 API：`BEGIN IMMEDIATE` 调用点（5 处）改用 `sqlx_core::transaction::TransactionManager` + `SqlStr` | 编译通过；SQLite 单写者、租约崩溃恢复与并发用例 PASS；禁止 DEFERRED 静默降级 |
-| WP3 | 动态 SQL：逐处处置 64 个调用点，按 §4 分类为 `AssertSqlSafe`（附 `// SQL-SAFE:` 理由）或绑定参数/白名单重构 | 逐处清单（文件:行、分类、理由、测试）；新增/扩展架构检查防止无理由 `AssertSqlSafe` |
+| WP2 | 事务 API：将 `:34` 的 `TransactionManager` 改为从 `sqlx_core::transaction` 引入；修复 `:1645/:1653/:1662/:2770` 四处 `SqliteTransactionManager` 方法调用；`:1653` 第二参数由 `Some(Cow::Borrowed("BEGIN IMMEDIATE"))` 改为 `Some(SqlStr::from_static("BEGIN IMMEDIATE"))` 并移除不再使用的 `Cow` 导入；`:797/:892/:918/:952/:1492` 的字面量 `BEGIN IMMEDIATE` 查询保持不变 | 编译通过；SQLite 单写者、租约崩溃恢复与并发用例 PASS；禁止 DEFERRED 静默降级 |
+| WP3 | 动态 SQL：逐处处置全部调用点（含 `stage4.rs:1056` 的 `&str` 形参），按 §4 分类为 `AssertSqlSafe`（附 `// SQL-SAFE:` 理由）或绑定参数/白名单重构 | 逐处清单（文件:行、分类、理由、测试）；新增/扩展架构检查防止无理由 `AssertSqlSafe`；以全工作区编译全绿为准 |
 | WP4 | 其他 API 兼容：`migrate!`/`Migrator`、feature 与 provider 行为差异逐项核对；修复新出现的编译错误 | `cargo check/clippy --workspace --all-targets --all-features` 全绿；迁移 status 只忽略明确的 migration table 缺失 |
 | WP5 | 完整验证：workspace 门禁 + CI 10 作业 + 真实 PG/MinIO 契约 + SQLite 单进程 E2E + 长任务崩溃/重复/恢复 | CI run ID 与逐项结果；性能记录为 evidence，不虚构 SLO |
 | WP6 | 关闭风险接受：同一 PR 删除 `RUSTSEC-2026-0459` ignore，更新依赖修复说明与本报告，`git diff --check` | `cargo audit --deny warnings` EXIT=0 且 ignore 列表仅剩 2023-0071/0543；独立评审 PASS |
@@ -109,10 +116,12 @@
 ## 9. 风险与开放问题
 
 1. `sqlx-core` 作为直接依赖是否可接受（版本必须严格等于 sqlx，升级需同步）；由 Owner 在 WP1 评审确认。
-2. 64 处动态 SQL 中是否存在实际的用户可控拼接；需 WP3 逐处判定，不能默认全部用 `AssertSqlSafe` 包裹。
+2. 全部动态 SQL（含 `stage4.rs` 的 `&str` 站点）中是否存在实际的用户可控拼接；需 WP3 逐处判定为“常量形态 / 绑定参数 / 白名单”，不能默认全部用 `AssertSqlSafe` 包裹。
 3. sqlx 0.9.1 之后若出现新的传递依赖漏洞，本计划关闭 0459 的同时不得引入新 ignore。
 4. 试验分支 `codex/plan-0018-sqlx-09-migration` 的修改仅为证据，未合入 main；实现时应从最新 main 重新开始，避免带入试验配置。
-5. 是否需要把 SQLite 的 `BEGIN IMMEDIATE` 封装为适配器内部唯一入口（而非 5 处散落调用）以减少 future drift；由独立评审决定，但不得扩大为通用事务框架。
+5. `BEGIN IMMEDIATE` 本次仅替换 API、保持现有调用结构，不封装为通用事务框架；若确需封装，另立计划/ADR（独立评审建议）。
+6. WP3/WP4 承诺的三项新静态检查（`// SQL-SAFE:` 注释、`sqlx` 与 `sqlx-core` 版本一致、`begin()` 无 `BEGIN IMMEDIATE` 拒绝）落在 `scripts/check-architecture.ps1` 还是新脚本、由哪个 CI job 执行，须在 WP3 冻结前明确。
+7. WP6 删除 ignore 前，由 Security + Platform/Persistence Owner 中的哪一方核验“CI 10/10 全绿 + audit EXIT=0”证据，须在 WP0 冻结。
 
 ## 10. 回滚与完成定义
 
