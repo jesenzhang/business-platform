@@ -217,7 +217,8 @@ impl ProcessingIntegrityQuery for SqliteGovernanceStore {
         if scope.resource_id.is_some() {
             sql.push_str(" AND j.id = ?");
         }
-        let mut query = sqlx::query_as::<_, JobRow>(&sql);
+        // SQL-SAFE: 基础 SQL 与两个可选谓词均来自代码字面量；租户/资源 ID 只作为绑定参数。
+        let mut query = sqlx::query_as::<_, JobRow>(sqlx::AssertSqlSafe(sql));
         if let Some(tenant_id) = scope.tenant_id {
             query = query.bind(tenant_id.to_string());
         }

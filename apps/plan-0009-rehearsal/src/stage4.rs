@@ -1050,9 +1050,10 @@ fn empty_target_snapshot() -> TargetSnapshot {
 
 async fn bounded_count(
     pool: &SqlitePool,
-    query: &str,
+    query: &'static str,
     error_code: &'static str,
 ) -> Result<usize, Stage4Error> {
+    // SQL-SAFE: SQL 文本全部来自字面量与 FORMAL_TABLES 常量；调用方行为不变。
     let value = sqlx::query_scalar::<_, i64>(query)
         .fetch_one(pool)
         .await

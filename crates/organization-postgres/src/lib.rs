@@ -254,7 +254,8 @@ async fn fetch_unit(
     let sql = format!(
         "SELECT {UNIT_COLUMNS} FROM organization_units WHERE tenant_id = $1 AND unit_id = $2"
     );
-    let row = sqlx::query_as::<_, UnitRow>(&sql)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 UNIT_COLUMNS；筛选值均为绑定参数。
+    let row = sqlx::query_as::<_, UnitRow>(sqlx::AssertSqlSafe(sql))
         .bind(tenant_id)
         .bind(unit_id)
         .fetch_optional(&mut *conn)
@@ -283,7 +284,8 @@ async fn fetch_unit_by_id(
     unit_id: Uuid,
 ) -> Result<OrganizationUnit, OrganizationStoreError> {
     let sql = format!("SELECT {UNIT_COLUMNS} FROM organization_units WHERE unit_id = $1");
-    let row = sqlx::query_as::<_, UnitRow>(&sql)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 UNIT_COLUMNS；筛选值均为绑定参数。
+    let row = sqlx::query_as::<_, UnitRow>(sqlx::AssertSqlSafe(sql))
         .bind(unit_id)
         .fetch_optional(&mut *conn)
         .await
@@ -302,7 +304,8 @@ async fn fetch_membership_by_key(
     let sql = format!(
         "SELECT {MEMBER_COLUMNS} FROM organization_members WHERE tenant_id = $1 AND unit_id = $2 AND user_id = $3 AND membership_type = $4"
     );
-    let row = sqlx::query_as::<_, MemberRow>(&sql)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 MEMBER_COLUMNS；筛选值均为绑定参数。
+    let row = sqlx::query_as::<_, MemberRow>(sqlx::AssertSqlSafe(sql))
         .bind(tenant_id)
         .bind(unit_id)
         .bind(user_id)
@@ -318,7 +321,8 @@ async fn fetch_membership_by_id(
     membership_id: Uuid,
 ) -> Result<OrganizationMembership, OrganizationStoreError> {
     let sql = format!("SELECT {MEMBER_COLUMNS} FROM organization_members WHERE membership_id = $1");
-    let row = sqlx::query_as::<_, MemberRow>(&sql)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 MEMBER_COLUMNS；筛选值均为绑定参数。
+    let row = sqlx::query_as::<_, MemberRow>(sqlx::AssertSqlSafe(sql))
         .bind(membership_id)
         .fetch_optional(&mut *conn)
         .await
@@ -1154,7 +1158,8 @@ impl OrganizationQueryPort for PostgresOrganizationStore {
         let sql = format!(
             "SELECT {UNIT_COLUMNS} FROM organization_units WHERE tenant_id = $1 ORDER BY created_at, unit_id"
         );
-        let rows = sqlx::query_as::<_, UnitRow>(&sql)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 UNIT_COLUMNS；租户 ID 为绑定参数。
+        let rows = sqlx::query_as::<_, UnitRow>(sqlx::AssertSqlSafe(sql))
             .bind(tenant_id)
             .fetch_all(&self.pool)
             .await
@@ -1171,7 +1176,8 @@ impl OrganizationQueryPort for PostgresOrganizationStore {
         let sql = format!(
             "SELECT {MEMBER_COLUMNS} FROM organization_members WHERE tenant_id = $1 AND unit_id = $2 AND status = 'active' ORDER BY joined_at, membership_id"
         );
-        let rows = sqlx::query_as::<_, MemberRow>(&sql)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 MEMBER_COLUMNS；租户与单位/用户 ID 均为绑定参数。
+        let rows = sqlx::query_as::<_, MemberRow>(sqlx::AssertSqlSafe(sql))
             .bind(tenant_id)
             .bind(unit_id)
             .fetch_all(&self.pool)
@@ -1193,7 +1199,8 @@ impl OrganizationQueryPort for PostgresOrganizationStore {
         let sql = format!(
             "SELECT {MEMBER_COLUMNS} FROM organization_members WHERE tenant_id = $1 AND user_id = $2 AND status = 'active' ORDER BY joined_at, membership_id"
         );
-        let rows = sqlx::query_as::<_, MemberRow>(&sql)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 MEMBER_COLUMNS；租户与单位/用户 ID 均为绑定参数。
+        let rows = sqlx::query_as::<_, MemberRow>(sqlx::AssertSqlSafe(sql))
             .bind(tenant_id)
             .bind(user_id)
             .fetch_all(&self.pool)

@@ -181,7 +181,8 @@ impl PostgresProcessingStore {
         }
         let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id = $1 AND status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= $2 FOR UPDATE");
-        let Some(row) = sqlx::query_as::<_, AiTaskRow>(&query)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；任务 ID 与时间均为绑定参数。
+        let Some(row) = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(task_id)
             .bind(now)
             .fetch_optional(&mut *transaction)
@@ -212,7 +213,8 @@ impl PostgresProcessingStore {
             return Err(ProcessingRepositoryError::Conflict);
         }
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id=$1");
-        let updated = sqlx::query_as::<_, AiTaskRow>(&query)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；任务 ID 为绑定参数。
+        let updated = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(task_id)
             .fetch_one(&mut *transaction)
             .await
@@ -1106,7 +1108,8 @@ impl AiTaskPort for PostgresProcessingStore {
         }
         let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= $1 ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1");
-        let row = sqlx::query_as::<_, AiTaskRow>(&query)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；时间与绑定参数分离。
+        let row = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(now)
             .fetch_optional(&mut *transaction)
             .await
@@ -1136,7 +1139,8 @@ impl AiTaskPort for PostgresProcessingStore {
             return Err(ProcessingRepositoryError::Conflict);
         }
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id = $1");
-        let updated = sqlx::query_as::<_, AiTaskRow>(&query)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；任务 ID 为绑定参数。
+        let updated = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(row.id)
             .fetch_one(&mut *transaction)
             .await
@@ -1235,7 +1239,8 @@ async fn load_job_for_update(
     let query = format!(
         "SELECT {JOB_COLUMNS} FROM document_processing_jobs WHERE tenant_id = $1 AND id = $2 FOR UPDATE"
     );
-    sqlx::query_as::<_, JobRow>(&query)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 JOB_COLUMNS；租户与任务 ID 均为绑定参数。
+    sqlx::query_as::<_, JobRow>(sqlx::AssertSqlSafe(query))
         .bind(tenant_id)
         .bind(job_id)
         .fetch_optional(&mut *connection)
@@ -1553,7 +1558,8 @@ async fn load_ai_task_for_update(
     let query = format!(
         "SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE tenant_id = $1 AND id = $2 FOR UPDATE"
     );
-    sqlx::query_as::<_, AiTaskRow>(&query)
+    // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；租户与任务 ID 均为绑定参数。
+    sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
         .bind(tenant_id)
         .bind(task_id)
         .fetch_optional(&mut *connection)
@@ -2497,7 +2503,8 @@ impl ProcessingExecutionUnitOfWork for PostgresProcessingStore {
     ) -> Result<u64, ProcessingRepositoryError> {
         let mut transaction = self.pool.begin().await.map_err(map_sql_error)?;
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= $1 FOR UPDATE SKIP LOCKED");
-        let rows = sqlx::query_as::<_, AiTaskRow>(&query)
+        // SQL-SAFE: SQL 形态固定，仅插入代码常量 AI_TASK_COLUMNS；时间为绑定参数。
+        let rows = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(now)
             .fetch_all(&mut *transaction)
             .await

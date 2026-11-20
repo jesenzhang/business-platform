@@ -376,7 +376,8 @@ async fn inspect_target(target_root: &Path) -> Result<TargetSnapshot, Stage3Erro
 
 async fn count_rows(pool: &SqlitePool, table: &str) -> Result<i64, Stage3Error> {
     let query = format!("SELECT COUNT(*) FROM {table}");
-    sqlx::query_scalar::<_, i64>(&query)
+    // SQL-SAFE: 表名来自本文件硬编码白名单（调用点均为字面量表清单），无外部输入。
+    sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(query))
         .fetch_one(pool)
         .await
         .map_err(|_| Stage3Error::TargetRead("table_count"))
