@@ -29,7 +29,7 @@ plans/
 3. [PLAN-0006 Enterprise AI Workspace Foundation](current/PLAN-0006-enterprise-ai-workspace-foundation.md)：Proposed / Revision 1 / BLOCKED。PLAN-0013 已 Integrated，仍需等待首个 Contract 真实切片完成后，交付 Workspace/Turn/AgentRun、Compiled Tool Catalog、Capability、Observation 和只读业务助手。
 4. 后续依次考虑 Knowledge/Evidence Projection、Analytics/Semantic Runtime、Approval/Finance/Legal 跨上下文切片；Platform Module Runtime、Marketplace、动态插件、Generated App Sandbox 不作为近期优先项。
 5. [PLAN-0015 Execution / Sandbox Service Boundary](current/PLAN-0015-execution-sandbox-service-boundary.md)：**Proposed / NOT ACTIVE，2026-09-24**。仅先冻结共享 Execution/Sandbox 基础设施边界与 Jarvis 语义兼容性，不抢占 PLAN-0014 或 Contract Business Vertical Slice，不选择 Docker/Kubernetes/microVM，也不激活新服务。
-6. [PLAN-0018 sqlx 0.9 迁移](current/PLAN-0018-sqlx-09-migration.md)：**Proposed / NOT ACTIVE / 待独立评审，2026-11-20**。目标是在同一 PR 中完成 `sqlx 0.9.1` 与 `libsqlite3-sys >= 0.39.0` 升级并删除 `RUSTSEC-2026-0459` ignore，关闭主干 CI 恢复时留下的 SQLite 风险接受；不授权编码，不阻塞 PLAN-0017/0014。
+6. [PLAN-0018 sqlx 0.9 迁移](current/PLAN-0018-sqlx-09-migration.md)：**Integrated，2026-11-20**。已合入 `main` @ `400c467`（PR #21），CI run `44689562232` 10/10 全绿；`sqlx 0.9.1` + `libsqlite3-sys 0.40.0` 已落地，`RUSTSEC-2026-0459` ignore 已删除，风险接受关闭。待后续按文档生命周期归档。
 
 ## 已归档计划
 

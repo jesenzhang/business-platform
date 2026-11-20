@@ -2,7 +2,7 @@
 
 > 文档 ID：PLAN-0018
 > 版本：0.1（评审稿）
-> 状态：**Proposed / NOT ACTIVE / 待独立评审**。本文件是文档计划，不授权改代码、依赖升级、CI 配置或风险接受变更。
+> 状态：**Integrated / 2026-11-20**。实现已获授权并合入 `main` @ `400c467`（PR #21），最终 [CI run 44689562232](https://github.com/jesenzhang/business-platform/actions/runs/44689562232) 10/10 全绿；`RUSTSEC-2026-0459` ignore 已删除。下列内容为执行时的计划基线，保留作为验收依据。
 > 日期：2026-11-20
 > 责任：Platform / Persistence Owners；协同：Security、CI Owner、Document Management、Identity/Organization/Policy 各持久化 Owner
 > 计划基线：`main` @ `0f56fbe`（[CI run 44482205617](https://github.com/jesenzhang/business-platform/actions/runs/44482205617) 10/10 全绿）

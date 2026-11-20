@@ -31,7 +31,7 @@
 - 门禁：`cargo audit --deny warnings`、fmt、check、clippy 本地通过；CI run `44476988954` 的 Security 作业（audit + gitleaks + trivy）全绿。
 - 回滚：revert `7f7dc0b`；无运行时副作用。
 
-**风险接受关闭**：libsqlite3-sys 的 bundled SQLite CVE 已由 PLAN-0018 关闭——`sqlx 0.9.1` + `libsqlite3-sys 0.40.0`，且 `.cargo/audit.toml` 中 `RUSTSEC-2026-0459` ignore 已删除；剩余 ignore 仅为 `RUSTSEC-2023-0071`（未编译的 rsa）和 `RUSTSEC-2026-0543`（chrono unmaintained）。
+**风险接受关闭**：libsqlite3-sys 的 bundled SQLite CVE 已由 PLAN-0018 关闭——`sqlx 0.9.1` + `libsqlite3-sys 0.40.0`，且 `.cargo/audit.toml` 中 `RUSTSEC-2026-0459` ignore 已删除；合入 `main` @ `400c467`（PR #21）后 [CI run 44689562232](https://github.com/jesenzhang/business-platform/actions/runs/44689562232) 10/10 全绿。剩余 ignore 仅为 `RUSTSEC-2023-0071`（未编译的 rsa）和 `RUSTSEC-2026-0543`（chrono unmaintained）。
 
 ## 2. P1 — 合同业务垂直切片计划：已编制、已独立评审、已合并（仍 NOT ACTIVE）
 
