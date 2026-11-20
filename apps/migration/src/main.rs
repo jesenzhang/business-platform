@@ -232,7 +232,11 @@ async fn run_sqlite_status(database_url: &str) -> anyhow::Result<()> {
         // missing ledger table means "pending", any other database error
         // must fail the status command.
         let sql = format!("SELECT COALESCE(MAX(version), 0) FROM {ledger}");
-        let applied = match sqlx::query_scalar::<_, i64>(&sql).fetch_one(&pool).await {
+        // SQL-SAFE: 表名来自上方硬编码的 ledger 白名单数组，无外部输入进入 SQL 文本。
+        let applied = match sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql))
+            .fetch_one(&pool)
+            .await
+        {
             Ok(version) => version,
             Err(error) if is_missing_iam_ledger(&error, ledger) => 0,
             Err(error) => return Err(error.into()),
