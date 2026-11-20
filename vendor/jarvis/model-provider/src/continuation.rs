@@ -94,7 +94,10 @@ fn chained_history_identity(
     }
     hasher.update((message_bytes.len() as u64).to_le_bytes());
     hasher.update(&message_bytes);
-    Ok(HistoryMessageId(format!("hm:{}", hex::encode(hasher.finalize()))))
+    Ok(HistoryMessageId(format!(
+        "hm:{}",
+        hex::encode(hasher.finalize())
+    )))
 }
 
 /// Explicit boundary describing the conversation prefix represented by a
