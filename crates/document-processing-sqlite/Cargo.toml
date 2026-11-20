@@ -21,6 +21,7 @@ runtime-governance = { workspace = true }
 sha2 = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
+sqlx-core = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
