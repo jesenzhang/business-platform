@@ -29,7 +29,7 @@ name = "jarvis_model_provider"
 async-trait = "0.1"
 bytes = "1.6"
 futures = "0.3"
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.11"

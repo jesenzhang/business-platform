@@ -103,7 +103,7 @@ sqlx = { version = "=0.9.1", features = ["runtime-tokio", "tls-rustls", "postgre
 sqlx-core = "=0.9.1"
 
 # HTTP client
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "multipart"] }
 
 # OIDC/JWT authentication (PLAN-0012 M3)
 jsonwebtoken = "9"
