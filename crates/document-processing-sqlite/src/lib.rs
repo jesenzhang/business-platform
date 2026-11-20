@@ -31,8 +31,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::SqliteTransactionManager;
-use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, TransactionManager};
-use std::borrow::Cow;
+use sqlx::{FromRow, SqlStr, Sqlite, SqliteConnection, SqlitePool};
+use sqlx_core::transaction::TransactionManager;
 use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
@@ -387,9 +387,10 @@ async fn ensure_revision1_finding_columns(pool: &SqlitePool) -> Result<(), sqlx:
     ];
     for (name, definition) in additions {
         if !columns.iter().any(|column| column == name) {
-            sqlx::query(&format!(
+            // SQL-SAFE: column name and type come from the hardcoded `additions` array; neither is external input.
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "ALTER TABLE data_integrity_findings ADD COLUMN {name} {definition}"
-            ))
+            )))
             .execute(pool)
             .await?;
         }
@@ -421,8 +422,11 @@ async fn ensure_audit_columns(connection: &mut SqliteConnection) -> Result<(), s
     ];
     for (name, definition) in additions {
         if !columns.iter().any(|column| column == name) {
+            // SQL-SAFE: column name and type come from the hardcoded `additions` array; neither is external input.
             let sql = format!("ALTER TABLE audit_events ADD COLUMN {name} {definition}");
-            sqlx::query(&sql).execute(&mut *connection).await?;
+            sqlx::query(sqlx::AssertSqlSafe(sql))
+                .execute(&mut *connection)
+                .await?;
         }
     }
     sqlx::query("UPDATE audit_events SET occurred_at = created_at WHERE occurred_at IS NULL")
@@ -1493,8 +1497,9 @@ impl AiTaskPort for SqliteProcessingStore {
             .execute(&mut *connection)
             .await
             .map_err(map_sql_error)?;
+        // SQL-SAFE: only the compile-time `AI_TASK_COLUMNS` constant is interpolated; the timestamp is a bind parameter.
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'queued' AND attempt_count < max_attempts AND next_attempt_at <= ?1 ORDER BY created_at, id LIMIT 1");
-        let row = sqlx::query_as::<_, AiTaskRow>(&query)
+        let row = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(now.to_rfc3339())
             .fetch_optional(&mut *connection)
             .await
@@ -1527,8 +1532,9 @@ impl AiTaskPort for SqliteProcessingStore {
         if result.rows_affected() != 1 {
             return Err(ProcessingRepositoryError::Conflict);
         }
+        // SQL-SAFE: only the compile-time `AI_TASK_COLUMNS` constant is interpolated; the task id is a bind parameter.
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE id = ?1");
-        let updated = sqlx::query_as::<_, AiTaskRow>(&query)
+        let updated = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(id)
             .fetch_one(&mut *connection)
             .await
@@ -1650,9 +1656,12 @@ async fn begin_immediate(
     pool: &SqlitePool,
 ) -> Result<ImmediateSqliteConnection, ProcessingRepositoryError> {
     let mut connection = pool.acquire().await.map_err(map_sql_error)?;
-    SqliteTransactionManager::begin(&mut connection, Some(Cow::Borrowed("BEGIN IMMEDIATE")))
-        .await
-        .map_err(map_sql_error)?;
+    SqliteTransactionManager::begin(
+        &mut connection,
+        Some(SqlStr::from_static("BEGIN IMMEDIATE")),
+    )
+    .await
+    .map_err(map_sql_error)?;
     Ok(ImmediateSqliteConnection { inner: connection })
 }
 
@@ -1669,10 +1678,11 @@ async fn load_job_for_update(
     tenant_id: Uuid,
     job_id: Uuid,
 ) -> Result<Option<ProcessingJob>, ProcessingRepositoryError> {
+    // SQL-SAFE: only the compile-time `JOB_COLUMNS` constant is interpolated; tenant and job ids are bind parameters.
     let query = format!(
         "SELECT {JOB_COLUMNS} FROM document_processing_jobs WHERE tenant_id = ?1 AND id = ?2"
     );
-    sqlx::query_as::<_, JobRow>(&query)
+    sqlx::query_as::<_, JobRow>(sqlx::AssertSqlSafe(query))
         .bind(tenant_id.to_string())
         .bind(job_id.to_string())
         .fetch_optional(&mut *connection)
@@ -1993,9 +2003,10 @@ async fn load_ai_task_for_update(
     tenant_id: Uuid,
     task_id: Uuid,
 ) -> Result<Option<AiTask>, ProcessingRepositoryError> {
+    // SQL-SAFE: only the compile-time `AI_TASK_COLUMNS` constant is interpolated; tenant and task ids are bind parameters.
     let query =
         format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE tenant_id = ?1 AND id = ?2");
-    sqlx::query_as::<_, AiTaskRow>(&query)
+    sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
         .bind(tenant_id.to_string())
         .bind(task_id.to_string())
         .fetch_optional(&mut *connection)
@@ -2911,9 +2922,10 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
         now: DateTime<Utc>,
     ) -> Result<u64, ProcessingRepositoryError> {
         let mut connection = begin_immediate(&self.pool).await?;
-        let rows = sqlx::query_as::<_, JobRow>(&format!(
+        // SQL-SAFE: only the compile-time `JOB_COLUMNS` constant is interpolated; the timestamp is a bind parameter.
+        let rows = sqlx::query_as::<_, JobRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {JOB_COLUMNS} FROM document_processing_jobs WHERE lease_expires_at IS NOT NULL AND lease_expires_at <= ?1"
-        ))
+        )))
         .bind(now.to_rfc3339())
         .fetch_all(&mut *connection)
         .await
@@ -2977,8 +2989,9 @@ impl ProcessingExecutionUnitOfWork for SqliteProcessingStore {
         now: DateTime<Utc>,
     ) -> Result<u64, ProcessingRepositoryError> {
         let mut connection = begin_immediate(&self.pool).await?;
+        // SQL-SAFE: only the compile-time `AI_TASK_COLUMNS` constant is interpolated; the timestamp is a bind parameter.
         let query = format!("SELECT {AI_TASK_COLUMNS} FROM document_ai_tasks WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?1");
-        let rows = sqlx::query_as::<_, AiTaskRow>(&query)
+        let rows = sqlx::query_as::<_, AiTaskRow>(sqlx::AssertSqlSafe(query))
             .bind(now.to_rfc3339())
             .fetch_all(&mut *connection)
             .await
